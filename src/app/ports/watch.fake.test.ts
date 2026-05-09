@@ -11,6 +11,9 @@ runWatchContract("FakeWatch", async (): Promise<WatchHarness> => {
     triggerChange: async (absPath) => {
       watcher.emitChange(absPath);
     },
+    deleteFile: async (absPath) => {
+      watcher.emitChange(absPath);
+    },
     dispose: async () => undefined,
   };
 });

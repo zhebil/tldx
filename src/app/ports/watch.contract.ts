@@ -23,6 +23,13 @@ export interface WatchHarness {
    * `emitChange` fired).
    */
   triggerChange(absPath: string, content: string): Promise<void>;
+  /**
+   * Remove `absPath` so watchers on it observe the disappearance. The contract
+   * folds delete into the same `onChange` signal as a modify - the use case
+   * recompiles, re-reads via `FsReadPort`, and surfaces ENOENT as a
+   * diagnostic. Resolves once the delete has been flushed.
+   */
+  deleteFile(absPath: string): Promise<void>;
   /** Tear down. */
   dispose(): Promise<void>;
 }
@@ -107,6 +114,32 @@ export function runWatchContract(
         await h.triggerChange(path, "v2");
         await new Promise((r) => setTimeout(r, 100));
         expect(changes).toEqual([]);
+      } finally {
+        await h.dispose();
+      }
+    });
+
+    it("delivers a change event when the watched file is deleted", async () => {
+      // Pins the unlink-folding policy: the WatchPort surface exposes a
+      // single `onChange` signal, so adapters fold chokidar's `unlink` into
+      // it. The use case recompiles and `FsReadPort` translates the now-
+      // missing file into a `FileNotFoundError` diagnostic. Adding a
+      // dedicated `onDisappear` would split a concern the consumer has
+      // unified - if that ever changes, this test will need to as well.
+      const h = await make();
+      try {
+        const path = await h.writeFile("doc.tldsl", "v1");
+        const changes: string[] = [];
+        const handle = h.port.watch(path, {
+          onChange: (p) => changes.push(p),
+        });
+        try {
+          await h.deleteFile(path);
+          await waitFor(() => changes.length >= 1, timeout);
+          expect(changes[0]).toBe(path);
+        } finally {
+          await handle.close();
+        }
       } finally {
         await h.dispose();
       }

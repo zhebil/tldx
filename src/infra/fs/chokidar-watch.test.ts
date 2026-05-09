@@ -29,6 +29,10 @@ runWatchContract(
         await new Promise((r) => setTimeout(r, 50));
         await writeFile(absPath, content, "utf8");
       },
+      deleteFile: async (absPath) => {
+        await new Promise((r) => setTimeout(r, 50));
+        await rm(absPath, { force: true });
+      },
       dispose: async () => {
         await rm(dir, { recursive: true, force: true });
       },
