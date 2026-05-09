@@ -75,6 +75,7 @@ module.exports = {
     { files: ["src/infra/transport/**"],   rules: { "no-restricted-imports": "off" } },
     { files: ["src/infra/devserver/**"],   rules: { "no-restricted-imports": "off" } },
     { files: ["src/infra/log/**"],         rules: { "no-restricted-imports": "off" } },
+    { files: ["src/infra/open-browser/**"], rules: { "no-restricted-imports": "off" } },
 
     // CLI is the wiring site; allowed node basics, but third-party adapter libs stay locked down.
     { files: ["src/cli/**"], rules: {
