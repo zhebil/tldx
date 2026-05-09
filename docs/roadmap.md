@@ -34,7 +34,7 @@
 ## Open questions for the next session
 
 1. **tldraw scene-JSON spike** - what is the exact JSON structure for shapes, bindings, and camera? Read tldraw source or generated JSON from a manual session before writing the compiler's emit stage. **Probably the next concrete step.**
-2. **Partial render handling on errors** - viewer shows (a) last valid render + red error banner, or (b) blank canvas + error panel? Last-good is friendlier interactively but requires caching the previous valid scene.
+2. ~~**Partial render handling on errors**~~ - decided: last-good scene + error banner. See `docs/decisions.md` ADR-13.
 3. **Layout report schema for `tldsl check`** - what fields about computed positions? Enough for the agent to reason about spatial relationships *without* a screenshot? (This is the text-equivalent of the mcp-excalidraw screenshot loop.)
 4. **`<edges>` block shorthand** - allow Mermaid-style `login -> verify` lines inside an `<edges>` block for diagrams with many arrows? Two parsers, slightly inconsistent style. Worth it?
 5. **Watcher + viewer mechanics** - chokidar vs `fs.watch`? websocket vs SSE vs polling? Standalone Node + Vite + tldraw lib? Electron? CLI starts it, or a Claude Code skill spins it up?

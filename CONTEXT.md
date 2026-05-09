@@ -142,6 +142,8 @@ type SceneMessage =
 
 `v` bumps on incompatible change. Both producer (`infra/transport`, fed by `app/watchAndServe`) and consumer (`viewer/`) import from contracts.
 
+**On compile error**: `watchAndServe` pushes only `{kind: "error", payload}` - no `scene` is sent. The viewer keeps its last successful `scene` rendered and overlays an error banner from the diagnostics. On the next successful compile, push the new `scene` and clear the banner. See `docs/decisions.md` ADR-13.
+
 ## IDs
 
 Stable IDs matter for phase 2 round-trip; we set the rules now so MVP doesn't paint us into a corner.
@@ -151,6 +153,7 @@ Stable IDs matter for phase 2 round-trip; we set the rules now so MVP doesn't pa
 - **Anonymous IDs are allowed only for non-addressable visual elements** - e.g. a `<note>` with no `id` (it cannot be referenced anywhere). The IR generates a synthetic ID for these.
 - **Sibling reorder must not change IDs.** This is the test of the rule: a parser/IR refactor that changes IDs across reorder is a bug.
 - **Renaming an `id` is a breaking change** for that element - phase 2 round-trip will reflect this.
+- **Synthetic-id scheme**: `<content-hash>-<n>` where `n` is the 0-based index among elements with the same content-hash, in document order. Reordering siblings of differing content leaves all ids unchanged. See `docs/decisions.md` ADR-12.
 
 ## Source span model
 
@@ -189,4 +192,3 @@ Tracked in `docs/roadmap.md`. Highlights:
 - Mermaid as input.
 - Drawings / freehand.
 - Multi-page beyond what import gives.
-- Last-good-render-on-error in the viewer (open question; tracked in `tldsl-8mu`).
