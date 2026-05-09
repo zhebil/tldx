@@ -33,6 +33,22 @@ interface Booted {
   bundleDir: string;
 }
 
+/**
+ * Wrap fetch with `Connection: close` so the underlying socket is not
+ * pooled by undici's keep-alive agent. Without this, `server.close()` waits
+ * up to ~3s per pooled socket for the keep-alive to expire before resolving,
+ * which dominates this test's wall time. Production (`tldsl serve`) is
+ * unaffected: the server side keeps default keep-alive behavior.
+ */
+async function closeFetch(
+  input: string | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const headers = new Headers(init.headers);
+  headers.set("Connection", "close");
+  return fetch(input, { ...init, headers });
+}
+
 async function bootWithBundle(files: Record<string, string>): Promise<Booted> {
   const bundleDir = await mkdtemp(join(tmpdir(), "tldsl-devserver-"));
   for (const [name, body] of Object.entries(files)) {
@@ -72,7 +88,7 @@ describe("startDevServer", () => {
       "index.html": "<!doctype html><title>v</title>",
     });
 
-    const res = await fetch(`${booted.server.url}`);
+    const res = await closeFetch(`${booted.server.url}`);
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type") ?? "").toMatch(/text\/html/);
@@ -85,7 +101,7 @@ describe("startDevServer", () => {
       "app.js": "console.log('viewer')",
     });
 
-    const res = await fetch(`${booted.server.url}app.js`);
+    const res = await closeFetch(`${booted.server.url}app.js`);
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type") ?? "").toMatch(/javascript/);
@@ -97,7 +113,7 @@ describe("startDevServer", () => {
       "index.html": "<!doctype html><body data-spa=\"yes\"></body>",
     });
 
-    const res = await fetch(`${booted.server.url}some/deep/route`);
+    const res = await closeFetch(`${booted.server.url}some/deep/route`);
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type") ?? "").toMatch(/text\/html/);
@@ -109,7 +125,7 @@ describe("startDevServer", () => {
 
     // `..%2f` decodes to `../`; the resolver must refuse rather than read
     // outside the bundle root.
-    const res = await fetch(`${booted.server.url}..%2fpackage.json`);
+    const res = await closeFetch(`${booted.server.url}..%2fpackage.json`);
 
     expect(res.status).toBe(403);
   });
@@ -186,7 +202,7 @@ describe("startDevServer", () => {
   it("rejects non-GET methods on static routes", async () => {
     booted = await bootWithBundle({ "index.html": "<!doctype html>" });
 
-    const res = await fetch(`${booted.server.url}index.html`, {
+    const res = await closeFetch(`${booted.server.url}index.html`, {
       method: "POST",
     });
 

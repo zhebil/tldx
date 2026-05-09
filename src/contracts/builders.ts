@@ -284,7 +284,8 @@ export type RichTextDoc = {
  * into separate paragraphs.
  *
  * Hand-rolled because contracts/ + domain/ cannot import tldraw's runtime
- * `toRichText`. Tracked separately in tldsl-94q for the emit-side helper.
+ * `toRichText`. Equivalence with tldraw's runtime is pinned by
+ * `tests/e2e/rich-text-roundtrip.test.ts` so drift surfaces in CI.
  */
 export function richText(text: string): RichTextDoc {
   if (text === "") {
