@@ -6,7 +6,11 @@ Read `CONTEXT.md` (project root) before writing code. It defines the layers, dep
 
 Read `docs/testing.md` for the testing philosophy. Co-located unit tests in `domain/` are the bulk of the suite; fakes per port are canonical.
 
+Other docs (`scene-json.md`, `lint-config.md`, `architecture.md`, `dsl.md`, `decisions.md`, `roadmap.md`) are reference material - **consult on demand**, not up front. Open one when the issue mentions it or your code touches that surface.
+
 **Targeted-test rule**: when adding behavior, write the smallest test that pins it down at the right layer. Pure logic → unit test in `domain/`. Orchestration → integration test in `app/` with fakes. Real adapter behavior → contract test in `infra/`. End-to-end smoke → fixture under `tests/e2e/`. Don't push integration coverage down into unit tests of internals.
+
+**Conflict-resolution rule**: if `CONTEXT.md` says a symbol/file lives in location A but `ls src/<A>` is empty (or the symbol exists somewhere else - e.g., types in `contracts/` that CONTEXT places in `domain/`), read the existing file before claiming an issue that references it. The resolved location may reshape the issue's scope. Cross-checking after the claim wastes a claim.
 
 ## Issue tracking
 
