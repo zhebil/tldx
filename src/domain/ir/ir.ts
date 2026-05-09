@@ -64,3 +64,31 @@ export type IRContainer = IRDoc | IRFrame;
 export function isContainer(el: IRElement): el is IRContainer {
   return el.kind === "doc" || el.kind === "frame";
 }
+
+/**
+ * Positioned IR. Output of `domain/ports/layout.ts` and input to
+ * `domain/emit/`. Visual elements (`box`, `note`, `frame`) carry required
+ * `x | y | w | h`; `doc` is the root and `edge` is a connector, so neither
+ * has a rect of its own. The shape mirrors the IR tree exactly: same ids,
+ * same child order, same kinds. Layout adapters MUST NOT add, drop, or
+ * reorder elements.
+ */
+
+type Rect = { x: number; y: number; w: number; h: number };
+
+export type IRBoxPositioned = IRBox & Rect;
+export type IRNotePositioned = IRNote & Rect;
+export type IRFramePositioned = Omit<IRFrame, "x" | "y" | "w" | "h" | "children"> &
+  Rect & {
+    children: IRElementPositioned[];
+  };
+export type IRDocPositioned = Omit<IRDoc, "children"> & {
+  children: IRElementPositioned[];
+};
+
+export type IRElementPositioned =
+  | IRDocPositioned
+  | IRFramePositioned
+  | IRBoxPositioned
+  | IRNotePositioned
+  | IREdge;
