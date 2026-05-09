@@ -1,6 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
+import { FakeClock } from "../../app/ports/clock.fake.js";
 import {
   runTransportContract,
   type TransportHarness,
@@ -17,7 +18,10 @@ interface ActiveSub {
 runTransportContract(
   "createSseTransport",
   async (): Promise<TransportHarness> => {
-    const transport = createSseTransport();
+    // FakeClock that's never advanced - heartbeats stay pending and never
+    // fire during contract scenarios, keeping them deterministic.
+    const clock = new FakeClock();
+    const transport = createSseTransport({ clock, heartbeatMs: 15_000 });
     const server: Server = createServer((req, res) => {
       transport.handler(req, res);
     });

@@ -11,10 +11,20 @@
  * comment so subscribers can detect that the stream is live, then replays
  * the most recently pushed message (last-wins replay; see TransportPort
  * docs).
+ *
+ * Heartbeat: each connected client gets a recurring `: ping` SSE comment
+ * write at `heartbeatMs` intervals (default 15s). This is a transport-level
+ * keepalive that prevents idle proxies / sleeping laptops from killing the
+ * connection. Comments are ignored by EventSource consumers, so the viewer
+ * never sees them. This is DISTINCT from the `kind="ping"` SceneMessage
+ * envelope, which is an app-level signal pushed via `push()`. The schedule
+ * is driven by `ClockPort.setTimer` in a self-rescheduling loop (no native
+ * `setInterval`) so tests with `FakeClock` can drive heartbeats deterministically.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import type { ClockPort, TimerHandle } from "../../app/ports/clock.js";
 import {
   TransportClosedError,
   type TransportPort,
@@ -30,16 +40,37 @@ export interface SseTransport extends TransportPort {
   handler(req: IncomingMessage, res: ServerResponse): void;
 }
 
+export interface CreateSseTransportOptions {
+  /** Clock used to schedule per-client heartbeat writes. */
+  clock: ClockPort;
+  /**
+   * Interval in milliseconds between `: ping` comment writes for each
+   * connected client. Defaults to 15000ms. Must be > 0.
+   */
+  heartbeatMs?: number;
+}
+
 interface Client {
   res: ServerResponse;
   closed: boolean;
+  heartbeat: TimerHandle | undefined;
 }
+
+const HEARTBEAT_FRAME = ": ping\n\n";
 
 function format(message: SceneMessage): string {
   return `data: ${JSON.stringify(message)}\n\n`;
 }
 
-export function createSseTransport(): SseTransport {
+export function createSseTransport(
+  options: CreateSseTransportOptions,
+): SseTransport {
+  const { clock } = options;
+  const heartbeatMs = options.heartbeatMs ?? 15_000;
+  if (heartbeatMs <= 0) {
+    throw new Error("createSseTransport: heartbeatMs must be > 0");
+  }
+
   const clients = new Set<Client>();
   let last: SceneMessage | undefined;
   let closed = false;
@@ -47,7 +78,25 @@ export function createSseTransport(): SseTransport {
   function dropClient(client: Client): void {
     if (client.closed) return;
     client.closed = true;
+    client.heartbeat?.cancel();
+    client.heartbeat = undefined;
     clients.delete(client);
+  }
+
+  function scheduleHeartbeat(client: Client): void {
+    if (client.closed || closed) return;
+    client.heartbeat = clock.setTimer(heartbeatMs, () => {
+      if (client.closed || closed) return;
+      try {
+        client.res.write(HEARTBEAT_FRAME);
+      } catch {
+        // Broken pipe: drop client; keepalive failures are not the use
+        // case's concern. Same policy as `push`.
+        dropClient(client);
+        return;
+      }
+      scheduleHeartbeat(client);
+    });
   }
 
   return {
@@ -70,16 +119,14 @@ export function createSseTransport(): SseTransport {
     async close(): Promise<void> {
       if (closed) return;
       closed = true;
-      for (const client of clients) {
-        if (client.closed) continue;
-        client.closed = true;
+      for (const client of [...clients]) {
+        dropClient(client);
         try {
           client.res.end();
         } catch {
           // Already torn down by the network side; nothing to do.
         }
       }
-      clients.clear();
     },
 
     handler(req: IncomingMessage, res: ServerResponse): void {
@@ -98,7 +145,7 @@ export function createSseTransport(): SseTransport {
       // ignored by EventSource consumers.
       res.write(": ok\n\n");
 
-      const client: Client = { res, closed: false };
+      const client: Client = { res, closed: false, heartbeat: undefined };
       clients.add(client);
 
       if (last !== undefined) {
@@ -114,6 +161,8 @@ export function createSseTransport(): SseTransport {
       req.on("close", cleanup);
       req.on("error", cleanup);
       res.on("error", cleanup);
+
+      scheduleHeartbeat(client);
     },
   };
 }
