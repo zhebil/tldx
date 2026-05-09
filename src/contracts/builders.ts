@@ -1,0 +1,249 @@
+/**
+ * Factories for the typical wire shapes. Tests use them today; domain/emit
+ * will compose over them when the emit pipeline lands. Defaults track the
+ * tldraw@^3.15 pin documented in docs/scene-json.md.
+ *
+ * Keep these PURE: no I/O, no randomness, no Date.now. Caller passes ids;
+ * id-generation policy is owned by domain/ir, not here.
+ */
+
+import type { Diagnostic } from "./diagnostic.js";
+import type { SceneJSON, TLRecord, TLStoreSchema } from "./scene-json.js";
+import type { SceneMessage } from "./scene-message.js";
+
+const DEFAULT_SCHEMA: TLStoreSchema = {
+  schemaVersion: 2,
+  sequences: {
+    "com.tldraw.store": 4,
+    "com.tldraw.document": 2,
+    "com.tldraw.page": 1,
+    "com.tldraw.shape": 4,
+    "com.tldraw.shape.geo": 9,
+    "com.tldraw.shape.note": 8,
+    "com.tldraw.shape.arrow": 5,
+    "com.tldraw.shape.frame": 0,
+    "com.tldraw.binding.arrow": 1,
+  },
+};
+
+// ---------------------------------------------------------------- envelope --
+
+export const sceneMessage = {
+  scene(payload: SceneJSON): SceneMessage {
+    return { v: 1, kind: "scene", payload };
+  },
+  error(diagnostics: Diagnostic[]): SceneMessage {
+    return { v: 1, kind: "error", payload: { diagnostics } };
+  },
+  ping(): SceneMessage {
+    return { v: 1, kind: "ping", payload: {} };
+  },
+};
+
+// ----------------------------------------------------------------- payload --
+
+/**
+ * Build a SceneJSON from a flat list of records. Records are keyed by their
+ * own `id` field; duplicate ids overwrite (last wins), which is *not* a
+ * defensive check - callers must pass unique ids. emit/ owns id uniqueness.
+ */
+export function sceneJson(
+  records: TLRecord[],
+  schema: TLStoreSchema = DEFAULT_SCHEMA,
+): SceneJSON {
+  const store: Record<string, TLRecord> = {};
+  for (const r of records) store[r.id] = r;
+  return { store, schema };
+}
+
+// ------------------------------------------------------------ record kinds --
+
+export function documentRecord(
+  input: { id?: string; gridSize?: number; name?: string } = {},
+): TLRecord {
+  return {
+    id: input.id ?? "document:document",
+    typeName: "document",
+    gridSize: input.gridSize ?? 10,
+    name: input.name ?? "",
+    meta: {},
+  };
+}
+
+export function pageRecord(input: {
+  id: string;
+  name?: string;
+  index?: string;
+}): TLRecord {
+  return {
+    id: input.id,
+    typeName: "page",
+    name: input.name ?? "tldsl",
+    index: input.index ?? "a1",
+    meta: {},
+  };
+}
+
+type ShapeBase = {
+  id: string;
+  x: number;
+  y: number;
+  parentId?: string;
+  index?: string;
+  rotation?: number;
+  opacity?: number;
+  meta?: Record<string, unknown>;
+};
+
+type ShapeBaseFields = {
+  id: string;
+  typeName: "shape";
+  x: number;
+  y: number;
+  rotation: number;
+  index: string;
+  parentId: string;
+  isLocked: boolean;
+  opacity: number;
+  meta: Record<string, unknown>;
+};
+
+function baseShapeFields(input: ShapeBase): ShapeBaseFields {
+  return {
+    id: input.id,
+    typeName: "shape",
+    x: input.x,
+    y: input.y,
+    rotation: input.rotation ?? 0,
+    index: input.index ?? "a1",
+    parentId: input.parentId ?? "page:main",
+    isLocked: false,
+    opacity: input.opacity ?? 1,
+    meta: input.meta ?? {},
+  };
+}
+
+export function boxShape(
+  input: ShapeBase & { w: number; h: number; text?: string; geo?: string },
+): TLRecord {
+  return {
+    ...baseShapeFields(input),
+    type: "geo",
+    props: {
+      w: input.w,
+      h: input.h,
+      geo: input.geo ?? "rectangle",
+      color: "black",
+      fill: "none",
+      dash: "draw",
+      size: "m",
+      richText: richText(input.text ?? ""),
+    },
+  } satisfies TLRecord;
+}
+
+export function noteShape(
+  input: ShapeBase & { text?: string; color?: string; size?: string },
+): TLRecord {
+  return {
+    ...baseShapeFields(input),
+    type: "note",
+    props: {
+      color: input.color ?? "yellow",
+      size: input.size ?? "m",
+      richText: richText(input.text ?? ""),
+    },
+  } satisfies TLRecord;
+}
+
+export function frameShape(
+  input: ShapeBase & { w: number; h: number; name?: string },
+): TLRecord {
+  return {
+    ...baseShapeFields(input),
+    type: "frame",
+    props: {
+      w: input.w,
+      h: input.h,
+      name: input.name ?? "",
+    },
+  } satisfies TLRecord;
+}
+
+export function arrowShape(input: ShapeBase): TLRecord {
+  return {
+    ...baseShapeFields(input),
+    type: "arrow",
+    props: {
+      start: { x: 0, y: 0 },
+      end: { x: 0, y: 0 },
+      color: "black",
+      size: "m",
+      dash: "draw",
+      fill: "none",
+      arrowheadStart: "none",
+      arrowheadEnd: "arrow",
+    },
+  } satisfies TLRecord;
+}
+
+export function arrowBinding(input: {
+  id: string;
+  arrowId: string;
+  shapeId: string;
+  terminal: "start" | "end";
+  normalizedAnchor?: { x: number; y: number };
+  isPrecise?: boolean;
+  isExact?: boolean;
+}): TLRecord {
+  return {
+    id: input.id,
+    typeName: "binding",
+    type: "arrow",
+    fromId: input.arrowId,
+    toId: input.shapeId,
+    props: {
+      terminal: input.terminal,
+      normalizedAnchor: input.normalizedAnchor ?? { x: 0.5, y: 0.5 },
+      isPrecise: input.isPrecise ?? false,
+      isExact: input.isExact ?? false,
+    },
+    meta: {},
+  };
+}
+
+// ------------------------------------------------------------- rich text --
+
+export type RichTextDoc = {
+  type: "doc";
+  content: Array<
+    | { type: "paragraph" }
+    | { type: "paragraph"; content: Array<{ type: "text"; text: string }> }
+  >;
+};
+
+/**
+ * Minimal ProseMirror-style rich-text doc, the shape tldraw expects on
+ * geo/note `props.richText`. Empty string emits an empty paragraph (which is
+ * what tldraw's `toRichText("")` produces). Multi-line input splits on `\n`
+ * into separate paragraphs.
+ *
+ * Hand-rolled because contracts/ + domain/ cannot import tldraw's runtime
+ * `toRichText`. Tracked separately in tldsl-94q for the emit-side helper.
+ */
+export function richText(text: string): RichTextDoc {
+  if (text === "") {
+    return { type: "doc", content: [{ type: "paragraph" }] };
+  }
+  return {
+    type: "doc",
+    content: text.split("\n").map((line) =>
+      line === ""
+        ? { type: "paragraph" }
+        : {
+            type: "paragraph",
+            content: [{ type: "text", text: line }],
+          },
+    ),
+  };
+}

@@ -1,0 +1,27 @@
+{
+  "store": {
+    "document:document": {
+      "id": "document:document",
+      "typeName": "document",
+      "gridSize": 10,
+      "name": "",
+      "meta": {}
+    },
+    "page:main": {
+      "id": "page:main",
+      "typeName": "page",
+      "name": "tldsl",
+      "index": "a1",
+      "meta": {}
+    }
+  },
+  "schema": {
+    "schemaVersion": 2,
+    "sequences": {
+      "com.tldraw.store": 4,
+      "com.tldraw.document": 2,
+      "com.tldraw.page": 1,
+      "com.tldraw.shape": 4
+    }
+  }
+}
