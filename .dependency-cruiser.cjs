@@ -29,6 +29,13 @@ module.exports = {
       to:   { path: "^src/(cli|app|domain|infra)" },
     },
     {
+      name: "elkjs-only-in-layout-elk",
+      severity: "error",
+      comment: "elkjs is the real layout adapter's library; only infra/layout-elk/ may import it.",
+      from: { path: "^src/(?!infra/layout-elk/)" },
+      to:   { path: "^elkjs($|/)" },
+    },
+    {
       name: "no-circular",
       severity: "error",
       from: {},
