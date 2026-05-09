@@ -144,6 +144,36 @@ describe("lower: diagnostics", () => {
     const { codes } = lowerSource(src);
     expect(codes).toEqual(["ir/invalid-numeric-attr"]);
   });
+
+  it("ir/invalid-direction on an unknown direction value", () => {
+    const src = `<doc direction="sideways"></doc>`;
+    const { codes } = lowerSource(src);
+    expect(codes).toEqual(["ir/invalid-direction"]);
+  });
+});
+
+describe("lower: direction", () => {
+  it("captures direction on <doc> when present", () => {
+    const { ir, codes } = lowerSource(`<doc direction="DOWN"></doc>`);
+    expect(codes).toEqual([]);
+    expect(ir?.direction).toBe("DOWN");
+  });
+
+  it("omits direction when not authored (port defaults)", () => {
+    const { ir, codes } = lowerSource(`<doc></doc>`);
+    expect(codes).toEqual([]);
+    expect(ir?.direction).toBeUndefined();
+  });
+
+  it("captures direction on <frame>", () => {
+    const { ir, codes } = lowerSource(
+      `<doc><frame id="f" direction="DOWN"></frame></doc>`,
+    );
+    expect(codes).toEqual([]);
+    const frame = ir!.children[0]!;
+    if (frame.kind !== "frame") throw new Error("expected frame");
+    expect(frame.direction).toBe("DOWN");
+  });
 });
 
 describe("lower: synthetic ids per ADR-12", () => {

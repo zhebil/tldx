@@ -30,6 +30,18 @@ The hard rule: **`<group>` never accepts visual attributes** (no `pad`, `bg`, `b
 
 Both `<group>` and `<frame>` carry layout attributes (`layout`, `gap`, `cols`, `align`).
 
+## Layout direction
+
+`<doc>` and `<frame>` accept an optional `direction="RIGHT|DOWN|LEFT|UP"` attribute that controls the layered-layout flow axis (passed through to ELK's `elk.direction`). Default is `RIGHT` (left-to-right). Frames inherit their parent's direction unless they set their own.
+
+```xml
+<doc direction="DOWN">
+  <box id="a" label="Top" />
+  <box id="b" label="Bottom" />
+  <edge from="a" to="b" />
+</doc>
+```
+
 ## Layout modes
 
 Any container can declare `layout="..."`:

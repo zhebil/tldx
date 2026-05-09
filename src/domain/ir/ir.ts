@@ -1,3 +1,4 @@
+import type { Direction } from "../layout/defaults.js";
 import type { SourceSpan } from "../diagnostics/index.js";
 
 /**
@@ -18,12 +19,16 @@ type IRBase = {
 
 export type IRDoc = IRBase & {
   kind: "doc";
+  /** Optional layout flow direction; layout port defaults when absent. */
+  direction?: Direction;
   children: IRElement[];
 };
 
 export type IRFrame = IRBase & {
   kind: "frame";
   name?: string;
+  /** Optional override for layout flow inside this frame. */
+  direction?: Direction;
   x?: number;
   y?: number;
   w?: number;

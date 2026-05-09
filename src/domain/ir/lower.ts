@@ -22,6 +22,11 @@ import {
   type Diagnostic,
   type SourceSpan,
 } from "../diagnostics/index.js";
+import {
+  DIRECTIONS,
+  isDirection,
+  type Direction,
+} from "../layout/defaults.js";
 import type {
   AstBox,
   AstEdge,
@@ -77,11 +82,13 @@ export function lower(ast: AstNode | null): LowerResult {
     addressable: false,
     contentFields: () => [],
   });
+  const direction = readDirection(ast.attrs, ctx);
   const doc: IRDoc = {
     kind: "doc",
     ...idHeader,
     span: ast.span,
     children: [],
+    ...(direction === undefined ? {} : { direction }),
   };
   for (const child of ast.children) {
     const lowered = lowerNode(child, ctx);
@@ -126,6 +133,7 @@ function lowerNode(node: AstNode, ctx: Ctx): IRElement | null {
 }
 
 function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
+  const direction = readDirection(node.attrs, ctx);
   const frame: IRFrame = {
     kind: "frame",
     ...assignId(node.attrs, node.span, ctx, {
@@ -136,6 +144,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
     span: node.span,
     children: [],
     ...optionalString(node.attrs, "name"),
+    ...(direction === undefined ? {} : { direction }),
     ...numericAttrs(node.attrs, ctx),
   };
   for (const child of node.children) {
@@ -349,6 +358,21 @@ function walkAndFilter(
 
 function getRaw(attrs: Attrs, name: string): string | undefined {
   return attrs[name]?.value;
+}
+
+function readDirection(attrs: Attrs, ctx: Ctx): Direction | undefined {
+  const attr = attrs.direction;
+  if (attr === undefined) return undefined;
+  const raw = attr.value;
+  if (isDirection(raw)) return raw;
+  ctx.diagnostics.push(
+    error(
+      "ir/invalid-direction",
+      `'direction' must be one of ${DIRECTIONS.join(", ")} (got '${raw}')`,
+      attr.span,
+    ),
+  );
+  return undefined;
 }
 
 function optionalString(
