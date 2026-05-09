@@ -1,5 +1,15 @@
 # Agent Instructions
 
+## Architecture
+
+Read `CONTEXT.md` (project root) before writing code. It defines the layers, dependency rules, and patterns. Lint enforces these mechanically - violations fail CI.
+
+Read `docs/testing.md` for the testing philosophy. Co-located unit tests in `domain/` are the bulk of the suite; fakes per port are canonical.
+
+**Targeted-test rule**: when adding behavior, write the smallest test that pins it down at the right layer. Pure logic → unit test in `domain/`. Orchestration → integration test in `app/` with fakes. Real adapter behavior → contract test in `infra/`. End-to-end smoke → fixture under `tests/e2e/`. Don't push integration coverage down into unit tests of internals.
+
+## Issue tracking
+
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
 ## Quick Reference
