@@ -1,0 +1,143 @@
+/**
+ * IR-with-positions → tldraw scene JSON.
+ *
+ * Pure function that the compileFile / watchAndServe use cases call after
+ * layout. Composes over `src/contracts/builders.ts`; never hand-rolls record
+ * JSON. The wire shape (and the tldraw pin behind it) is documented in
+ * `docs/scene-json.md`.
+ *
+ * MVP behavior:
+ * - One `document` record + one `page:main` record per scene.
+ * - Visual elements (`box`, `note`, `frame`) become tldraw shapes whose ids
+ *   are `shape:<irId>`. Their `parentId` follows the IR tree: top-level
+ *   shapes parent to `page:main`, frame children parent to the frame's
+ *   shape id. Shape `x | y` is whatever layout produced (frame-relative when
+ *   nested), preserved verbatim.
+ * - Notes drop their IR `w | h` - tldraw fits sticky notes itself.
+ * - Edges become an `arrow` shape (`x: 0, y: 0`, parented to the page) plus
+ *   two `binding` records anchoring start/end to the referenced shapes with
+ *   default-center attach. The 13-anchor scheme is phase 1.
+ * - Synthetic-id elements (notes / edges that didn't author an `id`) inherit
+ *   IR's content-hash ids (ADR-12), so emit is deterministic across reorder.
+ */
+
+import {
+  arrowBinding,
+  arrowShape,
+  boxShape,
+  documentRecord,
+  frameShape,
+  noteShape,
+  pageRecord,
+  sceneJson,
+} from "../../contracts/builders.js";
+import type { SceneJSON, TLRecord } from "../../contracts/scene-json.js";
+import type {
+  IRBoxPositioned,
+  IRDocPositioned,
+  IREdge,
+  IRElementPositioned,
+  IRFramePositioned,
+  IRNotePositioned,
+} from "../ir/index.js";
+
+const PAGE_ID = "page:main";
+
+export function emit(ir: IRDocPositioned): SceneJSON {
+  const records: TLRecord[] = [
+    documentRecord(),
+    pageRecord({ id: PAGE_ID }),
+  ];
+
+  for (const child of ir.children) {
+    emitElement(child, PAGE_ID, records);
+  }
+
+  return sceneJson(records);
+}
+
+function emitElement(
+  el: IRElementPositioned,
+  parentId: string,
+  out: TLRecord[],
+): void {
+  switch (el.kind) {
+    case "box":
+      out.push(emitBox(el, parentId));
+      return;
+    case "note":
+      out.push(emitNote(el, parentId));
+      return;
+    case "frame":
+      out.push(emitFrame(el, parentId));
+      for (const child of el.children) {
+        emitElement(child, shapeId(el.id), out);
+      }
+      return;
+    case "edge":
+      emitEdge(el, out);
+      return;
+    case "doc":
+      // Nested <doc> is rejected at IR-lowering; defend in depth.
+      throw new Error("emit: nested <doc> is not permitted");
+  }
+}
+
+function emitBox(box: IRBoxPositioned, parentId: string): TLRecord {
+  return boxShape({
+    id: shapeId(box.id),
+    parentId,
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: box.h,
+    ...(box.label === undefined ? {} : { text: box.label }),
+  });
+}
+
+function emitNote(note: IRNotePositioned, parentId: string): TLRecord {
+  return noteShape({
+    id: shapeId(note.id),
+    parentId,
+    x: note.x,
+    y: note.y,
+    text: note.text,
+  });
+}
+
+function emitFrame(frame: IRFramePositioned, parentId: string): TLRecord {
+  return frameShape({
+    id: shapeId(frame.id),
+    parentId,
+    x: frame.x,
+    y: frame.y,
+    w: frame.w,
+    h: frame.h,
+    ...(frame.name === undefined ? {} : { name: frame.name }),
+  });
+}
+
+function emitEdge(edge: IREdge, out: TLRecord[]): void {
+  const arrowId = shapeId(edge.id);
+  out.push(arrowShape({ id: arrowId, parentId: PAGE_ID, x: 0, y: 0 }));
+  out.push(
+    arrowBinding({
+      id: `binding:${edge.id}-start`,
+      arrowId,
+      shapeId: shapeId(edge.from),
+      terminal: "start",
+    }),
+  );
+  out.push(
+    arrowBinding({
+      id: `binding:${edge.id}-end`,
+      arrowId,
+      shapeId: shapeId(edge.to),
+      terminal: "end",
+    }),
+  );
+}
+
+function shapeId(irId: string): string {
+  return `shape:${irId}`;
+}
