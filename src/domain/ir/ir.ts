@@ -1,0 +1,66 @@
+import type { SourceSpan } from "../diagnostics/index.js";
+
+/**
+ * Normalized intermediate representation. Produced by `lower(ast)` from
+ * the parser AST; consumed by `domain/layout/` and `domain/emit/`.
+ *
+ * Every element carries a stable `id`. For addressable elements (`<box>`,
+ * `<frame>`) the id is required from source; for non-addressable visual
+ * elements (`<note>`, `<edge>`) the id may be synthesized per ADR-12.
+ * `idExplicit` records which case it was; this matters for phase-2 round-trip.
+ */
+
+type IRBase = {
+  id: string;
+  idExplicit: boolean;
+  span: SourceSpan;
+};
+
+export type IRDoc = IRBase & {
+  kind: "doc";
+  children: IRElement[];
+};
+
+export type IRFrame = IRBase & {
+  kind: "frame";
+  name?: string;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  children: IRElement[];
+};
+
+export type IRBox = IRBase & {
+  kind: "box";
+  label?: string;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+};
+
+export type IRNote = IRBase & {
+  kind: "note";
+  text: string;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+};
+
+export type IREdge = IRBase & {
+  kind: "edge";
+  /** Id of the source addressable element. Resolved at lower time. */
+  from: string;
+  /** Id of the destination addressable element. Resolved at lower time. */
+  to: string;
+};
+
+export type IRElement = IRDoc | IRFrame | IRBox | IRNote | IREdge;
+
+export type IRContainer = IRDoc | IRFrame;
+
+export function isContainer(el: IRElement): el is IRContainer {
+  return el.kind === "doc" || el.kind === "frame";
+}
