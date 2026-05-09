@@ -21,6 +21,24 @@ Write-only. Agent edits the DSL, user watches the canvas. Two CLI modes: `tldsl 
 
 Sits in the "AI tools should be plug-and-play, not frameworks to learn" lane.
 
+## Run it
+
+```bash
+npm install
+npm run build                                          # dist/cli/ + dist/viewer/
+node dist/cli/main.js serve tests/e2e/fixtures/auth.tldsl
+# or, after `npm link`:
+tldsl serve tests/e2e/fixtures/auth.tldsl
+```
+
+For an inner dev loop without rebuilding:
+
+```bash
+npm run dev:cli -- serve tests/e2e/fixtures/auth.tldsl
+```
+
+`tldsl check <file>` is the one-shot validator (exit 0 = clean, 1 = compile errors); `tldsl serve <file>` watches the file, recompiles on save, and pushes scene JSON to the bundled viewer over SSE.
+
 ## Documents
 
 - [`docs/architecture.md`](docs/architecture.md) - components and data flow

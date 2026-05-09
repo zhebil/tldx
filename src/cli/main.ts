@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * `tldsl` CLI entry point. Composition root: wires real adapters
  * (NodeFs, ChokidarWatch, ElkLayoutAdapter, SystemClock, StderrLog,

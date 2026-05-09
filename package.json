@@ -4,12 +4,18 @@
   "private": true,
   "type": "module",
   "description": "CLI + local viewer turning a plain-text DSL into a live tldraw canvas.",
+  "bin": {
+    "tldsl": "dist/cli/main.js"
+  },
   "scripts": {
     "lint": "eslint --max-warnings=0 --no-error-on-unmatched-pattern src",
     "lint:deps": "depcruise --config .dependency-cruiser.cjs --no-progress src",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "build:cli": "tsc -p tsconfig.build.json && chmod +x dist/cli/main.js",
     "build:viewer": "vite build",
+    "build": "npm run build:cli && npm run build:viewer",
+    "dev:cli": "tsx src/cli/main.ts",
     "check": "npm run typecheck && npm run lint && npm run lint:deps && npm run test"
   },
   "devDependencies": {
@@ -23,6 +29,7 @@
     "eslint": "^8.57.1",
     "eslint-import-resolver-typescript": "^3.6.3",
     "eslint-plugin-import": "^2.31.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.21",
     "vitest": "^2.1.4"

@@ -12,6 +12,19 @@ Other docs (`scene-json.md`, `lint-config.md`, `architecture.md`, `dsl.md`, `dec
 
 **Conflict-resolution rule**: if `CONTEXT.md` says a symbol/file lives in location A but `ls src/<A>` is empty (or the symbol exists somewhere else - e.g., types in `contracts/` that CONTEXT places in `domain/`), read the existing file before claiming an issue that references it. The resolved location may reshape the issue's scope. Cross-checking after the claim wastes a claim.
 
+## Build & run
+
+```bash
+npm run check        # typecheck + lint + dep-lint + vitest (full automated suite)
+npm run build        # dist/cli/ (tsc) + dist/viewer/ (vite); ship-ready artifacts
+npm run dev:cli -- <args>   # run CLI from source via tsx, e.g. `-- serve fixtures/x.tldsl`
+node dist/cli/main.js <args>  # run the built CLI
+```
+
+The CLI is wired as `bin.tldsl → dist/cli/main.js` (with shebang). After `npm link`, `tldsl serve <file>` and `tldsl check <file>` work like an installed binary.
+
+`tsconfig.build.json` is the emit config (extends the root `tsconfig.json`, flips `noEmit`, narrows includes). Tests/fakes/contract suites and `src/viewer/` are excluded from the CLI build.
+
 ## Implement → Review → Commit
 
 Default working loop in this repo:
