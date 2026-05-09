@@ -1,5 +1,7 @@
 # DSL syntax
 
+> **Status (MVP):** the elements and modes marked _phase 1_ in this doc are the design target - not what `tldsl check`/`serve` validate today. The MVP grammar is `<doc>`, `<box>`, `<note>`, `<edge>`, and `<frame>`; layout `auto` and `free`; default-center anchors only. Treat everything else as documentation-of-intent until each feature lands behind its own issue.
+
 XML / JSX-flavored. Self-closing tags for leaves, paired tags for containers, attributes for modifiers. Chosen for structural clarity over compactness; LLMs are heavily trained on this style.
 
 Markdown-style was considered first but didn't express unrestricted nesting cleanly. XML wins on structure; verbosity for edges is the trade-off (see `roadmap.md` open questions for the `<edges>` block idea).
