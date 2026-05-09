@@ -1,0 +1,28 @@
+{
+  "name": "tldsl",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI + local viewer turning a plain-text DSL into a live tldraw canvas.",
+  "scripts": {
+    "lint": "eslint --max-warnings=0 --no-error-on-unmatched-pattern src",
+    "lint:deps": "depcruise --config .dependency-cruiser.cjs --no-progress src",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run lint:deps && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "dependency-cruiser": "^16.4.0",
+    "eslint": "^8.57.1",
+    "eslint-import-resolver-typescript": "^3.6.3",
+    "eslint-plugin-import": "^2.31.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
