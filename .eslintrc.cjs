@@ -45,8 +45,10 @@ module.exports = {
         { target: "./src/infra", from: "./src/cli",    message: "Infra is below cli." },
         { target: "./src/infra", from: "./src/viewer", message: "Infra is below viewer." },
         // Allow infra → app/ports/** only; block infra → app/!(ports).
+        // `except` paths are resolved relative to `from` and treated as
+        // directory prefixes (not globs), so use the bare directory name.
         { target: "./src/infra", from: "./src/app",
-          except: ["./src/app/ports/**"],
+          except: ["ports"],
           message: "Infra may only import from app/ports/, not from other parts of app/." },
 
         // viewer/** is its own world. Only contracts/ is allowed.

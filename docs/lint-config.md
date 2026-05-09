@@ -68,9 +68,12 @@ module.exports = {
         { target: "./src/infra", from: "./src/cli",    message: "Infra is below cli." },
         { target: "./src/infra", from: "./src/viewer", message: "Infra is below viewer." },
         // Allow infra → app/ports/** only; block infra → app/!(ports).
-        // (Expressed via two zones - eslint-plugin-import does not support negation.)
+        // `except` paths are resolved relative to `from` and used as directory
+        // prefixes (not globs) when `from` is a plain path - hence "ports",
+        // not "./src/app/ports/**". eslint-plugin-import does not support
+        // negation, so this is the canonical form.
         { target: "./src/infra", from: "./src/app",
-          except: ["./src/app/ports/**"],
+          except: ["ports"],
           message: "Infra may only import from app/ports/, not from other parts of app/." },
 
         // viewer/** is its own world. Only contracts/ is allowed.
