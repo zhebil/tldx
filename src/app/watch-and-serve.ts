@@ -4,9 +4,13 @@
  *
  * Per ADR-13 (and CONTEXT.md "Scene message contract" → "On compile error"):
  * - On a clean compile, push `{ v: 1, kind: "scene", payload }`.
- * - On a compile error, push ONLY `{ v: 1, kind: "error", payload }` - no
- *   scene. The viewer keeps its last-good `scene` rendered with an error
- *   banner. The next clean compile clears it by pushing a fresh `scene`.
+ * - On a compile error with diagnostics, push ONLY
+ *   `{ v: 1, kind: "error", payload }` - no scene. The viewer keeps its
+ *   last-good `scene` rendered with an error banner. The next clean compile
+ *   clears it by pushing a fresh `scene`.
+ * - If the pipeline returns no scene and no diagnostics (for example, a
+ *   watcher observed a truncate-before-rewrite), suppress the push and wait
+ *   for a later change event.
  *
  * The use case is a thin orchestration layer: it delegates the pure pipeline
  * to `compileFile` (parse → ir → layout → emit) and is responsible only for
@@ -123,13 +127,15 @@ function pushResult(
   result: CompileFileResult,
 ): void {
   if (result.sceneJson === null) {
-    deps.transport.push(sceneMessage.error(result.diagnostics));
-    deps.log.log({
-      level: "warn",
-      code: "watch/recompile-error",
-      msg: `compile failed (${trigger}): ${result.diagnostics.length} diagnostic(s)`,
-      fields: { trigger, diagnosticCount: result.diagnostics.length },
-    });
+    if (result.diagnostics.length > 0) {
+      deps.transport.push(sceneMessage.error(result.diagnostics));
+      deps.log.log({
+        level: "warn",
+        code: "watch/recompile-error",
+        msg: `compile failed (${trigger}): ${result.diagnostics.length} diagnostic(s)`,
+        fields: { trigger, diagnosticCount: result.diagnostics.length },
+      });
+    }
     return;
   }
   deps.transport.push(sceneMessage.scene(result.sceneJson));

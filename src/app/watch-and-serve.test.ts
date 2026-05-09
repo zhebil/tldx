@@ -128,6 +128,22 @@ describe("watchAndServe", () => {
     await handle.close();
   });
 
+  it("suppresses null results that have no diagnostics", async () => {
+    const { deps, fs, watch, transport, log } = setup({ "auth.tldsl": VALID_DOC });
+    const handle = watchAndServe("auth.tldsl", deps);
+    await handle.ready;
+
+    fs.setFile("auth.tldsl", "");
+    watch.emitChange("auth.tldsl");
+    await handle.idle();
+
+    expect(transport.pushed).toHaveLength(1);
+    expect(transport.pushed[0]!.kind).toBe("scene");
+    expect(log.byCode("watch/recompile-error")).toHaveLength(0);
+
+    await handle.close();
+  });
+
   it("recovery: a clean compile after an error pushes a fresh scene", async () => {
     const { deps, fs, watch, transport } = setup({
       "auth.tldsl": IR_BROKEN,

@@ -123,6 +123,8 @@ export function createSseTransport(
         dropClient(client);
         try {
           client.res.end();
+          // `end()` alone can leave the keep-alive socket parked during serve shutdown.
+          client.res.destroy();
         } catch {
           // Already torn down by the network side; nothing to do.
         }

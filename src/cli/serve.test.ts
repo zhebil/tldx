@@ -72,6 +72,32 @@ describe("runServe", () => {
     await expect(started.close()).resolves.toBeUndefined();
   });
 
+  it("close() resolves while an SSE client is connected", async () => {
+    started = await runServe({ path: "doc.tldsl", deps: makeDeps(), io: makeIo() });
+    const controller = new AbortController();
+    try {
+      const res = await fetch(`${started.url}events`, { signal: controller.signal });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type") ?? "").toMatch(/text\/event-stream/);
+
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const outcome = await Promise.race([
+          started.close().then(() => "closed" as const),
+          new Promise<"timeout">((resolve) => {
+            timeout = setTimeout(() => resolve("timeout"), 1_000);
+          }),
+        ]);
+        expect(outcome).toBe("closed");
+        started = undefined;
+      } finally {
+        if (timeout !== undefined) clearTimeout(timeout);
+      }
+    } finally {
+      controller.abort();
+    }
+  });
+
   it("propagates dev-server boot failure (port collision)", async () => {
     // Bind a real listener on 127.0.0.1 to grab a port; runServe targeting
     // the same port hits EADDRINUSE inside startDevServer, which rejects.
