@@ -1,8 +1,7 @@
 /**
  * `tldsl` CLI entry point. Composition root: wires real adapters (NodeFs,
- * StubLayout for now - real ELK lands in tldsl-gxl) and dispatches
- * subcommands. Per CONTEXT.md, this is the ONLY place real adapters meet
- * use cases.
+ * ElkLayoutAdapter) and dispatches subcommands. Per CONTEXT.md, this is the
+ * ONLY place real adapters meet use cases.
  *
  * Subcommands:
  *   tldsl check <file>   Validate a single `.tldsl` file. Exits non-zero on
@@ -12,8 +11,8 @@
  * `serve` is a separate issue and not wired here yet.
  */
 
-import { StubLayout } from "../domain/ports/layout.fake.js";
 import { createNodeFsRead } from "../infra/fs/node-fs-read.js";
+import { ElkLayoutAdapter } from "../infra/layout-elk/elk-layout.js";
 
 import { runCheck, type CheckIo } from "./check.js";
 
@@ -43,7 +42,7 @@ const commands: readonly Command[] = [
         path,
         deps: {
           fs: createNodeFsRead(),
-          layout: new StubLayout(),
+          layout: new ElkLayoutAdapter(),
         },
         io,
       });
