@@ -12,6 +12,16 @@ Other docs (`scene-json.md`, `lint-config.md`, `architecture.md`, `dsl.md`, `dec
 
 **Conflict-resolution rule**: if `CONTEXT.md` says a symbol/file lives in location A but `ls src/<A>` is empty (or the symbol exists somewhere else - e.g., types in `contracts/` that CONTEXT places in `domain/`), read the existing file before claiming an issue that references it. The resolved location may reshape the issue's scope. Cross-checking after the claim wastes a claim.
 
+## Implement → Review → Commit
+
+Default working loop in this repo:
+
+1. **Claude implements** the change (driven by a `bd` issue).
+2. **User reviews** the diff. Do **not** commit before the review unless explicitly told to.
+3. **Claude commits in logical batches** via the `/commit` slash command. One concern per commit; stage hunks (not whole files) when a single file touches multiple concerns. Details in `.claude/commands/commit.md`.
+
+Never `git add .` / `git add -A` and never amend without an explicit ask.
+
 ## Issue tracking
 
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
