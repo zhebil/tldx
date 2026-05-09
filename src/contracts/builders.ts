@@ -11,17 +11,41 @@ import type { Diagnostic } from "./diagnostic.js";
 import type { SceneJSON, TLRecord, TLStoreSchema } from "./scene-json.js";
 import type { SceneMessage } from "./scene-message.js";
 
+/**
+ * Tracks `createTLSchema().serialize()` from tldraw@^3.15. Schema is opaque
+ * to us (docs/scene-json.md): if tldraw ticks one of these on a point release,
+ * bump in lockstep. The round-trip test in tests/e2e/scene-roundtrip.test.ts
+ * pins this against the live schema so drift fails CI rather than the viewer.
+ */
 const DEFAULT_SCHEMA: TLStoreSchema = {
   schemaVersion: 2,
   sequences: {
     "com.tldraw.store": 4,
+    "com.tldraw.asset": 1,
+    "com.tldraw.camera": 1,
     "com.tldraw.document": 2,
+    "com.tldraw.instance": 25,
+    "com.tldraw.instance_page_state": 5,
     "com.tldraw.page": 1,
+    "com.tldraw.instance_presence": 6,
+    "com.tldraw.pointer": 1,
     "com.tldraw.shape": 4,
-    "com.tldraw.shape.geo": 9,
-    "com.tldraw.shape.note": 8,
-    "com.tldraw.shape.arrow": 5,
-    "com.tldraw.shape.frame": 0,
+    "com.tldraw.asset.bookmark": 2,
+    "com.tldraw.asset.image": 5,
+    "com.tldraw.asset.video": 5,
+    "com.tldraw.shape.arrow": 6,
+    "com.tldraw.shape.bookmark": 2,
+    "com.tldraw.shape.draw": 2,
+    "com.tldraw.shape.embed": 4,
+    "com.tldraw.shape.frame": 1,
+    "com.tldraw.shape.geo": 10,
+    "com.tldraw.shape.group": 0,
+    "com.tldraw.shape.highlight": 1,
+    "com.tldraw.shape.image": 5,
+    "com.tldraw.shape.line": 5,
+    "com.tldraw.shape.note": 9,
+    "com.tldraw.shape.text": 3,
+    "com.tldraw.shape.video": 4,
     "com.tldraw.binding.arrow": 1,
   },
 };
@@ -134,9 +158,16 @@ export function boxShape(
       h: input.h,
       geo: input.geo ?? "rectangle",
       color: "black",
+      labelColor: "black",
       fill: "none",
       dash: "draw",
       size: "m",
+      font: "draw",
+      align: "middle",
+      verticalAlign: "middle",
+      url: "",
+      growY: 0,
+      scale: 1,
       richText: richText(input.text ?? ""),
     },
   } satisfies TLRecord;
@@ -150,14 +181,27 @@ export function noteShape(
     type: "note",
     props: {
       color: input.color ?? "yellow",
+      labelColor: "black",
       size: input.size ?? "m",
+      font: "draw",
+      fontSizeAdjustment: 0,
+      align: "middle",
+      verticalAlign: "middle",
+      growY: 0,
+      url: "",
+      scale: 1,
       richText: richText(input.text ?? ""),
     },
   } satisfies TLRecord;
 }
 
 export function frameShape(
-  input: ShapeBase & { w: number; h: number; name?: string },
+  input: ShapeBase & {
+    w: number;
+    h: number;
+    name?: string;
+    color?: string;
+  },
 ): TLRecord {
   return {
     ...baseShapeFields(input),
@@ -166,6 +210,7 @@ export function frameShape(
       w: input.w,
       h: input.h,
       name: input.name ?? "",
+      color: input.color ?? "black",
     },
   } satisfies TLRecord;
 }
@@ -175,14 +220,22 @@ export function arrowShape(input: ShapeBase): TLRecord {
     ...baseShapeFields(input),
     type: "arrow",
     props: {
+      kind: "arc",
       start: { x: 0, y: 0 },
       end: { x: 0, y: 0 },
+      bend: 0,
       color: "black",
+      labelColor: "black",
       size: "m",
       dash: "draw",
       fill: "none",
+      font: "draw",
       arrowheadStart: "none",
       arrowheadEnd: "arrow",
+      text: "",
+      labelPosition: 0.5,
+      scale: 1,
+      elbowMidPoint: 0.5,
     },
   } satisfies TLRecord;
 }
@@ -195,6 +248,7 @@ export function arrowBinding(input: {
   normalizedAnchor?: { x: number; y: number };
   isPrecise?: boolean;
   isExact?: boolean;
+  snap?: "center" | "edge-point" | "edge" | "none";
 }): TLRecord {
   return {
     id: input.id,
@@ -207,6 +261,7 @@ export function arrowBinding(input: {
       normalizedAnchor: input.normalizedAnchor ?? { x: 0.5, y: 0.5 },
       isPrecise: input.isPrecise ?? false,
       isExact: input.isExact ?? false,
+      snap: input.snap ?? "none",
     },
     meta: {},
   };

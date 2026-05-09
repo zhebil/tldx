@@ -161,6 +161,7 @@ describe("record factories", () => {
         normalizedAnchor: { x: 0.5, y: 0.5 },
         isPrecise: false,
         isExact: false,
+        snap: "none",
       },
       meta: {},
     });
