@@ -184,18 +184,21 @@ Treating schema as opaque means a tldraw point-release that ticks one of
 these numbers does not require a tldsl release - the viewer's bundled
 tldraw will migrate on load.
 
-## Reference fixtures
+## Constructing reference scenes
 
-Two fixtures live under `tests/e2e/fixtures/scene-json/`:
+The authoritative way to build a SceneJSON for tests is `src/contracts/builders.ts`
+(`sceneJson`, `documentRecord`, `pageRecord`, `boxShape`, `noteShape`,
+`frameShape`, `arrowShape`, `arrowBinding`, `richText`). Defaults in those
+factories are the tldraw-pin defaults documented above; if the pin moves,
+update both the factories and this doc in lockstep.
 
-- `empty.json` - just the `document` record + a single empty page. Smallest
-  valid scene; used to exercise emit-with-no-shapes.
-- `two-boxes-and-arrow.json` - two `geo` boxes connected by an `arrow` with
-  two `binding` records. Covers the MVP critical path: nodes + an edge.
-
-Both are hand-written from the docs above, not captured from a live session.
-A follow-up integration test (when the viewer lands) should round-trip them
-through `loadSnapshot` to confirm tldraw accepts them as-is.
+Static JSON fixtures aren't kept under `tests/e2e/fixtures/scene-json/`:
+hand-rolled examples drift from the factories and from real tldraw output.
+The viewer round-trip test (`tldsl-09k`) constructs scenes with the
+builders and calls `loadSnapshot` directly - that's the contract test that
+catches drift from real tldraw. Golden e2e fixtures (`<name>.tldsl` →
+`<name>.scene.json`) come later from real emit output, not from hand-rolled
+shapes.
 
 ## What this spike intentionally does *not* settle
 
