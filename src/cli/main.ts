@@ -14,6 +14,7 @@
  *                        SIGINT/SIGTERM.
  */
 
+import { realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -164,11 +165,23 @@ export async function main(argv: readonly string[], io: CliIo): Promise<number> 
 }
 
 // Run when invoked directly (not when imported by tests).
-const isEntry =
-  typeof process !== "undefined" &&
-  Array.isArray(process.argv) &&
-  process.argv[1] !== undefined &&
-  import.meta.url === `file://${process.argv[1]}`;
+function isEntrypoint(): boolean {
+  if (
+    typeof process === "undefined" ||
+    !Array.isArray(process.argv) ||
+    process.argv[1] === undefined
+  ) {
+    return false;
+  }
+
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
+  } catch {
+    return resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
+  }
+}
+
+const isEntry = isEntrypoint();
 
 if (isEntry) {
   const io: CliIo = {
