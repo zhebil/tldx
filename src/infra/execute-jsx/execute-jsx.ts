@@ -69,9 +69,15 @@ type BuildOutcome = BuildOk | { diagnostics: Diagnostic[] };
 export function createJsxExecute(): ExecutePort {
   return {
     async execute(source: string, path: string): Promise<ExecuteResult> {
-      const built = await buildBundle(source, path);
+      // esbuild requires an absolute `absWorkingDir` and resolves entry
+      // points to absolute paths, so a relative `path` (what the CLI and the
+      // PostToolUse hook pass) has to be resolved before anything reads it.
+      // Every span this adapter returns is therefore absolute; `compileFile`
+      // normalises them back to the caller's style.
+      const entry = resolvePath(path);
+      const built = await buildBundle(source, entry);
       if ("diagnostics" in built) return built;
-      return runInWorker(built.code, built.mapText, path, built.inputs);
+      return runInWorker(built.code, built.mapText, entry, built.inputs);
     },
   };
 }

@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -121,6 +121,30 @@ export default function Diagram() {
         if (!("diagnostics" in result)) throw new Error("expected diagnostics result");
         const compileError = result.diagnostics.find((d) => d.code === "runtime/compile");
         expect(compileError?.span?.file).toBe(path);
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+    20000,
+  );
+
+  it(
+    "accepts a relative entry path and reports absolute spans",
+    async () => {
+      const dir = await mkdtemp(join(process.cwd(), "tldsl-execute-jsx-relative-"));
+      try {
+        const path = join(dir, "diagram.tldsl.jsx");
+        const relPath = relative(process.cwd(), path);
+        expect(isAbsolute(relPath)).toBe(false);
+
+        const port = createJsxExecute();
+        const ok = await port.execute(okSource("a"), relPath);
+        if (!("ast" in ok)) throw new Error("expected ast result");
+        expect(ok.inputs).toContain(path);
+
+        const failed = await port.execute(THROWING_SOURCE, relPath);
+        if (!("diagnostics" in failed)) throw new Error("expected diagnostics result");
+        expect(failed.diagnostics[0]?.span?.file).toBe(path);
       } finally {
         await rm(dir, { recursive: true, force: true });
       }
