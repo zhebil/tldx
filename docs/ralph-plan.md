@@ -208,11 +208,46 @@ next task.
   `error[ir/unknown-prop]` lines with the allowed list and exits 1, and
   `check scratch.tldsl` exits 0 silently.
 
-- [ ] **A6 — Watch the module graph.**
+- [x] **A6 — Watch the module graph.** _(wake 7)_
   `app/ports/watch.ts` takes a set of paths and supports re-subscription.
   `watchAndServe` re-subscribes to `metafile.inputs` after each compile.
   A **failed** compile keeps the previous watch set — pin that in the contract
   test, it is the nasty failure mode.
+  **Done.** `WatchPort.watch(paths, listener)` now takes an array and
+  `WatchHandle` gains `update(paths)`, which replaces the watched set and is
+  required to diff (an unchanged set must not itself produce an event, or a
+  re-subscribe would look like a change and recompile forever). `FakeWatch`
+  holds a mutable `Set` per subscription; the chokidar adapter keeps one
+  `FSWatcher` per handle and calls `unwatch`/`add` on the delta only.
+  `watch.contract.ts` gained four scenarios — initial multi-path set,
+  `update()` adds, `update()` drops (200ms silence check), and `update()` with
+  an unchanged set stays silent — all four run against both the fake and real
+  chokidar.
+  `CompileFileResult` gained `inputs: string[] | null`, resolving the wake-5
+  note. `null` means *unknown, keep whatever you had*: the fs-read-error arm
+  and the JSX `{ diagnostics }` arm return it, so `watchAndServe` skips the
+  `update()` and the previous set survives a failed compile. The text parser
+  always returns `[path]` (known even on a parse error); the JSX success arm
+  returns `executed.inputs` normalised through the same path-style rule A4
+  introduced for spans (`normaliseSpan`'s core became `normalisePath` and is
+  now shared), so a stable module graph produces a byte-identical set every
+  compile and the diff is a no-op.
+  The plan said "pin it in the contract test", but `WatchPort` knows nothing
+  about compiles, so the rule cannot live there. It is pinned in
+  `watch-and-serve.test.ts` instead, with a comment saying why; the contract
+  covers the port-level half (`update` semantics).
+  **Review corrected one claim the subagent shipped:** its adapter comment
+  asserted that re-adding an already-watched path makes chokidar re-emit
+  `add`. Probed chokidar 5.0.0 directly — it honours `ignoreInitial` for
+  post-`ready` `add()` too, and emits nothing. The diff is therefore
+  defensive, not load-bearing; the comment now says so. This also means the
+  contract's "update() adds a path" scenario is *not* passing vacuously.
+  `npm run check` exit 0 (36 files, 312 tests). Verified by hand with the
+  **real** adapters (chokidar + esbuild worker + ELK) on a two-file diagram:
+  editing an imported `Parts.tldsl.jsx` pushes a second scene carrying the new
+  label, and — the nasty case — breaking the entry then editing the import
+  while it is still broken still pushes a third message, proving the import
+  stayed subscribed across a failed compile.
 
 - [ ] **A7 — Port fixtures and corpus to JSX.**
   Convert `tests/e2e/` fixtures and `scratch.tldsl`. Parity gate: the auth
@@ -470,6 +505,25 @@ anything that outlives the loop.)_
   phase 1 and unimplemented, or delete them from the doc. Leaving the doc as
   it stands is a trap: an LLM reading `dsl.md` will write `type="bi"` and get
   an error.
+
+- **(wake 7, A6)** `CompileFileResult.inputs` is `null` on the JSX
+  `{ diagnostics }` arm even when esbuild built the bundle fine and it was
+  *user code* that threw — in that case the input set is actually known, the
+  port just does not carry it. Consequence: an edit that both adds a new
+  import and throws will not widen the watch set until the file compiles
+  clean once. Fix is to widen `ExecuteResult`'s diagnostics arm with an
+  optional `inputs`, plus a contract scenario. Left alone because it needs
+  another `ExecutePort` contract change and the failure mode is benign (the
+  entry is always watched, so fixing the throw always retriggers).
+- **(wake 7, A6)** `inputs` includes the bundled runtime itself
+  (`src/runtime/*.ts` under tsx/vitest, `dist/runtime/*.js` from a build), so
+  `tldsl serve` on any `.tldsl.jsx` also watches the tldsl source tree. Real
+  but harmless — in a shipped CLI those live in `dist/` and nobody edits them.
+  If it ever matters, filter inputs to files under the entry's directory in
+  `compileFile`.
+- **(wake 7, A6)** `chokidar-watch.ts`'s `update()` uses `next.includes(p)` in
+  a loop — O(n²) over the input set. Module graphs are tens of files, so it
+  will never matter; noted only so nobody "discovers" it as a bug.
 
 - **(wake 5, A4)** `tests/e2e/fixtures/check-jsx-broken.tldsl.diagnostics.txt`
   asserts the message `Error: boom`, which comes from the first line of V8's
