@@ -26,6 +26,7 @@ import { describe, expect, it } from "vitest";
 
 import { runCheck, type CheckIo } from "../../src/cli/check.js";
 import { StubLayout } from "../../src/domain/ports/layout.fake.js";
+import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
 import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -93,7 +94,7 @@ describe("e2e: tldsl check fixtures", () => {
 
       const exitCode = await runCheck({
         path: inputPath,
-        deps: { fs: createNodeFsRead(), layout: new StubLayout() },
+        deps: { fs: createNodeFsRead(), layout: new StubLayout(), execute: createJsxExecute() },
         io,
       });
 

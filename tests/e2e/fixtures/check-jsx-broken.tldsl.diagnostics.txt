@@ -1,0 +1,1 @@
+{path}:2:9: error[runtime/threw]: Error: boom

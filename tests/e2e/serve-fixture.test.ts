@@ -25,6 +25,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { runServe, type ServeHandle, type ServeIo } from "../../src/cli/serve.js";
 import { createSystemClock } from "../../src/infra/clock/system-clock.js";
+import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
 import { createChokidarWatch } from "../../src/infra/fs/chokidar-watch.js";
 import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
 import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
@@ -98,6 +99,7 @@ async function bootServe(
       fs: createNodeFsRead(),
       watch: createChokidarWatch(),
       layout: new ElkLayoutAdapter(),
+      execute: createJsxExecute(),
       log,
       clock: createSystemClock(),
       viewerBundleDir: bundleDir,
