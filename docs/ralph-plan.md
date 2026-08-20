@@ -76,10 +76,29 @@ next task.
   `tldsl/jsx-dev-runtime` are what actually matter and still resolve), and
   `Group` omitted (see Blocked notes).
 
-- [ ] **A2 — `ExecutePort` + fake.**
+- [x] **A2 — `ExecutePort` + fake.** _(wake 3)_
   `src/app/ports/execute.ts`: `(source, path) => Promise<{ast} | {diagnostics}>`.
   Fake returns a canned AST with no worker. Contract test alongside, following
   the pattern in `src/app/ports/watch.contract.ts`.
+  **Done.** Four new files, nothing existing touched. `execute.ts` is
+  `ExecuteResult = { ast: AstNode } | { diagnostics: Diagnostic[] }` plus a
+  one-method `ExecutePort`. Success carries `AstNode`, not `AstDoc`, so
+  root-must-be-`<doc>` validation stays in `lower.ts` where the text parser
+  already put it. The port never rejects: compile error, user throw, and
+  timeout all come back as `{ diagnostics }`, and the header names the codes
+  A3 must emit (`runtime/threw`, `runtime/timeout`).
+  `FakeExecute` is a lookup table keyed by the **source string** (not the
+  path), programmed with `setResult(source, result)`, defaulting to an empty
+  `<doc>`, with a `calls` log. It never inspects `source`.
+  `execute.contract.ts` exports `runExecuteContract(label, make, options)` over
+  a harness that yields `okSource(boxId)` / `throwingSource()` / `infiniteSource()`
+  plus one `path`. Four scenarios: success (ast is a doc containing the box),
+  throw (resolves, all-error diagnostics, one `runtime/threw` with
+  `span.file === path`), timeout (`runtime/timeout`), and **no cross-call
+  state** — two different sources at the *same* path must return their own
+  box, which is what pins decision 8's "fresh worker per compile, so ESM module
+  caching is a non-issue". The real A3 adapter fails that test if it caches by
+  path. `npm run check` green (35 files, 276 tests).
 
 - [ ] **A3 — `infra/execute-jsx/` adapter.**
   esbuild **bundle** (not transform) with `jsx: "automatic"`,
@@ -285,6 +304,18 @@ anything that outlives the loop.)_
   it for `<>…</>`) and returns a bare array. Nothing rejects a fragment in a
   position that wants a single node yet — `lower.ts` will see an array where it
   expects an `AstNode`. Worth a check in A5.
+- **(wake 3)** `ExecuteResult`'s success arm is `{ ast }` only, per A2's wording.
+  A3 must return `metafile.inputs` alongside it and A6 feeds that to the
+  watcher, so A3 widens the success arm (`{ ast; inputs: string[] }`) and adds
+  a fifth contract scenario asserting `inputs` contains the entry plus every
+  transitively imported file. Doing it in A2 would have been a field no adapter
+  could populate yet.
+- **(wake 3)** The `ExecutePort` contract has no scenario for a source that
+  fails to *compile* (bad JS syntax), only one that throws at run time. A3 has
+  to decide whether an esbuild build error is `runtime/threw` or its own code;
+  jsx-pivot decision 7 only discusses thrown exceptions. Pick a code in A3 and
+  add the scenario there.
+
 - **(wake 1)** `dump-tmp.mts` lost its `--stack` flag (the `stackLayout` export it
   called no longer exists). It still dumps geometry via `ElkLayoutAdapter`, which
   is what the A0 acceptance check needed. A9 deletes it anyway.
