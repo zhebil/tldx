@@ -1,12 +1,14 @@
 # tldsl
 
-A minimalist text DSL for authoring [tldraw](https://tldraw.dev) scenes, designed so AI agents (Claude Code et al.) can drive a live canvas by editing plain files.
+A JSX authoring surface for [tldraw](https://tldraw.dev) scenes, designed so AI agents (Claude Code et al.) can drive a live canvas by editing plain files.
 
-The agent edits a `.tldsl` file with normal `Edit` / `Write` tools. A local watcher transpiles the file to tldraw scene JSON and pushes it to a browser viewer. No MCP, no special API - just files, a watcher, and a CLI.
+The agent edits a `.tldsl.jsx` file with normal `Edit` / `Write` tools, importing `Doc`, `Frame`, `Box`, `Note`, `Edge`, and `flow` from the `"tldsl"` module. The CLI executes the file in a Node worker, lowers the resulting AST through layout, and pushes tldraw scene JSON to a browser viewer. No MCP, no special API - just files, a watcher, and a CLI.
+
+**Accepted cost**: unlike a plain-text DSL, a `.tldsl.jsx` file needs the CLI to run - it isn't self-contained portable text. See `docs/jsx-pivot.md` for the trade-off this bought (JSX composition, props, `.map()`) and the full reasoning.
 
 ## Status
 
-**Pre-implementation.** Design is settled (see `docs/`). Next step is the tldraw scene-JSON spike (see `docs/open-questions.md`).
+`tldsl check <file>` and `tldsl serve <file>` both work end to end: execute → lower → layout → emit → scene JSON, pushed live to the viewer over SSE. Design for the remaining phase-1/phase-2 surface is settled (see `docs/`); this is not a finished product - see `docs/roadmap.md` for what's still ahead.
 
 ## Phase 1 in one paragraph
 
@@ -26,24 +28,50 @@ Sits in the "AI tools should be plug-and-play, not frameworks to learn" lane.
 ```bash
 npm install
 npm run build                                          # dist/cli/ + dist/viewer/
-node dist/cli/main.js serve tests/e2e/fixtures/auth.tldsl
+node dist/cli/main.js serve tests/e2e/fixtures/auth.tldsl.jsx
 # or, after `npm link`:
-tldsl serve tests/e2e/fixtures/auth.tldsl
+tldsl serve tests/e2e/fixtures/auth.tldsl.jsx
 ```
 
 For an inner dev loop without rebuilding:
 
 ```bash
-npm run dev:cli -- serve tests/e2e/fixtures/auth.tldsl
+npm run dev:cli -- serve tests/e2e/fixtures/auth.tldsl.jsx
 ```
 
-`tldsl check <file>` is the one-shot validator (exit 0 = clean, 1 = compile errors); `tldsl serve <file>` watches the file, recompiles on save, and pushes scene JSON to the bundled viewer over SSE.
+`tldsl check <file>` is the one-shot validator (exit 0 = clean, 1 = compile errors); `tldsl serve <file>` watches the file (and every file it imports), recompiles on save, and pushes scene JSON to the bundled viewer over SSE.
+
+## What a diagram looks like
+
+```jsx
+import { Doc, Frame, Box, Edge, Note } from "tldsl";
+
+export default function Diagram() {
+  return (
+    <Doc>
+      <Frame id="auth-flow" name="Auth flow">
+        <Box id="user" label="User" />
+        <Box id="login" label="Login form" />
+        <Box id="auth" label="Auth service" />
+
+        <Edge id="e-user-login" from="user" to="login" />
+        <Edge id="e-login-auth" from="login" to="auth" />
+
+        <Note id="n-design">Token store is the only writer of session tokens.</Note>
+      </Frame>
+    </Doc>
+  );
+}
+```
+
+Based on `tests/e2e/fixtures/auth.tldsl.jsx`. Edges reference other elements by `id`; `<Doc>` is always the root.
 
 ## Documents
 
 - [`docs/architecture.md`](docs/architecture.md) - components and data flow
 - [`docs/dsl.md`](docs/dsl.md) - syntax, elements, full example
-- [`docs/layout-and-edges.md`](docs/layout-and-edges.md) - group/frame split, layout modes, 13 anchors, edge styling
+- [`docs/jsx-pivot.md`](docs/jsx-pivot.md) - the JSX pivot: why the text DSL was replaced with JSX, decision-by-decision
+- [`docs/layout-and-edges.md`](docs/layout-and-edges.md) - group/frame split, layout modes, anchors, edge styling
 - [`docs/roadmap.md`](docs/roadmap.md) - phase 1 scope, phase 2, rejected, open questions
 - [`docs/decisions.md`](docs/decisions.md) - key design decisions and rationale (ADR-ish)
 
