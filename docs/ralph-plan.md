@@ -646,6 +646,36 @@ Ordered. Take from the top. Strike through when resolved.
   teach `sourceOrderViolations` in `tools/layout-report.mts` that a serpentine
   grid's odd rows run right-to-left, because gate 3 rejects it by construction
   otherwise; only then flip the placement. Do not attempt both in one wake.
+  - [x] **B21a — the tooling half.** _(wake 23)_ Done, and it is deliberately a
+    **no-op on today's corpus**: all six reports are byte-identical to the
+    baseline, because every corpus grid is row-major and scores 0 either way.
+    `sourceOrderViolations` now routes `mode === "grid"` through a new
+    `gridOrderViolations(children, serpentine)` and returns the **minimum** of
+    the row-major and serpentine counts. The helper walks consecutive children
+    in source order, starts a new row whenever `y` changes (counting a violation
+    if `y` went *up*), and inside a row expects `x` to increase, except on odd
+    rows when `serpentine` is true. `row`/`col`/`auto`/`free` are untouched.
+    Three tests in `tests/tools/layout-report.test.ts` pin it: row-major grid 0,
+    serpentine grid 0, and a grid that fits neither reading order (`x` = 0, 200,
+    100, 300 in one row) still above 0 - that last one is the load-bearing test,
+    since the risk of this change is defanging gate 3 into always returning 0.
+    `npm run check` green, 299 tests (up from 296).
+    **The honest cost, for whoever runs B21b:** `min` does not *detect* which
+    reading order the layout used, it scores under both and keeps the kinder
+    number. Geometry alone cannot tell the two apart, and the report has no
+    serpentine flag to read. So gate 3 is now genuinely weaker for grids: a
+    scrambled grid that happens to look serpentine on some rows scores lower
+    than it did yesterday. Judged worth it - the alternative is that B21b is
+    unmeasurable - but if a future grid hypothesis passes gate 3 narrowly,
+    re-derive the count by hand before trusting it.
+  - [ ] **B21b — flip the placement.** `gridPositions` in
+    `src/domain/layout/stack.ts` places row-major; make odd rows run
+    right-to-left. Note it now sits on top of a **kept** wrap (B20, wake 22), so
+    the champion baseline is the wake-22 grid, not the old column. `sequence` is
+    the file to watch: B20's chain gate makes it skip the wrap entirely, so
+    serpentine may have no chain left to help unless the gate is also revisited
+    - check that before spending the wake, and if `sequence` is untouched, say
+    so in the ledger rather than reading a 0-0 as support.
 
 - [ ] **B8** Frame title width participates in frame sizing. Frame `name` is
   never measured, so long titles overflow.
@@ -1182,3 +1212,19 @@ anything that outlives the loop.)_
   `layout: "grid"`, which is a **behavioural change visible to anything that
   reads the positioned IR** - only the report does today, but `emit/` or the
   viewer could grow such a reader without noticing the distinction.
+
+- **(wake 23)** Gate 3 is now weaker for `grid` containers than for `row`/`col`.
+  `sourceOrderViolations` scores a grid under both the row-major and the
+  serpentine reading order and keeps the lower count, because nothing in the
+  geometry (or in the positioned IR) says which one the layout used. Wake 22
+  already gave the report a `doc.layout` write-back for exactly this class of
+  problem; if a future wake wants the gate back at full strength, the cheap fix
+  is to write the *direction* back too - e.g. `layout: "grid"` plus a boolean -
+  rather than to infer it. Left inferred because B21b is the only thing that
+  will ever produce a serpentine grid and it has not shipped yet.
+- **(wake 23)** A `layout-report.mts` change does **not** always oblige a
+  champion regeneration - wake 22's follow-up said it did. The real trigger is
+  the report *output* changing. B21a altered the metric's code and left all six
+  corpus reports byte-identical, so `docs/layout-champion.md` is still current.
+  Diff the six reports against the champion before deciding; do not regenerate
+  on the mere fact that the tool was edited.

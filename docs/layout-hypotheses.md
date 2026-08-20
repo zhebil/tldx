@@ -1053,3 +1053,40 @@ alone. So the doc-root axis can now be decided by at most two files, and both of
 them voted the same way here. A future doc-root hypothesis has almost no corpus
 left to be wrong on; treat a 2-0 on this axis as weaker evidence than a 2-0
 elsewhere.
+
+---
+
+## Tooling note — serpentine-aware gate 3
+
+_(wake 23, B21a — not a hypothesis, no judge, no verdict)_
+
+Read this before proposing any hypothesis that produces a **grid**.
+
+`sourceOrderViolations` in `tools/layout-report.mts` — the metric behind
+objective gate 3 — used to demand that a grid's children run strictly
+row-major: `y` non-decreasing, and `x` increasing inside a row. That rejects a
+serpentine (boustrophedon) grid **by construction**, one violation per child in
+every odd row, which is why B21 was split into a tooling wake and a placement
+wake.
+
+The metric now scores a grid under two competing reading orders — row-major,
+and serpentine with odd rows running right-to-left — and returns the **lower**
+of the two counts. `row`, `col`, `auto` and `free` are unchanged.
+
+Two things to keep straight:
+
+- **It is a no-op on today's corpus.** All six reports are byte-identical to the
+  wake-22 champion, because every corpus grid is row-major and therefore scores
+  0 under both readings. `docs/layout-champion.md` is still current and was
+  deliberately not regenerated.
+- **It genuinely weakens the gate for grids.** `min` does not detect which
+  reading order the layout used; it takes the kinder score. Geometry alone
+  cannot distinguish the two, and the positioned IR carries no serpentine flag.
+  A scrambled grid that happens to look serpentine on some rows now scores lower
+  than it would have yesterday. If a grid hypothesis ever clears gate 3
+  *narrowly*, re-derive the count by hand before believing it.
+
+The regression that matters is pinned in `tests/tools/layout-report.test.ts`: a
+single-row grid at `x` = 0, 200, 100, 300 must still score above 0. The failure
+mode of this change was never a wrong number, it was defanging the gate into
+returning 0 for everything.
