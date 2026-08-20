@@ -449,3 +449,125 @@ midpoint (`normalizedAnchor` slid to `k / (n + 1)` along the side for the `k`-th
 of `n` edges, ordered by the other endpoint's position along that axis).
 Requeued as **B14**, at the top of the backlog, with the patch on disk so it is
 an extension rather than a rebuild.
+
+---
+
+## B14 — distribute the edges that share a side along that side _(wake 17)_ — REVERTED
+
+**Hypothesis.** B13 proved the package (elbow routing + geometry-derived side
+anchors) wins `deep-nesting` and loses `hexagonal`, and named the remaining
+defect precisely: `usecases` has seven outgoing edges, all of which pick the
+same facing side and therefore all stack on that side's single midpoint. Fix
+that one thing - group every terminal that landed on the same shape *and* the
+same side, order the group by the other endpoint's position along the side's
+free axis, and slide the `k`-th of `n` to `k / (n + 1)` along the side instead
+of `0.5` - and the pair should stop losing.
+
+**What was built.** `docs/patches/b13-elbow-side-anchors.patch` applied
+unchanged as the base (it restores `kind: "elbow"` and the per-terminal facing
+side pick), then one change on top: `emitEdge` can no longer decide an anchor
+on its own, because the group is not visible from a single edge. A `computeAnchors`
+pre-pass walks the IR, collects every edge, picks each terminal's side with the
+patch's existing logic, buckets terminals by `shapeId|side`, sorts each bucket
+by the other endpoint's centre along the free axis (`y` for left/right, `x` for
+top/bottom, edge id as tie-break), and writes a `Map` keyed
+`${edge.id}-start` / `-end`. The walk threads that map instead of the rect map
+and `emitEdge` just looks its two terminals up. `sideAnchor()` split into
+`pickSide()` (which side) + `anchorAt(side, t)` (where along it), because
+grouping needs the side name and the old helper baked the coordinate in.
+`n === 1` gives `t = 0.5`, i.e. byte-identical to B13 - confirmed by the four
+B13 tests passing unchanged and the auth-flow snapshot not moving.
+
++337/-20 across five files. One test added: three edges leaving one shape's
+right side, declared in the order `b, c, d` but with target centre-`y` order
+`c < d < b`, asserting anchors `0.25 / 0.5 / 0.75` land on `e2 / e3 / e1` - it
+fails under declaration-order placement, so it pins the ordering rule and not
+just the spacing. `npm run check` green at 285 tests, verified directly.
+
+**Objective gates: all pass, all uninformative for the fourth wake running.**
+Layout is untouched, so all six geometry reports are byte-identical to the
+champion by construction: same canvas, zero new overlaps, zero source-order
+violations. Every gate is a tautology for an arrow hypothesis. All six PNGs
+differ, so every file got a judge.
+
+**Blind A/B.** Assignment randomised per file, staging verified against the
+recorded assignment with `cmp` before launching. Judges never told which side
+was the candidate, and told the render outranks the report.
+
+| file | A was | B was | judge picked | winner |
+|---|---|---|---|---|
+| deep-nesting | candidate | champion | A | **candidate** |
+| hexagonal | champion | candidate | A | **champion** |
+| long-labels | champion | candidate | A | **champion** |
+| wide-fanout | candidate | champion | B | **champion** |
+| sequence | champion | candidate | TIE | tie |
+| sparse-graph | candidate | champion | TIE | tie |
+
+Judge reasoning, condensed:
+
+- **deep-nesting** (candidate): the candidate's "offset elbow routes keep all
+  eight edges individually traceable despite some clutter", while the champion
+  "collapses four collinear edges into one indistinguishable vertical line
+  (hiding Metrics→Config entirely) and drives a long diagonal straight through
+  the Router and Config boxes".
+- **hexagonal** (champion): the champion's "straight arrows fan out legibly
+  while [the candidate's] elbow routes run vertical segments straight through
+  boxes (CLI, ListOrders, UsersRepo, Payments, Notifications) and pile up
+  overlapping segments around the core".
+- **long-labels** (champion): both share the same overprinted note text, but the
+  champion's "arrows are clean vertical connectors while [the candidate] adds
+  elbow segments that cut horizontally through the auth, inventory and payments
+  boxes, piercing their label text".
+- **wide-fanout** (champion): the candidate's "18 hub fan-out arrows collapse
+  into a dense black tangle that overprints and pierces the first several Worker
+  boxes (and again below Scheduler)", where the champion "routes every edge as a
+  clean short segment between neighbors, leaving all labels legible".
+- **sequence**, **sparse-graph** (ties): no visible difference - a 14-step
+  single column and a grid of equal boxes have one edge per side each, so
+  `n === 1` everywhere and the candidate is B13 is the champion.
+
+**Verdict: REVERTED.** 1 candidate / 3 champion / 2 ties. Reverted by restoring
+the five files from `HEAD` (`git show HEAD:<path> > <path>`; the guardrail hook
+auto-denies `git checkout --`). Tree back to 281 tests, re-verified green.
+Champion doc unchanged.
+
+**What was actually learned — distribution is a regression, not the missing
+piece, and B13 remains the high-water mark.** B13 scored 1-1; B14 scored 1-3 on
+the same corpus with the same routing. Distribution did not repair `hexagonal`
+and it actively *lost* `long-labels` and `wide-fanout`, both of which B13 had
+tied.
+
+The mechanism of the regression is visible in the judges' own words and it is
+the opposite of what the hypothesis assumed. Stacking `n` edges on one anchor
+makes them **share** a trunk: `n` orthogonal runs that overlap into what reads
+as one line. Distributing them turns that single shared trunk into `n` distinct
+parallel trunks, each of which now has to cross the diagram on its own path.
+When the targets sit in a narrow column - `wide-fanout` is literally one column
+26 boxes tall, `long-labels` one column of 12 - every one of those new trunks
+runs down *through* the column. B14 therefore multiplied the number of
+box-piercing runs by `n` in exactly the two files where `n` was largest. That is
+why `wide-fanout`'s hub, with 18 outgoing edges, went from an unremarkable tie
+to "a dense black tangle".
+
+So the two anchor policies fail in mirror images, the same way B3 and B4a did:
+one anchor per side is illegible where the fan is wide and the layout is roomy
+(`hexagonal`); `n` anchors per side is illegible where the fan is wide and the
+layout is a corridor (`wide-fanout`, `long-labels`). Both are consequences of a
+router that has no idea the boxes exist. **The next thing to test is not another
+anchor rule.** Either the router must avoid obstacles, or the candidate must
+stop competing on the files whose layout leaves it nowhere to route.
+
+Two follow-ups requeued, in that order:
+
+- **B15** - elbow + side anchors gated to edges that actually have room:
+  keep `kind: "elbow"` and the B13 side anchor only for a terminal pair whose
+  centre-to-centre run does not pass through a third shape's rect, and leave
+  every other edge as today's arc from a centre. `deep-nesting` is the file
+  where the pair wins and it is also the file with room; `wide-fanout` and
+  `long-labels` are corridors where no orthogonal route exists at all. A
+  per-edge gate should keep the win and drop all three losses.
+- **B16** - distribution *bounded by the shared span* rather than by the whole
+  side: spread the `k`-th of `n` over only the portion of the side that faces
+  the targets' actual extent, so a fan whose targets span 40px does not get
+  spread over a 600px side. This is the smaller-change version of B14 and it is
+  only worth trying if B15 shows the routing is salvageable at all.

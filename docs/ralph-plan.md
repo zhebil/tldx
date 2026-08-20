@@ -16,7 +16,7 @@ once A is done. The loop never terminates; the human stops it.
 - Phase: **B**
 - Champion layout revision: `docs/layout-champion.md`, still the wake-12
   revision (the B1 candidate: cross-axis `align`, default `center`). Unchanged
-  since - B2, B3, B4a and B13 all reverted. Judged results so far live in
+  since - B2, B3, B4a, B13 and B14 all reverted. Judged results so far live in
   `docs/layout-hypotheses.md` - read it before proposing a hypothesis.
 
 ---
@@ -475,25 +475,41 @@ rather than falling back to text-only judging.
 
 Ordered. Take from the top. Strike through when resolved.
 
-- [ ] **B14** Distribute the edges that share a side along that side instead of
-  stacking them all on its midpoint. **This is an extension of B13, not a new
-  build** - apply `docs/patches/b13-elbow-side-anchors.patch` first (it restores
-  elbow routing plus the per-terminal facing-side pick, +216/-20, `npm run check`
-  green at 284 tests when it was measured), then change only the anchor
-  placement: group an edge terminal with every other terminal that landed on the
-  same shape *and* the same side, order that group by the other endpoint's
-  position along the side's axis, and slide the `k`-th of `n` to `k / (n + 1)`
-  along the side rather than `0.5`.
-  Evidence this is the remaining defect: at wake 16 the B13 pair **won**
-  `deep-nesting` outright - long cross-frame edges became clean orthogonal runs
-  around the boxes instead of diagonals through them - and lost only
-  `hexagonal`, where `usecases` has seven outgoing edges that all pick the same
-  facing side and therefore all stack on one point. Elbow routing then draws
-  seven straight trunks out of that one point. One-shape-one-anchor is the
-  defect; the routing style and the side binding are both fine.
-  Judge the whole thing (routing + distribution) as one candidate against the
-  current champion - the intermediate configuration is already measured and
-  losing, so there is nothing to learn by re-splitting it.
+- [ ] **B15** Elbow arrows + B13 side anchors, but **gated per edge to the
+  edges that have room to route**. Apply `docs/patches/b13-elbow-side-anchors.patch`
+  first, then add one condition: a terminal pair keeps `kind: "elbow"` and its
+  side anchor only if the centre-to-centre run between the two shapes does not
+  pass through a third shape's rect; every other edge stays today's `kind: "arc"`
+  from a centre anchor. Note this makes `kind` per-edge, so `arrowShape()` needs
+  to take it as an argument instead of hardcoding it.
+  Evidence: across B13 and B14 the pair has won `deep-nesting` twice and never
+  won anything else. `deep-nesting` is the corpus file with long cross-frame
+  edges *and* open space beside the boxes. The three files it loses
+  (`hexagonal`, `long-labels`, `wide-fanout`) are all cases where the targets
+  sit in a corridor and every orthogonal route the elbow router picks runs
+  through a box, because the router does not know the boxes exist. A per-edge
+  gate keeps the one win and should drop all three losses without needing an
+  obstacle-avoiding router.
+
+- [ ] **B16** Bound the B14 distribution by the *targets' span* rather than by
+  the whole side: spread the `k`-th of `n` over only the portion of the side
+  facing the targets' actual extent, so a fan whose targets span 40px is not
+  spread across a 600px side. Strictly gated on B15 - B14 measured that
+  distributing across the full side is a regression, and there is nothing to
+  learn from a narrower version of it until the routing itself stops piercing
+  boxes.
+
+- [x] ~~**B14** Distribute the edges that share a side along that side instead
+  of stacking them all on its midpoint, sliding the `k`-th of `n` to
+  `k / (n + 1)`.~~ **REVERTED** _(wake 17)_ - and a regression against B13,
+  which stays the high-water mark. 1 candidate / 3 champion / 2 ties, where B13
+  scored 1-1 on the same corpus with the same routing. Distribution did not
+  repair `hexagonal` and it lost `long-labels` and `wide-fanout`, both of which
+  B13 had tied. Cause: stacking `n` edges on one anchor makes them *share* one
+  trunk; distributing them creates `n` distinct parallel trunks, each of which
+  must cross the diagram on its own path - so in a corridor layout it multiplies
+  the box-piercing runs by `n`. Survives as **B16**, gated behind **B15**.
+  Ledger entry in `docs/layout-hypotheses.md`.
 
 - [x] ~~**B13** Elbow arrows **and** side anchors as one change. Flip
   `arrowShape()` to `kind: "elbow"` *and* derive each terminal's
@@ -927,3 +943,25 @@ anything that outlives the loop.)_
   unprompted by judges as defects *shared* by champion and candidate, i.e. they
   are champion defects nothing has attacked yet. B9 covers the note half; the
   `wide-fanout` chain has no backlog entry.
+
+- **(wake 17)** Five wakes of arrow hypotheses (B3, B4a, B12, B13, B14) have now
+  each been judged on gates that are structurally blind to them: an arrow change
+  moves no shape, so all four objective gates are tautologies and the verdict
+  rests entirely on the judges. Wake 16 already noted this; wake 17 confirms it
+  is systematic, not incidental. A fifth gate that can see rendered arrow paths -
+  count of arrow segments that cross a shape's rect, extracted from the emitted
+  scene plus the layout rects rather than from the PNG - would have rejected B14
+  before spending six judge calls, and would have rejected B4a too. Worth one
+  wake as tooling work rather than as a hypothesis.
+- **(wake 17)** `docs/patches/b13-elbow-side-anchors.patch` is now load-bearing
+  for two backlog entries (B15 and, behind it, B16). It applied cleanly against
+  wake-17 `HEAD`. It will stop doing so the first time anything else touches
+  `emit.ts` or `builders.ts`; whichever wake breaks it should regenerate it
+  rather than hand-resolve, and whichever wake resolves B15 should delete it.
+- **(wake 17)** Both `long-labels` and `wide-fanout` judges again named
+  champion-side defects unprompted: `long-labels` renders its notes overprinted
+  into unreadable text (B9 covers it) and `wide-fanout` is a 26-box vertical
+  corridor whose 18 hub edges pierce every box in the column no matter which
+  side wins. `wide-fanout` still has no backlog entry of its own - the corridor
+  shape is a *layout* failure, not an arrow failure, and B7's aspect-ratio
+  targeting is the closest existing entry.
