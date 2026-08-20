@@ -6,7 +6,7 @@ import type { AstNode } from "../parser/ast.js";
 import { astBuilders } from "../parser/ast.fixture.js";
 
 import { estimatedBoxSize } from "./defaults.js";
-import { hybridLayout, type AutoPlacer } from "./stack.js";
+import { bestGridCols, formsChain, hybridLayout, type AutoPlacer } from "./stack.js";
 
 const { box, doc, edge, frame } = astBuilders();
 
@@ -273,5 +273,149 @@ describe("hybridLayout", () => {
     expect(a.y).toBe(0);
     expect(b.x).toBe(sizeA.w + 10);
     expect(b.y).toBe(0);
+  });
+});
+
+describe("bestGridCols", () => {
+  it("picks a sane column count for a set of equal boxes", () => {
+    const els = Array.from({ length: 6 }, () => ({ x: 0, y: 0, w: 100, h: 100 }));
+    expect(bestGridCols(els, 0)).toBe(4);
+  });
+
+  it("honours the tie-break by keeping the smaller cols", () => {
+    const els = [
+      { x: 0, y: 0, w: 100, h: 100 },
+      { x: 0, y: 0, w: 100, h: 100 },
+    ];
+    // cols=1 -> 100x200 (ratio 0.5), cols=2 -> 200x100 (ratio 2); against
+    // target 1 both score |ln(0.5)| = |ln(2)|, a genuine tie.
+    expect(bestGridCols(els, 0, 1)).toBe(1);
+  });
+
+  it("guards the empty case", () => {
+    expect(bestGridCols([], 40)).toBe(1);
+  });
+});
+
+describe("formsChain", () => {
+  it("is true for a linear chain covering the whole container", () => {
+    const ids = ["a", "b", "c"];
+    const edges = [
+      { from: "a", to: "b" },
+      { from: "b", to: "c" },
+    ];
+    expect(formsChain(ids, edges)).toBe(true);
+  });
+
+  it("is false for a fan (a hub with out-degree > 1)", () => {
+    const ids = ["hub", "a", "b", "c"];
+    const edges = [
+      { from: "hub", to: "a" },
+      { from: "hub", to: "b" },
+      { from: "hub", to: "c" },
+    ];
+    expect(formsChain(ids, edges)).toBe(false);
+  });
+
+  it("is false for an edgeless set", () => {
+    expect(formsChain(["a", "b", "c"], [])).toBe(false);
+  });
+
+  it("is false for a sparse set that fails the coverage clause", () => {
+    // degrees are all <= 1, but 2 edges over 8 children is well under half.
+    const ids = ["a", "b", "c", "d", "e", "f", "g", "h"];
+    const edges = [
+      { from: "a", to: "b" },
+      { from: "c", to: "d" },
+    ];
+    expect(formsChain(ids, edges)).toBe(false);
+  });
+});
+
+describe("hybridLayout doc-root aspect wrap (B20)", () => {
+  it("leaves a chain of children in a single column, unwrapped", async () => {
+    const result = await layoutAst(
+      doc({}, [
+        box({ id: "a", label: "A" }),
+        box({ id: "b", label: "B" }),
+        box({ id: "c", label: "C" }),
+        box({ id: "d", label: "D" }),
+        edge({ id: "e1", from: "a", to: "b" }),
+        edge({ id: "e2", from: "b", to: "c" }),
+        edge({ id: "e3", from: "c", to: "d" }),
+      ]),
+    );
+    expect(result.layout).toBe("col");
+    expect(result.cols).toBeUndefined();
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    const c = boxById(result.children, "c");
+    const d = boxById(result.children, "d");
+    expect(a.x).toBe(b.x);
+    expect(b.x).toBe(c.x);
+    expect(c.x).toBe(d.x);
+    expect(b.y).toBeGreaterThan(a.y);
+    expect(c.y).toBeGreaterThan(b.y);
+    expect(d.y).toBeGreaterThan(c.y);
+  });
+
+  it("wraps a fan of children into a grid sized by bestGridCols", async () => {
+    const labels = ["hub", "a", "b", "c"];
+    const result = await layoutAst(
+      doc({}, [
+        box({ id: "hub", label: "hub" }),
+        box({ id: "a", label: "a" }),
+        box({ id: "b", label: "b" }),
+        box({ id: "c", label: "c" }),
+        edge({ id: "e1", from: "hub", to: "a" }),
+        edge({ id: "e2", from: "hub", to: "b" }),
+        edge({ id: "e3", from: "hub", to: "c" }),
+      ]),
+    );
+    const sizes = labels.map((l) => estimatedBoxSize(l));
+    const expectedCols = bestGridCols(
+      sizes.map((s) => ({ x: 0, y: 0, w: s.w, h: s.h })),
+      40,
+    );
+    expect(result.layout).toBe("grid");
+    expect(result.cols).toBe(expectedCols);
+  });
+
+  it("leaves an explicit layout=\"col\" doc unaffected even when its children fan out", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "hub", label: "hub" }),
+        box({ id: "a", label: "a" }),
+        box({ id: "b", label: "b" }),
+        edge({ id: "e1", from: "hub", to: "a" }),
+        edge({ id: "e2", from: "hub", to: "b" }),
+      ]),
+    );
+    expect(result.layout).toBe("col");
+    const hub = boxById(result.children, "hub");
+    const a = boxById(result.children, "a");
+    expect(a.x).toBe(hub.x);
+    expect(a.y).toBeGreaterThan(hub.y);
+  });
+
+  it("leaves a doc with explicit cols unaffected even when its children fan out", async () => {
+    const result = await layoutAst(
+      doc({ cols: 2 }, [
+        box({ id: "hub", label: "hub" }),
+        box({ id: "a", label: "a" }),
+        box({ id: "b", label: "b" }),
+        edge({ id: "e1", from: "hub", to: "a" }),
+        edge({ id: "e2", from: "hub", to: "b" }),
+      ]),
+    );
+    // cols only takes effect under mode "grid"; the default mode is "col",
+    // so an explicit cols with no explicit layout still stacks - the point
+    // here is that it never gets promoted to "grid" by the wrap.
+    expect(result.layout).toBe("col");
+    expect(result.cols).toBe(2);
+    const hub = boxById(result.children, "hub");
+    const a = boxById(result.children, "a");
+    expect(a.x).toBe(hub.x);
+    expect(a.y).toBeGreaterThan(hub.y);
   });
 });

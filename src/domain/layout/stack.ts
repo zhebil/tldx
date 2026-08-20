@@ -39,6 +39,7 @@ import {
 } from "./defaults.js";
 
 const DEFAULT_GAP = 40;
+const TARGET_ASPECT = 16 / 9;
 
 type Rect = { x: number; y: number; w: number; h: number };
 type FlowMode = "row" | "col" | "grid";
@@ -66,7 +67,8 @@ export type AutoPlacer = (req: AutoPlaceRequest) => Promise<AutoPlaceResult>;
 export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IRDocPositioned> {
   const mode = resolveMode(ir.layout);
   const gap = ir.gap ?? DEFAULT_GAP;
-  const { children } = await layoutContainer(
+  const mayAutoGrid = ir.layout === undefined && ir.cols === undefined;
+  const { children, mode: usedMode, cols: usedCols } = await layoutContainer(
     ir.children,
     mode,
     ir.cols,
@@ -75,8 +77,14 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
     ir.direction,
     ir.align ?? DEFAULT_ALIGN,
     placeAuto,
+    mayAutoGrid,
   );
-  return { ...ir, children };
+  return {
+    ...ir,
+    layout: usedMode,
+    ...(usedCols === undefined ? {} : { cols: usedCols }),
+    children,
+  };
 }
 
 function resolveMode(mode: LayoutMode | undefined): LayoutMode {
@@ -115,6 +123,7 @@ async function sizeFrame(frame: IRFrame, placeAuto: AutoPlacer): Promise<IRFrame
     frame.direction,
     frame.align ?? DEFAULT_ALIGN,
     placeAuto,
+    false,
   );
   const w = frame.w ?? contentW;
   const h = frame.h ?? contentH;
@@ -138,7 +147,14 @@ async function layoutContainer(
   direction: Direction | undefined,
   align: Align,
   placeAuto: AutoPlacer,
-): Promise<{ children: IRElementPositioned[]; w: number; h: number }> {
+  mayAutoGrid: boolean,
+): Promise<{
+  children: IRElementPositioned[];
+  w: number;
+  h: number;
+  mode: LayoutMode;
+  cols: number | undefined;
+}> {
   const sized: (IRBoxPositioned | IRNotePositioned | IRFramePositioned | null)[] = await Promise.all(
     children.map(async (c) => {
       if (c.kind === "edge") return null;
@@ -157,6 +173,8 @@ async function layoutContainer(
 
   let w: number;
   let h: number;
+  let usedMode: LayoutMode = mode;
+  let usedCols = cols;
 
   if (mode === "auto") {
     const nodes = flowedIndices.map((i) => {
@@ -188,10 +206,23 @@ async function layoutContainer(
     w = bbox.maxX + pad.right;
     h = bbox.maxY + pad.bottom;
   } else {
+    const flowedEls = flowedIndices.map((i) => sized[i]!);
+    let flowMode: FlowMode = mode as FlowMode;
+    let flowCols = cols;
+    if (mayAutoGrid && mode === "col") {
+      const childIds = children
+        .filter((c) => c.kind !== "edge" && c.kind !== "doc")
+        .map((c) => c.id);
+      const edges = collectAutoEdges(children);
+      if (!formsChain(childIds, edges)) {
+        flowMode = "grid";
+        flowCols = bestGridCols(flowedEls, gap);
+      }
+    }
     const positions = computeFlowPositions(
-      flowedIndices.map((i) => sized[i]!),
-      mode,
-      cols,
+      flowedEls,
+      flowMode,
+      flowCols,
       gap,
       pad.left,
       pad.top,
@@ -203,10 +234,12 @@ async function layoutContainer(
     const bbox = boundingBox(children, sized);
     w = bbox.maxX + pad.right;
     h = bbox.maxY + pad.bottom;
+    usedMode = flowMode;
+    usedCols = flowCols;
   }
 
   const out: IRElementPositioned[] = children.map((c, i) => (c.kind === "edge" ? c : sized[i]!));
-  return { children: out, w, h };
+  return { children: out, w, h, mode: usedMode, cols: usedCols };
 }
 
 function boundingBox(
@@ -248,6 +281,31 @@ function collectAutoEdges(children: readonly IRElement[]): { from: string; to: s
     if (from !== undefined && to !== undefined && from !== to) out.push({ from, to });
   }
   return out;
+}
+
+/**
+ * True iff the direct children of a container form a chain: at least one
+ * edge, every child has resolved in-/out-degree <= 1, and the edges cover
+ * most of the container (`edges.length * 2 >= childIds.length`). Used to
+ * gate the doc-root aspect wrap - a grid is topology-blind and turns a
+ * chain's adjacent-pair edges into row-wrap diagonals (see B7/B20 in
+ * docs/layout-hypotheses.md).
+ */
+export function formsChain(
+  childIds: readonly string[],
+  edges: readonly { from: string; to: string }[],
+): boolean {
+  if (edges.length === 0) return false;
+  const outDeg = new Map<string, number>();
+  const inDeg = new Map<string, number>();
+  for (const e of edges) {
+    outDeg.set(e.from, (outDeg.get(e.from) ?? 0) + 1);
+    inDeg.set(e.to, (inDeg.get(e.to) ?? 0) + 1);
+  }
+  for (const id of childIds) {
+    if ((outDeg.get(id) ?? 0) > 1 || (inDeg.get(id) ?? 0) > 1) return false;
+  }
+  return edges.length * 2 >= childIds.length;
 }
 
 function indexDescendants(
@@ -348,4 +406,44 @@ function gridPositions(
     y += rowHeights[r]! + gap;
   }
   return els.map((_, i) => ({ x: colX[i % cols]!, y: rowY[Math.floor(i / cols)]! }));
+}
+
+/** Pure column-max / row-max extent of a row-major grid, no positions. */
+function gridExtent(els: readonly Rect[], cols: number, gap: number): { w: number; h: number } {
+  const rows = Math.ceil(els.length / cols);
+  const colWidths = new Array<number>(cols).fill(0);
+  const rowHeights = new Array<number>(rows).fill(0);
+  els.forEach((el, i) => {
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    colWidths[c] = Math.max(colWidths[c]!, el.w);
+    rowHeights[r] = Math.max(rowHeights[r]!, el.h);
+  });
+  const w = colWidths.reduce((a, b) => a + b, 0) + gap * (cols - 1);
+  const h = rowHeights.reduce((a, b) => a + b, 0) + gap * (rows - 1);
+  return { w, h };
+}
+
+/**
+ * Scans `cols` from 1 to `els.length` and returns the one whose grid extent
+ * is closest to `target` aspect ratio (log-ratio distance, so 2x too wide
+ * and 2x too tall score equally). Ties keep the smaller `cols`.
+ */
+export function bestGridCols(
+  els: readonly Rect[],
+  gap: number,
+  target: number = TARGET_ASPECT,
+): number {
+  if (els.length === 0) return 1;
+  let bestCols = 1;
+  let bestScore = Infinity;
+  for (let cols = 1; cols <= els.length; cols++) {
+    const { w, h } = gridExtent(els, cols, gap);
+    const score = Math.abs(Math.log(w / h / target));
+    if (score < bestScore) {
+      bestScore = score;
+      bestCols = cols;
+    }
+  }
+  return bestCols;
 }
