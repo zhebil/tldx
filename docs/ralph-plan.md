@@ -388,8 +388,11 @@ One hypothesis per wake. Never batch. Never stop.
    append them, then take the top one. The backlog is never allowed to be empty
    at the end of a wake.
 
-2. **Record the champion.** `tools/layout-report.mts` over all six corpus files,
-   saved as the champion report. This is the baseline for this wake only.
+2. **Record the champion.** `tools/layout-report.mts` over all six corpus
+   files, saved as the champion report, AND `tools/screenshot.mts` over the same
+   six, saved as champion PNGs. Both are the baseline for this wake only. See
+   "Rendering for judgement" below - the report alone is not sufficient
+   evidence.
 
 3. **Build it.** Delegate implementation. Smallest change that tests the
    hypothesis. No refactoring rides along.
@@ -402,10 +405,15 @@ One hypothesis per wake. Never batch. Never stop.
    A rejection here is still a result — record it and move on.
 
 5. **Subjective judgement.** Delegate to a **fable** subagent, once per corpus
-   file. Give it: the source, and two reports labelled **A** and **B** with the
-   assignment **randomised per file** (record which was which; do not tell the
+   file. Give it: the source, two **rendered PNGs** labelled **A** and **B**,
+   and the two matching geometry reports under the same labels. The A/B
+   assignment is **randomised per file** (record which was which; never tell the
    judge). Ask for a winner and one sentence of reasoning. Never ask for a
    numeric score — pairwise comparison only.
+
+   The judge must look at the images. Tell it explicitly: **where the render and
+   the geometry report disagree, the render is the truth.** The report describes
+   what layout intended; the PNG shows what tldraw actually drew.
 
 6. **Verdict.** Candidate becomes champion iff it wins strictly more files than
    it loses. Ties go to the champion (bias toward not churning).
@@ -418,6 +426,37 @@ One hypothesis per wake. Never batch. Never stop.
 8. **Commit.** Kept → commit the change plus the ledger entry. Reverted →
    commit the ledger entry alone. Either way the wake ends with a commit.
 
+### Rendering for judgement
+
+`tools/screenshot.mts <file.tldsl.jsx> <out.png>` starts `serve`, loads the
+viewer in headless chromium via playwright, waits for the canvas to paint,
+captures a PNG, and kills the server. Playwright is a devDependency; chromium is
+already cached locally. Do not use the playwright MCP browser tools for this -
+they report success but do not write the file to this filesystem.
+
+**Why this exists.** The geometry report describes the layout engine's model of
+the diagram. tldraw does not honour that model exactly, so the report can be
+confidently wrong:
+
+- Notes reserve a fixed box in layout, but tldraw resizes stickies to fit their
+  text. A note can overlap three shapes while the report says
+  `overlapping shape pairs: 0`.
+- tldraw wraps box label text to the box width no matter what the estimator
+  believed. A box the estimator thinks fits on one line can render clipped or
+  wrapped.
+
+Both defects are invisible to a text-only judge, and one of them already cost a
+correct decision: **B2 (label wrapping) was REVERTED at wake 13** on the
+reasoning that the champion "keeps every long label on one legible line" - which
+was true of the report and false of the render. B11 carries that hypothesis
+forward; retry it now that the judge can see, and treat the B2 verdict as void
+rather than as evidence.
+
+Any hypothesis about text metrics, note sizing, arrow routing, or anything else
+whose effect is produced by the renderer rather than by layout **must** be judged
+on PNGs. If the screenshot tool is broken, fix it as that wake's unit of work
+rather than falling back to text-only judging.
+
 ### Rules that keep this honest
 
 - **Never edit the corpus to make a hypothesis win.** Corpus changes are their
@@ -428,6 +467,9 @@ One hypothesis per wake. Never batch. Never stop.
 - If a hypothesis needs more than ~200 LOC, split it and put the pieces at the
   top of the backlog.
 - Objective gates run before the judge, always. Pretty-but-broken never wins.
+- **The report models layout; the PNG shows the render. The PNG wins.** Never
+  conclude anything about text fit, note size, or arrow paths from the report
+  alone - those are renderer behaviour, and the report does not simulate them.
 
 ### Hypothesis backlog
 

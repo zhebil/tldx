@@ -30,9 +30,11 @@ verdict for yourself.
 - **Exploration** (finding files, gathering facts, running verbose commands) →
   **haiku** subagent. Have it report conclusions, not file dumps.
 - **Layout judgement** (Phase B step 5 only) → **fable** subagent, one call per
-  corpus file. Give it the diagram source plus two reports labelled A and B,
-  assignment randomised per file. Ask for a winner and one sentence of
-  reasoning. Never a numeric score. Never reveal which side is the candidate.
+  corpus file. Give it the diagram source, two **rendered PNGs** labelled A and
+  B, and the two matching geometry reports under the same labels; assignment
+  randomised per file. Ask for a winner and one sentence of reasoning. Never a
+  numeric score. Never reveal which side is the candidate. Tell the judge that
+  where the render and the report disagree, the render is the truth.
 - Review every subagent's diff yourself before committing. A subagent reporting
   success is not evidence of success — read the diff and the check output.
 
@@ -51,6 +53,12 @@ verdict for yourself.
   with a written record. Batching destroys both.
 - **Never edit corpus fixtures to make a hypothesis win.** That is the one
   failure mode that silently invalidates everything downstream of it.
+- **Judge on pixels, not on the report.** `tools/screenshot.mts <file> <out.png>`
+  renders a diagram through the real viewer with playwright and writes a PNG.
+  The geometry report describes what layout intended; tldraw resizes stickies and
+  wraps label text on its own, so the report can say `overlapping shape pairs: 0`
+  about a diagram whose note visibly covers three shapes. Do not use the
+  playwright MCP browser tools - they report success without writing a file here.
 - If `npm run check` cannot be made green within this wake, `git checkout` the
   change away, record the failure in the plan, and commit the record alone. A
   failed wake that is written down is worth more than a broken tree.
