@@ -50,6 +50,13 @@ module.exports = {
       to:   { path: "^elkjs($|/)" },
     },
     {
+      name: "esbuild-only-in-execute-jsx",
+      severity: "error",
+      comment: "esbuild is the JSX executor adapter's library; only infra/execute-jsx/ may import it.",
+      from: { path: "^src/(?!infra/execute-jsx/)" },
+      to:   { path: "^esbuild($|/)" },
+    },
+    {
       name: "no-circular",
       severity: "error",
       from: {},

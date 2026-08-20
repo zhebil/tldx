@@ -23,6 +23,7 @@ module.exports = {
       patterns: [
         { group: ["chokidar"], message: "Only allowed under infra/fs/." },
         { group: ["elkjs", "elkjs/*"], message: "Only allowed under infra/layout-elk/." },
+        { group: ["esbuild", "esbuild/*"], message: "Only allowed under infra/execute-jsx/." },
         { group: ["@tldraw/*", "tldraw"], message: "Only allowed under viewer/." },
       ],
     }],
@@ -86,6 +87,7 @@ module.exports = {
     // Adapters get to import the modules they wrap.
     { files: ["src/infra/fs/**"],          rules: { "no-restricted-imports": "off" } },
     { files: ["src/infra/layout-elk/**"],  rules: { "no-restricted-imports": "off" } },
+    { files: ["src/infra/execute-jsx/**"], rules: { "no-restricted-imports": "off" } },
     { files: ["src/infra/transport/**"],   rules: { "no-restricted-imports": "off" } },
     { files: ["src/infra/devserver/**"],   rules: { "no-restricted-imports": "off" } },
     { files: ["src/infra/log/**"],         rules: { "no-restricted-imports": "off" } },
@@ -97,6 +99,7 @@ module.exports = {
         patterns: [
           { group: ["chokidar"],            message: "Only allowed under infra/fs/." },
           { group: ["elkjs", "elkjs/*"],    message: "Only allowed under infra/layout-elk/." },
+          { group: ["esbuild", "esbuild/*"], message: "Only allowed under infra/execute-jsx/." },
           { group: ["@tldraw/*", "tldraw"], message: "Only allowed under viewer/." },
         ],
       }],
