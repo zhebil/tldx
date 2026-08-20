@@ -14,10 +14,10 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 12
-  from the B1 candidate (cross-axis `align`, default `center`). Judged results
-  so far live in `docs/layout-hypotheses.md` - read it before proposing a
-  hypothesis.
+- Champion layout revision: `docs/layout-champion.md`, still the wake-12
+  revision (the B1 candidate: cross-axis `align`, default `center`). Unchanged
+  since - B2, B3, B4a and B13 all reverted. Judged results so far live in
+  `docs/layout-hypotheses.md` - read it before proposing a hypothesis.
 
 ---
 
@@ -475,20 +475,37 @@ rather than falling back to text-only judging.
 
 Ordered. Take from the top. Strike through when resolved.
 
-- [ ] **B13** Elbow arrows **and** side anchors as one change. Flip
-  `arrowShape()` to `kind: "elbow"` (wake 14's one-token diff) *and* derive each
-  terminal's `normalizedAnchor` from layout geometry with `isPrecise: true`
-  (wake 15's `collectRects` + facing-side pick, ~70 LOC in `domain/emit/`), then
-  judge the pair. Both halves have now been measured alone and both lost for
-  mirror-image reasons: an elbow from a centre is drawn straight through both
-  boxes, and a fixed side midpoint is coarser than the continuous perimeter clip
-  tldraw already gives an arc. Neither is adoptable alone; the combination is
-  the first configuration where the anchor has a routing style that can use it.
-  Both diffs are recoverable from `docs/layout-hypotheses.md` (B3 and B4a) -
-  this is not a from-scratch build.
-  If it still loses, the next variant to try is *distributing* several edges
-  along a shared side rather than stacking them all on its midpoint, which is
-  the specific defect `hexagonal` showed at wake 15.
+- [ ] **B14** Distribute the edges that share a side along that side instead of
+  stacking them all on its midpoint. **This is an extension of B13, not a new
+  build** - apply `docs/patches/b13-elbow-side-anchors.patch` first (it restores
+  elbow routing plus the per-terminal facing-side pick, +216/-20, `npm run check`
+  green at 284 tests when it was measured), then change only the anchor
+  placement: group an edge terminal with every other terminal that landed on the
+  same shape *and* the same side, order that group by the other endpoint's
+  position along the side's axis, and slide the `k`-th of `n` to `k / (n + 1)`
+  along the side rather than `0.5`.
+  Evidence this is the remaining defect: at wake 16 the B13 pair **won**
+  `deep-nesting` outright - long cross-frame edges became clean orthogonal runs
+  around the boxes instead of diagonals through them - and lost only
+  `hexagonal`, where `usecases` has seven outgoing edges that all pick the same
+  facing side and therefore all stack on one point. Elbow routing then draws
+  seven straight trunks out of that one point. One-shape-one-anchor is the
+  defect; the routing style and the side binding are both fine.
+  Judge the whole thing (routing + distribution) as one candidate against the
+  current champion - the intermediate configuration is already measured and
+  losing, so there is nothing to learn by re-splitting it.
+
+- [x] ~~**B13** Elbow arrows **and** side anchors as one change. Flip
+  `arrowShape()` to `kind: "elbow"` *and* derive each terminal's
+  `normalizedAnchor` from layout geometry with `isPrecise: true`, then judge the
+  pair.~~ **REVERTED** _(wake 16)_ - but the closest result yet, and the first
+  arrow hypothesis to win a file. 1 candidate / 1 champion / 4 ties; ties go to
+  the champion, so a 1-1 split reverts. The package hypothesis held
+  (`deep-nesting` won exactly as B3 predicted once terminals stopped binding to
+  centres); what remains broken is that all seven of `usecases`'s outgoing edges
+  stack on one side midpoint. Survives as **B14**. Patch saved to
+  `docs/patches/b13-elbow-side-anchors.patch`. Ledger entry in
+  `docs/layout-hypotheses.md`.
 
 - [x] ~~**B1** `align` attribute (`start`/`center`/`end`) on row/col
   containers.~~ **KEPT** _(wake 12)_ - shipped with the implicit default
@@ -890,3 +907,23 @@ anything that outlives the loop.)_
   `Infinity` on both sides of the comparison. It did not bite (no corpus shape is
   degenerate) and the code is reverted, but whoever lands B13 should either
   guard it or pin the invariant where sizes are assigned.
+
+- **(wake 16)** `docs/patches/` is a new directory holding one reverted-but-live
+  patch (`b13-elbow-side-anchors.patch`). It exists because B13's code was about
+  to be reconstructed from ledger prose for the third time. It is **not** a
+  general convention: only save a patch when a reverted hypothesis has a named
+  successor in the backlog that extends it directly. Delete the file when B14
+  resolves either way.
+- **(wake 16)** Every arrow hypothesis so far (B3, B4a, B13) is invisible to all
+  four objective gates - the reports come back byte-identical by construction,
+  because nothing about arrow routing touches layout. Three wakes have now spent
+  the gate step learning nothing. Consider a fifth gate that can see rendered
+  arrows (e.g. count edge segments crossing a shape's bounding box in the PNG,
+  or emit the arrow paths from tldraw and test those), so a candidate that
+  routes through boxes can be rejected before a judge is spent.
+- **(wake 16)** `long-labels` renders its two notes overlapping each other and
+  the reporting box into unreadable overprinted text, and `wide-fanout` renders
+  arrows piercing every box in a degenerate vertical chain. Both were called out
+  unprompted by judges as defects *shared* by champion and candidate, i.e. they
+  are champion defects nothing has attacked yet. B9 covers the note half; the
+  `wide-fanout` chain has no backlog entry.

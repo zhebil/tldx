@@ -343,3 +343,109 @@ producing reverts that each look like a refutation of a mechanism that is
 actually fine. Requeued as a single hypothesis, **B13**, which flips
 `kind: "elbow"` and side-anchors the terminals in one change and judges the pair
 together. B12 is struck as superseded rather than left as a blocked retry.
+
+---
+
+## B13 — elbow arrows **and** automatic side anchors, shipped together — **REVERTED**
+
+_(wake 16)_
+
+**Hypothesis.** B3 (elbow routing) and B4a (side anchors derived from layout
+geometry) each lost alone, for mirror-image reasons: an elbow leaving a shape
+*centre* is drawn straight through both boxes, and a fixed side midpoint is a
+*coarsening* of the continuous perimeter clip tldraw already gives an arc.
+Neither is adoptable on its own. The combination is the first configuration
+where the anchor has a routing style that can use it, so ship both in one change
+and judge the pair.
+
+**Diff.** +216 / -20 across five files, both halves recoverable from
+`docs/patches/b13-elbow-side-anchors.patch` (saved before the revert — this is
+the third time this code would otherwise be rebuilt from prose).
+
+- `contracts/builders.ts`: `arrowShape()` `kind: "arc"` → `"elbow"`. One token.
+- `domain/emit/emit.ts` (+115 / −4): `emit()` runs a `collectRects` walk before
+  `emitElement`, building a `Map<string, Rect>` of **absolute page-space** rects
+  for every box / note / frame (the frame's own absolute origin accumulates on
+  descent, since IR `x`/`y` are frame-relative under a frame). `emitEdge` takes
+  the centre-to-centre delta and, **per terminal independently**, compares
+  `|dx| / w` against `|dy| / h` using that terminal's own rect to pick
+  left / right / top / bottom, emitting `normalizedAnchor` with
+  `isPrecise: true` (load-bearing — tldraw ignores the anchor without it). The
+  target terminal reuses the same delta negated, since it faces back toward the
+  source.
+- Zero-size guard: `sideAnchor()` returns null when `w === 0 || h === 0` or the
+  centres coincide, and that terminal falls back to the centre attach. This
+  closes the unguarded division flagged in the plan's "Discovered work" at
+  wake 15.
+- Tests (+94 / −8 in `emit.test.ts`, +1 in `builders.test.ts`): a horizontal
+  pair, a vertical pair, a nested-in-frame pair pinning absolute-origin
+  accumulation, and a degenerate zero-width case proving per-terminal
+  independence. Snapshot regenerated via vitest.
+
+No layout code touched.
+
+**Objective gates — all pass, all uninformative.** `npm run check` green (36
+files, 284 tests). Emit-only plus the builders flip, so all six corpus geometry
+reports are **byte-identical** to the champion by construction: canvas 1.00x,
+overlaps 0 → 0, source-order violations 0 → 0. As with B3 and B4a, the gates are
+structurally blind to this hypothesis. Unlike B4a, **all six PNGs differ**, so
+every file got a judge.
+
+**Blind A/B.** Assignment randomised per file and the staging verified against
+the recorded assignment with `cmp` before launching. Judges never told which
+side was the candidate, and told the render outranks the report.
+
+| file | A was | B was | judge picked | winner |
+|---|---|---|---|---|
+| deep-nesting | candidate | champion | A | **candidate** |
+| hexagonal | champion | candidate | A | **champion** |
+| long-labels | candidate | champion | TIE | tie |
+| sequence | candidate | champion | TIE | tie |
+| sparse-graph | champion | candidate | TIE | tie |
+| wide-fanout | candidate | champion | TIE | tie |
+
+Judge reasoning, condensed:
+
+- **deep-nesting** (candidate): the candidate "routes the long cross-frame edges
+  as clean orthogonal elbows around the boxes", where the champion "draws them
+  as long diagonals that slice straight through the Router and Config boxes and
+  tangle with the vertical trunk".
+- **hexagonal** (champion): the candidate's elbow routing "cuts through the CLI,
+  ListOrders, Payments and Notifications boxes and tangles the driven-ports
+  column".
+- **long-labels** (tie): indistinguishable, and both carry the same defect —
+  the two notes overlap each other and the reporting box into unreadable
+  overprinted text.
+- **sequence**, **sparse-graph**, **wide-fanout** (ties): no visible difference.
+  `wide-fanout`'s judge noted both renders draw the same degenerate vertical
+  chain with arrows piercing every box.
+
+**Verdict: REVERTED.** 1 candidate / 1 champion / 4 ties — not *strictly* more
+wins than losses, and ties go to the champion. Reverted by restoring the five
+files from `HEAD` (`git show HEAD:<path> > <path>`; the guardrail hook
+auto-denies `git checkout --`). Tree back to 281 tests. Champion doc unchanged —
+byte-identical, and the candidate moved no number in it.
+
+**What was actually learned — the mechanism is now half-proved, not refuted.**
+This is the first of the three arrow wakes where the candidate *won a file*.
+`deep-nesting` is the case with long cross-frame edges and room to route, and
+there the pair does exactly what B3 predicted it would once terminals stopped
+binding to centres: orthogonal runs around the boxes instead of diagonals
+through them. The package hypothesis is correct. It is the *anchor placement*
+that is still wrong, not the routing style.
+
+`hexagonal` is the counter-example and it fails for the reason the B13 backlog
+entry predicted in advance: `usecases` has seven outgoing edges, every one of
+them picks the same facing side, and all seven therefore stack on that side's
+single midpoint. Elbow routing then draws seven orthogonal trunks out of one
+point, which is worse than seven diverging diagonals out of one point because
+the trunks are straight lines through whatever is stacked between. One shape
+one anchor is the defect; it is not a defect of elbows and not a defect of side
+binding.
+
+So the next variant is the one already named in the backlog: **distribute** the
+edges that share a side along that side rather than stacking them on its
+midpoint (`normalizedAnchor` slid to `k / (n + 1)` along the side for the `k`-th
+of `n` edges, ordered by the other endpoint's position along that axis).
+Requeued as **B14**, at the top of the backlog, with the patch on disk so it is
+an extension rather than a rebuild.
