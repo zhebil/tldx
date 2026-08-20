@@ -24,6 +24,7 @@
 
 import { watchAndServe } from "../app/watch-and-serve.js";
 import type { ClockPort } from "../app/ports/clock.js";
+import type { ExecutePort } from "../app/ports/execute.js";
 import type { FsReadPort } from "../app/ports/fs.js";
 import type { LogPort } from "../app/ports/log.js";
 import type { WatchPort } from "../app/ports/watch.js";
@@ -40,6 +41,7 @@ export type ServeDeps = {
   fs: FsReadPort;
   watch: WatchPort;
   layout: LayoutPort;
+  execute: ExecutePort;
   log: LogPort;
   clock: ClockPort;
   /** Directory containing the built viewer bundle (must contain index.html). */
@@ -96,6 +98,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     fs: deps.fs,
     watch: deps.watch,
     layout: deps.layout,
+    execute: deps.execute,
     transport,
     log: deps.log,
   });

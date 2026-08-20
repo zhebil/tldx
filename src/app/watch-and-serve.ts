@@ -21,6 +21,7 @@
 import { sceneMessage } from "../contracts/builders.js";
 
 import { compileFile, type CompileFileResult } from "./compile-file.js";
+import type { ExecutePort } from "./ports/execute.js";
 import type { FsReadPort } from "./ports/fs.js";
 import type { LogPort } from "./ports/log.js";
 import type { TransportPort } from "./ports/transport.js";
@@ -31,6 +32,7 @@ export type WatchAndServeDeps = {
   watch: WatchPort;
   fs: FsReadPort;
   layout: LayoutPort;
+  execute: ExecutePort;
   transport: TransportPort;
   log: LogPort;
 };
@@ -59,7 +61,11 @@ export function watchAndServe(
   let closed = false;
 
   const compileAndPush = async (trigger: "initial" | "change"): Promise<void> => {
-    const result = await compileFile(path, { fs: deps.fs, layout: deps.layout });
+    const result = await compileFile(path, {
+      fs: deps.fs,
+      layout: deps.layout,
+      execute: deps.execute,
+    });
     if (closed) return;
     pushResult(deps, trigger, result);
   };

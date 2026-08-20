@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
  * `tldsl` CLI entry point. Composition root: wires real adapters
- * (NodeFs, ChokidarWatch, ElkLayoutAdapter, SystemClock, StderrLog,
- * openBrowser) and dispatches subcommands. Per CONTEXT.md, this is the
- * ONLY place real adapters meet use cases.
+ * (NodeFs, ChokidarWatch, ElkLayoutAdapter, JsxExecute, SystemClock,
+ * StderrLog, openBrowser) and dispatches subcommands. Per CONTEXT.md, this
+ * is the ONLY place real adapters meet use cases.
  *
  * Subcommands:
- *   tldsl check <file>   Validate a single `.tldsl` file. Exits non-zero on
- *                        compile errors. Files not ending in `.tldsl` are
- *                        accepted silently with exit 0 (PostToolUse hook).
+ *   tldsl check <file>   Validate a single `.tldsl` or `.tldsl.jsx` file.
+ *                        Exits non-zero on compile errors. Files ending in
+ *                        neither are accepted silently with exit 0
+ *                        (PostToolUse hook).
  *   tldsl serve <file>   Watch the file, recompile on save, push the scene
  *                        to a local viewer over SSE. Stays alive until
  *                        SIGINT/SIGTERM.
@@ -19,6 +20,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createSystemClock } from "../infra/clock/system-clock.js";
+import { createJsxExecute } from "../infra/execute-jsx/execute-jsx.js";
 import { createChokidarWatch } from "../infra/fs/chokidar-watch.js";
 import { createNodeFsRead } from "../infra/fs/node-fs-read.js";
 import { ElkLayoutAdapter } from "../infra/layout-elk/elk-layout.js";
@@ -78,7 +80,7 @@ const commands: readonly Command[] = [
   {
     name: "check",
     args: "<file>",
-    description: "parse and validate a single .tldsl file",
+    description: "parse and validate a single .tldsl or .tldsl.jsx file",
     run: (rest, io) => {
       const path = rest[0];
       if (path === undefined) {
@@ -90,6 +92,7 @@ const commands: readonly Command[] = [
         deps: {
           fs: createNodeFsRead(),
           layout: new ElkLayoutAdapter(),
+          execute: createJsxExecute(),
         },
         io,
       });
@@ -98,7 +101,7 @@ const commands: readonly Command[] = [
   {
     name: "serve",
     args: "<file>",
-    description: "watch a .tldsl file and serve the live viewer locally",
+    description: "watch a .tldsl or .tldsl.jsx file and serve the live viewer locally",
     run: async (rest, io) => {
       const path = rest[0];
       if (path === undefined) {
@@ -112,6 +115,7 @@ const commands: readonly Command[] = [
             fs: createNodeFsRead(),
             watch: createChokidarWatch(),
             layout: new ElkLayoutAdapter(),
+            execute: createJsxExecute(),
             log: createStderrLog(),
             clock: createSystemClock(),
             viewerBundleDir: defaultViewerBundleDir(),

@@ -24,6 +24,7 @@ import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FakeClock } from "../app/ports/clock.fake.js";
+import { FakeExecute } from "../app/ports/execute.fake.js";
 import { InMemoryFs } from "../app/ports/fs.fake.js";
 import { CaptureLog } from "../app/ports/log.fake.js";
 import { FakeWatch } from "../app/ports/watch.fake.js";
@@ -45,6 +46,7 @@ function makeDeps(): ServeDeps {
     fs: new InMemoryFs({ "doc.tldsl": VALID_DOC }),
     watch: new FakeWatch(),
     layout: new StubLayout(),
+    execute: new FakeExecute(),
     log: new CaptureLog(),
     clock: new FakeClock(),
     viewerBundleDir: tmpdir(),

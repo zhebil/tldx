@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { SceneMessage } from "../contracts/scene-message.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
 
+import { FakeExecute } from "./ports/execute.fake.js";
 import { CaptureLog } from "./ports/log.fake.js";
 import { FakeWatch } from "./ports/watch.fake.js";
 import { InMemoryFs } from "./ports/fs.fake.js";
@@ -44,6 +45,7 @@ function setup(initial: Record<string, string>): Setup {
     transport,
     log,
     layout: new StubLayout(),
+    execute: new FakeExecute(),
   };
   return { deps, fs, watch, transport, log };
 }
