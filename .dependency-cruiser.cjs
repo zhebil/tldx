@@ -29,6 +29,20 @@ module.exports = {
       to:   { path: "^src/(cli|app|domain|infra)" },
     },
     {
+      name: "runtime-imports-only-domain-types",
+      severity: "error",
+      comment: "src/runtime/ is the JSX authoring surface, bundled and run inside a worker; it may not depend on node built-ins or on infra/app/cli/viewer.",
+      from: { path: "^src/runtime" },
+      to:   { path: "^(node:|src/infra|src/app|src/cli|src/viewer)" },
+    },
+    {
+      name: "runtime-is-a-leaf",
+      severity: "error",
+      comment: "src/runtime/ is a leaf: nothing outside it may depend on it (the JSX executor adapter gets the one exception when it lands).",
+      from: { path: "^src/(domain|app|cli|contracts|viewer)" },
+      to:   { path: "^src/runtime" },
+    },
+    {
       name: "elkjs-only-in-layout-elk",
       severity: "error",
       comment: "elkjs is the real layout adapter's library; only infra/layout-elk/ may import it.",

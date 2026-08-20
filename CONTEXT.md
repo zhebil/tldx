@@ -75,6 +75,14 @@ contracts/  Wire types shared across layers. Imports NOTHING.
 viewer/     Separate Vite-built bundle. tldraw + transport client. Imports
             from contracts/ ONLY. Built into a static bundle that
             infra/devserver serves.
+
+runtime/    The JSX authoring surface (`"tldsl"` module: `Doc`, `Frame`,
+            `Box`, `Note`, `Edge`, `flow`, plus the `jsx`/`jsxs`/`jsxDEV`
+            runtime esbuild's automatic transform targets). It is bundled by
+            `infra/execute-jsx/` and executed inside a worker alongside user
+            diagram code - not imported anywhere else in the project. It may
+            import types from `domain/parser` and `contracts/` and nothing
+            else. Output is exactly the `domain/parser/ast.ts` AST shape.
 ```
 
 `viewer/` is its own deliverable. Both `viewer/` and `domain/emit/` reference `contracts/scene-message.ts` and `contracts/scene-json.ts`. That's the versioned contract.
@@ -88,6 +96,7 @@ domain    → domain itself, contracts             (PURE)
 infra     → app/ports, domain/ports, contracts   (implements them)
 viewer    → contracts                            (its own world otherwise)
 contracts → nothing
+runtime   → domain/parser (types), contracts     (leaf; nothing else may import it)
 tests     → same rules as the code they test (no bypass)
 ```
 
@@ -99,6 +108,7 @@ Specifically:
 - `cli/**` is the wiring site. It may import everything except `viewer/**` (the viewer is a built artifact, not a TS dependency).
 - `viewer/**` may import only `contracts/**`. No `cli`, `app`, `domain`, `infra`.
 - `contracts/**` imports nothing - no node built-ins, no third-party packages, no internal modules.
+- `runtime/**` may import types from `domain/parser/**` and `contracts/**` only - no `node:*`, `infra/**`, `app/**`, `cli/**`, `viewer/**`. It is a leaf: no other layer may import `runtime/**` (the JSX executor adapter gets the one exception when it lands).
 
 ## Boundaries
 

@@ -63,6 +63,20 @@ module.exports = {
         { target: "./src/contracts", from: "./src/domain", message: "contracts/ has no dependencies." },
         { target: "./src/contracts", from: "./src/infra",  message: "contracts/ has no dependencies." },
         { target: "./src/contracts", from: "./src/viewer", message: "contracts/ has no dependencies." },
+
+        // runtime/** is the JSX authoring surface, bundled and run inside a
+        // worker alongside user code. It never sees infra/app/cli/viewer.
+        { target: "./src/runtime", from: "./src/infra",  message: "Runtime is bundled and executed standalone; it does not depend on infra." },
+        { target: "./src/runtime", from: "./src/app",    message: "Runtime is bundled and executed standalone; it does not depend on app." },
+        { target: "./src/runtime", from: "./src/cli",    message: "Runtime is bundled and executed standalone; it does not depend on cli." },
+        { target: "./src/runtime", from: "./src/viewer", message: "Runtime is bundled and executed standalone; it does not depend on viewer." },
+
+        // runtime/** is a leaf: nothing else depends on it.
+        { target: "./src/domain",    from: "./src/runtime", message: "runtime/ is a leaf - only its own worker imports it." },
+        { target: "./src/app",       from: "./src/runtime", message: "runtime/ is a leaf - only its own worker imports it." },
+        { target: "./src/cli",       from: "./src/runtime", message: "runtime/ is a leaf - only its own worker imports it." },
+        { target: "./src/contracts", from: "./src/runtime", message: "runtime/ is a leaf - only its own worker imports it." },
+        { target: "./src/viewer",    from: "./src/runtime", message: "runtime/ is a leaf - only its own worker imports it." },
       ],
     }],
 
