@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { Diagnostic } from "../diagnostics/index.js";
 import { parse } from "../parser/index.js";
 
 import type { IRDoc, IRElement } from "./ir.js";
@@ -13,6 +14,12 @@ function lowerSource(source: string): {
   expect(parseDiags, "parser produced unexpected diagnostics").toEqual([]);
   const { ir, diagnostics } = lower(ast);
   return { ir, codes: diagnostics.map((d) => d.code) };
+}
+
+function lowerDiagnostics(source: string): Diagnostic[] {
+  const { ast, diagnostics: parseDiags } = parse(source, "test.tldsl");
+  expect(parseDiags, "parser produced unexpected diagnostics").toEqual([]);
+  return lower(ast).diagnostics;
 }
 
 function ids(els: readonly IRElement[]): string[] {
@@ -291,5 +298,50 @@ describe("lower: end-to-end on the auth fixture grammar", () => {
     expect(frame.idExplicit).toBe(true);
     expect(ids(frame.children)).toEqual(["user", "login", "e1", "n"]);
     for (const c of frame.children) expect(c.idExplicit).toBe(true);
+  });
+});
+
+describe("lower: ir/unknown-prop", () => {
+  it("rejects a misspelled attribute on <box> with the attribute's span", () => {
+    const src = `<doc><box id="a" lable="x" /></doc>`;
+    const diagnostics = lowerDiagnostics(src);
+    expect(diagnostics).toHaveLength(1);
+    const [d] = diagnostics;
+    expect(d!.code).toBe("ir/unknown-prop");
+    expect(d!.message).toBe(
+      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h)",
+    );
+    expect(d!.span).toEqual({
+      file: "test.tldsl",
+      line: 1,
+      column: 18,
+      length: 5,
+    });
+  });
+
+  it("rejects a plausible-but-unsupported attribute on <box>", () => {
+    const src = `<doc><box id="a" className="card" /></doc>`;
+    const { codes } = lowerSource(src);
+    expect(codes).toEqual(["ir/unknown-prop"]);
+  });
+
+  it("emits nothing for a fully valid document", () => {
+    const src = `
+      <doc direction="DOWN" layout="grid" gap="4" pad="8" cols="2">
+        <frame id="f" name="F" direction="DOWN" layout="row" gap="4" pad="8" cols="2" x="0" y="0" w="10" h="10">
+          <box id="a" label="A" x="0" y="0" w="1" h="1" />
+          <note id="n" x="0" y="0" w="1" h="1">hi</note>
+          <edge id="e" from="a" to="a" />
+        </frame>
+      </doc>
+    `;
+    const { codes } = lowerSource(src);
+    expect(codes).toEqual([]);
+  });
+
+  it("rejects an unknown attribute on <edge>", () => {
+    const src = `<doc><box id="a" /><edge from="a" to="a" route="curved" /></doc>`;
+    const { codes } = lowerSource(src);
+    expect(codes).toEqual(["ir/unknown-prop"]);
   });
 });

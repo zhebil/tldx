@@ -11,6 +11,8 @@
  * - `<edge from to>` reference real ids and use bare-id form (anchor and
  *   free-endpoint syntaxes are phase 1, not MVP);
  * - `x | y | w | h` parse as finite numbers when present.
+ * - attributes outside the fixed allowed set per element kind are rejected
+ *   with `ir/unknown-prop` (replaces the type checker the MVP doesn't have).
  *
  * Errors do not abort lowering; the IR is produced best-effort and the
  * caller decides what to do based on `hasErrors(diagnostics)`. Edges that
@@ -50,6 +52,50 @@ import type {
 } from "./ir.js";
 import { contentHash, SyntheticIdAllocator } from "./synthetic-id.js";
 
+const ALLOWED_PROPS = {
+  doc: ["id", "direction", "layout", "gap", "pad", "cols"],
+  frame: [
+    "id",
+    "name",
+    "direction",
+    "layout",
+    "gap",
+    "pad",
+    "cols",
+    "x",
+    "y",
+    "w",
+    "h",
+  ],
+  box: ["id", "label", "x", "y", "w", "h"],
+  note: ["id", "x", "y", "w", "h"],
+  edge: ["id", "from", "to"],
+} as const;
+
+/**
+ * Reject attributes outside the fixed allowed set for this element kind.
+ * This is the safety net standing in for a type checker: unknown props
+ * (typos, unimplemented DSL surface) become `ir/unknown-prop` diagnostics
+ * but do not stop lowering.
+ */
+function checkUnknownProps(
+  kind: keyof typeof ALLOWED_PROPS,
+  attrs: Attrs,
+  ctx: Ctx,
+): void {
+  const allowed: readonly string[] = ALLOWED_PROPS[kind];
+  for (const [name, attr] of Object.entries(attrs)) {
+    if (allowed.includes(name)) continue;
+    ctx.diagnostics.push(
+      error(
+        "ir/unknown-prop",
+        `'${name}' is not supported on '<${kind}>' (allowed: ${allowed.join(", ")})`,
+        attr.nameSpan,
+      ),
+    );
+  }
+}
+
 export type LowerResult = {
   /** The lowered document, or null if the AST root is not `<doc>`. */
   ir: IRDoc | null;
@@ -78,6 +124,8 @@ export function lower(ast: AstNode | null): LowerResult {
     explicitIds: new Map(),
     synthetic: new SyntheticIdAllocator(),
   };
+
+  checkUnknownProps("doc", ast.attrs, ctx);
 
   // Pass 1: walk and assign ids.
   const idHeader = assignId(ast.attrs, ast.span, ctx, {
@@ -139,6 +187,7 @@ function lowerNode(node: AstNode, ctx: Ctx): IRElement | null {
 }
 
 function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
+  checkUnknownProps("frame", node.attrs, ctx);
   const direction = readDirection(node.attrs, ctx);
   const layout = readLayoutMode(node.attrs, ctx);
   const frame: IRFrame = {
@@ -164,6 +213,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
 }
 
 function lowerBox(node: AstBox, ctx: Ctx): IRBox {
+  checkUnknownProps("box", node.attrs, ctx);
   return {
     kind: "box",
     ...assignId(node.attrs, node.span, ctx, {
@@ -178,6 +228,7 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
 }
 
 function lowerNote(node: AstNote, ctx: Ctx): IRNote {
+  checkUnknownProps("note", node.attrs, ctx);
   return {
     kind: "note",
     ...assignId(node.attrs, node.span, ctx, {
@@ -192,6 +243,7 @@ function lowerNote(node: AstNote, ctx: Ctx): IRNote {
 }
 
 function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
+  checkUnknownProps("edge", node.attrs, ctx);
   const fromAttr = node.attrs.from;
   const toAttr = node.attrs.to;
   if (fromAttr === undefined || toAttr === undefined) {
