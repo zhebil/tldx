@@ -308,7 +308,7 @@ next task.
   `2:9: error[runtime/threw]` and exits 1, and a non-`.tldsl.jsx` path is
   now skipped silently.
 
-- [ ] **A9 — Layout report tool.**
+- [x] **A9 — Layout report tool.** _(wake 10)_
   `tools/layout-report.mts <file>` printing, deterministically:
   1. Per-container geometry table (id, parent, x, y, w, h) in source order.
   2. Objective metrics: canvas w/h, aspect ratio, total shape area / canvas
@@ -321,6 +321,27 @@ next task.
      lines. This is what makes a text-only judge able to see the diagram.
   Must be pure-stdout, no colour, stable across runs.
   Delete `dump-tmp.mts` when this lands.
+  **Done.** `tools/layout-report.mts` exports a pure
+  `layoutReport(doc: IRDocPositioned): string` plus a `main()` that builds its
+  own mini pipeline (fs read → `createJsxExecute` → `lower` → `ElkLayoutAdapter`)
+  (`compileFile` only returns opaque `SceneJSON`, useless for geometry).
+  Child coordinates are parent-relative, so the walk accumulates offsets and
+  every metric is absolute. Overlap skips ancestor-related pairs; edges are
+  centre-to-centre segments; crossings use a strict orientation test that
+  excludes shared endpoints. `tsconfig.json`'s `include` gained `"tools"` so
+  typecheck covers the tool (eslint/dep-cruiser only scan `src`).
+  Two deliberate deviations from the wording above, both load-bearing:
+  - The ASCII render is capped at **60 rows**. Verbatim "~100 columns, preserve
+    aspect" gave `wide-fanout` a **975-line** report, unusable as a judge
+    prompt, and it would appear twice per Phase B judge call. The render now
+    compresses vertically and its header states the distortion exactly
+    (`1 cell = 1.4 x 42.7 px`), with the true canvas and aspect ratio printed
+    in the metrics right above it.
+  - "Total shape area" is **leaf area only** (boxes + notes). Frames contain
+    their children, so summing both double-counts.
+  Verified: `npm run check` green (36 files / 273 tests, one new test pinning
+  the three gate metrics on a hand-built doc), and all six corpus files plus
+  `scratch.tldsl.jsx` byte-identical across two consecutive runs.
 
 - [ ] **A10 — Docs.**
   Rewrite `docs/dsl.md` for JSX. Amend `docs/decisions.md`: ADR-2 amended;
@@ -625,3 +646,25 @@ anything that outlives the loop.)_
   `index.ts` and `ast.fixture.ts`. The name is a lie — nothing parses. Worth
   renaming to `domain/ast/` at some point, but it touches ~20 import sites and
   `CONTEXT.md`, so it was not done inside A8.
+
+- **(wake 10, A9)** The first thing the new tool showed: **`wide-fanout` is not
+  wide.** Its canvas is **138 x 2560** (aspect 0.05), a single 26-element
+  column, because a `<doc>` with no `layout` defaults to `col` and the fixture
+  never overrides it. `sequence` is 282 x 1360. Half the corpus is a thin
+  vertical ribbon. That is a genuine layout-quality finding and a strong
+  Phase B hypothesis (auto-flow a container whose child count would make it
+  absurdly tall), **not** a corpus bug: do not "fix" the fixtures.
+- **(wake 10, A9)** The report's ASCII render is the judge's only view of the
+  diagram, so its size directly bounds Phase B's prompt cost. Two reports per
+  judge call at ~100 lines each is the budget the 60-row cap was chosen for.
+  If a future hypothesis makes diagrams much taller, the cap - not the corpus -
+  is what absorbs it.
+- **(wake 10, A9)** `tools/` is typechecked but **not** linted: `npm run lint`
+  and `npm run lint:deps` both scan `src` only. The tool imports across every
+  layer (`domain/`, `infra/`, `cli/`) with nothing enforcing direction. That is
+  fine for a diagnostic script, but nothing stops it rotting into a second,
+  unpoliced entry point. Keep it a single file.
+- **(wake 10, A9)** The frame-boundary-crossing metric skips a frame that is an
+  endpoint of the edge, or an ancestor of either endpoint. No corpus file draws
+  an edge to a `<frame>` today, so that guard is untested by anything but
+  reading. If edges to frames ever appear, re-check it.
