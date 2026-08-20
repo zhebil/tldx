@@ -254,3 +254,92 @@ judges named is that one cause.
 So elbow arrows are not a bad default - they are a default that cannot be
 adopted before edges bind to sides. That is exactly **B4** (the anchor scheme).
 Retry as **B12**, which is B3 gated on B4 rather than a blind repeat.
+
+---
+
+## B4a — automatic side anchors on edge terminals — **REVERTED**
+
+_(wake 15)_
+
+**Hypothesis.** Backlog entry B4 reads "ship the anchor scheme (8 compass +
+`center` + `@x,y`), then bind edges to sides instead of centres", with the
+evidence that `hexagonal`'s `usecases` has seven outgoing edges all bound to its
+centre. That is two things, and only the second is a layout-quality question the
+frozen corpus can answer - an authored anchor attribute is a language feature no
+corpus file uses. Split accordingly and tested the judgeable half, **B4a**:
+derive each terminal's anchor automatically from layout geometry, binding it to
+the side midpoint of the shape that faces the other end of the edge.
+
+**Diff.** +72 / -6 in `domain/emit/emit.ts`, +94 / -8 in `emit.test.ts`, plus a
+regenerated `emit.test.ts.snap`. `emit()` gained a `collectRects` walk building a
+`Map<string, Rect>` of **absolute** (page-space) rects for every box / note /
+frame - IR `x`/`y` are frame-relative under a frame, so the frame origin
+accumulates as the walk descends. `emitEdge` looks both endpoints up, compares
+`|dx| / w` against `|dy| / h` to pick the side the centre-to-centre ray exits
+through, and emits `normalizedAnchor` with **`isPrecise: true`** (tldraw ignores
+`normalizedAnchor` unless that flag is set - it is load-bearing, not cosmetic).
+Missing geometry or coincident centres fall back to the old centre attach.
+`contracts/builders.ts` untouched; no layout code touched.
+
+**Objective gates — all pass, all uninformative.** `npm run check` green (36
+files, 284 tests). This is an emit-only change, so every corpus geometry report
+is byte-identical to the champion by construction: canvas area 1.00x, overlaps
+0 → 0, source-order violations 0 → 0 on all six files. As with B3, the gates
+cannot see this hypothesis at all.
+
+Five of six PNGs differ. `sparse-graph` renders **byte-identical** and is
+recorded as a structural tie without spending a judge: its edges join
+equal-sized boxes at equal `y`, and for that geometry a centre-bound arc already
+clips to exactly the side midpoint the candidate computes.
+
+**Blind A/B.** Assignment randomised per file, judges never told which side was
+the candidate, and told the render outranks the report.
+
+| file | A was | B was | judge picked | winner |
+|---|---|---|---|---|
+| deep-nesting | candidate | champion | TIE | tie |
+| hexagonal | champion | candidate | A | champion |
+| long-labels | champion | candidate | TIE | tie |
+| sequence | candidate | champion | TIE | tie |
+| sparse-graph | champion | candidate | _(not judged)_ | structural tie |
+| wide-fanout | champion | candidate | TIE | tie |
+
+Judge reasoning, condensed:
+
+- **hexagonal** (champion): same node placement in both, but the candidate
+  "routes several usecases-to-driven-port arrows straight through the
+  'Entities + rules' box and tangles the driving-port arrows with a stray
+  arrowhead landing near CreateSession", where the champion's edges "fan out
+  cleanly from Use cases".
+- **deep-nesting** (tie): the only pixel differences are "tldraw's hand-drawn
+  stroke jitter"; both carry the same pre-existing defects.
+- **long-labels** (tie): both renders show the same sticky-note overflow piling
+  garbled text below the reporting box.
+- **sequence**, **wide-fanout** (ties): no visible difference to prefer.
+
+**Verdict: REVERTED.** 0 candidate / 1 champion / 5 ties. Champion doc unchanged
+(byte-identical, and the candidate moved no number in it). Reverted by restoring
+the three files from `HEAD` (`git show HEAD:<path> > <path>`) - the guardrail
+hook auto-denies `git checkout --`, and `git stash` would shift `stash@{0}`,
+which the B2 entry references.
+
+**Why it lost — and why this reframes B12.** With `isPrecise: false`, tldraw
+does not really draw from the centre. It draws a curve from the centre and
+**clips it at the box boundary**, which is a *continuous* side anchor: the exit
+point slides freely around the perimeter as the other end moves. Snapping to one
+of four fixed side midpoints is therefore not an improvement on centre-binding
+for arc arrows - it is a **coarsening** of something the renderer already does
+better, and it costs exactly what `hexagonal` shows: a fan of seven edges that
+previously left `usecases` from seven distinct perimeter points now leaves from
+one point, so several of them run through the box stacked in between.
+
+The consequence for the backlog matters more than the revert. B12 gated elbow
+arrows on B4 "landing first". That gate is now measured and it does not hold in
+that direction either: side anchors alone can only lose (they coarsen arc
+clipping), and elbow alone can only lose (wake 14 - an elbow leaving a centre is
+drawn straight through both boxes). **They are a package, not a sequence.**
+Neither half is adoptable on its own, and testing them one at a time will keep
+producing reverts that each look like a refutation of a mechanism that is
+actually fine. Requeued as a single hypothesis, **B13**, which flips
+`kind: "elbow"` and side-anchors the terminals in one change and judges the pair
+together. B12 is struck as superseded rather than left as a blocked retry.

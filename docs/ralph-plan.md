@@ -475,6 +475,21 @@ rather than falling back to text-only judging.
 
 Ordered. Take from the top. Strike through when resolved.
 
+- [ ] **B13** Elbow arrows **and** side anchors as one change. Flip
+  `arrowShape()` to `kind: "elbow"` (wake 14's one-token diff) *and* derive each
+  terminal's `normalizedAnchor` from layout geometry with `isPrecise: true`
+  (wake 15's `collectRects` + facing-side pick, ~70 LOC in `domain/emit/`), then
+  judge the pair. Both halves have now been measured alone and both lost for
+  mirror-image reasons: an elbow from a centre is drawn straight through both
+  boxes, and a fixed side midpoint is coarser than the continuous perimeter clip
+  tldraw already gives an arc. Neither is adoptable alone; the combination is
+  the first configuration where the anchor has a routing style that can use it.
+  Both diffs are recoverable from `docs/layout-hypotheses.md` (B3 and B4a) -
+  this is not a from-scratch build.
+  If it still loses, the next variant to try is *distributing* several edges
+  along a shared side rather than stacking them all on its midpoint, which is
+  the specific defect `hexagonal` showed at wake 15.
+
 - [x] ~~**B1** `align` attribute (`start`/`center`/`end`) on row/col
   containers.~~ **KEPT** _(wake 12)_ - shipped with the implicit default
   flipped from `start` to `center`, which is the part the frozen corpus could
@@ -496,9 +511,16 @@ Ordered. Take from the top. Strike through when resolved.
   through the source box, the target box, and whatever is stacked between. Not
   a bad default - a default that cannot be adopted before B4. Survives as B12.
   Ledger entry in `docs/layout-hypotheses.md`.
-- [ ] **B4** Ship the anchor scheme (8 compass + `center` + `@x,y`), then bind
+- [x] ~~**B4** Ship the anchor scheme (8 compass + `center` + `@x,y`), then bind
   edges to sides instead of centres. Evidence: `usecases` has seven outgoing
-  edges all bound to its centre.
+  edges all bound to its centre.~~ **REVERTED** _(wake 15)_ - split first: the
+  authored attribute is a language feature the frozen corpus cannot exercise, so
+  only the judgeable half (**B4a**, anchors derived automatically from layout
+  geometry) was measured. 0 candidate / 1 champion / 5 ties. `isPrecise: false`
+  does not mean "draw from the centre" - tldraw clips the curve at the box
+  boundary, which is a *continuous* side anchor, so snapping to four fixed side
+  midpoints coarsens it. Survives only as part of **B13**. Ledger entry in
+  `docs/layout-hypotheses.md`.
 - [ ] **B5** Edge-aware child ordering *within* a `col` container: keep source
   order as the tie-break but let a container opt into sorting children to line
   up with a neighbouring container's connected children. Evidence: 7 ports
@@ -514,10 +536,13 @@ Ordered. Take from the top. Strike through when resolved.
   resizes stickies to fit, so reserved space and rendered space disagree.
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
-- [ ] **B12** Retry B3 (default arrow `kind: "elbow"`) *after* B4 lands.
+- [x] ~~**B12** Retry B3 (default arrow `kind: "elbow"`) *after* B4 lands.
   Strictly gated on B4: elbow routing only stops drawing through boxes once
   terminals bind to sides instead of centres. Do not retry it before then -
-  wake 14 already measured that outcome.
+  wake 14 already measured that outcome.~~ **SUPERSEDED by B13** _(wake 15)_ -
+  the gate was real but not directional. B4a measured the other half and it
+  loses on its own too, for the mirror-image reason. Sequencing them cannot
+  work; they have to ship together.
 - [ ] **B11** Wrap box labels at a width derived from the document's target
   aspect ratio instead of a constant. B2 showed wrapping itself is not the
   problem - a fixed 320px cap is. Pick the cap so the resulting canvas moves
@@ -851,3 +876,17 @@ anything that outlives the loop.)_
   render session: `demo-render.png`, `demo.tldsl.jsx`, `.playwright-mcp/`.
   Neither the loop nor the build produces them. They want a `.gitignore` entry
   (or deleting), but they are not the loop's to remove.
+
+- **(wake 15, B4a)** The **authored** half of B4 - the `anchor` attribute
+  itself (8 compass points + `center` + `@x,y`) - was never built, and it is not
+  a Phase B hypothesis: no corpus file uses it, so the blind judge cannot see it
+  and the loop cannot decide it. It is a language feature. File it as its own
+  task (parser/AST/IR + `docs/dsl.md`) rather than leaving it disguised as a
+  layout experiment in the backlog. B13 does not need it - it derives anchors
+  automatically - but an author who wants to override the derived side does.
+
+- **(wake 15, B4a)** `sideAnchor()` divides by `rect.w` and `rect.h`. Nothing in
+  IR currently guarantees those are non-zero, and a zero-size shape would give
+  `Infinity` on both sides of the comparison. It did not bite (no corpus shape is
+  degenerate) and the code is reverted, but whoever lands B13 should either
+  guard it or pin the invariant where sizes are assigned.
