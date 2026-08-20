@@ -44,8 +44,9 @@ total edge length: 2128
 mean edge length: 266
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
+arrow paths crossing a non-endpoint shape: 10
 source-order violations per container:
-  deep-nesting (col): 0
+  deep-nesting (grid): 0
   l1 (col): 0
   l2 (col): 0
   l3 (col): 0
@@ -167,8 +168,9 @@ total edge length: 5634
 mean edge length: 256
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
+arrow paths crossing a non-endpoint shape: 5
 source-order violations per container:
-  hexagonal (col): 0
+  hexagonal (grid): 0
   hex (row): 0
   driving-adapters (col): 0
   driving-ports (col): 0
@@ -222,96 +224,52 @@ left-edge alignment groups per container:
 layout-report: tests/corpus/long-labels.tldsl.jsx
 
 == Geometry ==
-id              parent       x    y     w    h
-gateway         long-labels  23   0     903  60
-auth            long-labels  32   100   885  60
-rate-limiter    long-labels  23   200   903  60
-router          long-labels  18   300   912  60
-orders          long-labels  14   400   921  60
-inventory       long-labels  23   500   903  60
-payments        long-labels  27   600   894  60
-notifier        long-labels  18   700   912  60
-audit           long-labels  0    800   948  60
-reporting       long-labels  5    900   939  60
-note-reporting  long-labels  374  1000  200  80
-note-payments   long-labels  374  1120  200  80
+id              parent       x    y    w    h
+gateway         long-labels  0    0    903  60
+auth            long-labels  988  0    885  60
+rate-limiter    long-labels  0    100  903  60
+router          long-labels  988  100  912  60
+orders          long-labels  0    200  921  60
+inventory       long-labels  988  200  903  60
+payments        long-labels  0    300  894  60
+notifier        long-labels  988  300  912  60
+audit           long-labels  0    400  948  60
+reporting       long-labels  988  400  939  60
+note-reporting  long-labels  0    500  200  80
+note-payments   long-labels  988  500  200  80
 
 == Metrics ==
-canvas: 948 x 1200
-aspect ratio: 0.79
-fill ratio (leaf area / canvas area): 0.509
+canvas: 1927 x 580
+aspect ratio: 3.32
+fill ratio (leaf area / canvas area): 0.518
 overlapping shape pairs: 0
-edge-edge crossings: 0
-total edge length: 1400
-mean edge length: 175
+edge-edge crossings: 1
+total edge length: 4446
+mean edge length: 556
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
+arrow paths crossing a non-endpoint shape: 1
 source-order violations per container:
-  long-labels (col): 0
+  long-labels (grid): 0
 left-edge alignment groups per container:
-  long-labels: 8 groups over 12 children
+  long-labels: 2 groups over 12 children
 
-== ASCII Render (100x60 cells; 1 cell = 9.5 x 20.0 px) ==
-  |----------------------------------------------------------------------------------------------|  
-  |The API gateway receives every inbound request and forwards it to the correct internal service|  
-  |                                               .                                              |  
-  |----------------------------------------------------------------------------------------------|  
-                                                  .                                                 
-   |--------------------------------------------------------------------------------------------|   
-   |The authentication service checks the bearer token and rejects the request if it has expired|   
-   |                                              .                                             |   
-   |--------------------------------------------------------------------------------------------|   
-                                                  .                                                 
-  |----------------------------------------------------------------------------------------------|  
-  |The rate limiter tracks request counts per client and returns a 429 once the quota is exceeded|  
-  |                                               .                                              |  
-  |----------------------------------------------------------------------------------------------|  
-                                                  .                                                 
-  |----------------------------------------------------------------------------------------------|  
-  |The router inspects the request path and dispatches it to the handler registered for that rout|  
-  |                                               .                                              |  
-  |----------------------------------------------------------------------------------------------|  
-                                                  .                                                 
- |------------------------------------------------------------------------------------------------| 
- |The order service validates the cart contents and calculates tax before creating a pending order| 
- |                                                .                                               | 
- |------------------------------------------------------------------------------------------------| 
-                                                  .                                                 
-  |----------------------------------------------------------------------------------------------|  
-  |The inventory service reserves stock for each line item and releases the hold if payment fails|  
-  |                                               .                                              |  
-  |----------------------------------------------------------------------------------------------|  
-                                                  .                                                 
-   |--------------------------------------------------------------------------------------------|   
-   |The payment service charges the customer's card through the processor and records the outcom|   
-   |--------------------------------------------------------------------------------------------|   
-                                                  .                                                 
-  |----------------------------------------------------------------------------------------------|  
-  |The notification service sends a confirmation email once the order has been successfully place|  
-  |                                               .                                              |  
-  |----------------------------------------------------------------------------------------------|  
-                                                  .                                                 
-|--------------------------------------------------------------------------------------------------|
-|The audit log service records every state transition so support staff can reconstruct what happene|
-|                                                 .                                                |
-|--------------------------------------------------------------------------------------------------|
+== ASCII Render (100x15 cells; 1 cell = 19.3 x 38.7 px) ==
+The API gateway receives every inbound request     The authentication service checks the bearer t   
+                       ...................................................                          
+|---------------------------------------------|    |----------------------------------------------| 
+|The rate limiter tracks request counts per cl|    |The router inspects the request path and dispa| 
+|---------------------------------------------|  ..|----------------------------------------------| 
+The order service validates the cart contents an.  The inventory service reserves stock for each l  
+                        ...................................................                         
+|---------------------------------------------|    |----------------------------------------------| 
+|The payment service charges the customer's ca|....|The notification service sends a confirmation | 
+|---------------------------------------------|    |----------------------------------------------| 
+The audit log service records every state transiti The reporting service aggregates completed orders
                                                                                                     
- |-------------------------------------------------------------------------------------------------|
- |The reporting service aggregates completed orders nightly and publishes a summary to the dashboar|
- |                                                                                                 |
- |-------------------------------------------------------------------------------------------------|
-                                                                                                    
-                                       |--------------------|                                       
-                                       |                    |                                       
-                                       |Reporting reads from|                                       
-                                       |                    |                                       
-                                       |--------------------|                                       
-                                                                                                    
-                                       |--------------------|                                       
-                                       |                    |                                       
-                                       |Payment charges are |                                       
-                                       |                    |                                       
-                                       |--------------------|                                       
+|---------|                                        |---------|                                      
+|Reporting|                                        |Payment c|                                      
+|---------|                                        |---------|                                      
 ```
 
 ---
@@ -348,6 +306,7 @@ total edge length: 1300
 mean edge length: 100
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
+arrow paths crossing a non-endpoint shape: 0
 source-order violations per container:
   sequence (col): 0
 left-edge alignment groups per container:
@@ -460,6 +419,7 @@ total edge length: 1440
 mean edge length: 180
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
+arrow paths crossing a non-endpoint shape: 0
 source-order violations per container:
   sparse-graph (auto): 0
 left-edge alignment groups per container:
@@ -510,108 +470,72 @@ left-edge alignment groups per container:
 layout-report: tests/corpus/wide-fanout.tldsl.jsx
 
 == Geometry ==
-id        parent       x  y     w    h
-hub       wide-fanout  0  0     138  60
-leaf-1    wide-fanout  9  100   120  60
-leaf-2    wide-fanout  9  200   120  60
-leaf-3    wide-fanout  9  300   120  60
-leaf-4    wide-fanout  9  400   120  60
-leaf-5    wide-fanout  9  500   120  60
-leaf-6    wide-fanout  9  600   120  60
-leaf-7    wide-fanout  9  700   120  60
-leaf-8    wide-fanout  9  800   120  60
-leaf-9    wide-fanout  9  900   120  60
-leaf-10   wide-fanout  5  1000  129  60
-leaf-11   wide-fanout  5  1100  129  60
-leaf-12   wide-fanout  5  1200  129  60
-leaf-13   wide-fanout  5  1300  129  60
-leaf-14   wide-fanout  5  1400  129  60
-leaf-15   wide-fanout  5  1500  129  60
-leaf-16   wide-fanout  5  1600  129  60
-leaf-17   wide-fanout  5  1700  129  60
-leaf-18   wide-fanout  5  1800  129  60
-mini-hub  wide-fanout  5  1900  129  60
-mini-1    wide-fanout  9  2000  120  60
-mini-2    wide-fanout  9  2100  120  60
-mini-3    wide-fanout  9  2200  120  60
-mini-4    wide-fanout  9  2300  120  60
-mini-5    wide-fanout  9  2400  120  60
-mini-6    wide-fanout  9  2500  120  60
+id        parent       x    y    w    h
+hub       wide-fanout  0    0    138  60
+leaf-1    wide-fanout  178  0    120  60
+leaf-2    wide-fanout  347  0    120  60
+leaf-3    wide-fanout  516  0    120  60
+leaf-4    wide-fanout  685  0    120  60
+leaf-5    wide-fanout  854  0    120  60
+leaf-6    wide-fanout  0    100  120  60
+leaf-7    wide-fanout  178  100  120  60
+leaf-8    wide-fanout  347  100  120  60
+leaf-9    wide-fanout  516  100  120  60
+leaf-10   wide-fanout  685  100  129  60
+leaf-11   wide-fanout  854  100  129  60
+leaf-12   wide-fanout  0    200  129  60
+leaf-13   wide-fanout  178  200  129  60
+leaf-14   wide-fanout  347  200  129  60
+leaf-15   wide-fanout  516  200  129  60
+leaf-16   wide-fanout  685  200  129  60
+leaf-17   wide-fanout  854  200  129  60
+leaf-18   wide-fanout  0    300  129  60
+mini-hub  wide-fanout  178  300  129  60
+mini-1    wide-fanout  347  300  120  60
+mini-2    wide-fanout  516  300  120  60
+mini-3    wide-fanout  685  300  120  60
+mini-4    wide-fanout  854  300  120  60
+mini-5    wide-fanout  0    400  120  60
+mini-6    wide-fanout  178  400  120  60
 
 == Metrics ==
-canvas: 138 x 2560
-aspect ratio: 0.05
-fill ratio (leaf area / canvas area): 0.548
+canvas: 983 x 460
+aspect ratio: 2.14
+fill ratio (leaf area / canvas area): 0.428
 overlapping shape pairs: 0
 edge-edge crossings: 0
-total edge length: 21100
-mean edge length: 844
+total edge length: 10864
+mean edge length: 435
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
+arrow paths crossing a non-endpoint shape: 36
 source-order violations per container:
-  wide-fanout (col): 0
+  wide-fanout (grid): 0
 left-edge alignment groups per container:
-  wide-fanout: 3 groups over 26 children
+  wide-fanout: 6 groups over 26 children
 
-== ASCII Render (100x60 cells; 1 cell = 1.4 x 42.7 px) ==
-Dispatcher                                                                                          
-                                                  .                                                 
-      |--------------------------------------------------------------------------------------|      
-      |Worker 1                                   .                                          |      
-      |--------------------------------------------------------------------------------------|      
-      Worker 2                                    .                                                 
-                                                  .                                                 
-      Worker 3                                    .                                                 
-                                                  .                                                 
-      |--------------------------------------------------------------------------------------|      
-      |Worker 4                                   .                                          |      
-      |--------------------------------------------------------------------------------------|      
-      Worker 5                                    .                                                 
-                                                  .                                                 
-      Worker 6                                    .                                                 
-                                                  .                                                 
-      |--------------------------------------------------------------------------------------|      
-      |Worker 7                                   .                                          |      
-      |--------------------------------------------------------------------------------------|      
-      |Worker 8                                   .                                          |      
-      |--------------------------------------------------------------------------------------|      
-      Worker 9                                    .                                                 
-                                                  .                                                 
-    Worker 10                                     .                                                 
-                                                  .                                                 
-    |-------------------------------------------------------------------------------------------|   
-    |Worker 11                                    .                                             |   
-    |-------------------------------------------------------------------------------------------|   
-    Worker 12                                     .                                                 
-                                                  .                                                 
-    Worker 13                                     .                                                 
-                                                  .                                                 
-    |-------------------------------------------------------------------------------------------|   
-    |Worker 14                                    .                                             |   
-    |-------------------------------------------------------------------------------------------|   
-    Worker 15                                     .                                                 
-                                                  .                                                 
-    Worker 16                                     .                                                 
-                                                  .                                                 
-    |-------------------------------------------------------------------------------------------|   
-    |Worker 17                                    .                                             |   
-    |-------------------------------------------------------------------------------------------|   
-    |Worker 18                                    .                                             |   
-    |-------------------------------------------------------------------------------------------|   
-    Scheduler                                     .                                                 
-                                                  .                                                 
-      Task 1                                      .                                                 
-                                                  .                                                 
-      |--------------------------------------------------------------------------------------|      
-      |Task 2                                     .                                          |      
-      |--------------------------------------------------------------------------------------|      
-      Task 3                                      .                                                 
-                                                  .                                                 
-      Task 4                                      .                                                 
-                                                  .                                                 
-      |--------------------------------------------------------------------------------------|      
-      |Task 5                                     .                                          |      
-      |--------------------------------------------------------------------------------------|      
-      Task 6                                      .                                                 
-                                                                                                    
+== ASCII Render (100x23 cells; 1 cell = 9.8 x 20.0 px) ==
+|-------------|   |-----------|    |-----------|    |-----------|    |-----------|    |-----------| 
+|Dispatcher...|...|Worker 1...|....|Worker 2...|....|Worker 3...|....|Worker 4...|....|Worker 5   | 
+|      .......|...|...........|..  |           |    |           |    |           |    |           | 
+|-------------|...|-----------|....|-----------|... |-----------|    |-----------|    |-----------| 
+      ..  . .   ... ................................................                                
+|-----------|..   |-----------|....|-----------|....|-----------|....|------------|.. |------------|
+|Worker 6   |. .. |Worker 7   |....|Worker 8. .|....|Worker 9   |    |Worker 10   |  .|Worker 11   |
+|     ..    | .  .|       ....|    |.....    ..|....|  ........ |    |            |   |            |
+|-----------|  .  |-----------|..  |-----------|    |-----------|....|------------|   |------------|
+      .         .   ..           ...          .....        ......       .........                   
+|------------|   .|------------|   |------------|  .|------------|...|------------|...|------------|
+|Worker 12   |    |Worker 13   |   |Worker 14   |   |Worker 15   |   |Worker 16   |   |Worker 17   |
+|------------|    |------------|   |------------|   |------------|   |------------|   |------------|
+      .              .                                                                              
+|------------|    |------------|   |-----------|    |-----------|    |-----------|    |-----------| 
+|Worker 18   |    |Scheduler   |   |Task 1     |    |Task 2     |    |Task 3     |    |Task 4     | 
+|     .      |    |    ........|...|...........|....|...........|....|...........|....|......     | 
+|------------|    |------------|   |-----------|    |-----------|    |-----------|    |-----------| 
+               ....     .                                                                           
+|-----------|..   |-----------|                                                                     
+|Task 5 ....|     |Task 6     |                                                                     
+|     ..    |     |     .     |                                                                     
+|-----------|     |-----------|                                                                     
 ```
