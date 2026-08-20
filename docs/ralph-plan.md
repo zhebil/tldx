@@ -16,7 +16,8 @@ once A is done. The loop never terminates; the human stops it.
 - Phase: **B**
 - Champion layout revision: `docs/layout-champion.md`, still the wake-12
   revision (the B1 candidate: cross-axis `align`, default `center`). Unchanged
-  since - B2, B3, B4a, B13, B14 and B15 all reverted. Judged results so far live in
+  since - B2, B3, B4a, B13, B14, B15 and B6 all reverted after judging, and B7
+  rejected at an objective gate before judging. Judged results so far live in
   `docs/layout-hypotheses.md` - read it before proposing a hypothesis.
 
 ---
@@ -608,9 +609,33 @@ Ordered. Take from the top. Strike through when resolved.
   by edges has to act on the pair. The one win (`long-labels`) was B9's sticky
   overflow being masked by slack, not this hypothesis working. Ledger entry in
   `docs/layout-hypotheses.md`.
-- [ ] **B7** Aspect-ratio targeting for the doc root: currently defaulting to
+- [x] ~~**B7** Aspect-ratio targeting for the doc root: currently defaulting to
   `col` makes tall skinny documents (1198 × 2940). Try wrapping top-level
-  children into a grid that targets ~16:9.
+  children into a grid that targets ~16:9.~~ **REJECTED AT GATE 5** _(wake 21)_
+  - built, measured, and thrown out before a judge was spent. `sequence` goes
+  from 0 arrow paths crossing a non-endpoint shape to 3, so gate 5 rejects it;
+  the other four gates passed comfortably (worst area ratio 1.28x, no new
+  overlap, no source-order violation, `npm run check` green). The mechanism, not
+  the tuning: wrapping a *chain* into a row-major grid leaves every row boundary
+  spanned by a right-end-to-left-start diagonal across the whole canvas, and no
+  choice of `cols` removes them. The grid wrap optimises the bounding box and is
+  indifferent to which children the edges connect. Survives as **B20** and
+  **B21**. Ledger entry in `docs/layout-hypotheses.md`.
+
+- [ ] **B20** _(successor to B7)_ Gate the doc-root aspect wrap on **topology**:
+  apply it when the top-level children form a fan or carry no edges at all, skip
+  it when they form a chain (each child having at most one in- and one out-edge,
+  covering most of the container). B7's implementation is entirely reusable -
+  `bestGridCols` is not what failed - so this is a predicate, not a rewrite.
+  Expect `sequence` to be untouched and `long-labels` / `wide-fanout` to wrap.
+
+- [ ] **B21** _(successor to B7)_ Serpentine (boustrophedon) row direction for a
+  wrapped grid, so a chain's wrap-back edge becomes a short vertical hop instead
+  of a full-width diagonal. **Two units of work, do them in this order:** first
+  teach `sourceOrderViolations` in `tools/layout-report.mts` that a serpentine
+  grid's odd rows run right-to-left, because gate 3 rejects it by construction
+  otherwise; only then flip the placement. Do not attempt both in one wake.
+
 - [ ] **B8** Frame title width participates in frame sizing. Frame `name` is
   never measured, so long titles overflow.
 - [ ] **B9** Note sizing: notes reserve a fixed 200×80 in layout but tldraw
@@ -637,8 +662,9 @@ Ordered. Take from the top. Strike through when resolved.
 - [ ] **B11** Wrap box labels at a width derived from the document's target
   aspect ratio instead of a constant. B2 showed wrapping itself is not the
   problem - a fixed 320px cap is. Pick the cap so the resulting canvas moves
-  *toward* ~16:9, not past it. Overlaps B7; do B7 first if it lands, then this
-  reduces to choosing the cap from the width B7 already wants.
+  *toward* ~16:9, not past it. Overlapped B7, which was rejected at gate 5; the
+  overlap now transfers to B20, so do B20 first if it lands and this reduces to
+  choosing the cap from the width B20 already wants.
 
 ---
 
@@ -1088,3 +1114,24 @@ anything that outlives the loop.)_
   screenshot failure of this shape is a *selector* problem, not a broken
   diagram, and any corpus file whose first-painted shape is an axis-aligned
   arrow would have hit it.
+
+- **(wake 21)** Three of six corpus files are **structurally blind to any
+  doc-root hypothesis**: `deep-nesting` and `hexagonal` each have exactly one
+  top-level child (a single frame), and `sparse-graph` sets `layout="auto"` on
+  the doc. B7 produced byte-identical reports for all three. Combined with the
+  wake-20 note above, this means the corpus can only ever decide a doc-root
+  hypothesis 3-0, on `long-labels`, `sequence` and `wide-fanout`. Any future
+  verdict line that reads "N ties" on this axis is describing the corpus, not
+  the hypothesis. A corpus file with several top-level siblings would be a
+  genuine gap - though adding one is its own hypothesis, judged on whether it
+  covers a real diagram shape, and it invalidates the champion report.
+
+- **(wake 21)** Estimated box width and rendered box width disagree in the
+  direction the report cannot see. B7's `wide-fanout` render wraps `Dispatcher`
+  to "Dispatch / er" and `Scheduler` to "Schedul / er" - tldraw is drawing those
+  boxes narrower than `estimatedBoxSize` reserved. This is the same class of
+  defect as B9's sticky overflow but in the opposite sign (reserved space
+  exceeds rendered space rather than falling short), and it is invisible to
+  every metric in the report. Worth folding into B9's wake rather than spending
+  its own, since both are "the estimator and the renderer disagree about a
+  shape's size".

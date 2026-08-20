@@ -871,3 +871,83 @@ happened to resolve a box first. Changed to `state: "attached"`; the existing
 zoom-to-fit plus 500ms settle already covers paint. This affects *whether* a
 capture happens, never what is captured, so both sides of the `sequence`
 comparison remain the same tool's output.
+
+---
+
+## B7 — aspect-ratio targeting for the doc root — **REJECTED AT GATE 5**
+
+_(wake 21)_
+
+**Hypothesis (backlog, verbatim).** "Aspect-ratio targeting for the doc root:
+currently defaulting to `col` makes tall skinny documents (1198 × 2940). Try
+wrapping top-level children into a grid that targets ~16:9."
+
+**What was built.** +61/-13 in `src/domain/layout/stack.ts`, +4 unit tests.
+`TARGET_ASPECT = 16 / 9`; a pure `gridExtent(els, cols, gap)` mirroring
+`gridPositions`' column/row-max arithmetic; an exported
+`bestGridCols(els, gap, target?)` that scans `cols` from 1 to `n` and picks the
+minimum of `|log((w / h) / target)|`, ties keeping the smaller `cols`.
+`layoutContainer` gained a `mayAutoGrid` flag - true only for the doc root, and
+only when the author set neither `layout` nor `cols` - and now reports the mode
+and column count it actually used. `hybridLayout` writes those back onto the
+positioned doc, so `layout: "grid"` is what `tools/layout-report.mts` reads.
+That last part is load-bearing rather than cosmetic: the report picks its
+source-order rule from `doc.layout ?? "col"`, and a row-major grid is a
+violation of the col rule on every wrap. Frames, `auto`, `free`, explicit `row`
+/ `col`, and explicit `cols` are all untouched.
+
+**Objective gates — four passed, the fifth failed.**
+
+| corpus file | canvas champion → candidate | area ratio | overlaps | source-order | arrow crossings |
+| --- | --- | --- | --- | --- | --- |
+| deep-nesting | 560x776 → 560x776 | 1.00 | 0 → 0 | 0 → 0 | 10 → 10 |
+| hexagonal | 1198x636 → 1198x636 | 1.00 | 0 → 0 | 0 → 0 | 5 → 5 |
+| long-labels | 948x1200 → 1927x580 | 0.98 | 0 → 0 | 0 → 0 | 6 → **1** |
+| sequence | 282x1360 → 881x460 | 1.06 | 0 → 0 | 0 → 0 | 0 → **3** ❌ |
+| sparse-graph | 680x460 → 680x460 | 1.00 | 0 → 0 | 0 → 0 | 0 → 0 |
+| wide-fanout | 138x2560 → 983x460 | 1.28 | 0 → 0 | 0 → 0 | 186 → **36** |
+
+`npm run check` green (36 files / 289 tests). No overlap appeared, no
+source-order violation appeared, and the worst area ratio was 1.28x against the
+1.5x ceiling. **Gate 5 rejects it: `sequence` goes from 0 arrow paths crossing a
+non-endpoint shape to 3.** Per the protocol that is a rejection without a judge,
+so no fable call was spent and there are no per-file verdicts.
+
+**Why `sequence` breaks, and it is the mechanism, not the tuning.** `sequence`
+is a chain: `s1 → s2 → … → s14`, one edge per adjacent pair. Wrapping a chain
+into a row-major grid leaves every row boundary spanned by an edge that runs
+from the *right* end of one row back to the *left* end of the next - a diagonal
+across the full canvas width, at row-pitch height, passing through whatever sits
+in the middle columns. Three columns means four such wrap-backs, and the render
+shows all four as long diagonals slicing the middle column. No choice of `cols`
+removes them; it only changes how many there are and how far each one travels.
+The grid wrap is **topology-blind**: it optimises the bounding box and is
+indifferent to which children the edges connect. Gate 5 exists to catch exactly
+that, and this is the first time it has fired.
+
+**What the renders say about the other two files, recorded because it does not
+survive in the metrics.** PNGs were captured for `sequence` and `wide-fanout`
+after the gate failed - not for judgement, but because the `wide-fanout` number
+looks like a landslide and is not one. 186 → 36 crossings is real, and the
+render still shows the `Dispatcher` hub firing eighteen straight chords across a
+6x5 raster, most of them cutting through two or three boxes on the way. The grid
+converts a vertical corridor into a raster; the fan is still drawn as eighteen
+chords either way. `wide-fanout` is now the **fifth** consecutive hypothesis to
+fail on it, and B7's evidence sharpens the diagnosis the previous four left
+vague: the defect is not the corridor's shape, it is that eighteen edges from
+one source get eighteen independent straight lines regardless of where the
+targets are. That is a *routing* problem, and the terminal-binding line (B3,
+B4a, B13, B14, B15) already established that anchors alone cannot fix routing.
+
+**What survives.** Two successors, both aimed at the topology-blindness rather
+than at the aspect target, which was never the part that failed:
+
+- **B20** - gate the wrap on topology: skip it when the container's children
+  form a chain, apply it when they form a fan or an unconnected set.
+- **B21** - serpentine row direction, which turns every wrap-back edge into a
+  short vertical hop. Needs a tooling change first (`sourceOrderViolations`
+  must learn that a serpentine grid's odd rows run right-to-left), so it is two
+  units of work, not one.
+
+The `bestGridCols` scoring function itself is not implicated by anything
+measured here. If B20 or B21 revives the wrap, reuse it as written.
