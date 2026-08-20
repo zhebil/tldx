@@ -16,6 +16,12 @@
  * to `compileFile` (parse → ir → layout → emit) and is responsible only for
  * wiring the watcher event to a transport push and emitting structured logs
  * for observability.
+ *
+ * After every compile, the watch subscription is re-synced to
+ * `result.inputs` (the module graph the compile actually touched) via
+ * `watchHandle.update()`, so imports added or dropped by a JSX entry are
+ * picked up. A failed compile with unknown inputs (`null`) leaves the
+ * existing watch set untouched rather than dropping it.
  */
 
 import { sceneMessage } from "../contracts/builders.js";
@@ -67,6 +73,9 @@ export function watchAndServe(
       execute: deps.execute,
     });
     if (closed) return;
+    if (result.inputs !== null) {
+      watchHandle?.update(result.inputs);
+    }
     pushResult(deps, trigger, result);
   };
 
@@ -87,9 +96,9 @@ export function watchAndServe(
       });
   };
 
-  let watchHandle: WatchHandle;
+  let watchHandle: WatchHandle | undefined;
   const ready = (async (): Promise<void> => {
-    watchHandle = deps.watch.watch(path, {
+    watchHandle = deps.watch.watch([path], {
       onChange: () => {
         if (closed) return;
         schedule("change");
@@ -122,7 +131,7 @@ export function watchAndServe(
       // `ready` always assigns watchHandle synchronously inside its first
       // microtask; awaiting it is enough to ensure assignment.
       await ready.catch(() => undefined);
-      await watchHandle.close();
+      await watchHandle?.close();
     },
   };
 }

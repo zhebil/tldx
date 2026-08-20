@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { SceneMessage } from "../contracts/scene-message.js";
+import { error } from "../domain/diagnostics/index.js";
+import type { AstDoc } from "../domain/parser/ast.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
 
 import { FakeExecute } from "./ports/execute.fake.js";
@@ -25,6 +27,18 @@ const ANOTHER_VALID_DOC = `<doc id="auth">
 const PARSE_BROKEN = `<doc id="d"><box id="b"`;
 
 const IR_BROKEN = `<doc id="d"><box id="x" /><box id="x" /></doc>`;
+
+function docWithBox(path: string): AstDoc {
+  const span = { file: path, line: 1, column: 1 };
+  return {
+    kind: "doc",
+    attrs: {},
+    span,
+    children: [
+      { kind: "box", attrs: { id: { value: "b", span, nameSpan: span } }, span },
+    ],
+  };
+}
 
 interface Setup {
   deps: WatchAndServeDeps;
@@ -200,5 +214,86 @@ describe("watchAndServe", () => {
     watch.emitChange("auth.tldsl"); // close already unsubscribed; no-op anyway
 
     expect(transport.pushed).toHaveLength(1);
+  });
+
+  describe("module graph re-subscription", () => {
+    const ENTRY = "a.tldsl.jsx";
+    const SRC_OK = "ok-source";
+    const SRC_BROKEN = "broken-source";
+
+    function makeExecuteOk(): FakeExecute {
+      const execute = new FakeExecute();
+      execute.setResult(SRC_OK, {
+        ast: docWithBox(ENTRY),
+        inputs: [ENTRY, "parts.tldsl.jsx"],
+      });
+      return execute;
+    }
+
+    it("re-subscribes to the module graph after a successful compile", async () => {
+      const fs = new InMemoryFs({ [ENTRY]: SRC_OK });
+      const watch = new FakeWatch();
+      const transport = new InMemoryTransport();
+      const deps: WatchAndServeDeps = {
+        fs,
+        watch,
+        transport,
+        log: new CaptureLog(),
+        layout: new StubLayout(),
+        execute: makeExecuteOk(),
+      };
+
+      const handle = watchAndServe(ENTRY, deps);
+      await handle.ready;
+
+      expect(watch.activeSubscribers("parts.tldsl.jsx")).toBe(1);
+      expect(transport.pushed).toHaveLength(1);
+
+      watch.emitChange("parts.tldsl.jsx");
+      await handle.idle();
+
+      expect(transport.pushed).toHaveLength(2);
+
+      await handle.close();
+    });
+
+    it("a failed compile keeps the previous watch set", async () => {
+      // The WatchPort contract can't express this - the port knows nothing
+      // about compiles. This pins watchAndServe's response to compileFile's
+      // `inputs: null` arm, the nasty failure mode the plan calls out.
+      const fs = new InMemoryFs({ [ENTRY]: SRC_OK });
+      const watch = new FakeWatch();
+      const transport = new InMemoryTransport();
+      const execute = makeExecuteOk();
+      execute.setResult(SRC_BROKEN, {
+        diagnostics: [error("runtime/threw", "boom", { file: ENTRY, line: 1, column: 1 })],
+      });
+      const deps: WatchAndServeDeps = {
+        fs,
+        watch,
+        transport,
+        log: new CaptureLog(),
+        layout: new StubLayout(),
+        execute,
+      };
+
+      const handle = watchAndServe(ENTRY, deps);
+      await handle.ready;
+      expect(watch.activeSubscribers("parts.tldsl.jsx")).toBe(1);
+
+      fs.setFile(ENTRY, SRC_BROKEN);
+      watch.emitChange(ENTRY);
+      await handle.idle();
+
+      expect(transport.pushed).toHaveLength(2);
+      expect(transport.pushed[1]!.kind).toBe("error");
+      expect(watch.activeSubscribers("parts.tldsl.jsx")).toBe(1);
+
+      watch.emitChange("parts.tldsl.jsx");
+      await handle.idle();
+      expect(transport.pushed).toHaveLength(3);
+
+      await handle.close();
+    });
   });
 });
