@@ -35,6 +35,13 @@ export type CompileFileResult = {
   /** Populated only when the pipeline ran clean. Null on any error. */
   sceneJson: SceneJSON | null;
   diagnostics: Diagnostic[];
+  /**
+   * Every file that contributed to this compile, in `path`'s style. Null
+   * means "unknown, keep whatever you had" - the fs-read-error and JSX
+   * diagnostics-only arms don't know the input set, so a watcher should
+   * leave its existing subscriptions alone rather than dropping them.
+   */
+  inputs: string[] | null;
 };
 
 export async function compileFile(
@@ -45,35 +52,42 @@ export async function compileFile(
   try {
     source = await deps.fs.read(path);
   } catch (err) {
-    return { sceneJson: null, diagnostics: [readErrorDiag(path, err)] };
+    return { sceneJson: null, diagnostics: [readErrorDiag(path, err)], inputs: null };
   }
 
   let ast: AstNode | null;
   let diagnostics: Diagnostic[];
+  let inputs: string[];
 
   if (path.endsWith(".jsx")) {
     const executed = await deps.execute.execute(source, path);
     if ("diagnostics" in executed) {
-      return { sceneJson: null, diagnostics: normaliseSpans(path, executed.diagnostics) };
+      return {
+        sceneJson: null,
+        diagnostics: normaliseSpans(path, executed.diagnostics),
+        inputs: null,
+      };
     }
     ast = executed.ast;
     diagnostics = [];
+    inputs = executed.inputs.map((f) => normalisePath(path, f));
   } else {
     const parsed = parse(source, path);
     ast = parsed.ast;
     diagnostics = normaliseSpans(path, parsed.diagnostics);
+    inputs = [path];
   }
 
   const { ir, diagnostics: lowerDiags } = lower(ast);
   diagnostics.push(...normaliseSpans(path, lowerDiags));
 
   if (ir === null || hasErrors(diagnostics)) {
-    return { sceneJson: null, diagnostics };
+    return { sceneJson: null, diagnostics, inputs };
   }
 
   const positioned = await deps.layout.layout(ir);
   const sceneJson = emit(positioned);
-  return { sceneJson, diagnostics };
+  return { sceneJson, diagnostics, inputs };
 }
 
 function readErrorDiag(path: string, err: unknown): Diagnostic {
@@ -98,7 +112,11 @@ function normaliseSpans(path: string, diagnostics: readonly Diagnostic[]): Diagn
 }
 
 function normaliseSpan(path: string, span: SourceSpan): SourceSpan {
+  return { ...span, file: normalisePath(path, span.file) };
+}
+
+function normalisePath(path: string, file: string): string {
   const dir = dirname(path);
-  const resolved = resolve(dir, span.file);
-  return { ...span, file: join(dir, relative(resolve(dir), resolved)) };
+  const resolved = resolve(dir, file);
+  return join(dir, relative(resolve(dir), resolved));
 }

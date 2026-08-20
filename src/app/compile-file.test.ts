@@ -256,4 +256,50 @@ describe("compileFile", () => {
       expect(result.diagnostics[0]!.span!.file).toBe("foo/bar.tldsl.jsx");
     });
   });
+
+  describe("inputs", () => {
+    it("is [path] for the text-parser front end, even on parse error", async () => {
+      const ok = await compileFile(
+        "auth.tldsl",
+        deps({ "auth.tldsl": `<doc id="d"><box id="b" /></doc>` }),
+      );
+      expect(ok.inputs).toEqual(["auth.tldsl"]);
+
+      const broken = await compileFile(
+        "bad.tldsl",
+        deps({ "bad.tldsl": `<doc id="d"><box id="b"` }),
+      );
+      expect(broken.inputs).toEqual(["bad.tldsl"]);
+    });
+
+    it("is null when the file read fails", async () => {
+      const result = await compileFile("missing.tldsl", deps({}));
+      expect(result.inputs).toBeNull();
+    });
+
+    it("is null on a diagnostics-only JSX execute result", async () => {
+      const path = "broken.tldsl.jsx";
+      const source = "throw new Error('boom')";
+      const execute = new FakeExecute();
+      execute.setResult(source, {
+        diagnostics: [error("runtime/threw", "boom", { file: path, line: 1, column: 1 })],
+      });
+
+      const result = await compileFile(path, deps({ [path]: source }, new StubLayout(), execute));
+      expect(result.inputs).toBeNull();
+    });
+
+    it("is executed.inputs, normalised to the path's directory style, on JSX success", async () => {
+      const path = "foo/bar.tldsl.jsx";
+      const source = "export default function Diagram() { return null; }";
+      const execute = new FakeExecute();
+      execute.setResult(source, {
+        ast: docWithLabelledBox(path, "box"),
+        inputs: [resolve(path), resolve("foo/parts.tldsl.jsx")],
+      });
+
+      const result = await compileFile(path, deps({ [path]: source }, new StubLayout(), execute));
+      expect(result.inputs).toEqual(["foo/bar.tldsl.jsx", "foo/parts.tldsl.jsx"]);
+    });
+  });
 });
