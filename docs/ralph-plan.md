@@ -249,13 +249,29 @@ next task.
   while it is still broken still pushes a third message, proving the import
   stayed subscribed across a failed compile.
 
-- [ ] **A7 — Port fixtures and corpus to JSX.**
+- [x] **A7 — Port fixtures and corpus to JSX.** _(wake 8)_
   Convert `tests/e2e/` fixtures and `scratch.tldsl`. Parity gate: the auth
   fixture must produce byte-identical `SceneJSON` through both front ends.
   Also create the Phase B corpus (see A9's tooling for what it feeds):
   `tests/corpus/hexagonal.tldsl.jsx`, `sequence.tldsl.jsx`,
   `wide-fanout.tldsl.jsx`, `deep-nesting.tldsl.jsx`, `sparse-graph.tldsl.jsx`,
   `long-labels.tldsl.jsx`. Six diagrams, deliberately different shapes.
+  **Done.** `auth.tldsl.jsx` sits beside `auth.tldsl` and the parity gate is a
+  new `describe` in `auth-fixture.test.ts` asserting
+  `JSON.stringify(jsxScene) === JSON.stringify(textScene)` — byte-identical,
+  not `toEqual`, so key order counts. Verified non-vacuous by hand: 21 records
+  each side, equal; flipping one label in a copy of the JSX fixture makes it
+  differ. `scratch.tldsl` was **replaced** by `scratch.tldsl.jsx` (the `.tldsl`
+  is deleted — A8 removes the front end that read it), with four genuinely
+  linear edge runs collapsed onto `flow(...)`. `check-jsx-dup.tldsl.jsx` ports
+  the duplicate-id case; its golden file was *captured from a real run*, not
+  hand-written. The corpus is six files plus `corpus.test.ts`, which globs
+  `*.tldsl.jsx`, asserts at least six were found, and compiles each through
+  the real esbuild/worker + ELK stack expecting zero diagnostics.
+  `sparse-graph.tldsl.jsx` sets `layout="auto"` so the corpus keeps one file
+  on the ELK path. Verified `npm run check` green (37 files / 321 tests,
+  exit 0) and every corpus file plus `scratch.tldsl.jsx` exiting 0 silently
+  through the real CLI.
 
 - [ ] **A8 — Delete the text parser.**
   `tokenize.ts`, `parse.ts`, their tests, `.tldsl` dispatch. Update the
@@ -530,3 +546,28 @@ anything that outlives the loop.)_
   `Error.prototype.stack`. Stable on Node 20-25, but it is a V8 format
   dependency in a golden file - if it ever goes flaky across Node versions,
   assert the code and span and drop the message text.
+
+- **(wake 8, A7)** A prop named `key` on a tldsl element is **silently
+  discarded**. `jsxDEV`'s signature takes `key` as argument 3, so it never
+  reaches `props` and A5's `ir/unknown-prop` net cannot see it — the one prop
+  name in the language that fails without a diagnostic. Two subagents reached
+  for `key={...}` on `.map()` output out of React habit; it was stripped from
+  the corpus before freezing. Either `jsx-dev-runtime.ts` should reject a
+  non-`undefined` `key`, or A10 must document that `key` is meaningless here.
+- **(wake 8, A7)** `flow(...)` edges carry no `id`, so the four runs collapsed
+  onto it in `scratch.tldsl.jsx` lost their original ids (`ae-1..ae-4`,
+  `ae-6..ae-8`, `pe-1..pe-5`, `pe-9..pe-13`) in favour of generated ones. No
+  test referenced them, but it means `flow()` and explicit `<Edge id=...>` are
+  not interchangeable if anything ever addresses an edge by id.
+- **(wake 8, A7)** `tests/corpus/` is **neither typechecked nor linted** —
+  `allowJs` is off so `tsc` skips `.jsx`, and `npm run lint` only runs over
+  `src`. `corpus.test.ts` compiling each file at runtime is the only thing
+  standing between a typo and a silently rotten bench. Adequate, but it is the
+  reason that test asserts a minimum fixture count rather than trusting the
+  glob.
+- **(wake 8, A7)** **A8's delete list**, gathered while porting: `auth.tldsl`,
+  `check-good.tldsl`, `check-broken.tldsl` + `check-broken.diagnostics.txt`,
+  `check-good.diagnostics.txt`, the parity `describe` in
+  `auth-fixture.test.ts`, and that file's *first* `describe` too — it calls
+  `parse()` directly and dies with the text parser. `check-not-tldsl.txt`
+  stays; it is the skip case.
