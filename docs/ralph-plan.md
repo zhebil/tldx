@@ -174,11 +174,39 @@ next task.
   `tests/e2e/fixtures/check-jsx-broken.tldsl.jsx:2:9: error[runtime/threw]` and
   exits 1 on the broken one, and still exits 0 silently on `src/cli/main.ts`.
 
-- [ ] **A5 — Unknown-prop rejection in `lower.ts`.**
+- [x] **A5 — Unknown-prop rejection in `lower.ts`.** _(wake 6)_
   `<Box lable="x" />` and `<Box className="..." />` must produce
   `ir/unknown-prop` with the allowed list and a real span. Mirror the existing
   `parser/unknown-element` hint format in `parse.ts`.
   This is the safety net that replaces the type checker — do not skip it.
+  **Done.** One `ALLOWED_PROPS` table in `lower.ts` plus a `checkUnknownProps`
+  helper called at the top of `lower()` (doc root) and of each of
+  `lowerFrame`/`lowerBox`/`lowerNote`/`lowerEdge` - before `lowerEdge`'s early
+  return on a missing endpoint, so a typo'd edge still reports. One diagnostic
+  per offending attribute, spanned on `AttrValue.nameSpan`, best-effort like
+  every other check in the file: it never drops the element.
+  The allowed sets are **exactly what `lower.ts` consumes** and nothing more:
+  `doc` = id/direction/layout/gap/pad/cols, `frame` = that plus name/x/y/w/h,
+  `box` = id/label/x/y/w/h, `note` = id/x/y/w/h, `edge` = id/from/to.
+  That is the one real decision in this task, and it was made deliberately:
+  `docs/dsl.md` documents `type`, `route`, `head-start`, `head-end`, `bg` and
+  `border`, none of which the IR reads. Whitelisting them would re-create for
+  those six props the exact silent-ignore bug A5 exists to kill, and the
+  message ("is not supported on") is honest about them. It matches how
+  `lower.ts` already treats anchor and free-endpoint syntax
+  (`ir/anchor-not-supported`). Consequence: `scratch.tldsl` used `type="bi"`,
+  `type="line"` and `route="curved"` on ten edges; those attributes were
+  removed (nothing else in that file touched) and it now checks clean.
+  The rule immediately caught a real pre-existing fixture bug it was not
+  aiming at: `watch-and-serve.test.ts`'s `ANOTHER_VALID_DOC` had
+  `<note id="readme" label="ok" />`, and `<note>` takes its text as a child,
+  never as `label` - so that fixture had been silently rendering an empty
+  sticky. Fixed to `<note id="readme">ok</note>`.
+  `npm run check` green (36 files, 298 tests). Verified by hand through the
+  **JSX** front end, which is the front end that matters here:
+  `<Box id="a" lable="API" className="rounded-lg bg-blue-500" />` prints two
+  `error[ir/unknown-prop]` lines with the allowed list and exits 1, and
+  `check scratch.tldsl` exits 0 silently.
 
 - [ ] **A6 — Watch the module graph.**
   `app/ports/watch.ts` takes a set of paths and supports re-subscription.
@@ -421,6 +449,28 @@ anything that outlives the loop.)_
   of the test), so a crash between `mkdtemp` and its `finally` leaves a
   `tldsl-execute-jsx-relative-*` directory in the repo root. Untracked and
   harmless, but it is why `git add .` stays banned.
+- **(wake 6, A5)** `ir/unknown-prop`'s span is only as precise as the front
+  end allows. From the text parser it points at the attribute *name*; from
+  JSX it points at the **element**, because `jsxDEV` hands the runtime one
+  `source` per element and `propsToAttrs` copies it into both `span` and
+  `nameSpan`. Two unknown props on one `<Box>` therefore report the same
+  line:column twice. Acceptable (the message names the prop), but if it ever
+  matters, the only fix is column-scanning the source line for the prop name
+  in `components.ts` - esbuild does not emit per-attribute positions.
+- **(wake 6, A5)** Wake 2's Fragment note is still open and A5 did **not**
+  close it: `<>…</>` returns a bare array, and `lower()` is typed on `AstNode`.
+  An array reaching `lower()` hits the `ast.kind !== "doc"` branch and reports
+  `ir/root-not-doc` with `<undefined>` in the message and no usable span. It
+  is a wrong-but-not-silent failure, so it was left alone rather than widened
+  into A5's scope. The right place is `flattenNodes`/`Doc` in
+  `src/runtime/components.ts`, not `lower.ts`.
+- **(wake 6, A5)** `docs/dsl.md` now documents six edge/frame attributes the
+  IR actively rejects (`type`, `route`, `head-start`, `head-end`, `bg`,
+  `border`). **A10 owns reconciling that** - either mark them clearly as
+  phase 1 and unimplemented, or delete them from the doc. Leaving the doc as
+  it stands is a trap: an LLM reading `dsl.md` will write `type="bi"` and get
+  an error.
+
 - **(wake 5, A4)** `tests/e2e/fixtures/check-jsx-broken.tldsl.diagnostics.txt`
   asserts the message `Error: boom`, which comes from the first line of V8's
   `Error.prototype.stack`. Stable on Node 20-25, but it is a V8 format
