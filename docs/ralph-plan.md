@@ -596,7 +596,18 @@ Ordered. Take from the top. Strike through when resolved.
   opts in - and corpus changes are their own hypothesis. The underlying evidence
   is real and survives as **B19**, which realigns *positions* without touching
   child order.
-- [ ] **B6** Spacing as a function of edge density rather than the constant 40.
+- [x] ~~**B6** Spacing as a function of edge density rather than the constant
+  40.~~ **REVERTED** _(wake 20)_ - 1 candidate / 3 champion / 2 structural ties.
+  All five gates passed; the judges did not. The heuristic has the sign right
+  and the granularity wrong: gap is a **container-level** knob, so density
+  measured per container is spent on *every* sibling pair, including the pairs
+  with no edge between them. On `sparse-graph` that inverted the diagram's own
+  grouping signal - connected pairs ended further apart than unconnected
+  neighbours. A per-container scalar cannot express a per-pair property, so do
+  not spend a wake retuning the cap or the curve; a spacing hypothesis motivated
+  by edges has to act on the pair. The one win (`long-labels`) was B9's sticky
+  overflow being masked by slack, not this hypothesis working. Ledger entry in
+  `docs/layout-hypotheses.md`.
 - [ ] **B7** Aspect-ratio targeting for the doc root: currently defaulting to
   `col` makes tall skinny documents (1198 × 2940). Try wrapping top-level
   children into a grid that targets ~16:9.
@@ -1051,3 +1062,29 @@ anything that outlives the loop.)_
   tunnels through a *frame's* interior without touching a box is invisible to
   both metrics when the frame is an ancestor of one endpoint. Not worth a wake
   until a hypothesis is plausibly affected by it.
+
+- **(wake 20)** Two of six corpus files are **structurally blind to any
+  hypothesis about default spacing**: `deep-nesting` and `hexagonal` set an
+  explicit `gap` on every frame and have a single top-level child, so B6's
+  candidate produced byte-identical renders and reports for both. They cost
+  nothing (no judge is spent on an identical pair) but they do mean a spacing
+  hypothesis can win at most 4-0, and two "ties" in the verdict line are not
+  evidence of anything. Worth knowing before reading any future spacing result.
+
+- **(wake 20)** `tools/layout-report.mts`'s `canvas:` line may not track an
+  `auto` container's real extent. On `sparse-graph` the candidate moved shapes
+  40px right (`n4` x 500 → 540, so a right edge of 660 vs 620) while the
+  `canvas:` header stayed 680x460 on both sides. **Objective gate 4 reads that
+  line**, so if it is derived from the container's declared w/h rather than from
+  the placed shapes' bounding box, the area gate is partly blind on `auto`
+  files. The B6 deltas were far under 1.5x either way, so it did not change that
+  verdict - but it should be confirmed before a hypothesis lands near the
+  ceiling.
+
+- **(wake 20)** `tools/screenshot.mts` waited on `[data-shape-id]` with
+  playwright's default `state: "visible"`, which a perfectly vertical arrow
+  (zero-width bounding box) never satisfies. Fixed to `state: "attached"` while
+  unblocking B6's `sequence` capture. Two consequences worth remembering: a
+  screenshot failure of this shape is a *selector* problem, not a broken
+  diagram, and any corpus file whose first-painted shape is an axis-aligned
+  arrow would have hit it.

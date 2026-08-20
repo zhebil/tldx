@@ -771,3 +771,103 @@ not a win on its own.
 direct `arrowPath` unit tests only; nothing in the corpus emits `kind: "elbow"`
 today, so the first hypothesis that flips it back is also the first real
 exercise of that branch.
+
+---
+
+## B6 — container gap as a function of edge density _(wake 20)_ — **REVERTED**
+
+**Hypothesis.** Spacing should not be a constant 40. A container whose subtree
+is densely wired needs more room between its children than a container of
+unrelated boxes, so derive the gap from edge density when the author has not
+set one explicitly.
+
+**The change.** `src/domain/layout/stack.ts`, +47/-5, plus 4 unit tests.
+`hybridLayout` collects every edge in the document once and threads the list
+down through `layoutContainer` → `sizeElement` → `sizeFrame`. A new
+`resolveGap(explicitGap, children, allEdges)` replaces both
+`container.gap ?? DEFAULT_GAP` sites:
+
+- an explicit `gap` still wins, untouched;
+- otherwise `density = edgesInside / max(1, directChildCount)`, where
+  `edgesInside` counts edges declared **anywhere in the document** whose `from`
+  *and* `to` both land inside this container's subtree — corpus files declare
+  most edges at the doc root while the boxes they connect sit several frames
+  deep, so counting only locally-declared edges would have made the whole
+  hypothesis invisible;
+- `gap = round(40 * (1 + min(density, 1)))`, i.e. 40 with no internal edges,
+  80 once a container has at least as many internal edges as direct children.
+
+Nothing else moved: `DEFAULT_GAP`, `defaults.ts`, `elk-layout.ts`, the IR types
+and `StubLayout` are all untouched, and the derived value reaches ELK for free
+because `AutoPlaceRequest.gap` is filled from the same variable.
+
+**Objective gates — all five passed.**
+
+| corpus file | canvas champion → candidate | area ratio | overlaps | source-order | arrow crossings |
+| --- | --- | --- | --- | --- | --- |
+| deep-nesting | 560x776 → 560x776 | 1.00 | 0 → 0 | 0 → 0 | 10 → 10 |
+| hexagonal | 1198x636 → 1198x636 | 1.00 | 0 → 0 | 0 → 0 | 5 → 5 |
+| long-labels | 948x1200 → 948x1497 | 1.25 | 0 → 0 | 0 → 0 | 6 → 6 |
+| sequence | 282x1360 → 282x1841 | 1.35 | 0 → 0 | 0 → 0 | 0 → 0 |
+| sparse-graph | 680x460 → 680x460 | 1.00 | 0 → 0 | 0 → 0 | 0 → 0 |
+| wide-fanout | 138x2560 → 138x3510 | 1.37 | 0 → 0 | 0 → 0 | 186 → 186 |
+
+`npm run check` green, 289 tests. Three files land between 1.25x and 1.37x
+area, under the 1.5x ceiling but not by much — a cap above 1x on the density
+term would have failed the gate outright.
+
+**Verdict: 1 candidate / 3 champion / 2 structural ties → REVERTED.**
+
+`deep-nesting` and `hexagonal` produced **byte-identical** renders and reports,
+so no judge was spent on them. Both files set an explicit `gap` on every frame
+and have a single top-level child, so `resolveGap` never reaches its derived
+branch. That is worth noting for its own sake: two of six corpus files are
+structurally blind to any hypothesis about *default* spacing.
+
+| file | A/B assignment | winner | judge's reasoning |
+| --- | --- | --- | --- |
+| long-labels | A=champion, B=candidate | **candidate** | "Both layouts garble the two notes into overlapping text, but B's extra vertical spacing keeps the collision confined below the reporting box while A's note text smears across both the audit and reporting boxes." |
+| sequence | A=champion, B=candidate | champion | "A's tighter 100px spacing keeps the 14-step column more compact and scannable, while B stretches the same content over 35% more height with no legibility gain." |
+| sparse-graph | A=champion, B=candidate | champion | "Identical structure and cleanliness, but A's shorter arrows keep connected pairs tighter, so proximity grouping better matches the actual edges than B's stretched-out arrow gaps." |
+| wide-fanout | A=candidate, B=champion | champion | "Both renders collapse to the same single vertical chain with identical structure and crossing counts, but B packs it with tighter, even spacing (fill 0.55 vs 0.40), so labels render slightly larger and the diagram wastes less blank canvas with no legibility cost." |
+
+**What this actually measured — the heuristic has the sign right and the
+granularity wrong.**
+
+The one win is the tell. `long-labels` improved not because its edges needed
+room but because two tldraw stickies were overflowing their reserved boxes, and
+more vertical slack gave the overflow somewhere harmless to go. That is B9's
+defect being masked, not B6's hypothesis being confirmed. The three losses are
+all the same complaint in different words: **more space, nothing bought.**
+
+The mechanism the sparse-graph judge named unprompted is the real finding, and
+it generalises past this hypothesis. Gap is a **container-level** knob, so
+raising it moves *every* sibling pair apart uniformly — including the pairs with
+no edge between them. Density is measured per container but spent per gap, so a
+container that is dense *on average* pushes apart the children that are not
+connected at all. In `sparse-graph` this inverted the diagram's own grouping
+signal: connected pairs ended up further apart than unconnected neighbours, so
+proximity stopped encoding connectivity and started contradicting it.
+
+That is the general lesson for the backlog: **a per-container scalar cannot
+express a per-pair property.** Any future spacing hypothesis motivated by edges
+has to act on the pair (a minimum separation between two specific children, or
+a per-edge routing allowance), not on the container's gap. B6's variants — a
+different cap, a different curve, density measured over direct children only —
+are all the same shape and all inherit the same defect; do not spend a wake
+tuning the constant.
+
+`wide-fanout` is now the fourth consecutive hypothesis to lose on it, and for
+the fourth different reason. Its 186 crossings come from a 26-box vertical
+corridor; nothing that adjusts spacing, anchors, or routing style has moved it,
+because the defect is the corridor's *shape*. B7 is the only backlog entry
+aimed there.
+
+**Tool fix, kept and committed separately.** `tools/screenshot.mts` waited on
+`[data-shape-id]` with playwright's default `state: "visible"`. A perfectly
+vertical arrow has a zero-width bounding box, which that check never passes, so
+the candidate `sequence` render timed out twice while the champion's had
+happened to resolve a box first. Changed to `state: "attached"`; the existing
+zoom-to-fit plus 500ms settle already covers paint. This affects *whether* a
+capture happens, never what is captured, so both sides of the `sequence`
+comparison remain the same tool's output.
