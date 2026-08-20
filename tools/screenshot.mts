@@ -87,7 +87,9 @@ async function captureScreenshot(url: string, outPath: string): Promise<void> {
       deviceScaleFactor: 1,
     });
     await page.goto(url, { waitUntil: "networkidle" });
-    await page.waitForSelector("[data-shape-id]", { timeout: 15_000 });
+    // `state: "attached"` because a perfectly vertical arrow has a zero-width
+    // bounding box, which playwright's default visibility check never passes.
+    await page.waitForSelector("[data-shape-id]", { timeout: 15_000, state: "attached" });
     // Fit the whole diagram in view before capturing - tldraw's default UI
     // wires this to shift+1, and without it a wide diagram overflows the
     // 1600x1200 viewport and defects outside the initial camera go unseen.
