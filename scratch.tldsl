@@ -41,7 +41,7 @@
   <edge id="hx-5"  from="p-create-order"   to="usecases" />
   <edge id="hx-6"  from="p-list-orders"    to="usecases" />
   <edge id="hx-7"  from="p-create-session" to="usecases" />
-  <edge id="hx-8"  from="usecases" to="domain" type="bi" />
+  <edge id="hx-8"  from="usecases" to="domain" />
   <edge id="hx-9"  from="usecases" to="p-orders-repo" />
   <edge id="hx-10" from="usecases" to="p-users-repo" />
   <edge id="hx-11" from="usecases" to="p-sessions" />
@@ -75,16 +75,16 @@
   <edge id="ae-1" from="a1" to="a2" />
   <edge id="ae-2" from="a2" to="a3" />
   <edge id="ae-3" from="a3" to="a4" />
-  <edge id="ae-4" from="a4" to="a5" type="bi" />
+  <edge id="ae-4" from="a4" to="a5" />
   <edge id="ae-5" from="a3" to="a6" />
   <edge id="ae-6" from="a6" to="a7" />
   <edge id="ae-7" from="a7" to="a8" />
-  <edge id="ae-8" from="a8" to="a9" type="bi" />
+  <edge id="ae-8" from="a8" to="a9" />
   <edge id="ae-9" from="a3" to="a10" />
-  <edge id="ae-fail" from="a6" to="a-fail" route="curved" />
+  <edge id="ae-fail" from="a6" to="a-fail" />
 
   <note id="na-1">Idempotency: re-POSTing /login with the same creds is fine - SessionStore.create is non-idempotent by design (each call mints a new session id).</note>
-  <edge id="ae-na-1" from="na-1" to="a8" type="line" />
+  <edge id="ae-na-1" from="na-1" to="a8" />
 
 
   <frame id="pay-flow" name="Payment flow (checkout)" pad="20" layout="col" gap="12">
@@ -110,18 +110,18 @@
   <edge id="pe-2"  from="p2"  to="p3" />
   <edge id="pe-3"  from="p3"  to="p4" />
   <edge id="pe-4"  from="p4"  to="p5" />
-  <edge id="pe-5"  from="p5"  to="p6" type="bi" />
+  <edge id="pe-5"  from="p5"  to="p6" />
   <edge id="pe-6"  from="p3"  to="p7" />
-  <edge id="pe-7"  from="p7"  to="p8" type="bi" />
+  <edge id="pe-7"  from="p7"  to="p8" />
   <edge id="pe-8"  from="p3"  to="p9" />
   <edge id="pe-9"  from="p10" to="p11" />
   <edge id="pe-10" from="p11" to="p12" />
   <edge id="pe-11" from="p12" to="p13" />
   <edge id="pe-12" from="p13" to="p14" />
-  <edge id="pe-13" from="p14" to="p15" type="bi" />
-  <edge id="pe-fail" from="p7" to="p-fail" route="curved" />
+  <edge id="pe-13" from="p14" to="p15" />
+  <edge id="pe-fail" from="p7" to="p-fail" />
 
   <note id="np-1">Two-phase: synchronous up to PaymentIntent (steps 1-9), then async finalisation via webhook (steps 10-15). Order rows live in Postgres throughout.</note>
-  <edge id="pe-np-1" from="np-1" to="p10" type="line" />
+  <edge id="pe-np-1" from="np-1" to="p10" />
 
 </doc>
