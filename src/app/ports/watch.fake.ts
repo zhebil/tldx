@@ -7,7 +7,7 @@
 import type { WatchHandle, WatchListener, WatchPort } from "./watch.js";
 
 interface Subscription {
-  path: string;
+  paths: Set<string>;
   listener: WatchListener;
   closed: boolean;
 }
@@ -15,10 +15,14 @@ interface Subscription {
 export class FakeWatch implements WatchPort {
   private readonly subs: Subscription[] = [];
 
-  watch(path: string, listener: WatchListener): WatchHandle {
-    const sub: Subscription = { path, listener, closed: false };
+  watch(paths: readonly string[], listener: WatchListener): WatchHandle {
+    const sub: Subscription = { paths: new Set(paths), listener, closed: false };
     this.subs.push(sub);
     return {
+      update: (next: readonly string[]) => {
+        if (sub.closed) return;
+        sub.paths = new Set(next);
+      },
       close: async () => {
         sub.closed = true;
       },
@@ -29,7 +33,7 @@ export class FakeWatch implements WatchPort {
   emitChange(path: string): void {
     for (const sub of this.subs) {
       if (sub.closed) continue;
-      if (sub.path !== path) continue;
+      if (!sub.paths.has(path)) continue;
       sub.listener.onChange(path);
     }
   }
@@ -38,13 +42,13 @@ export class FakeWatch implements WatchPort {
   emitError(path: string, error: Error): void {
     for (const sub of this.subs) {
       if (sub.closed) continue;
-      if (sub.path !== path) continue;
+      if (!sub.paths.has(path)) continue;
       sub.listener.onError?.(error);
     }
   }
 
-  /** Test helper - count active (un-closed) subscriptions for `path`. */
+  /** Test helper - count active (un-closed) subscriptions watching `path`. */
   activeSubscribers(path: string): number {
-    return this.subs.filter((s) => !s.closed && s.path === path).length;
+    return this.subs.filter((s) => !s.closed && s.paths.has(path)).length;
   }
 }

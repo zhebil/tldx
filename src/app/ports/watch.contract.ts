@@ -15,7 +15,7 @@ import type { WatchPort } from "./watch.js";
 
 export interface WatchHarness {
   port: WatchPort;
-  /** Create a file at `relPath`; returns the absolute path. Caller may then `port.watch(absPath, …)`. */
+  /** Create a file at `relPath`; returns the absolute path. Caller may then `port.watch([absPath], …)`. */
   writeFile(relPath: string, content: string): Promise<string>;
   /**
    * Mutate `absPath` so that watchers on it observe a change. Resolves once
@@ -65,7 +65,7 @@ export function runWatchContract(
       try {
         const path = await h.writeFile("doc.tldsl", "first");
         const changes: string[] = [];
-        const handle = h.port.watch(path, {
+        const handle = h.port.watch([path], {
           onChange: (p) => changes.push(p),
         });
         try {
@@ -85,7 +85,7 @@ export function runWatchContract(
       try {
         const path = await h.writeFile("doc.tldsl", "v1");
         const changes: string[] = [];
-        const handle = h.port.watch(path, {
+        const handle = h.port.watch([path], {
           onChange: (p) => changes.push(p),
         });
         try {
@@ -107,7 +107,7 @@ export function runWatchContract(
       try {
         const path = await h.writeFile("doc.tldsl", "v1");
         const changes: string[] = [];
-        const handle = h.port.watch(path, {
+        const handle = h.port.watch([path], {
           onChange: (p) => changes.push(p),
         });
         await handle.close();
@@ -130,7 +130,7 @@ export function runWatchContract(
       try {
         const path = await h.writeFile("doc.tldsl", "v1");
         const changes: string[] = [];
-        const handle = h.port.watch(path, {
+        const handle = h.port.watch([path], {
           onChange: (p) => changes.push(p),
         });
         try {
@@ -149,9 +149,97 @@ export function runWatchContract(
       const h = await make();
       try {
         const path = await h.writeFile("doc.tldsl", "v1");
-        const handle = h.port.watch(path, { onChange: () => undefined });
+        const handle = h.port.watch([path], { onChange: () => undefined });
         await handle.close();
         await expect(handle.close()).resolves.toBeUndefined();
+      } finally {
+        await h.dispose();
+      }
+    });
+
+    it("watches every path in the initial set", async () => {
+      const h = await make();
+      try {
+        const a = await h.writeFile("a.tldsl", "v1");
+        const b = await h.writeFile("b.tldsl", "v1");
+        const changes: string[] = [];
+        const handle = h.port.watch([a, b], {
+          onChange: (p) => changes.push(p),
+        });
+        try {
+          await h.triggerChange(a, "v2");
+          await waitFor(() => changes.includes(a), timeout);
+          await h.triggerChange(b, "v2");
+          await waitFor(() => changes.includes(b), timeout);
+        } finally {
+          await handle.close();
+        }
+      } finally {
+        await h.dispose();
+      }
+    });
+
+    it("update() adds a path", async () => {
+      const h = await make();
+      try {
+        const a = await h.writeFile("a.tldsl", "v1");
+        const b = await h.writeFile("b.tldsl", "v1");
+        const changes: string[] = [];
+        const handle = h.port.watch([a], {
+          onChange: (p) => changes.push(p),
+        });
+        try {
+          handle.update([a, b]);
+          await h.triggerChange(b, "v2");
+          await waitFor(() => changes.includes(b), timeout);
+        } finally {
+          await handle.close();
+        }
+      } finally {
+        await h.dispose();
+      }
+    });
+
+    it("update() drops a path", async () => {
+      const h = await make();
+      try {
+        const a = await h.writeFile("a.tldsl", "v1");
+        const b = await h.writeFile("b.tldsl", "v1");
+        const changes: string[] = [];
+        const handle = h.port.watch([a, b], {
+          onChange: (p) => changes.push(p),
+        });
+        try {
+          handle.update([a]);
+          await h.triggerChange(b, "v2");
+          await new Promise((r) => setTimeout(r, 200));
+          expect(changes).toEqual([]);
+
+          await h.triggerChange(a, "v2");
+          await waitFor(() => changes.includes(a), timeout);
+        } finally {
+          await handle.close();
+        }
+      } finally {
+        await h.dispose();
+      }
+    });
+
+    it("update() with an unchanged set delivers no event by itself", async () => {
+      const h = await make();
+      try {
+        const a = await h.writeFile("a.tldsl", "v1");
+        const changes: string[] = [];
+        const handle = h.port.watch([a], {
+          onChange: (p) => changes.push(p),
+        });
+        try {
+          handle.update([a]);
+          await new Promise((r) => setTimeout(r, 200));
+          expect(changes).toEqual([]);
+        } finally {
+          await handle.close();
+        }
       } finally {
         await h.dispose();
       }

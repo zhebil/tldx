@@ -1,6 +1,9 @@
 /**
- * Filesystem watch port. The watcher in `watchAndServe` calls `watch(path, …)`
- * and recompiles on every change event. The real adapter wraps chokidar; the
+ * Filesystem watch port. The watcher in `watchAndServe` calls
+ * `watch(paths, …)` with the current module-graph input set and recompiles
+ * on every change event. After each compile it calls `handle.update(paths)`
+ * to re-subscribe to the (possibly changed) input set - re-running a JSX
+ * entry can add or drop imports. The real adapter wraps chokidar; the
  * colocated `FakeWatch` lets tests drive events synthetically.
  *
  * Scope for MVP: a single change event signal. Add/unlink are folded into
@@ -10,12 +13,19 @@
  */
 
 export interface WatchHandle {
+  /**
+   * Replace the watched set with `paths`. Implementations must diff against
+   * the currently-watched set and only add/remove what changed - calling
+   * `update` with an unchanged set must not itself produce an event. No-op
+   * after `close()`.
+   */
+  update(paths: readonly string[]): void;
   /** Stop watching. Idempotent - calling twice resolves the second time too. */
   close(): Promise<void>;
 }
 
 export interface WatchListener {
-  /** Fires when the watched path changes. The argument is the absolute path that changed. */
+  /** Fires when a watched path changes. The argument is the absolute path that changed. */
   onChange(path: string): void;
   /** Optional: fires on watcher-level errors (permissions, EMFILE, etc.). */
   onError?(error: Error): void;
@@ -23,10 +33,11 @@ export interface WatchListener {
 
 export interface WatchPort {
   /**
-   * Begin watching `path` (a single file). The returned handle stops the
-   * watcher when closed. Implementations must defer the first event until
-   * after they are "ready" - tests rely on `watch()` not delivering a
-   * spurious event for the file's pre-existing state.
+   * Begin watching every path in `paths`. The returned handle stops the
+   * watcher when closed and supports re-subscription via `update()`.
+   * Implementations must defer the first event until after they are
+   * "ready" - tests rely on `watch()` not delivering a spurious event for
+   * a file's pre-existing state.
    */
-  watch(path: string, listener: WatchListener): WatchHandle;
+  watch(paths: readonly string[], listener: WatchListener): WatchHandle;
 }

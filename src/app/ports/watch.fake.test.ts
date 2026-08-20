@@ -22,8 +22,8 @@ describe("FakeWatch (fake-specific affordances)", () => {
   it("activeSubscribers reflects subscribe + close lifecycle", async () => {
     const w = new FakeWatch();
     expect(w.activeSubscribers("/a")).toBe(0);
-    const h1 = w.watch("/a", { onChange: () => undefined });
-    const h2 = w.watch("/a", { onChange: () => undefined });
+    const h1 = w.watch(["/a"], { onChange: () => undefined });
+    const h2 = w.watch(["/a"], { onChange: () => undefined });
     expect(w.activeSubscribers("/a")).toBe(2);
     await h1.close();
     expect(w.activeSubscribers("/a")).toBe(1);
@@ -34,11 +34,11 @@ describe("FakeWatch (fake-specific affordances)", () => {
   it("emitError reaches subscribers that supplied onError", () => {
     const w = new FakeWatch();
     const errors: Error[] = [];
-    w.watch("/a", {
+    w.watch(["/a"], {
       onChange: () => undefined,
       onError: (e) => errors.push(e),
     });
-    w.watch("/a", { onChange: () => undefined });
+    w.watch(["/a"], { onChange: () => undefined });
     w.emitError("/a", new Error("boom"));
     expect(errors).toHaveLength(1);
     expect(errors[0]?.message).toBe("boom");
@@ -47,7 +47,7 @@ describe("FakeWatch (fake-specific affordances)", () => {
   it("emitChange ignores events for paths nobody is watching", () => {
     const w = new FakeWatch();
     const changes: string[] = [];
-    w.watch("/a", { onChange: (p) => changes.push(p) });
+    w.watch(["/a"], { onChange: (p) => changes.push(p) });
     w.emitChange("/b");
     expect(changes).toEqual([]);
   });
