@@ -48,7 +48,7 @@ next task.
   40/60 spacing exactly. `npm run check` green (264 tests); `hex` verified as a
   row of five column frames at x = 24, 224, 469, 741, 995.
 
-- [ ] **A1 — JSX runtime + component library.**
+- [x] **A1 — JSX runtime + component library.** _(wake 2)_
   `src/runtime/jsx-runtime.js` and `jsx-dev-runtime.js` exporting `jsx`, `jsxs`,
   `jsxDEV`. `jsxDEV` receives `(type, props, key, isStatic, source, self)`;
   stash `source` as the node's `span` in the shape `domain/parser/ast.ts`
@@ -57,6 +57,24 @@ next task.
   Output must be exactly the existing AST type — `ast.ts` does not change.
   Done when: a unit test executes a small element tree and asserts the AST
   matches what the old parser produced for the equivalent `.tldsl`.
+  **Done.** `src/runtime/` is a new lint-enforced leaf layer (eslint zones +
+  dependency-cruiser rules + `CONTEXT.md`): it may import types from
+  `domain/parser` and `contracts` and nothing else, and nothing may import it
+  until A3's executor. `jsx-runtime.ts` exports `jsx`/`jsxs`/`Fragment`,
+  `jsx-dev-runtime.ts` exports `jsxDEV(type, props, key, isStatic, source)`;
+  both just call the resolved `type` as `type(props, source)`, so user-defined
+  components work for free. `components.ts` has `Doc`, `Frame`, `Box`, `Note`,
+  `Edge`, `flow`, building the exact `ast.ts` shapes — `ast.ts` untouched.
+  esbuild's `source.columnNumber` is **1-based**, matching the text parser, so
+  spans map straight through with no fixup. `runtime.test.tsx` builds a tree in
+  real JSX and asserts it equals `parse()` on the equivalent `.tldsl` once spans
+  are stripped, then asserts the spans separately. `npm run check` green (269
+  tests, 34 files).
+  Two deviations, both deliberate: written as `.ts` not `.js` (`allowJs` is off,
+  so `tsconfig.build.json` would not emit `.js` from `src/` and neither linter
+  would cover it — the module specifiers `tldsl/jsx-runtime` and
+  `tldsl/jsx-dev-runtime` are what actually matter and still resolve), and
+  `Group` omitted (see Blocked notes).
 
 - [ ] **A2 — `ExecutePort` + fake.**
   `src/app/ports/execute.ts`: `(source, path) => Promise<{ast} | {diagnostics}>`.
@@ -219,6 +237,17 @@ Ordered. Take from the top. Strike through when resolved.
 
 _(Wakes append here when a task cannot proceed. Never delete entries.)_
 
+- **(wake 2, A1)** `Group` could not be built. A1 lists it as a component but
+  also fixes `ast.ts` as unchangeable, and `ast.ts` has no `group` node kind
+  (`ALLOWED_ELEMENT_NAMES` is `doc, frame, box, note, edge`). Aliasing it to
+  `Frame` would be silently wrong — ADR-4 exists precisely to keep groups from
+  collapsing into frames. Shipped the other five components and left `Group`
+  out. Resolving it needs a decision that is out of A1's scope: either add a
+  `group` kind to `ast.ts` + `lower.ts` (its own task), or drop `<group>` from
+  the language. `docs/jsx-pivot.md` assumes it survives ("Still open: whether
+  ADR-4's `<group>` rejects visual props stays a runtime check"), so the likely
+  answer is the former. A10 must not document `Group` until it exists.
+
 ---
 
 ## Discovered work
@@ -240,6 +269,22 @@ anything that outlives the loop.)_
   nested graph). Edges are resolved to the owning direct child instead. Phase B
   should watch whether cross-frame edge routing regressed; this also narrows
   B10's scope.
+- **(wake 2)** TS's automatic-runtime JSX typing falls back to the *global* `JSX`
+  namespace from `@types/react` unless the `jsxImportSource` module exports its
+  own. `jsx-runtime.ts` therefore exports a minimal `namespace JSX` (with an
+  `eslint-disable` for `no-namespace`). Consequence: a JSX expression's static
+  type is always the namespace's declared `Element` union, never the specific
+  component's return type, so `runtime.test.tsx` needs an `as AstDoc` cast. Only
+  affects our own TS callers; `.tldsl.jsx` files are untyped by decision 6.
+- **(wake 2)** `runtime.test.tsx` asserts hardcoded source line numbers (49–56)
+  to prove the `jsxDEV` span plumbing. Editing anything above `buildTree()` in
+  that file breaks it. Left as-is because it is the only thing that actually
+  pins decision 7; if it turns into a nuisance, assert relative offsets from a
+  captured base line instead.
+- **(wake 2)** `Fragment` is exported from both runtime modules (esbuild imports
+  it for `<>…</>`) and returns a bare array. Nothing rejects a fragment in a
+  position that wants a single node yet — `lower.ts` will see an array where it
+  expects an `AstNode`. Worth a check in A5.
 - **(wake 1)** `dump-tmp.mts` lost its `--stack` flag (the `stackLayout` export it
   called no longer exists). It still dumps geometry via `ElkLayoutAdapter`, which
   is what the A0 acceptance check needed. A9 deletes it anyway.
