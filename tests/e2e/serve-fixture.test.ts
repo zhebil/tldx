@@ -88,7 +88,7 @@ async function bootServe(
   bundleDir: string,
 ): Promise<Setup> {
   const workDir = await mkdtemp(join(tmpdir(), "tldsl-serve-"));
-  const filePath = join(workDir, "auth.tldsl");
+  const filePath = join(workDir, fixtureName);
   await copyFile(join(FIXTURES, fixtureName), filePath);
 
   const log = createCaptureLog();
@@ -168,7 +168,7 @@ describe("e2e: tldsl serve", () => {
     // and the static handler 404s gracefully on missing index.html.
     const bundleDir = await mkdtemp(join(tmpdir(), "tldsl-serve-bundle-"));
     try {
-      setup = await bootServe("auth.tldsl", bundleDir);
+      setup = await bootServe("auth.tldsl.jsx", bundleDir);
 
       // The CLI announces the URL on stdout once the server is bound.
       expect(setup.io.stdout).toContain("tldsl serving");

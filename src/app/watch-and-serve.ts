@@ -1,5 +1,5 @@
 /**
- * `watchAndServe`: subscribe to a `.tldsl` file, recompile on every change,
+ * `watchAndServe`: subscribe to a `.tldsl.jsx` file, recompile on every change,
  * and push the result over a `TransportPort` so the viewer renders it.
  *
  * Per ADR-13 (and CONTEXT.md "Scene message contract" → "On compile error"):
@@ -13,7 +13,7 @@
  *   for a later change event.
  *
  * The use case is a thin orchestration layer: it delegates the pure pipeline
- * to `compileFile` (parse → ir → layout → emit) and is responsible only for
+ * to `compileFile` (execute → ir → layout → emit) and is responsible only for
  * wiring the watcher event to a transport push and emitting structured logs
  * for observability.
  *

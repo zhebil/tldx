@@ -6,6 +6,7 @@ import type { SceneJSON, TLRecord } from "../contracts/scene-json.js";
 import { error } from "../domain/diagnostics/index.js";
 import type { IRDoc, IRDocPositioned } from "../domain/ir/index.js";
 import type { AstDoc } from "../domain/parser/ast.js";
+import { astBuilders } from "../domain/parser/ast.fixture.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 
@@ -23,41 +24,32 @@ function deps(
 }
 
 function docWithLabelledBox(path: string, label: string): AstDoc {
-  const span = { file: path, line: 1, column: 1 };
-  return {
-    kind: "doc",
-    attrs: {},
-    span,
-    children: [
-      {
-        kind: "box",
-        attrs: {
-          id: { value: "b", span, nameSpan: span },
-          label: { value: label, span, nameSpan: span },
-        },
-        span,
-      },
-    ],
-  };
+  const { doc, box } = astBuilders(path);
+  return doc({}, [box({ id: "b", label })]);
 }
 
 function recordsByType(scene: SceneJSON, typeName: string): TLRecord[] {
   return Object.values(scene.store).filter((r) => r.typeName === typeName);
 }
 
+const SRC = "export default function Diagram() { return null; }";
+
 describe("compileFile", () => {
   describe("happy path", () => {
     it("returns a sceneJson and no diagnostics for a valid doc", async () => {
-      const result = await compileFile(
-        "auth.tldsl",
-        deps({
-          "auth.tldsl": `<doc id="auth">
-            <box id="login" label="Login" />
-            <box id="dash" label="Dashboard" />
-            <edge from="login" to="dash" />
-          </doc>`,
-        }),
-      );
+      const path = "auth.tldsl.jsx";
+      const { doc, box, edge } = astBuilders(path);
+      const execute = new FakeExecute();
+      execute.setResult(SRC, {
+        ast: doc({ id: "auth" }, [
+          box({ id: "login", label: "Login" }),
+          box({ id: "dash", label: "Dashboard" }),
+          edge({ from: "login", to: "dash" }),
+        ]),
+        inputs: [path],
+      });
+
+      const result = await compileFile(path, deps({ [path]: SRC }, new StubLayout(), execute));
 
       expect(result.diagnostics).toEqual([]);
       expect(result.sceneJson).not.toBeNull();
@@ -67,20 +59,19 @@ describe("compileFile", () => {
     });
 
     it("invokes the layout port with the lowered IR", async () => {
+      const path = "x.tldsl.jsx";
+      const { doc, box } = astBuilders(path);
+      const execute = new FakeExecute();
+      execute.setResult(SRC, {
+        ast: doc({ id: "d" }, [box({ id: "b" })]),
+        inputs: [path],
+      });
       const layout: LayoutPort = {
         layout: vi.fn(async (ir: IRDoc): Promise<IRDocPositioned> =>
           new StubLayout().layout(ir),
         ),
       };
-      await compileFile(
-        "x.tldsl",
-        deps(
-          {
-            "x.tldsl": `<doc id="d"><box id="b" /></doc>`,
-          },
-          layout,
-        ),
-      );
+      await compileFile(path, deps({ [path]: SRC }, layout, execute));
       expect(layout.layout).toHaveBeenCalledTimes(1);
       const irArg = (layout.layout as ReturnType<typeof vi.fn>).mock.calls[0]![0] as IRDoc;
       expect(irArg.kind).toBe("doc");
@@ -90,7 +81,7 @@ describe("compileFile", () => {
 
   describe("filesystem errors", () => {
     it("returns fs/not-found and null sceneJson when the file is missing", async () => {
-      const result = await compileFile("missing.tldsl", deps({}));
+      const result = await compileFile("missing.tldsl.jsx", deps({}));
       expect(result.sceneJson).toBeNull();
       expect(result.diagnostics).toHaveLength(1);
       expect(result.diagnostics[0]!.code).toBe("fs/not-found");
@@ -107,7 +98,7 @@ describe("compileFile", () => {
         layout: new StubLayout(),
         execute: new FakeExecute(),
       };
-      const result = await compileFile("guarded.tldsl", failing);
+      const result = await compileFile("guarded.tldsl.jsx", failing);
       expect(result.sceneJson).toBeNull();
       expect(result.diagnostics).toHaveLength(1);
       expect(result.diagnostics[0]!.code).toBe("fs/read-error");
@@ -115,59 +106,40 @@ describe("compileFile", () => {
   });
 
   describe("compile errors short-circuit before layout", () => {
-    it("returns parser diagnostics and skips layout/emit on parse error", async () => {
-      const layout: LayoutPort = { layout: vi.fn() };
-      const result = await compileFile(
-        "bad.tldsl",
-        deps(
-          { "bad.tldsl": `<doc id="d"><box id="b"` },
-          layout,
-        ),
-      );
-      expect(result.sceneJson).toBeNull();
-      expect(result.diagnostics.some((d) => d.code.startsWith("parser/"))).toBe(true);
-      expect(layout.layout).not.toHaveBeenCalled();
-    });
-
     it("returns ir diagnostics and skips layout/emit on lowering error", async () => {
+      const path = "dup.tldsl.jsx";
+      const { doc, box } = astBuilders(path);
+      const execute = new FakeExecute();
+      execute.setResult(SRC, {
+        ast: doc({ id: "d" }, [
+          box({ id: "x" }),
+          box({ id: "x" }),
+        ]),
+        inputs: [path],
+      });
       const layout: LayoutPort = { layout: vi.fn() };
-      const result = await compileFile(
-        "dup.tldsl",
-        deps(
-          {
-            "dup.tldsl": `<doc id="d"><box id="x" /><box id="x" /></doc>`,
-          },
-          layout,
-        ),
-      );
+      const result = await compileFile(path, deps({ [path]: SRC }, layout, execute));
       expect(result.sceneJson).toBeNull();
       expect(result.diagnostics.some((d) => d.code === "ir/duplicate-id")).toBe(true);
       expect(layout.layout).not.toHaveBeenCalled();
     });
 
     it("returns ir/root-not-doc when the top-level element is not <doc>", async () => {
-      const result = await compileFile(
-        "frag.tldsl",
-        deps({ "frag.tldsl": `<box id="x" />` }),
-      );
+      const path = "frag.tldsl.jsx";
+      const { frame } = astBuilders(path);
+      const execute = new FakeExecute();
+      execute.setResult(SRC, {
+        ast: frame({ id: "x" }),
+        inputs: [path],
+      });
+      const result = await compileFile(path, deps({ [path]: SRC }, new StubLayout(), execute));
       expect(result.sceneJson).toBeNull();
       expect(result.diagnostics.some((d) => d.code === "ir/root-not-doc")).toBe(true);
     });
   });
 
-  describe("empty source", () => {
-    it("returns null sceneJson and no diagnostics for an empty file", async () => {
-      const result = await compileFile(
-        "empty.tldsl",
-        deps({ "empty.tldsl": "" }),
-      );
-      expect(result.sceneJson).toBeNull();
-      expect(result.diagnostics).toEqual([]);
-    });
-  });
-
   describe("JSX front end", () => {
-    it("compiles a .tldsl.jsx path from the executor's AST, never the text parser", async () => {
+    it("compiles a .tldsl.jsx path from the executor's AST", async () => {
       const path = "diagram.tldsl.jsx";
       const source = "export default function Diagram() { return null; }";
       const execute = new FakeExecute();
@@ -211,17 +183,6 @@ describe("compileFile", () => {
       expect(execute.calls).toEqual([{ source, path }]);
     });
 
-    it("never calls execute for a .tldsl path", async () => {
-      const execute = new FakeExecute();
-
-      await compileFile(
-        "auth.tldsl",
-        deps({ "auth.tldsl": `<doc id="d"><box id="b" /></doc>` }, new StubLayout(), execute),
-      );
-
-      expect(execute.calls).toEqual([]);
-    });
-
     it("normalises a bare-basename diagnostic span to be relative to the path's directory", async () => {
       const path = "foo/bar.tldsl.jsx";
       const source = "whatever";
@@ -258,22 +219,8 @@ describe("compileFile", () => {
   });
 
   describe("inputs", () => {
-    it("is [path] for the text-parser front end, even on parse error", async () => {
-      const ok = await compileFile(
-        "auth.tldsl",
-        deps({ "auth.tldsl": `<doc id="d"><box id="b" /></doc>` }),
-      );
-      expect(ok.inputs).toEqual(["auth.tldsl"]);
-
-      const broken = await compileFile(
-        "bad.tldsl",
-        deps({ "bad.tldsl": `<doc id="d"><box id="b"` }),
-      );
-      expect(broken.inputs).toEqual(["bad.tldsl"]);
-    });
-
     it("is null when the file read fails", async () => {
-      const result = await compileFile("missing.tldsl", deps({}));
+      const result = await compileFile("missing.tldsl.jsx", deps({}));
       expect(result.inputs).toBeNull();
     });
 

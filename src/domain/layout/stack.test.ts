@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { lower } from "../ir/lower.js";
 import type { IRBoxPositioned, IRElementPositioned, IRFramePositioned } from "../ir/index.js";
-import { parse } from "../parser/index.js";
+import type { AstNode } from "../parser/ast.js";
+import { astBuilders } from "../parser/ast.fixture.js";
 
 import { estimatedBoxSize } from "./defaults.js";
 import { hybridLayout, type AutoPlacer } from "./stack.js";
+
+const { box, doc, edge, frame } = astBuilders();
 
 /**
  * Trivial deterministic stub placer: lays nodes out in a row (source order)
@@ -28,22 +31,20 @@ const stubPlaceAuto: AutoPlacer = async (req) => {
   return { positions, w, h };
 };
 
-function layoutSource(source: string, placeAuto: AutoPlacer = stubPlaceAuto) {
-  const { ast, diagnostics: parseDiags } = parse(source, "test.tldsl");
-  expect(parseDiags).toEqual([]);
+function layoutAst(ast: AstNode, placeAuto: AutoPlacer = stubPlaceAuto) {
   const { ir, diagnostics } = lower(ast);
   expect(diagnostics).toEqual([]);
   if (ir === null) throw new Error("lower returned null ir");
   return hybridLayout(ir, placeAuto);
 }
 
-function box(children: readonly IRElementPositioned[], id: string): IRBoxPositioned {
+function boxById(children: readonly IRElementPositioned[], id: string): IRBoxPositioned {
   const el = children.find((c) => c.kind === "box" && c.id === id);
   if (el === undefined) throw new Error(`no box '${id}'`);
   return el as IRBoxPositioned;
 }
 
-function frame(children: readonly IRElementPositioned[], id: string): IRFramePositioned {
+function frameById(children: readonly IRElementPositioned[], id: string): IRFramePositioned {
   const el = children.find((c) => c.kind === "frame" && c.id === id);
   if (el === undefined) throw new Error(`no frame '${id}'`);
   return el as IRFramePositioned;
@@ -51,16 +52,16 @@ function frame(children: readonly IRElementPositioned[], id: string): IRFramePos
 
 describe("hybridLayout", () => {
   it("stacks col children top-to-bottom in source order", async () => {
-    const doc = await layoutSource(`
-      <doc layout="col">
-        <box id="a" label="A" />
-        <box id="b" label="B" />
-        <box id="c" label="C" />
-      </doc>
-    `);
-    const a = box(doc.children, "a");
-    const b = box(doc.children, "b");
-    const c = box(doc.children, "c");
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "a", label: "A" }),
+        box({ id: "b", label: "B" }),
+        box({ id: "c", label: "C" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    const c = boxById(result.children, "c");
     expect(a.x).toBe(0);
     expect(a.y).toBe(0);
     expect(b.y).toBeGreaterThan(a.y);
@@ -70,30 +71,30 @@ describe("hybridLayout", () => {
   });
 
   it("defaults to col when layout is absent", async () => {
-    const doc = await layoutSource(`
-      <doc>
-        <box id="a" label="A" />
-        <box id="b" label="B" />
-      </doc>
-    `);
-    const a = box(doc.children, "a");
-    const b = box(doc.children, "b");
+    const result = await layoutAst(
+      doc({}, [
+        box({ id: "a", label: "A" }),
+        box({ id: "b", label: "B" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
     expect(a.x).toBe(0);
     expect(b.x).toBe(0);
     expect(b.y).toBeGreaterThan(a.y);
   });
 
   it("stacks row children left-to-right in source order", async () => {
-    const doc = await layoutSource(`
-      <doc layout="row">
-        <box id="a" label="A" />
-        <box id="b" label="B" />
-        <box id="c" label="C" />
-      </doc>
-    `);
-    const a = box(doc.children, "a");
-    const b = box(doc.children, "b");
-    const c = box(doc.children, "c");
+    const result = await layoutAst(
+      doc({ layout: "row" }, [
+        box({ id: "a", label: "A" }),
+        box({ id: "b", label: "B" }),
+        box({ id: "c", label: "C" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    const c = boxById(result.children, "c");
     expect(a.y).toBe(0);
     expect(a.x).toBe(0);
     expect(b.x).toBeGreaterThan(a.x);
@@ -103,18 +104,18 @@ describe("hybridLayout", () => {
   });
 
   it("places grid children row-major", async () => {
-    const doc = await layoutSource(`
-      <doc layout="grid" cols="2">
-        <box id="a" label="A" />
-        <box id="b" label="B" />
-        <box id="c" label="C" />
-        <box id="d" label="D" />
-      </doc>
-    `);
-    const a = box(doc.children, "a");
-    const b = box(doc.children, "b");
-    const c = box(doc.children, "c");
-    const d = box(doc.children, "d");
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2 }, [
+        box({ id: "a", label: "A" }),
+        box({ id: "b", label: "B" }),
+        box({ id: "c", label: "C" }),
+        box({ id: "d", label: "D" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    const c = boxById(result.children, "c");
+    const d = boxById(result.children, "d");
     // row 0: a, b side by side
     expect(a.y).toBe(b.y);
     expect(b.x).toBeGreaterThan(a.x);
@@ -126,17 +127,17 @@ describe("hybridLayout", () => {
   });
 
   it("sizes a nested frame to its content bounding box", async () => {
-    const doc = await layoutSource(`
-      <doc layout="col">
-        <frame id="f" layout="col" pad="10" gap="5">
-          <box id="a" label="A" />
-          <box id="b" label="B" />
-        </frame>
-      </doc>
-    `);
-    const f = frame(doc.children, "f");
-    const a = box(f.children, "a");
-    const b = box(f.children, "b");
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        frame({ id: "f", layout: "col", pad: 10, gap: 5 }, [
+          box({ id: "a", label: "A" }),
+          box({ id: "b", label: "B" }),
+        ]),
+      ]),
+    );
+    const f = frameById(result.children, "f");
+    const a = boxById(f.children, "a");
+    const b = boxById(f.children, "b");
     const sizeA = estimatedBoxSize("A");
     const sizeB = estimatedBoxSize("B");
     expect(a.x).toBe(10);
@@ -147,16 +148,16 @@ describe("hybridLayout", () => {
   });
 
   it("keeps a hard-pinned child's coordinates verbatim and out of the flow", async () => {
-    const doc = await layoutSource(`
-      <doc layout="col">
-        <box id="a" label="A" />
-        <box id="pinned" label="Pinned" x="500" y="500" />
-        <box id="b" label="B" />
-      </doc>
-    `);
-    const a = box(doc.children, "a");
-    const pinned = box(doc.children, "pinned");
-    const b = box(doc.children, "b");
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "a", label: "A" }),
+        box({ id: "pinned", label: "Pinned", x: 500, y: 500 }),
+        box({ id: "b", label: "B" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const pinned = boxById(result.children, "pinned");
+    const b = boxById(result.children, "b");
     expect(pinned.x).toBe(500);
     expect(pinned.y).toBe(500);
     // b flows directly after a, unaffected by the pinned sibling.
@@ -165,31 +166,31 @@ describe("hybridLayout", () => {
   });
 
   it("sizes a nested frame bottom-up before the parent's row placement uses it", async () => {
-    const doc = await layoutSource(`
-      <doc layout="row" gap="10">
-        <frame id="f1" layout="col" pad="10" gap="5">
-          <box id="a" label="A very long label indeed" />
-        </frame>
-        <frame id="f2" layout="col" pad="10" gap="5">
-          <box id="b" label="B" />
-        </frame>
-      </doc>
-    `);
-    const f1 = frame(doc.children, "f1");
-    const f2 = frame(doc.children, "f2");
+    const result = await layoutAst(
+      doc({ layout: "row", gap: 10 }, [
+        frame({ id: "f1", layout: "col", pad: 10, gap: 5 }, [
+          box({ id: "a", label: "A very long label indeed" }),
+        ]),
+        frame({ id: "f2", layout: "col", pad: 10, gap: 5 }, [
+          box({ id: "b", label: "B" }),
+        ]),
+      ]),
+    );
+    const f1 = frameById(result.children, "f1");
+    const f2 = frameById(result.children, "f2");
     expect(f2.x).toBe(f1.x + f1.w + 10);
   });
 
   it("delegates an auto container to the injected placer and applies its positions/size", async () => {
-    const doc = await layoutSource(`
-      <doc layout="auto" gap="10">
-        <box id="a" label="A" />
-        <box id="b" label="B" />
-        <edge id="e" from="a" to="b" />
-      </doc>
-    `);
-    const a = box(doc.children, "a");
-    const b = box(doc.children, "b");
+    const result = await layoutAst(
+      doc({ layout: "auto", gap: 10 }, [
+        box({ id: "a", label: "A" }),
+        box({ id: "b", label: "B" }),
+        edge({ id: "e", from: "a", to: "b" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
     const sizeA = estimatedBoxSize("A");
     expect(a.x).toBe(0);
     expect(a.y).toBe(0);

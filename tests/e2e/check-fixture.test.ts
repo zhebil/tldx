@@ -1,9 +1,9 @@
 /**
  * Fixture-driven e2e test for `tldsl check`.
  *
- * Each fixture is a pair `<name>.tldsl` + `<name>.diagnostics.txt` (the
- * expected stderr; empty = no output expected). The non-`.tldsl` skip case
- * uses `<name>.<other-ext>` as input.
+ * Each fixture is a pair `<name>.tldsl.jsx` + `<name>.diagnostics.txt` (the
+ * expected stderr; empty = no output expected). The non-`.tldsl.jsx` skip
+ * case uses `<name>.<other-ext>` as input.
  *
  * The test invokes `runCheck` directly with the real `NodeFs` adapter and
  * `StubLayout` (real ELK is a separate parallel issue, tldsl-gxl).
@@ -15,7 +15,8 @@
  * passed to runCheck, so this keeps fixtures portable across machines.
  *
  * Convention: fixtures whose basename starts with `check-` are part of
- * this suite. Other fixtures (e.g. `auth.tldsl`) are owned by other tests.
+ * this suite. Other fixtures (e.g. `auth.tldsl.jsx`) are owned by other
+ * tests.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -34,7 +35,7 @@ const FIXTURES = join(HERE, "fixtures");
 const FIXTURE_PREFIX = "check-";
 
 type Fixture = {
-  /** Full input filename, e.g. "check-good.tldsl" or "check-not-tldsl.txt". */
+  /** Full input filename, e.g. "check-jsx-good.tldsl.jsx" or "check-not-tldsl.txt". */
   input: string;
   /** Path to the matching <basename>.diagnostics.txt. */
   expectedStderr: string;

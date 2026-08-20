@@ -6,10 +6,10 @@
  * is the ONLY place real adapters meet use cases.
  *
  * Subcommands:
- *   tldsl check <file>   Validate a single `.tldsl` or `.tldsl.jsx` file.
- *                        Exits non-zero on compile errors. Files ending in
- *                        neither are accepted silently with exit 0
- *                        (PostToolUse hook).
+ *   tldsl check <file>   Validate a single `.tldsl.jsx` file. Exits non-zero
+ *                        on compile errors. Files not ending in `.tldsl.jsx`
+ *                        are accepted silently with exit 0 (PostToolUse
+ *                        hook).
  *   tldsl serve <file>   Watch the file, recompile on save, push the scene
  *                        to a local viewer over SSE. Stays alive until
  *                        SIGINT/SIGTERM.
@@ -80,7 +80,7 @@ const commands: readonly Command[] = [
   {
     name: "check",
     args: "<file>",
-    description: "parse and validate a single .tldsl or .tldsl.jsx file",
+    description: "parse and validate a single .tldsl.jsx file",
     run: (rest, io) => {
       const path = rest[0];
       if (path === undefined) {

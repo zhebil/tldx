@@ -13,7 +13,6 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { compileFile } from "../../src/app/compile-file.js";
 import {
   arrowBinding,
   arrowShape,
@@ -25,10 +24,7 @@ import {
   sceneJson,
 } from "../../src/contracts/builders.js";
 import type { SceneJSON, TLRecord } from "../../src/contracts/scene-json.js";
-import { parse } from "../../src/domain/parser/index.js";
 import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
-import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
-import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(HERE, "fixtures");
@@ -174,23 +170,29 @@ function expectedScene(): SceneJSON {
   return sceneJson(records);
 }
 
-describe("e2e fixture: auth.tldsl", () => {
-  it("parses cleanly under the MVP grammar", () => {
-    const source = readFixture("auth.tldsl");
-    const result = parse(source, "auth.tldsl");
+describe("e2e fixture: auth.tldsl.jsx", () => {
+  it(
+    "executes cleanly and produces the expected element counts",
+    async () => {
+      const path = join(FIXTURES, "auth.tldsl.jsx");
+      const source = readFixture("auth.tldsl.jsx");
+      const result = await createJsxExecute().execute(source, path);
 
-    expect(result.diagnostics).toEqual([]);
-    expect(result.ast?.kind).toBe("doc");
-    if (result.ast?.kind !== "doc") throw new Error("expected doc");
+      expect("diagnostics" in result).toBe(false);
+      if ("diagnostics" in result) throw new Error("unreachable");
+      expect(result.ast.kind).toBe("doc");
+      if (result.ast.kind !== "doc") throw new Error("expected doc");
 
-    const frame = result.ast.children[0];
-    if (frame?.kind !== "frame") throw new Error("expected frame at root");
+      const frame = result.ast.children[0];
+      if (frame?.kind !== "frame") throw new Error("expected frame at root");
 
-    const elementKinds = frame.children.map((c) => c.kind);
-    expect(elementKinds.filter((k) => k === "box")).toHaveLength(5);
-    expect(elementKinds.filter((k) => k === "edge")).toHaveLength(4);
-    expect(elementKinds.filter((k) => k === "note")).toHaveLength(1);
-  });
+      const elementKinds = frame.children.map((c) => c.kind);
+      expect(elementKinds.filter((k) => k === "box")).toHaveLength(5);
+      expect(elementKinds.filter((k) => k === "edge")).toHaveLength(4);
+      expect(elementKinds.filter((k) => k === "note")).toHaveLength(1);
+    },
+    30_000,
+  );
 });
 
 describe("e2e fixture: auth scene spec", () => {
@@ -218,30 +220,4 @@ describe("e2e fixture: auth scene spec", () => {
     expect(docs).toHaveLength(1);
     expect(pages).toHaveLength(1);
   });
-});
-
-// Parity gate for the JSX pivot (docs/jsx-pivot.md, A7): kept alive until
-// A8 deletes the text parser, proving both front ends emit the same scene.
-describe("e2e fixture: auth.tldsl vs auth.tldsl.jsx parity", () => {
-  it(
-    "compiles to byte-identical SceneJSON through both front ends",
-    async () => {
-      const deps = {
-        fs: createNodeFsRead(),
-        layout: new ElkLayoutAdapter(),
-        execute: createJsxExecute(),
-      };
-
-      const textResult = await compileFile(join(FIXTURES, "auth.tldsl"), deps);
-      const jsxResult = await compileFile(join(FIXTURES, "auth.tldsl.jsx"), deps);
-
-      expect(textResult.diagnostics).toEqual([]);
-      expect(jsxResult.diagnostics).toEqual([]);
-      expect(textResult.sceneJson).not.toBeNull();
-      expect(jsxResult.sceneJson).not.toBeNull();
-
-      expect(JSON.stringify(jsxResult.sceneJson)).toBe(JSON.stringify(textResult.sceneJson));
-    },
-    30_000,
-  );
 });

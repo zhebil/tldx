@@ -2,12 +2,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { AstDoc } from "../domain/parser/ast.js";
-import { parse } from "../domain/parser/parse.js";
 
 import { Box, Doc, Edge, Frame, Note, flow } from "./index.js";
 import { jsx } from "./jsx-runtime.js";
-
-const FILE = "test.tldsl";
 
 function stripSpans(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(stripSpans);
@@ -60,25 +57,33 @@ function buildTree(): AstDoc {
   ) as AstDoc;
 }
 
-const EQUIVALENT_TLDSL = `<doc>
-  <frame name="Auth" w="320">
-    <box id="login" label="Login form" />
-    <box id="verify" label="Verify creds" />
-    <note id="note1">Ask about session length</note>
-    <edge from="login" to="verify" />
-    <box id="extra1" label="extra1" />
-    <box id="extra2" label="extra2" />
-    <box id="extra3" label="extra3" />
-  </frame>
-</doc>`;
-
-describe("JSX runtime - AST parity with the text parser", () => {
-  it("produces the same AST (modulo spans) as parse() on the equivalent .tldsl text", () => {
+describe("JSX runtime - AST shape", () => {
+  it("builds the expected AST for a small diagram", () => {
     const jsxAst = buildTree();
-    const { ast: textAst, diagnostics } = parse(EQUIVALENT_TLDSL, FILE);
 
-    expect(diagnostics).toEqual([]);
-    expect(stripSpans(jsxAst)).toEqual(stripSpans(textAst));
+    expect(stripSpans(jsxAst)).toEqual({
+      kind: "doc",
+      attrs: {},
+      children: [
+        {
+          kind: "frame",
+          attrs: { name: { value: "Auth" }, w: { value: "320" } },
+          children: [
+            { kind: "box", attrs: { id: { value: "login" }, label: { value: "Login form" } } },
+            { kind: "box", attrs: { id: { value: "verify" }, label: { value: "Verify creds" } } },
+            {
+              kind: "note",
+              attrs: { id: { value: "note1" } },
+              text: "Ask about session length",
+            },
+            { kind: "edge", attrs: { from: { value: "login" }, to: { value: "verify" } } },
+            { kind: "box", attrs: { id: { value: "extra1" }, label: { value: "extra1" } } },
+            { kind: "box", attrs: { id: { value: "extra2" }, label: { value: "extra2" } } },
+            { kind: "box", attrs: { id: { value: "extra3" }, label: { value: "extra3" } } },
+          ],
+        },
+      ],
+    });
   });
 
   it("stashes jsxDEV's source as the node span, with 1-based lines matching this file", () => {
@@ -86,14 +91,14 @@ describe("JSX runtime - AST parity with the text parser", () => {
     const lines = spanLines(jsxAst);
 
     // Doc, Frame, 2 named boxes, Note, Edge, and the mapped box all sit on
-    // lines 49-56 in buildTree() above.
+    // lines 46-53 in buildTree() above.
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {
-      expect(line).toBeGreaterThanOrEqual(49);
-      expect(line).toBeLessThanOrEqual(56);
+      expect(line).toBeGreaterThanOrEqual(46);
+      expect(line).toBeLessThanOrEqual(53);
     }
 
-    expect((jsxAst as { span: { line: number } }).span.line).toBe(49);
+    expect((jsxAst as { span: { line: number } }).span.line).toBe(46);
   });
 });
 

@@ -32,7 +32,9 @@ import { StubLayout } from "../domain/ports/layout.fake.js";
 
 import { runServe, type ServeDeps, type ServeHandle, type ServeIo } from "./serve.js";
 
-const VALID_DOC = `<doc id="d"><box id="a" label="hi" /></doc>`;
+// FakeExecute has no result programmed for this source, so it falls back to
+// its default empty-doc AST - real content doesn't matter for these tests.
+const SRC = "export default function Diagram() { return null; }";
 
 function makeIo(): ServeIo {
   return {
@@ -43,7 +45,7 @@ function makeIo(): ServeIo {
 
 function makeDeps(): ServeDeps {
   return {
-    fs: new InMemoryFs({ "doc.tldsl": VALID_DOC }),
+    fs: new InMemoryFs({ "doc.tldsl.jsx": SRC }),
     watch: new FakeWatch(),
     layout: new StubLayout(),
     execute: new FakeExecute(),
@@ -68,14 +70,14 @@ describe("runServe", () => {
   });
 
   it("close() is idempotent", async () => {
-    started = await runServe({ path: "doc.tldsl", deps: makeDeps(), io: makeIo() });
+    started = await runServe({ path: "doc.tldsl.jsx", deps: makeDeps(), io: makeIo() });
     await started.close();
     // Second close must not throw and must not reject (single-flight).
     await expect(started.close()).resolves.toBeUndefined();
   });
 
   it("close() resolves while an SSE client is connected", async () => {
-    started = await runServe({ path: "doc.tldsl", deps: makeDeps(), io: makeIo() });
+    started = await runServe({ path: "doc.tldsl.jsx", deps: makeDeps(), io: makeIo() });
     const controller = new AbortController();
     try {
       const res = await fetch(`${started.url}events`, { signal: controller.signal });
@@ -116,7 +118,7 @@ describe("runServe", () => {
       const deps = makeDeps();
       deps.port = blockedPort;
       await expect(
-        runServe({ path: "doc.tldsl", deps, io: makeIo() }),
+        runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() }),
       ).rejects.toBeDefined();
     } finally {
       await new Promise<void>((resolve) => {

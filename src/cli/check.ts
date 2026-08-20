@@ -1,13 +1,13 @@
 /**
- * `tldsl check <file>`: parse → ir → layout → emit a single file and report
+ * `tldsl check <file>`: execute → ir → layout → emit a single file and report
  * diagnostics. The composition root (`cli/main.ts`) wires real adapters and
  * calls into `runCheck`; this module owns argv shape, the non-`.tldsl` skip
  * rule, diagnostic formatting, and the exit code.
  *
  * Per CONTEXT.md "tldsl check on non-`.tldsl` files": the agent's
  * `PostToolUse` hook fires on every Write|Edit, so anything that doesn't end
- * in `.tldsl` or `.tldsl.jsx` exits 0 silently. Don't pollute agent context
- * with noise on unrelated edits.
+ * in `.tldsl.jsx` exits 0 silently. Don't pollute agent context with noise
+ * on unrelated edits.
  *
  * Pure-ish: no `process.exit`, no global stdio. The caller passes an `io`
  * struct (write functions) and uses the returned exit code. That keeps the
@@ -31,14 +31,13 @@ export type RunCheckArgs = {
   io: CheckIo;
 };
 
-const TLDSL_EXT = ".tldsl";
 const TLDSL_JSX_EXT = ".tldsl.jsx";
 
 export async function runCheck(args: RunCheckArgs): Promise<number> {
   const { path, deps, io } = args;
 
   // PostToolUse fires on every Write|Edit. Stay silent on unrelated files.
-  if (!path.endsWith(TLDSL_EXT) && !path.endsWith(TLDSL_JSX_EXT)) {
+  if (!path.endsWith(TLDSL_JSX_EXT)) {
     return 0;
   }
 

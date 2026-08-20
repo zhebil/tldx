@@ -1,11 +1,9 @@
 /**
- * `compileFile`: read a `.tldsl` or `.tldsl.jsx` file and run the pure
- * compiler pipeline (front end → ir → layout → emit). Two front ends feed
- * the same pipeline: the text parser (`.tldsl`) and the JSX executor
- * (`.jsx`, via `ExecutePort` - see `docs/jsx-pivot.md` decision 8). Both
- * produce the same `AstNode` shape, so `lower`/`layout`/`emit` don't know
- * which front end ran. Returns the produced `SceneJSON` (or null when there
- * are errors) plus the merged diagnostics.
+ * `compileFile`: read a `.tldsl.jsx` file and run the pure compiler pipeline
+ * (JSX executor → ir → layout → emit). The JSX executor (via `ExecutePort` -
+ * see `docs/jsx-pivot.md` decision 8) is the only front end; it produces the
+ * `AstNode` shape `lower`/`layout`/`emit` expect. Returns the produced
+ * `SceneJSON` (or null when there are errors) plus the merged diagnostics.
  *
  * Per ADR-13, the caller decides what to do on error: `cli/check` formats
  * diagnostics and exits non-zero; `watchAndServe` pushes only an error
@@ -18,7 +16,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { hasErrors, type Diagnostic, type SourceSpan, error } from "../domain/diagnostics/index.js";
 import { emit } from "../domain/emit/index.js";
 import { lower } from "../domain/ir/index.js";
-import { parse, type AstNode } from "../domain/parser/index.js";
+import type { AstNode } from "../domain/parser/index.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 import type { SceneJSON } from "../contracts/scene-json.js";
 
@@ -55,28 +53,17 @@ export async function compileFile(
     return { sceneJson: null, diagnostics: [readErrorDiag(path, err)], inputs: null };
   }
 
-  let ast: AstNode | null;
-  let diagnostics: Diagnostic[];
-  let inputs: string[];
-
-  if (path.endsWith(".jsx")) {
-    const executed = await deps.execute.execute(source, path);
-    if ("diagnostics" in executed) {
-      return {
-        sceneJson: null,
-        diagnostics: normaliseSpans(path, executed.diagnostics),
-        inputs: null,
-      };
-    }
-    ast = executed.ast;
-    diagnostics = [];
-    inputs = executed.inputs.map((f) => normalisePath(path, f));
-  } else {
-    const parsed = parse(source, path);
-    ast = parsed.ast;
-    diagnostics = normaliseSpans(path, parsed.diagnostics);
-    inputs = [path];
+  const executed = await deps.execute.execute(source, path);
+  if ("diagnostics" in executed) {
+    return {
+      sceneJson: null,
+      diagnostics: normaliseSpans(path, executed.diagnostics),
+      inputs: null,
+    };
   }
+  const ast: AstNode = executed.ast;
+  const diagnostics: Diagnostic[] = [];
+  const inputs: string[] = executed.inputs.map((f) => normalisePath(path, f));
 
   const { ir, diagnostics: lowerDiags } = lower(ast);
   diagnostics.push(...normaliseSpans(path, lowerDiags));
@@ -100,8 +87,7 @@ function readErrorDiag(path: string, err: unknown): Diagnostic {
 
 /**
  * Every diagnostic's `span.file` is expressed the same way the caller
- * expressed `path`. The text parser already does this (`normalise(path)`
- * is a no-op), but JSX spans from `jsxDEV` are basenames relative to the
+ * expressed `path`. JSX spans from `jsxDEV` are basenames relative to the
  * entry file's directory, and the execute adapter's own diagnostics carry
  * absolute paths - both get rewritten here to match `path`'s style.
  */
