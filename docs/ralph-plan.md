@@ -13,8 +13,10 @@ once A is done. The loop never terminates; the human stops it.
 
 ## Status
 
-- Phase: **A**
-- Champion layout revision: _(none yet — set when Phase B starts)_
+- Phase: **B**
+- Champion layout revision: `docs/layout-champion.md`, generated at `d7abc03`
+  (Phase A head). No hypothesis has been judged yet; the first Phase B wake
+  compares against this file.
 
 ---
 
@@ -343,11 +345,29 @@ next task.
   the three gate metrics on a hand-built doc), and all six corpus files plus
   `scratch.tldsl.jsx` byte-identical across two consecutive runs.
 
-- [ ] **A10 — Docs.**
+- [x] **A10 — Docs.**
   Rewrite `docs/dsl.md` for JSX. Amend `docs/decisions.md`: ADR-2 amended;
   ADR-10, ADR-11, ADR-12 rule 2 removed; ADR-5 gets a note that ELK is demoted
   to opt-in `layout="auto"`; add ADRs for the pivot decisions. Update
-  `CONTEXT.md` layers, ports table, and glossary. Update `README.md`.
+  `CONTEXT.md` layers, ports table, and glossary. Update `README.md`. _(wake 11)_
+  **Done.** `docs/dsl.md` rewritten from scratch (255 lines) against the shipped
+  surface only, with a short "Not implemented" tail instead of the old doc's
+  aspirational phase-1 element table. `docs/decisions.md` amended in place:
+  ADR-2/4/5/6/8 gained JSX-pivot update notes, ADR-10 tombstoned as DELETED,
+  ADR-11 tombstoned as REJECTED, ADR-12 rule 2 struck through with the `ns`
+  convention as its replacement, and ADR-14..21 added for the eight shipped
+  pivot decisions. `CONTEXT.md`: stale "pre-implementation" note removed,
+  `domain/parser/` reworded as AST-type-only, `infra/execute-jsx/` added to the
+  layers and dependency rules, an `ExecutePort` row added to the boundaries
+  table, both dependency structs corrected, the span section rewritten around
+  `jsxDEV`, and `runtime`/`ExecutePort`/`hybrid layout` added to the glossary.
+  `README.md`: status corrected (it claimed "pre-implementation" while both
+  subcommands work end to end), every `.tldsl` path fixed to `.tldsl.jsx`, the
+  dead `docs/open-questions.md` link dropped, `docs/jsx-pivot.md` linked, and a
+  real JSX snippet added.
+  Verified myself, not the subagents' word: `npm run check` exit 0 (36 files /
+  273 tests), and both the `dsl.md` full example and the `README.md` snippet
+  extracted to `/tmp` and run through the real CLI - both exit 0 silently.
 
 When every box above is checked, set **Phase: B** in Status, run one full
 `tools/layout-report.mts` over the corpus, commit it as
@@ -668,3 +688,36 @@ anything that outlives the loop.)_
   endpoint of the edge, or an ancestor of either endpoint. No corpus file draws
   an edge to a `<frame>` today, so that guard is untested by anything but
   reading. If edges to frames ever appear, re-check it.
+- **(wake 11, A10)** **`docs/jsx-pivot.md` decision 11's `ns` example is broken
+  as written.** It suggests ``id={`${ns}.login`}``, but `lower.ts`'s
+  `validateEndpoint` scans `from`/`to` for a literal `.` *before* resolving the
+  id and treats any match as dotted-anchor syntax. Verified by running it: a
+  `<Box id="billing.api">` is legal, but `<Edge from="billing.api" ...>` always
+  fails with `ir/anchor-not-supported`. The docs now say hyphen. **This is a
+  real constraint on B4** (ship the anchor scheme): resolution needs to
+  disambiguate an id containing a dot from `id.anchor` - longest-id-match, or
+  move anchors onto a separator that cannot appear in an id.
+- **(wake 11, A10)** `.claude/settings.json` has **no `PostToolUse` hook at
+  all** - only `PreCompact` and `SessionStart`, both running `bd prime`. ADR-8
+  and `docs/architecture.md` both describe a `Write|Edit` → `tldsl check` hook
+  that is not actually wired in this repo, so the one-tool-turn feedback loop
+  the whole design rests on has never run here. Left alone: A10 was doc-scoped
+  and wiring a hook is a behavioural change, not a documentation one.
+- **(wake 11, A10)** Two source-comment leftovers, both out of A10's doc scope:
+  `src/cli/main.ts`'s `serve` help text still says "watch a .tldsl or
+  .tldsl.jsx file" (stale since A8 made `.tldsl` unsupported), and
+  `src/domain/parser/ast.ts`'s header still claims unknown elements are
+  rejected "at parse time" when that check now lives in
+  `runtime/components.ts`'s `invokeComponent`.
+- **(wake 11, A10)** A10's list named four docs; three more are now stale and
+  were deliberately left alone. `docs/layout-and-edges.md` still teaches the
+  `<group>`/`<frame>` split and 13 anchors, `docs/architecture.md` still draws
+  the `tokenize → parse` data flow and the unwired hook, and
+  `docs/roadmap.md`'s phase-1 element list still contains `<import>`/`<use>`.
+  `jsx-pivot.md`'s "docs that go stale" section lists `roadmap.md`; A10's
+  wording dropped it. Worth one cleanup task, not a Phase B hypothesis.
+- **(wake 11, A10)** B1's evidence cites `scratch.tldsl` (now
+  `scratch.tldsl.jsx`) and "`dsl.md` declares `align` and nothing implements
+  it" - after A10, `dsl.md` no longer declares `align` at all. The measurement
+  behind B1 still stands; only the citations are stale. Do not treat the
+  rewritten `dsl.md` as evidence that `align` was considered and dropped.
