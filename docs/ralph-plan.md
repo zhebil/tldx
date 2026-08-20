@@ -16,7 +16,7 @@ once A is done. The loop never terminates; the human stops it.
 - Phase: **B**
 - Champion layout revision: `docs/layout-champion.md`, still the wake-12
   revision (the B1 candidate: cross-axis `align`, default `center`). Unchanged
-  since - B2, B3, B4a, B13 and B14 all reverted. Judged results so far live in
+  since - B2, B3, B4a, B13, B14 and B15 all reverted. Judged results so far live in
   `docs/layout-hypotheses.md` - read it before proposing a hypothesis.
 
 ---
@@ -475,29 +475,45 @@ rather than falling back to text-only judging.
 
 Ordered. Take from the top. Strike through when resolved.
 
-- [ ] **B15** Elbow arrows + B13 side anchors, but **gated per edge to the
-  edges that have room to route**. Apply `docs/patches/b13-elbow-side-anchors.patch`
-  first, then add one condition: a terminal pair keeps `kind: "elbow"` and its
-  side anchor only if the centre-to-centre run between the two shapes does not
-  pass through a third shape's rect; every other edge stays today's `kind: "arc"`
-  from a centre anchor. Note this makes `kind` per-edge, so `arrowShape()` needs
-  to take it as an argument instead of hardcoding it.
-  Evidence: across B13 and B14 the pair has won `deep-nesting` twice and never
-  won anything else. `deep-nesting` is the corpus file with long cross-frame
-  edges *and* open space beside the boxes. The three files it loses
-  (`hexagonal`, `long-labels`, `wide-fanout`) are all cases where the targets
-  sit in a corridor and every orthogonal route the elbow router picks runs
-  through a box, because the router does not know the boxes exist. A per-edge
-  gate keeps the one win and should drop all three losses without needing an
-  obstacle-avoiding router.
+- [ ] **B17** _(tooling wake, not an A/B)_ A fifth objective gate:
+  `tools/layout-report.mts` (or a sibling) counts, from the **emitted scene**
+  plus the layout rects, how many arrow paths cross a non-endpoint shape's rect
+   - and for `kind: "elbow"` it must trace the actual L-legs, not the
+  centre-to-centre chord. Reject a candidate that raises the count on any file.
+  Evidence: five arrow hypotheses (B3, B4a, B13, B14, B15) have now been judged
+  on four gates that are structurally blind to arrows, so every arrow wake spends
+  six judge calls to learn something a number could have said. This gate would
+  have rejected B4a, B14, and the `hexagonal` half of B15 for free.
 
-- [ ] **B16** Bound the B14 distribution by the *targets' span* rather than by
-  the whole side: spread the `k`-th of `n` over only the portion of the side
-  facing the targets' actual extent, so a fan whose targets span 40px is not
-  spread across a 600px side. Strictly gated on B15 - B14 measured that
-  distributing across the full side is a regression, and there is nothing to
-  learn from a narrower version of it until the routing itself stops piercing
-  boxes.
+- [ ] **B18** Short-edge arrowhead floor: keep centre anchors
+  (`isPrecise: false`) for any edge whose endpoint rects are closer than a small
+  multiple of the arrowhead size, and only use a precise anchor when there is
+  room to draw a head. Evidence: B15's `deep-nesting` loss and its `wide-fanout`
+  win were both decided by two short hub-to-neighbour edges, on whether tldraw
+  drew a visible arrowhead or a bare dot at the target - the same mechanism with
+  the sign flipped by gap size. Independent of routing style, so worth fixing
+  whatever happens to elbows.
+
+- [x] ~~**B15** Elbow arrows + B13 side anchors, gated per edge to the edges
+  that have room to route: keep `kind: "elbow"` and the side anchor only if the
+  centre-to-centre run does not pass through a third shape's rect.~~
+  **REVERTED** _(wake 18)_ - 1 candidate / 2 champion / 3 ties, and it closes
+  the whole terminal-binding line. Two findings. (a) A straight-line clearance
+  test is the wrong predicate for an orthogonal router: `hexagonal` kept 18 of
+  66 edges on elbow and still drew vertical legs through boxes, because the gate
+  tests the chord and the router draws an L. (b) The `deep-nesting` win B13 and
+  B14 both scored was never about routing - with only 2 of 24 edges left on
+  elbow the file *flipped to the champion*, decided by the judge on arrowheads,
+  the mirror of `wide-fanout` flipping the other way for the same reason. The
+  one repeated win in five arrow wakes was a renderer artefact at short edges.
+  Survives only as **B18**. Ledger entry in `docs/layout-hypotheses.md`.
+
+- [x] ~~**B16** Bound the B14 distribution by the *targets' span* rather than by
+  the whole side.~~ **STRUCK** _(wake 18)_ - never measured. Its own gate was
+  "strictly gated on B15 ... only worth trying if B15 shows the routing is
+  salvageable at all", and B15 shows it is not: the router cannot be made to
+  avoid boxes by choosing anchors, whatever the spacing rule. Retry only if
+  something makes the routing itself obstacle-aware.
 
 - [x] ~~**B14** Distribute the edges that share a side along that side instead
   of stacking them all on its midpoint, sliding the `k`-th of `n` to
@@ -965,3 +981,23 @@ anything that outlives the loop.)_
   side wins. `wide-fanout` still has no backlog entry of its own - the corridor
   shape is a *layout* failure, not an arrow failure, and B7's aspect-ratio
   targeting is the closest existing entry.
+
+- **(wake 18)** `docs/patches/b13-elbow-side-anchors.patch` is now **dead
+  weight** and should be deleted. It was kept for B15 and B16; B15 is resolved
+  and B16 is struck, so nothing in the backlog needs it. Keeping it invites a
+  future wake to resurrect a line of attack that five wakes of evidence have
+  closed. Deleting it is a one-line wake, or a hunk in whichever wake next
+  touches `docs/`.
+- **(wake 18)** The judges twice decided a whole file on **whether tldraw drew
+  an arrowhead or a bare dot** at a short edge's target - `deep-nesting` against
+  the candidate, `wide-fanout` for it, same mechanism, opposite sign. That means
+  the corpus currently has files whose verdict is dominated by a renderer
+  artefact at two edges rather than by layout quality, and any hypothesis whose
+  visible effect is small enough will be decided by noise of this kind. B18
+  attacks the artefact; the deeper issue is that a 1-file margin on this corpus
+  is not a reliable signal, and a future wake may want to require a 2-file
+  margin for hypotheses whose diff is this localised.
+- **(wake 18)** Untracked cruft still sits in the repo root (`.playwright-mcp/`,
+  `demo-render.png`, `demo.tldsl.jsx`), first noted at wake 14 and still not
+  cleaned. It is now five wakes old. `demo.tldsl.jsx` may be worth keeping as a
+  fixture; the other two are byproducts and should be gitignored or removed.

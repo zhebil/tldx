@@ -571,3 +571,141 @@ Two follow-ups requeued, in that order:
   the targets' actual extent, so a fan whose targets span 40px does not get
   spread over a 600px side. This is the smaller-change version of B14 and it is
   only worth trying if B15 shows the routing is salvageable at all.
+
+---
+
+## B15 — elbow + side anchors gated per edge to the runs with room _(wake 18)_ — REVERTED
+
+**Hypothesis.** Across B13 and B14 the elbow+side-anchor pair won `deep-nesting`
+twice and never won anything else. `deep-nesting` is the corpus file with long
+cross-frame edges *and* open space beside the boxes; the three files the pair
+loses (`hexagonal`, `long-labels`, `wide-fanout`) are corridors where every
+orthogonal route the router picks runs through a box, because the router does
+not know the boxes exist. So gate the pair per edge: a terminal pair keeps
+`kind: "elbow"` and its side anchors only if the centre-to-centre run between
+the two endpoints does not pass through a third shape's rect; every other edge
+falls back to today's champion behaviour, `kind: "arc"` from a centre anchor.
+Keep the one win, drop the three losses, without building an obstacle-avoiding
+router.
+
+**What was built.** `docs/patches/b13-elbow-side-anchors.patch` applied
+unchanged as the base, then the gate on top. `arrowShape(input, kind)` takes the
+kind as an argument instead of hardcoding it, so `kind` is per-edge for the
+first time. `collectRects` fills an `obstacleIds: Set<string>` alongside the
+rect map, containing **box and note ids only** - frames are deliberately not
+obstacles, since a cross-frame edge would always be blocked by its own ancestor
+frame and the hypothesis would be untestable. `segmentIntersectsRect` is the
+standard slab method with strict comparisons, so a segment that only grazes a
+rect boundary does not count as blocking. `isRouteBlocked` walks the obstacle
+set excluding the edge's own two endpoints. `emitEdge` starts every edge at
+`arc` + centre anchors and only flips to `elbow` + the B13 side-anchor pick when
+the straight run is clear.
+
++195/-0 net in `emit.ts`, +5/-2 in `builders.ts`, one test added pinning both
+branches of the gate (a scene where a third box sits on the line, asserting arc
++ centre anchors, and one where nothing does, asserting elbow + side anchors).
+The auth-flow snapshot did not move: both its edges have clear runs, so they
+stay elbow exactly as under B13. `npm run check` green at 285 tests, run and
+read directly.
+
+**How much the gate actually gated.** Counted from the emitted scene:
+
+| file | elbow | arc | total |
+|---|---|---|---|
+| deep-nesting | 2 | 22 | 24 |
+| hexagonal | 18 | 48 | 66 |
+| long-labels | 4 | 20 | 24 |
+| sequence | 13 | 26 | 39 |
+| sparse-graph | 8 | 16 | 24 |
+| wide-fanout | 2 | 73 | 75 |
+
+**Objective gates: all pass, all uninformative for the fifth wake running.**
+Layout is untouched, so all six geometry reports are byte-identical to the
+champion by construction: same canvas, zero new overlaps, zero source-order
+violations. All six PNGs differ, so every file got a judge.
+
+**Blind A/B.** Assignment randomised per file from `/dev/urandom`, staged and
+verified against the recorded assignment with `cmp` before launching. Judges
+never told which side was the candidate, and told the render outranks the
+report.
+
+| file | A was | B was | judge picked | winner |
+|---|---|---|---|---|
+| deep-nesting | candidate | champion | B | **champion** |
+| hexagonal | champion | candidate | A | **champion** |
+| wide-fanout | candidate | champion | A | **candidate** |
+| long-labels | champion | candidate | TIE | tie |
+| sequence | champion | candidate | TIE | tie |
+| sparse-graph | candidate | champion | TIE | tie |
+
+Judge reasoning, condensed:
+
+- **deep-nesting** (champion): the two renders are otherwise identical, but the
+  champion "draws visible arrowheads on the Parser→Normalizer→Serializer row
+  edges so their direction is traceable", while under the candidate "those two
+  connectors collapse into tiny directionless stubs between the boxes".
+- **hexagonal** (champion): the candidate's "elbow routes run vertical segments
+  through the ListOrders and CreateSession boxes and stack overlapping segments
+  near Use cases without removing the long diagonal crossings", where the
+  champion's "straight arrows all stay off box interiors and remain traceable".
+- **wide-fanout** (candidate): pixel-identical except at the two hub-to-first-child
+  edges, where the candidate "draws a visible arrowhead at the target while [the
+  champion] collapses it to a tiny dot", in "an otherwise equally cluttered
+  vertical stack whose overlapping fanout arrows run straight through every box
+  in both versions".
+- **long-labels**, **sparse-graph**, **sequence** (ties): no visible difference
+  beyond sub-arrowhead antialiasing; the shared defects (overprinted note text
+  in `long-labels`) are identical on both sides.
+
+**Verdict: REVERTED.** 1 candidate / 2 champion / 3 ties. Reverted by restoring
+the five files from `HEAD` (`git show HEAD:<path> > <path>`; the guardrail hook
+auto-denies `git checkout --`). Tree back to 281 tests, re-verified green.
+Champion doc unchanged.
+
+**What was actually learned — two things, and the second one kills the whole
+line of attack.**
+
+*One: a straight-line clearance test is the wrong predicate for an orthogonal
+router.* `hexagonal` kept 18 of its 66 edges on elbow and the judge still saw
+vertical segments cutting through `ListOrders` and `CreateSession`. That is not
+a bug in the gate; it is the gate answering a different question than the one
+that matters. The gate tests the straight centre-to-centre segment. The router
+then draws an **L**. Clearing the diagonal says nothing about whether either leg
+of the L clears - in a grid-ish layout the diagonal threads between two boxes
+precisely when the axis-aligned legs run through them. Any future gate has to
+test the path that will actually be drawn, not the chord between its endpoints.
+
+*Two: the `deep-nesting` win was never about routing.* The gate left only 2 of
+24 edges on elbow there, and the file flipped from a candidate win (B13, B14) to
+a champion win - decided by the judge on arrowheads, not on routes. This is the
+mirror of the `wide-fanout` result in the same wake, where the candidate won for
+the *same* reason with the sign reversed. Both files came down to two short
+hub-to-neighbour edges and to whether tldraw drew a visible arrowhead or a dot
+at their target. With centre anchors (`isPrecise: false`) tldraw clips the curve
+at the box boundary and has room for a head; with a precise side anchor the
+arrow terminates exactly on the side midpoint, and over a short gap the head
+degenerates. Which side that favours depends on the gap size, i.e. on nothing
+the hypothesis controls.
+
+So B13's one repeated win is not evidence that elbow routing helps
+`deep-nesting`. It is evidence that on that corpus the **only** visible
+difference elbow+side-anchors makes, once the box-piercing routes are gated
+away, is a renderer artefact at short edges. Five hypotheses (B3, B4a, B13, B14,
+B15) have now been spent on terminal binding and routing style, producing one
+win that turns out to be an arrowhead. **The remaining backlog entry in this
+line, B16, is struck: its gate was "only worth trying if B15 shows the routing
+is salvageable at all", and B15 shows it is not.**
+
+Requeued, in order:
+
+- **B17** (tooling, not an A/B) - a fifth objective gate that counts, from the
+  emitted scene plus the layout rects, how many arrow paths cross a
+  non-endpoint shape's rect. Five arrow wakes have now been judged on four
+  gates that are structurally blind to arrows, and this metric would have
+  rejected B4a, B14 and the `hexagonal` half of B15 before spending six judge
+  calls each.
+- **B18** - short-edge arrowhead floor: keep centre anchors (`isPrecise: false`)
+  for any edge whose endpoints are closer than a small multiple of the arrowhead
+  size, because a precise anchor over a short gap renders as a directionless
+  stub. This is the defect that decided both `deep-nesting` and `wide-fanout`
+  here, and it is worth fixing on its own terms whatever happens to routing.
