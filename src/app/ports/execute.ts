@@ -1,0 +1,25 @@
+/**
+ * JSX execution port. `execute(source, path)` runs a `.tldsl.jsx` module and
+ * hands back the `AstNode` it produced. The real adapter (`infra/execute-jsx/`,
+ * A3) bundles with esbuild and runs the module in a fresh `worker_threads`
+ * worker per compile, hard-terminated after a 2s budget - see
+ * `docs/jsx-pivot.md` decision 8.
+ *
+ * The result is `AstNode`, not `AstDoc`: root-must-be-`<doc>` validation stays
+ * in `domain/ir/lower.ts` where it already lives for the text parser.
+ *
+ * This port never rejects. Every failure mode - a compile error, user code
+ * throwing, or the 2s timeout - comes back as `{ diagnostics }` with
+ * `severity: "error"`. The real adapter uses diagnostic codes `runtime/threw`
+ * (user code threw or the module errored) and `runtime/timeout` (the worker
+ * was terminated after exceeding its budget).
+ */
+
+import type { AstNode } from "../../domain/parser/ast.js";
+import type { Diagnostic } from "../../domain/diagnostics/index.js";
+
+export type ExecuteResult = { ast: AstNode } | { diagnostics: Diagnostic[] };
+
+export interface ExecutePort {
+  execute(source: string, path: string): Promise<ExecuteResult>;
+}
