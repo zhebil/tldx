@@ -50,6 +50,46 @@ describe("tools/layout-report", () => {
     expect(lines).toContain("  root (row): 1");
     expect(lines).toContain("  f (col): 0");
   });
+
+  it("scores a row-major grid 0 source-order violations", () => {
+    const children = [
+      box({ id: "a", x: 0, y: 0, w: 50, h: 50 }),
+      box({ id: "b", x: 100, y: 0, w: 50, h: 50 }),
+      box({ id: "c", x: 200, y: 0, w: 50, h: 50 }),
+      box({ id: "d", x: 0, y: 100, w: 50, h: 50 }),
+      box({ id: "e", x: 100, y: 100, w: 50, h: 50 }),
+      box({ id: "f", x: 200, y: 100, w: 50, h: 50 }),
+    ];
+    const report = layoutReport(doc({ layout: "grid", children }));
+    expect(report.split("\n")).toContain("  root (grid): 0");
+  });
+
+  it("scores a serpentine grid 0 source-order violations", () => {
+    const children = [
+      box({ id: "a", x: 0, y: 0, w: 50, h: 50 }),
+      box({ id: "b", x: 100, y: 0, w: 50, h: 50 }),
+      box({ id: "c", x: 200, y: 0, w: 50, h: 50 }),
+      box({ id: "d", x: 200, y: 100, w: 50, h: 50 }),
+      box({ id: "e", x: 100, y: 100, w: 50, h: 50 }),
+      box({ id: "f", x: 0, y: 100, w: 50, h: 50 }),
+    ];
+    const report = layoutReport(doc({ layout: "grid", children }));
+    expect(report.split("\n")).toContain("  root (grid): 0");
+  });
+
+  it("still scores a grid that fits neither reading order above 0", () => {
+    const children = [
+      box({ id: "a", x: 0, y: 0, w: 50, h: 50 }),
+      box({ id: "b", x: 200, y: 0, w: 50, h: 50 }),
+      box({ id: "c", x: 100, y: 0, w: 50, h: 50 }),
+      box({ id: "d", x: 300, y: 0, w: 50, h: 50 }),
+    ];
+    const report = layoutReport(doc({ layout: "grid", children }));
+    const line = report.split("\n").find((l) => l.startsWith("  root (grid):"));
+    expect(line).toBeDefined();
+    const count = Number(line!.split(": ")[1]);
+    expect(count).toBeGreaterThan(0);
+  });
 });
 
 describe("arrowPath", () => {

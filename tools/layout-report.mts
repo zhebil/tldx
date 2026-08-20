@@ -473,16 +473,42 @@ function metricsLines(
   return out;
 }
 
+function gridOrderViolations(
+  children: ContainerInfo["children"],
+  serpentine: boolean,
+): number {
+  let count = 0;
+  let row = 0;
+  for (let i = 1; i < children.length; i++) {
+    const prev = children[i - 1]!;
+    const cur = children[i]!;
+    if (cur.y !== prev.y) {
+      if (cur.y < prev.y) count++;
+      row++;
+      continue;
+    }
+    const reversed = serpentine && row % 2 === 1;
+    if (reversed ? cur.x > prev.x : cur.x < prev.x) count++;
+  }
+  return count;
+}
+
 function sourceOrderViolations(c: ContainerInfo): number {
   if (c.mode === "auto" || c.mode === "free") return 0;
+  if (c.mode === "grid") {
+    // A grid may be placed row-major or serpentine, and the geometry alone does not
+    // say which; scoring under both and keeping the lower count accepts either.
+    return Math.min(
+      gridOrderViolations(c.children, false),
+      gridOrderViolations(c.children, true),
+    );
+  }
   let count = 0;
   for (let i = 1; i < c.children.length; i++) {
     const prev = c.children[i - 1]!;
     const cur = c.children[i]!;
     if (c.mode === "row") {
       if (cur.x < prev.x) count++;
-    } else if (c.mode === "grid") {
-      if (cur.y < prev.y || (cur.y === prev.y && cur.x < prev.x)) count++;
     } else {
       // "col" and any unrecognised mode fall back to the col rule.
       if (cur.y < prev.y) count++;
