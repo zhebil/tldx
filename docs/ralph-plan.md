@@ -488,9 +488,14 @@ Ordered. Take from the top. Strike through when resolved.
   crossings 0 → 2). 0 candidate / 1 champion / 5 structural ties. The mechanism
   survives as B11; the constant cap does not. Ledger entry in
   `docs/layout-hypotheses.md`.
-- [ ] **B3** Default arrow `kind: "elbow"` instead of tldraw's `arc`.
-  `builders.ts` never sets `kind`. Curved arrows read as amateur on
-  architecture diagrams.
+- [x] ~~**B3** Default arrow `kind: "elbow"` instead of tldraw's `arc`.~~
+  **REVERTED** _(wake 14)_ - and the backlog premise was wrong: `builders.ts`
+  does set `kind`, to `"arc"`. 1 candidate / 2 champion / 3 ties. Elbow routing
+  helps where it has room but every terminal is bound to a shape **centre**
+  (`normalizedAnchor: {0.5, 0.5}`), so an orthogonal segment is drawn straight
+  through the source box, the target box, and whatever is stacked between. Not
+  a bad default - a default that cannot be adopted before B4. Survives as B12.
+  Ledger entry in `docs/layout-hypotheses.md`.
 - [ ] **B4** Ship the anchor scheme (8 compass + `center` + `@x,y`), then bind
   edges to sides instead of centres. Evidence: `usecases` has seven outgoing
   edges all bound to its centre.
@@ -509,6 +514,10 @@ Ordered. Take from the top. Strike through when resolved.
   resizes stickies to fit, so reserved space and rendered space disagree.
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
+- [ ] **B12** Retry B3 (default arrow `kind: "elbow"`) *after* B4 lands.
+  Strictly gated on B4: elbow routing only stops drawing through boxes once
+  terminals bind to sides instead of centres. Do not retry it before then -
+  wake 14 already measured that outcome.
 - [ ] **B11** Wrap box labels at a width derived from the document's target
   aspect ratio instead of a constant. B2 showed wrapping itself is not the
   problem - a fixed 320px cap is. Pick the cap so the resulting canvas moves
@@ -822,3 +831,23 @@ anything that outlives the loop.)_
   long-labels`. `git checkout --` is auto-denied by the guardrail hook in this
   environment, so stashing was the only available revert. Drop it whenever
   convenient - the ledger entry records everything it contained.
+
+- **(wake 14)** `screenshot.mts` captures the tldraw **editor chrome** along
+  with the diagram: the colour-palette panel pinned top-right occludes whatever
+  is under it (in `sparse-graph` it hides most of "Node 19"), and the toolbar
+  covers the bottom strip. Judges were told to ignore it, which works but wastes
+  a sentence of every judge prompt and still hides real pixels. The viewer
+  should render without UI when screenshotting - a `?ui=0` query param the
+  viewer reads, or `page.addStyleTag` hiding `.tlui-layout__top`/`__bottom`
+  before capture.
+- **(wake 14)** `wide-fanout` renders as a 138x2560 single-column stack with all
+  24 edges stacked on one vertical spine - two judges independently called it
+  degenerate. The geometry report already says so (21100 total edge length, the
+  worst in the corpus by 4x) but no gate fires on it. This is the strongest
+  evidence yet for **B7** (aspect-ratio targeting on the doc root); consider
+  also adding a gate on mean-edge-length-per-canvas-diagonal so a fixture this
+  bad cannot pass silently again.
+- **(wake 14)** Untracked cruft is sitting in the repo root from a manual
+  render session: `demo-render.png`, `demo.tldsl.jsx`, `.playwright-mcp/`.
+  Neither the loop nor the build produces them. They want a `.gitignore` entry
+  (or deleting), but they are not the loop's to remove.

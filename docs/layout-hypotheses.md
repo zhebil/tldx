@@ -164,3 +164,93 @@ in its ASCII view, so a wrapped box shows its full label spilling past its own
 border. The judge saw the correct geometry table and cited the correct numbers,
 so this did not decide the verdict here, but it will understate any future
 wrapping hypothesis.
+
+---
+
+## B3 — default arrow `kind: "elbow"` instead of `"arc"` — **REVERTED**
+
+_(wake 14)_
+
+**Hypothesis.** Curved arrows read as amateur on architecture diagrams; tldraw
+supports orthogonal `kind: "elbow"` routing, so make it the default.
+
+The backlog entry's premise was wrong on one point: `builders.ts` does not
+"never set `kind`" - it explicitly sets `kind: "arc"`, and already carries
+`elbowMidPoint: 0.5` in the same prop bag. The change was a one-token flip, not
+an addition.
+
+**Diff.** +4 / -3 across three files. `kind: "arc"` → `"elbow"` in
+`arrowShape()` (`contracts/builders.ts`), the same key pinned in the existing
+`arrowShape` case in `builders.test.ts`, and two lines of the `emit` auth-flow
+snapshot regenerated. Nothing else moved. No layout code touched at all -
+tldraw computes the route, our engine does not.
+
+**Objective gates — all pass, and all uninformative.**
+
+`npm run check` green (36 files, 281 tests). Every corpus file's geometry report
+is **byte-identical** between champion and candidate, so canvas, overlaps,
+source-order violations and edge length are unchanged by construction:
+
+| file | canvas | area | overlaps | source-order | total edge len |
+|---|---|---|---|---|---|
+| deep-nesting | 560x776 | 1.00x | 0 → 0 | 0 → 0 | 2128 → 2128 |
+| hexagonal | 1198x636 | 1.00x | 0 → 0 | 0 → 0 | 5634 → 5634 |
+| long-labels | 948x1200 | 1.00x | 0 → 0 | 0 → 0 | 1400 → 1400 |
+| sequence | 282x1360 | 1.00x | 0 → 0 | 0 → 0 | 1300 → 1300 |
+| sparse-graph | 680x460 | 1.00x | 0 → 0 | 0 → 0 | 1440 → 1440 |
+| wide-fanout | 138x2560 | 1.00x | 0 → 0 | 0 → 0 | 21100 → 21100 |
+
+This is the first hypothesis the geometry report is **structurally blind to**.
+Under the pre-wake-14 protocol it would have been six ties and an automatic
+revert with nothing learned. All six rendered PNGs differ, so `screenshot.mts`
+is what made this wake mean anything.
+
+**Blind judgement.** Six files, six PNG pairs, A/B randomised per file, judges
+told the render outranks the report and to ignore the tldraw editor chrome.
+
+| file | A was | B was | winner | verdict |
+|---|---|---|---|---|
+| deep-nesting | champion | candidate | A | champion |
+| hexagonal | champion | candidate | A | champion |
+| long-labels | champion | candidate | A | tie (see below) |
+| sequence | candidate | champion | A | tie (see below) |
+| sparse-graph | champion | candidate | A | tie (see below) |
+| wide-fanout | candidate | champion | A | candidate |
+
+Three judges volunteered, unprompted, that their pair was visually
+indistinguishable and that they were picking by forced-choice tiebreak. Those
+are recorded as ties, not wins - counting a self-declared coin flip as evidence
+would have injected noise in whichever direction the randomisation happened to
+land. The rule was applied in both directions: `sequence`'s "A" was the
+candidate and is not counted for it either.
+
+Judge reasoning, condensed:
+
+- **deep-nesting** (champion): the candidate "collapses several edges into one
+  overlapping vertical line through the centers of Config, Router, Metrics,
+  Handler, Validator and Normalizer", routes one edge horizontally through the
+  Normalizer box, and leaves clipped arrow stubs dangling below two boxes.
+- **hexagonal** (champion): the candidate's "orthogonal routing collapses into
+  overlapping vertical trunks that cut straight through box labels".
+- **wide-fanout** (candidate): otherwise pixel-identical, but the champion
+  loses the arrowheads on the two segments leaving each hub while the candidate
+  draws them.
+
+**Verdict: REVERTED.** 1 candidate / 2 champion / 3 ties. Champion doc
+unchanged (it was already byte-identical to the tree, and the candidate did not
+move a single number in it).
+
+**Why it lost, and what it costs to fix.** Not the mechanism. Elbow routing
+visibly *helped* where it had room - `hexagonal`'s seven-way fan out of
+`usecases` becomes seven parallel orthogonal runs instead of seven diverging
+diagonals. It lost because `arrowBinding()` anchors every terminal at
+`normalizedAnchor: {x: 0.5, y: 0.5}` with `isPrecise: false`, i.e. the shape's
+**centre**. An arc leaving a centre is a curve that tldraw clips at the box
+boundary, so centre-binding is invisible. An elbow leaving a centre is a
+straight orthogonal segment that is drawn *through* the source box, through the
+target box, and through anything stacked between them. Every defect all three
+judges named is that one cause.
+
+So elbow arrows are not a bad default - they are a default that cannot be
+adopted before edges bind to sides. That is exactly **B4** (the anchor scheme).
+Retry as **B12**, which is B3 gated on B4 rather than a blind repeat.
