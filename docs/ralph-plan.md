@@ -438,9 +438,14 @@ Ordered. Take from the top. Strike through when resolved.
   flipped from `start` to `center`, which is the part the frozen corpus could
   actually see. 5 candidate / 0 champion / 1 structural tie. Ledger entry in
   `docs/layout-hypotheses.md`.
-- [ ] **B2** Real text measurement instead of `len * 9 + 48`. Height is
+- [x] ~~**B2** Real text measurement instead of `len * 9 + 48`. Height is
   currently pinned at 60 and text never wraps, so `a10` is a 426px box for one
-  line. Try: wrap at a max width, measure per-line, grow height.
+  line. Try: wrap at a max width, measure per-line, grow height.~~
+  **REVERTED** _(wake 13)_ - a constant 320px wrap cap trades a too-wide canvas
+  for a too-tall one (`long-labels` 948x1200 → 318x1880, aspect 0.79 → 0.17,
+  crossings 0 → 2). 0 candidate / 1 champion / 5 structural ties. The mechanism
+  survives as B11; the constant cap does not. Ledger entry in
+  `docs/layout-hypotheses.md`.
 - [ ] **B3** Default arrow `kind: "elbow"` instead of tldraw's `arc`.
   `builders.ts` never sets `kind`. Curved arrows read as amateur on
   architecture diagrams.
@@ -462,6 +467,11 @@ Ordered. Take from the top. Strike through when resolved.
   resizes stickies to fit, so reserved space and rendered space disagree.
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
+- [ ] **B11** Wrap box labels at a width derived from the document's target
+  aspect ratio instead of a constant. B2 showed wrapping itself is not the
+  problem - a fixed 320px cap is. Pick the cap so the resulting canvas moves
+  *toward* ~16:9, not past it. Overlaps B7; do B7 first if it lands, then this
+  reduces to choosing the cap from the width B7 already wants.
 
 ---
 
@@ -754,3 +764,19 @@ anything that outlives the loop.)_
   instead of centres) - and a warning that B4's own evidence
   ("`usecases` has seven outgoing edges all bound to its centre") was measured
   against the *old* champion. Re-measure before building it.
+- **(wake 13)** `tools/layout-report.mts` renders every label as one unwrapped
+  line in its ASCII view, so a box whose label wraps shows the text spilling
+  past its own border. Any hypothesis that changes text metrics will be judged
+  against a render that contradicts its own geometry table. Fix before
+  retrying B11.
+- **(wake 13)** Five of six corpus files are blind to anything that only
+  affects long text - their labels are all short. B2 therefore came down to a
+  single judge on a single file, which is a thin basis for a verdict. The
+  corpus is frozen and must not be edited to suit a hypothesis, but a corpus
+  *expansion* is a legitimate hypothesis of its own (per the Phase B rules) and
+  is worth proposing once the text-metrics thread resumes.
+- **(wake 13)** The reverted B2 diff is parked in `git stash` as
+  `stash@{0}: B2 reverted (wake 13): wrapped box labels, lost blind A/B on
+  long-labels`. `git checkout --` is auto-denied by the guardrail hook in this
+  environment, so stashing was the only available revert. Drop it whenever
+  convenient - the ledger entry records everything it contained.

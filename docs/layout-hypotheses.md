@@ -91,3 +91,76 @@ Recurring theme across all five: centring turns a flow into a *spine*, and
 edges bound to shape centres then run straight along it. That is the mechanism,
 and it predicts B4 (bind edges to sides) interacts with this - worth
 re-measuring B4 against the new champion rather than the old evidence.
+
+---
+
+## B2 — wrapped, per-line box label measurement — **REVERTED**
+
+_(wake 13)_
+
+**Hypothesis.** `estimatedBoxSize` measures a label as one unwrapped line
+(`len * 9 + 48`) and pins height at 60, so a 95-character label becomes a
+948px-wide, 60px-tall box. Wrap the label at a maximum width, size the box off
+the longest wrapped line, and grow the height per line.
+
+**Diff.** +25 / -3, one file. `BOX_MAX_W = 320` and a private greedy
+`wrapLabel(text, contentW)` in `domain/layout/defaults.ts`; `estimatedBoxSize`
+now takes `w` from the longest line and `h` from the line count. A word longer
+than the content width is deliberately not broken, so such a box still
+overflows the cap. Plus a new `domain/layout/defaults.test.ts` (3 cases: short
+label unchanged at 120x60, 13-word label wraps to 3 lines under the cap, single
+50-char word left unbroken). Nothing outside those two files moved - every
+pre-existing hardcoded size in the suite uses a label short enough to stay on
+one line.
+
+**Objective gates — all pass.**
+
+| file | canvas (champ → cand) | area | overlaps | source-order | crossings | total edge len |
+|---|---|---|---|---|---|---|
+| deep-nesting | 560x776 → 560x776 | 1.00x | 0 → 0 | 0 → 0 | 0 → 0 | 2128 → 2128 |
+| hexagonal | 1198x636 → 1198x636 | 1.00x | 0 → 0 | 0 → 0 | 2 → 2 | 5634 → 5634 |
+| long-labels | 948x1200 → 318x1880 | 0.53x | 0 → 0 | 0 → 0 | 0 → **2** | 1400 → **2352** |
+| sequence | 282x1360 → 282x1360 | 1.00x | 0 → 0 | 0 → 0 | 0 → 0 | 1300 → 1300 |
+| sparse-graph | 680x460 → 680x460 | 1.00x | 0 → 0 | 0 → 0 | 0 → 0 | 1440 → 1440 |
+| wide-fanout | 138x2560 → 138x2560 | 1.00x | 0 → 0 | 0 → 0 | 0 → 0 | 21100 → 21100 |
+
+`npm run check` green (37 files, 284 tests). No gate rejects the candidate -
+canvas area on the only affected file *shrank* to 0.53x. But two non-gate
+metrics moved the wrong way on that same file: edge crossings 0 → 2 and total
+edge length 1400 → 2352 (+68%), because taller boxes push the column from
+1200px to 1880px and the notes now sit far below the nodes they annotate.
+
+**Blind judgement.** One file. Five of six corpus files produce
+byte-identical reports under both engines - every label outside `long-labels`
+is short enough that wrapping never triggers - so they were recorded as
+structural ties and not sent to a judge, per the B1 precedent.
+
+| file | A was | B was | winner | verdict |
+|---|---|---|---|---|
+| long-labels | candidate | champion | B | champion |
+| deep-nesting, hexagonal, sequence, sparse-graph, wide-fanout | — | — | — | tie (identical) |
+
+Reasoning, verbatim:
+
+- **long-labels** — "B keeps every long label on one legible line with zero
+  edge crossings and a sane 0.79 aspect ratio, while A squeezes everything into
+  a 318px-wide, 1880px-tall strip that wraps labels, crosses edges twice, and
+  forces awkward scrolling."
+
+**Verdict: 0 candidate, 1 champion, 5 ties → REVERTED.** Champion unchanged;
+`docs/layout-champion.md` is still the B1 baseline.
+
+What this rules out is the *parameter*, not the mechanism. A 320px cap turns a
+column of long-label boxes into a ribbon - it trades a too-wide canvas for a
+too-tall one, and the aspect ratio gets worse (0.79 → 0.17), not better. The
+judge's objection was entirely about the resulting canvas shape, never about
+wrapping as such. Any retry must choose the wrap width as a function of the
+document's target shape rather than as a constant, which makes it a variant of
+B7 (aspect-ratio targeting) rather than a standalone text-metrics change. Filed
+as B11.
+
+**Confound worth knowing.** `tools/layout-report.mts` renders labels unwrapped
+in its ASCII view, so a wrapped box shows its full label spilling past its own
+border. The judge saw the correct geometry table and cited the correct numbers,
+so this did not decide the verdict here, but it will understate any future
+wrapping hypothesis.
