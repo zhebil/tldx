@@ -36,6 +36,13 @@ export function isDirection(s: string): s is Direction {
   return (DIRECTIONS as readonly string[]).includes(s);
 }
 
+export type LayoutMode = "row" | "col" | "grid" | "auto" | "free";
+export const LAYOUT_MODES: readonly LayoutMode[] = ["row", "col", "grid", "auto", "free"];
+
+export function isLayoutMode(s: string): s is LayoutMode {
+  return (LAYOUT_MODES as readonly string[]).includes(s);
+}
+
 export function estimatedBoxSize(label: string | undefined): {
   w: number;
   h: number;

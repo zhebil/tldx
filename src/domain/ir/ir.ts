@@ -1,4 +1,4 @@
-import type { Direction } from "../layout/defaults.js";
+import type { Direction, LayoutMode } from "../layout/defaults.js";
 import type { SourceSpan } from "../diagnostics/index.js";
 
 /**
@@ -21,6 +21,11 @@ export type IRDoc = IRBase & {
   kind: "doc";
   /** Optional layout flow direction; layout port defaults when absent. */
   direction?: Direction;
+  /** Optional deterministic-layout mode (spike; ELK adapter ignores this). */
+  layout?: LayoutMode;
+  gap?: number;
+  pad?: number;
+  cols?: number;
   children: IRElement[];
 };
 
@@ -29,6 +34,11 @@ export type IRFrame = IRBase & {
   name?: string;
   /** Optional override for layout flow inside this frame. */
   direction?: Direction;
+  /** Optional deterministic-layout mode (spike; ELK adapter ignores this). */
+  layout?: LayoutMode;
+  gap?: number;
+  pad?: number;
+  cols?: number;
   x?: number;
   y?: number;
   w?: number;

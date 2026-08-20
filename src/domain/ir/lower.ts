@@ -25,7 +25,10 @@ import {
 import {
   DIRECTIONS,
   isDirection,
+  LAYOUT_MODES,
+  isLayoutMode,
   type Direction,
+  type LayoutMode,
 } from "../layout/defaults.js";
 import type {
   AstBox,
@@ -83,12 +86,15 @@ export function lower(ast: AstNode | null): LowerResult {
     contentFields: () => [],
   });
   const direction = readDirection(ast.attrs, ctx);
+  const layout = readLayoutMode(ast.attrs, ctx);
   const doc: IRDoc = {
     kind: "doc",
     ...idHeader,
     span: ast.span,
     children: [],
     ...(direction === undefined ? {} : { direction }),
+    ...(layout === undefined ? {} : { layout }),
+    ...numericAttrs(ast.attrs, ctx, ["gap", "pad", "cols"] as const),
   };
   for (const child of ast.children) {
     const lowered = lowerNode(child, ctx);
@@ -134,6 +140,7 @@ function lowerNode(node: AstNode, ctx: Ctx): IRElement | null {
 
 function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
   const direction = readDirection(node.attrs, ctx);
+  const layout = readLayoutMode(node.attrs, ctx);
   const frame: IRFrame = {
     kind: "frame",
     ...assignId(node.attrs, node.span, ctx, {
@@ -145,7 +152,9 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
     children: [],
     ...optionalString(node.attrs, "name"),
     ...(direction === undefined ? {} : { direction }),
-    ...numericAttrs(node.attrs, ctx),
+    ...(layout === undefined ? {} : { layout }),
+    ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
+    ...numericAttrs(node.attrs, ctx, ["gap", "pad", "cols"] as const),
   };
   for (const child of node.children) {
     const lowered = lowerNode(child, ctx);
@@ -164,7 +173,7 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
     }),
     span: node.span,
     ...optionalString(node.attrs, "label"),
-    ...numericAttrs(node.attrs, ctx),
+    ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
   };
 }
 
@@ -178,7 +187,7 @@ function lowerNote(node: AstNote, ctx: Ctx): IRNote {
     }),
     span: node.span,
     text: node.text,
-    ...numericAttrs(node.attrs, ctx),
+    ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
   };
 }
 
@@ -375,6 +384,21 @@ function readDirection(attrs: Attrs, ctx: Ctx): Direction | undefined {
   return undefined;
 }
 
+function readLayoutMode(attrs: Attrs, ctx: Ctx): LayoutMode | undefined {
+  const attr = attrs.layout;
+  if (attr === undefined) return undefined;
+  const raw = attr.value;
+  if (isLayoutMode(raw)) return raw;
+  ctx.diagnostics.push(
+    error(
+      "ir/bad-layout-mode",
+      `'layout' must be one of ${LAYOUT_MODES.join(", ")} (got '${raw}')`,
+      attr.span,
+    ),
+  );
+  return undefined;
+}
+
 function optionalString(
   attrs: Attrs,
   name: "label" | "name",
@@ -384,12 +408,13 @@ function optionalString(
   return { [name]: raw } as { label?: string } | { name?: string };
 }
 
-function numericAttrs(
+function numericAttrs<K extends string>(
   attrs: Attrs,
   ctx: Ctx,
-): { x?: number; y?: number; w?: number; h?: number } {
-  const out: { x?: number; y?: number; w?: number; h?: number } = {};
-  for (const key of ["x", "y", "w", "h"] as const) {
+  keys: readonly K[],
+): Partial<Record<K, number>> {
+  const out: Partial<Record<K, number>> = {};
+  for (const key of keys) {
     const v = attrs[key];
     if (v === undefined) continue;
     const n = Number(v.value);
