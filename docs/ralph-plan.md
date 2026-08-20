@@ -640,9 +640,11 @@ Ordered. Take from the top. Strike through when resolved.
   (B9's defect, given room rather than fixed), and `wide-fanout` still draws
   eighteen unrouted chords. Ledger entry in `docs/layout-hypotheses.md`.
 
-- [ ] **B21** _(successor to B7)_ Serpentine (boustrophedon) row direction for a
+- [x] ~~**B21** _(successor to B7)_ Serpentine (boustrophedon) row direction for a
   wrapped grid, so a chain's wrap-back edge becomes a short vertical hop instead
-  of a full-width diagonal. **Two units of work, do them in this order:** first
+  of a full-width diagonal.~~ **RESOLVED** _(wake 24)_ - B21a built and kept,
+  B21b measured and rejected at gate 5. Both halves below.
+  **Two units of work, do them in this order:** first
   teach `sourceOrderViolations` in `tools/layout-report.mts` that a serpentine
   grid's odd rows run right-to-left, because gate 3 rejects it by construction
   otherwise; only then flip the placement. Do not attempt both in one wake.
@@ -668,14 +670,21 @@ Ordered. Take from the top. Strike through when resolved.
     than it did yesterday. Judged worth it - the alternative is that B21b is
     unmeasurable - but if a future grid hypothesis passes gate 3 narrowly,
     re-derive the count by hand before trusting it.
-  - [ ] **B21b — flip the placement.** `gridPositions` in
+  - [x] ~~**B21b — flip the placement.** `gridPositions` in
     `src/domain/layout/stack.ts` places row-major; make odd rows run
-    right-to-left. Note it now sits on top of a **kept** wrap (B20, wake 22), so
-    the champion baseline is the wake-22 grid, not the old column. `sequence` is
-    the file to watch: B20's chain gate makes it skip the wrap entirely, so
-    serpentine may have no chain left to help unless the gate is also revisited
-    - check that before spending the wake, and if `sequence` is untouched, say
-    so in the ledger rather than reading a 0-0 as support.
+    right-to-left.~~ **REJECTED AT GATE 5** _(wake 24)_ - `wide-fanout` goes
+    36 → 43 arrow paths crossing a non-endpoint shape, so no judge was spent.
+    Gates 1-4 all passed and canvas was byte-identical on all six files.
+    Wake 23's warning was the right one and the answer is worse than it looked:
+    `sequence` is untouched (byte-identical, recorded as *not* evidence), and so
+    are `deep-nesting`, `hexagonal` and `sparse-graph`. Only `wide-fanout` and
+    `long-labels` could see the change, and **neither is a chain** - B20's gate
+    admits a container to the wrap precisely when it is *not* a chain, so the
+    auto-wrap and serpentine are aimed at structurally disjoint inputs. In a fan
+    there is no wrap-back edge to shorten, only spokes to lengthen (total edge
+    length +18% on `wide-fanout`, +39% on `long-labels`). Reviving this needs
+    B20's gate reopened, which the corpus has no file to justify. Ledger entry
+    in `docs/layout-hypotheses.md`.
 
 - [ ] **B8** Frame title width participates in frame sizing. Frame `name` is
   never measured, so long titles overflow.
@@ -1228,3 +1237,23 @@ anything that outlives the loop.)_
   corpus reports byte-identical, so `docs/layout-champion.md` is still current.
   Diff the six reports against the champion before deciding; do not regenerate
   on the mere fact that the tool was edited.
+
+- **(wake 24)** Gate 3's grid weakness (wake 23, above) can now be **paid off or
+  deleted**, and deleting is the cheaper option. B21b was "the only thing that
+  will ever produce a serpentine grid", and it was rejected. So today nothing in
+  `src/` places a serpentine grid, which makes `sourceOrderViolations`' `min`
+  over two reading orders pure downside: a weaker gate protecting a code path
+  that does not exist. Either revert the metric to row-major-only, or keep it
+  and write the direction back onto the positioned doc as wake 23 suggested.
+  Not done in this wake because it is its own unit of work, and because leaving
+  it costs nothing until the next grid hypothesis.
+
+- **(wake 24)** **The corpus has no multi-row chain at the doc root, and cannot
+  grow one without reopening B20.** B20's chain gate sends every chain to `col`,
+  so a chain never wraps and never has more than one column; every doc that
+  *does* wrap is a fan or a tree. That means any hypothesis about the *order* in
+  which a wrapped grid is filled is unmeasurable on this corpus by construction -
+  not merely unsupported, structurally unreachable. B21b is the proof. Before
+  proposing another doc-root placement rule, check which of the six files can
+  physically see it; wake 22 already recorded that at most two can, and B21b
+  found both of those are the wrong topology for wrap-order work.

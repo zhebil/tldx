@@ -1090,3 +1090,94 @@ The regression that matters is pinned in `tests/tools/layout-report.test.ts`: a
 single-row grid at `x` = 0, 200, 100, 300 must still score above 0. The failure
 mode of this change was never a wrong number, it was defanging the gate into
 returning 0 for everything.
+## B21b — serpentine (boustrophedon) rows for an auto-wrapped grid — **REJECTED AT GATE 5**
+
+_(wake 24)_
+
+**Hypothesis (backlog, verbatim).** "Serpentine (boustrophedon) row direction for
+a wrapped grid, so a chain's wrap-back edge becomes a short vertical hop instead
+of a full-width diagonal. ... `gridPositions` in `src/domain/layout/stack.ts`
+places row-major; make odd rows run right-to-left."
+
+**What was built.** +69/-7 across `src/domain/layout/stack.ts` (+24/-7) and
+`src/domain/layout/stack.test.ts` (+45, two tests). One idea, threaded through
+four functions: for element index `i` in a `cols`-wide grid, with
+`r = floor(i / cols)`, the column becomes
+`serpentine && r % 2 === 1 ? cols - 1 - (i % cols) : i % cols`. That mapping is
+used both when accumulating `colWidths` and when reading `colX`, and `gridExtent`
+takes the same flag so `bestGridCols` scores the geometry that will actually be
+placed. Row assignment is untouched.
+
+The flag is **on only for the grid the engine chose itself** - the
+`mayAutoGrid && mode === "col"` auto-wrap from B20. An explicit `layout="grid"`
+stays row-major, on the reasoning that an explicit grid is a table and reversing
+its odd rows scrambles the meaning the author wrote. The second unit test pins
+that: `cols={3}` explicit, child 3 keeps child 0's `x`.
+
+**Objective gates — gate 5 fails.**
+
+| corpus file | canvas champion → candidate | area ratio | overlaps | source-order | arrow crossings |
+| --- | --- | --- | --- | --- | --- |
+| deep-nesting | 560x776 → 560x776 | 1.00 | 0 → 0 | 0 → 0 | 10 → 10 |
+| hexagonal | 1198x636 → 1198x636 | 1.00 | 0 → 0 | 0 → 0 | 5 → 5 |
+| long-labels | 1927x580 → 1927x580 | 1.00 | 0 → 0 | 0 → 0 | 1 → 1 |
+| sequence | 282x1360 → 282x1360 | 1.00 | 0 → 0 | 0 → 0 | 0 → 0 |
+| sparse-graph | 680x460 → 680x460 | 1.00 | 0 → 0 | 0 → 0 | 0 → 0 |
+| wide-fanout | 983x460 → 983x460 | 1.00 | 0 → 0 | 0 → 0 | 36 → **43** |
+
+`npm run check` green (36 files / 301 tests, up from 299) - gate 1 passed, so the
+rejection is about the layout, not a broken build. Gates 2, 3 and 4 passed on
+every file; canvas is byte-identical everywhere, because reversing a row
+permutes elements among columns whose widths barely differ. **Gate 5 rejects on
+`wide-fanout`: 36 → 43 arrow paths crossing a non-endpoint shape.** No judge was
+spent.
+
+**Reach.** Only two of six files moved. `deep-nesting` and `hexagonal` have one
+top-level child, `sparse-graph` sets `layout="auto"`, and `sequence` is
+chain-gated out of the wrap by B20 - all four reports are byte-identical to the
+champion. That is exactly the check wake 23 asked for, so it is recorded rather
+than read as support: **`sequence` is untouched, and its 0-0 is not evidence.**
+
+**Why it lost, and it is not a tuning problem.** Serpentine assumes the wrapped
+sequence is a *chain*, so that the only edge crossing a row boundary is the
+wrap-back one. Neither file that can see this change is a chain - and they
+cannot be, because B20's gate is what decides a grid happens at all. The gate
+admits a container precisely when it is *not* a chain, so the auto-wrap and
+serpentine are structurally aimed at disjoint inputs. Two concrete readings:
+
+- **`wide-fanout` is a fan.** Every edge runs from `hub` (row 0, column 0) to a
+  leaf. Row-major puts leaf-6 directly under the hub; serpentine slides it to the
+  far right. Reversing rows 1 and 3 does not shorten any wrap-back edge - there
+  are none - it just lengthens half the spokes and drags them across more
+  intervening boxes. Total edge length 10864 → 12811 (+18%), and that is what
+  gate 5's 36 → 43 is measuring. `mini-hub` moving from column 1 to column 4
+  makes its own six-spoke fan straddle the row instead of hanging off its left
+  end.
+- **`long-labels` is a tree, not a chain.** `gateway` has two out-edges and
+  `orders` has three, so its adjacent-pair edges are not the wrap-back edges
+  serpentine helps. It survives gate 5 at 1 → 1, but the non-gate numbers move
+  the wrong way too: total edge length 4446 → 6190 (+39%) and edge-edge
+  crossings 1 → 2. Serpentine repairs `router → orders` into a vertical hop and
+  breaks `gateway → rate-limiter` and `auth → router` into diagonals in exchange.
+
+**What this establishes.** B20's finding was that a layout rule may consult edge
+topology to gate itself. B21b is the same finding read backwards: **a placement
+rule tuned for one topology cannot ride along on a wrap that is gated to admit
+only the opposite topology.** Serpentine is not wrong in general - it is wrong
+for every input the auto-wrap can currently reach. Reviving it needs the wrap to
+reach a chain first, which means revisiting B20's gate, which the corpus has no
+file to justify. Treat this as closing the doc-root wrap-order line rather than
+as a near miss.
+
+The tooling half (**B21a**, wake 23) did work as designed: gate 3 reports 0
+source-order violations for both changed files under the serpentine reading, so
+the gate that would have rejected this by construction correctly did not. Its
+cost stands unchanged - `min` over two reading orders is a genuinely weaker gate
+for grids, and it bought a measurement that came back negative.
+
+**Verdict: REJECTED AT GATE 5 → REVERTED.** Reverse-patched away; `src/` is
+byte-identical to the wake-22 champion, so `docs/layout-champion.md` is still
+current and was not regenerated.
+
+---
+
