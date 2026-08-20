@@ -2,26 +2,26 @@
 
 This document is the source of truth for the project's architecture: vocabulary, layers, dependency rules, and patterns. The `eslint`/`dependency-cruiser` configs (defined in `docs/lint-config.md`, wired by the bootstrap toolchain task) mechanically enforce what's described here. **If code disagrees with this doc, the code is wrong (or this doc is stale - update it deliberately).**
 
-> Status note: this is pre-implementation. The lint rules described below are *designed to* fail CI from day 1; they actually take effect once `tldsl-iuk` (bootstrap toolchain) lands. No production code should be merged before that issue closes.
+> Status note: the lint rules described below are live and enforced in CI.
 
 ## What the application is
 
-`tldsl` is a CLI + local viewer that turns a plain-text DSL into a live tldraw canvas. AI agents (Claude Code et al.) author `.tldsl` files with normal Edit/Write tools; a watcher recompiles on save and pushes scene JSON to a browser viewer. A one-shot `tldsl check` validates files and is wired into the agent's `PostToolUse` hook so syntax/layout errors land back in context.
+`tldsl` is a CLI + local viewer that turns a JSX authoring surface into a live tldraw canvas. AI agents (Claude Code et al.) author `.tldsl.jsx` files with normal Edit/Write tools, importing `Doc`, `Frame`, `Box`, `Note`, `Edge`, and `flow` from the `"tldsl"` module; a watcher recompiles on save and pushes scene JSON to a browser viewer. A one-shot `tldsl check` validates files and is wired into the agent's `PostToolUse` hook so syntax/layout errors land back in context.
 
 ## Scope split
 
 There are three concentric scopes. **Every section below is MVP-scoped.** Phase 1 and phase 2 are tracked in `docs/roadmap.md`.
 
 - **MVP (now):** the smallest slice that proves the thesis (file → live canvas, errors land in agent context within one tool turn).
-- **Phase 1 (later):** full DSL feature surface from the original design (`<group>`, `<shape>`, `<text>`, `<line>`, `<import>`, `<use>`, 13 anchors, edge styling, comments-as-stickies).
+- **Phase 1 (later):** remaining feature surface from the original design (`Group`, `<Shape>` kinds, `<Text>`, `<Line>`, full anchor scheme, edge styling). `<import>`/`<use>` and comments-as-stickies are not phase 1 - the former was superseded outright by ES `import`, the latter was rejected as incompatible with the JSX execution model. See `docs/decisions.md` ADR-10, ADR-11.
 - **Phase 2 (later):** round-trip from canvas back to DSL.
 
 ### MVP scope
 
 - `tldsl serve <file>` and `tldsl check <file>`.
-- Grammar subset: `<doc>`, `<box>`, `<note>`, `<edge>`, `<frame>`. No `<group>`, no `<import>`/`<use>`, no `<shape>` kinds, no edge styling beyond defaults, no comments-as-stickies.
-- Layout: ELK auto-layout for `layout=auto`; `free` with hard pins (`x y`) supported. Other layout modes deferred.
-- Anchors: default-center attach only. The 13-anchor scheme is phase 1.
+- Component library: `Doc`, `Frame`, `Box`, `Note`, `Edge`, `flow`, imported from `"tldsl"` in a `.tldsl.jsx` file. No `Group`, no `<Shape>` kinds, no edge styling beyond defaults, no comments-as-stickies (comments are plain JS comments and compile to nothing).
+- Layout: hybrid - `row`/`col`/`grid`/`free` place deterministically in the domain; `layout="auto"` calls ELK on that container's already-sized direct children. `free` with hard pins (`x`/`y`) supported.
+- Anchors: default-center attach only. The full scheme (8 compass points + `center`, plus arbitrary `0..1` fractions) is phase 1; see `docs/decisions.md` ADR-6.
 - Live viewer reload on file change.
 - Diagnostics from `check` printed as plain text, exit non-zero on error.
 - Success criterion: in a fresh agent session, the agent authors a 5-node auth-flow diagram, the canvas updates live, and any invalid edit produces an inline error within one tool turn.
@@ -48,9 +48,12 @@ app/        Application. Use cases orchestrating the domain pipeline + ports.
               <port>.fake.ts. (FsReadPort, WatchPort, TransportPort, LogPort.)
 
 domain/     Pure compiler core. No imports outside domain/ + contracts/.
-  parser/     DSL text → AST.
+  parser/     The AST type (`ast.ts`) shared by `runtime/` (which produces it)
+              and `domain/ir/` (which consumes it). Does not parse text - the
+              text front end was deleted with the JSX pivot; see
+              `docs/jsx-pivot.md`.
   ir/         AST → normalized IR. Derives IDs, expands shorthand, applies
-              MVP validation (e.g. <edge> endpoints reference real elements).
+              MVP validation (e.g. `<Edge>` endpoints reference real elements).
   layout/     IR → IR-with-positions. Calls the layout port.
   emit/       IR-with-positions → contracts/SceneJSON.
   diagnostics/ Error type + source-span model. NO formatting (cli/ owns that).
@@ -65,6 +68,14 @@ infra/      Adapters. One per port that exists.
                 bundle. Exports startDevServer({ port, viewerBundleDir, transport }).
                 No port interface - one impl, called directly from cli/serve.ts.
                 CLI composes and starts it; CLI does NOT contain HTTP code.
+  execute-jsx/  esbuild bundle + worker_threads worker, hard-terminated at a
+                2s budget. Implements ExecutePort. The only place that
+                imports runtime/ - it bundles the runtime alongside the
+                user's `.tldsl.jsx` entry and runs the result in a fresh
+                worker per compile. esbuild is a real runtime dependency of
+                the CLI here (the first platform-specific native binary in
+                the project), contained to this directory the way elkjs is
+                contained to layout-elk/.
   log/          stdout/stderr logger. Implements LogPort.
 
 contracts/  Wire types shared across layers. Imports NOTHING.
@@ -83,6 +94,8 @@ runtime/    The JSX authoring surface (`"tldsl"` module: `Doc`, `Frame`,
             diagram code - not imported anywhere else in the project. It may
             import types from `domain/parser` and `contracts/` and nothing
             else. Output is exactly the `domain/parser/ast.ts` AST shape.
+            `infra/execute-jsx/` is the one layer that imports it - that
+            exception has landed, not just planned.
 ```
 
 `viewer/` is its own deliverable. Both `viewer/` and `domain/emit/` reference `contracts/scene-message.ts` and `contracts/scene-json.ts`. That's the versioned contract.
@@ -108,7 +121,7 @@ Specifically:
 - `cli/**` is the wiring site. It may import everything except `viewer/**` (the viewer is a built artifact, not a TS dependency).
 - `viewer/**` may import only `contracts/**`. No `cli`, `app`, `domain`, `infra`.
 - `contracts/**` imports nothing - no node built-ins, no third-party packages, no internal modules.
-- `runtime/**` may import types from `domain/parser/**` and `contracts/**` only - no `node:*`, `infra/**`, `app/**`, `cli/**`, `viewer/**`. It is a leaf: no other layer may import `runtime/**` (the JSX executor adapter gets the one exception when it lands).
+- `runtime/**` may import types from `domain/parser/**` and `contracts/**` only - no `node:*`, `infra/**`, `app/**`, `cli/**`, `viewer/**`. It is a leaf: the only exception to "no other layer may import `runtime/**`" is `infra/execute-jsx/`, which bundles it.
 
 ## Boundaries
 
@@ -117,8 +130,9 @@ A boundary becomes a port only when **two adapters justify the seam** (real impl
 | Boundary | Port? | Why / why not |
 |---|---|---|
 | Filesystem read | `app/ports/fs.ts` | Real (node:fs) + InMemoryFs fake. Use cases need it; tests need it instant. |
-| Filesystem watch | `app/ports/watch.ts` | Real (chokidar) + controllable fake. Watcher tests need to drive events. |
-| Layout engine | `domain/ports/layout.ts` | Real (elkjs) + StubLayout. Domain unit tests need determinism. |
+| Filesystem watch | `app/ports/watch.ts` | Real (chokidar) + controllable fake. Watcher tests need to drive events. `watch(paths, listener)` takes an array, not a single file - a `.tldsl.jsx` entry can pull in imports, and `WatchHandle.update(paths)` re-subscribes to the current set (diffing against what's already watched; an unchanged set emits nothing) after every compile. |
+| Layout engine | `domain/ports/layout.ts` | Real (elkjs, opt-in for `layout="auto"`) + StubLayout. Domain unit tests need determinism. |
+| JSX execution | `app/ports/execute.ts` (`ExecutePort`) | Real (`infra/execute-jsx/`: esbuild bundle + `worker_threads` worker, hard `terminate()` at 2s) + `FakeExecute`. Two adapters justify the seam; `domain/` stays pure by never touching esbuild or the worker directly. |
 | Viewer transport | `app/ports/transport.ts` | Real (SSE) + InMemoryTransport. App tests assert what got pushed. |
 | Logger | `app/ports/log.ts` | Real (stderr) + CaptureLog. Use cases emit structured logs; tests inspect them. |
 | Dev HTTP server | **No port** (impl in `infra/devserver/`). | One impl, no test variation - port abstraction is ceremony. CLI composes via `startDevServer(...)`; HTTP/SSE code stays in `infra/devserver/`. |
@@ -129,8 +143,8 @@ A boundary becomes a port only when **two adapters justify the seam** (real impl
 **Per-use-case dependency structs** (no global Caps):
 
 ```ts
-type CompileFileDeps   = { fs: FsReadPort; layout: LayoutPort };
-type WatchAndServeDeps = { watch: WatchPort; fs: FsReadPort; layout: LayoutPort; transport: TransportPort; log: LogPort };
+type CompileFileDeps   = { fs: FsReadPort; layout: LayoutPort; execute: ExecutePort };
+type WatchAndServeDeps = { watch: WatchPort; fs: FsReadPort; layout: LayoutPort; execute: ExecutePort; transport: TransportPort; log: LogPort };
 ```
 
 Each use case declares only what it needs. `compileFile` does not see a transport; `watchAndServe` does not see stdio.
@@ -158,9 +172,9 @@ type SceneMessage =
 
 Stable IDs matter for phase 2 round-trip; we set the rules now so MVP doesn't paint us into a corner.
 
-- **Explicit `id` is required on addressable elements** - anything that can be referenced by `<edge from="..." to="...">` or (later) `<use name="...">`.
-- **Derived IDs are namespaced** - when imports land in phase 1, IDs from imported docs are prefixed by the `<import name="...">`. No collisions across imports.
-- **Anonymous IDs are allowed only for non-addressable visual elements** - e.g. a `<note>` with no `id` (it cannot be referenced anywhere). The IR generates a synthetic ID for these.
+- **Explicit `id` is required on addressable elements** - anything that can be referenced by `<Edge from="..." to="...">`.
+- **Namespacing is a convention, not a compiler guarantee** - a reusable component takes an `ns` prop and interpolates it into its ids (`id={`${ns}-login`}`; the separator must not be `.`, which `<Edge>` `from`/`to` read as anchor syntax). ES `import` gives module reuse but no automatic id prefixing; `ir/duplicate-id` catches a collision and names the first definition's line. See `docs/decisions.md` ADR-12 (rule 2) and `docs/jsx-pivot.md` decision 11.
+- **Anonymous IDs are allowed only for non-addressable visual elements** - e.g. a `<Note>` with no `id` (it cannot be referenced anywhere). The IR generates a synthetic ID for these.
 - **Sibling reorder must not change IDs.** This is the test of the rule: a parser/IR refactor that changes IDs across reorder is a bug.
 - **Renaming an `id` is a breaking change** for that element - phase 2 round-trip will reflect this.
 - **Synthetic-id scheme**: `<content-hash>-<n>` where `n` is the 0-based index among elements with the same content-hash, in document order. Reordering siblings of differing content leaves all ids unchanged. See `docs/decisions.md` ADR-12.
@@ -174,31 +188,37 @@ type SourceSpan = { file: string; line: number; column: number; length?: number 
 type Diagnostic = { severity: "error" | "warning"; code: string; message: string; span?: SourceSpan };
 ```
 
-`code` is a stable identifier (e.g. `parser/unexpected-token`, `ir/missing-id`) so agents can pattern-match. The CLI formatter renders these to the plain-text format.
+`code` is a stable identifier (e.g. `ir/missing-id`, `runtime/threw`) so agents can pattern-match. The CLI formatter renders these to the plain-text format.
 
-## `tldsl check` on non-`.tldsl` files
+Spans come from esbuild's `jsxDEV` transform: every JSX element compiles to a `jsxDEV(type, props, key, isStatic, source, self)` call where `source` is `{fileName, lineNumber, columnNumber}`, injected per element. The runtime component library stashes it as the node's `span`. No sourcemap walking for element spans; sourcemaps are used only to map a *thrown* error's top frame back to user code (`runtime/threw`). `span.file` is normalised at the `compileFile` boundary so it's expressed the same way the caller expressed `path` - relative in, relative out; absolute in, absolute out.
 
-The `PostToolUse` hook fires on every `Write|Edit`. `tldsl check` exits 0 with no output for files that don't end in `.tldsl`. Don't pollute agent context with noise on unrelated edits.
+## `tldsl check` on non-`.tldsl.jsx` files
+
+The `PostToolUse` hook fires on every `Write|Edit`. `tldsl check` exits 0 with no output for files that don't end in `.tldsl.jsx`. Don't pollute agent context with noise on unrelated edits.
 
 ## Glossary
 
-- **DSL** - the `.tldsl` source language.
-- **AST** - parser output; close to surface syntax. Lives in `domain/parser/`.
+- **DSL** - the `.tldsl.jsx` JSX authoring surface: plain JSX importing `Doc`, `Frame`, `Box`, `Note`, `Edge`, `flow` from `"tldsl"`, executed by the CLI to produce an AST.
+- **AST** - close to surface syntax; the type is defined in `domain/parser/ast.ts` but produced by `runtime/` (via `jsx`/`jsxs`/`jsxDEV`), not by a parser, and consumed by `domain/ir/`.
 - **IR** - normalized intermediate representation; IDs derived/validated, shorthand expanded. Lives in `domain/ir/`.
 - **SceneJSON** - the scene payload pushed to the viewer (currently a pin of tldraw's scene-JSON shape). Lives in `contracts/scene-json.ts`.
 - **Scene message** - the versioned envelope around SceneJSON on the wire. Lives in `contracts/scene-message.ts`.
 - **Port** - an interface a layer depends on, owned by that layer. Has at least two adapters (real + fake).
 - **Adapter** - a concrete implementation of a port; lives in `infra/`.
+- **runtime** - the `"tldsl"` module (`src/runtime/`): the component library (`Doc`, `Frame`, `Box`, `Note`, `Edge`, `flow`) plus the `jsx`/`jsxs`/`jsxDEV` functions esbuild's automatic JSX transform targets. Bundled into the user's entry by `infra/execute-jsx/` and executed in a worker; not imported anywhere else.
+- **ExecutePort** - `app/ports/execute.ts`; `(source, path) => Promise<{ ast; inputs } | { diagnostics }>`. Runs a `.tldsl.jsx` module and hands back its AST plus every file that contributed to the bundle. Real adapter: `infra/execute-jsx/` (esbuild bundle + `worker_threads`, hard `terminate()` at 2s). Fake: `FakeExecute`.
+- **hybrid layout** - `domain/layout/stack.ts`'s `hybridLayout`: `row`/`col`/`grid`/`free` containers are placed deterministically bottom-up in the domain; only a container with `layout="auto"` calls ELK, on a flat graph of that container's already-sized direct children.
 
 ## Out of scope (do not build for MVP)
 
 Tracked in `docs/roadmap.md`. Highlights:
 
 - Round-trip from canvas back to DSL.
-- `<import>` / `<use>`, `<group>`, `<shape>`, `<text>`, `<line>`.
-- Full 13-anchor scheme; default-center is enough for MVP.
+- `Group`, `<Shape>` kinds, `<Text>`, `<Line>`. (`<import>`/`<use>` is not on this list - ES `import` replaced it outright, not deferred.)
+- Full 8-compass-point-plus-fractions anchor scheme; default-center is enough for MVP. (Named anchors and free endpoints are parsed and rejected today: `ir/anchor-not-supported`, `ir/free-endpoint-not-supported`.)
 - Edge styling, head decorators, waypoints, edge labels.
-- Domain bundles (`<service>`, `<decision>`).
+- Domain bundles (`<Service>`, `<Decision>`).
 - Mermaid as input.
 - Drawings / freehand.
-- Multi-page beyond what import gives.
+- Multi-page beyond what module composition gives.
+- Comments-as-stickies - rejected outright (`{/* */}` is a JS comment, stripped before it ever reaches the runtime), not deferred.
