@@ -1,4 +1,4 @@
-import type { Direction, LayoutMode } from "../layout/defaults.js";
+import type { Align, Direction, LayoutMode } from "../layout/defaults.js";
 import type { SourceSpan } from "../diagnostics/index.js";
 
 /**
@@ -26,6 +26,7 @@ export type IRDoc = IRBase & {
   gap?: number;
   pad?: number;
   cols?: number;
+  align?: Align;
   children: IRElement[];
 };
 
@@ -39,6 +40,7 @@ export type IRFrame = IRBase & {
   gap?: number;
   pad?: number;
   cols?: number;
+  align?: Align;
   x?: number;
   y?: number;
   w?: number;

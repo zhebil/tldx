@@ -181,6 +181,83 @@ describe("hybridLayout", () => {
     expect(f2.x).toBe(f1.x + f1.w + 10);
   });
 
+  it("aligns col children on the cross axis: start", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col", align: "start" }, [
+        box({ id: "a", label: "A", w: 100, h: 40 }),
+        box({ id: "b", label: "B", w: 60, h: 40 }),
+      ]),
+    );
+    expect(boxById(result.children, "a").x).toBe(0);
+    expect(boxById(result.children, "b").x).toBe(0);
+  });
+
+  it("aligns col children on the cross axis: center", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col", align: "center" }, [
+        box({ id: "a", label: "A", w: 100, h: 40 }),
+        box({ id: "b", label: "B", w: 60, h: 40 }),
+      ]),
+    );
+    expect(boxById(result.children, "a").x).toBe(0);
+    expect(boxById(result.children, "b").x).toBe(20);
+  });
+
+  it("aligns col children on the cross axis: end", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col", align: "end" }, [
+        box({ id: "a", label: "A", w: 100, h: 40 }),
+        box({ id: "b", label: "B", w: 60, h: 40 }),
+      ]),
+    );
+    expect(boxById(result.children, "a").x).toBe(0);
+    expect(boxById(result.children, "b").x).toBe(40);
+  });
+
+  it("aligns row children on the cross axis: start", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row", align: "start" }, [
+        box({ id: "a", label: "A", w: 40, h: 100 }),
+        box({ id: "b", label: "B", w: 40, h: 60 }),
+      ]),
+    );
+    expect(boxById(result.children, "a").y).toBe(0);
+    expect(boxById(result.children, "b").y).toBe(0);
+  });
+
+  it("aligns row children on the cross axis: center", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row", align: "center" }, [
+        box({ id: "a", label: "A", w: 40, h: 100 }),
+        box({ id: "b", label: "B", w: 40, h: 60 }),
+      ]),
+    );
+    expect(boxById(result.children, "a").y).toBe(0);
+    expect(boxById(result.children, "b").y).toBe(20);
+  });
+
+  it("aligns row children on the cross axis: end", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row", align: "end" }, [
+        box({ id: "a", label: "A", w: 40, h: 100 }),
+        box({ id: "b", label: "B", w: 40, h: 60 }),
+      ]),
+    );
+    expect(boxById(result.children, "a").y).toBe(0);
+    expect(boxById(result.children, "b").y).toBe(40);
+  });
+
+  it("defaults to center alignment when align is absent", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "a", label: "A", w: 100, h: 40 }),
+        box({ id: "b", label: "B", w: 60, h: 40 }),
+      ]),
+    );
+    expect(boxById(result.children, "a").x).toBe(0);
+    expect(boxById(result.children, "b").x).toBe(20);
+  });
+
   it("delegates an auto container to the injected placer and applies its positions/size", async () => {
     const result = await layoutAst(
       doc({ layout: "auto", gap: 10 }, [

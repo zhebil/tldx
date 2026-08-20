@@ -141,6 +141,11 @@ describe("lower: diagnostics", () => {
     const { codes } = lowerAst(doc({ direction: "sideways" }));
     expect(codes).toEqual(["ir/invalid-direction"]);
   });
+
+  it("ir/bad-align on an unknown align value", () => {
+    const { codes } = lowerAst(doc({ align: "middle" }));
+    expect(codes).toEqual(["ir/bad-align"]);
+  });
 });
 
 describe("lower: direction", () => {

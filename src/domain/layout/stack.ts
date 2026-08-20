@@ -28,10 +28,12 @@ import type {
 } from "../ir/index.js";
 
 import {
+  DEFAULT_ALIGN,
   estimatedBoxSize,
   estimatedNoteSize,
   FRAME_PAD_INNER,
   FRAME_TITLE_PX,
+  type Align,
   type Direction,
   type LayoutMode,
 } from "./defaults.js";
@@ -71,6 +73,7 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
     gap,
     { left: 0, top: 0, right: 0, bottom: 0 },
     ir.direction,
+    ir.align ?? DEFAULT_ALIGN,
     placeAuto,
   );
   return { ...ir, children };
@@ -110,6 +113,7 @@ async function sizeFrame(frame: IRFrame, placeAuto: AutoPlacer): Promise<IRFrame
     gap,
     { left: pad, top: padTop, right: pad, bottom: pad },
     frame.direction,
+    frame.align ?? DEFAULT_ALIGN,
     placeAuto,
   );
   const w = frame.w ?? contentW;
@@ -132,6 +136,7 @@ async function layoutContainer(
   gap: number,
   pad: Pad,
   direction: Direction | undefined,
+  align: Align,
   placeAuto: AutoPlacer,
 ): Promise<{ children: IRElementPositioned[]; w: number; h: number }> {
   const sized: (IRBoxPositioned | IRNotePositioned | IRFramePositioned | null)[] = await Promise.all(
@@ -190,6 +195,7 @@ async function layoutContainer(
       gap,
       pad.left,
       pad.top,
+      align,
     );
     flowedIndices.forEach((i, k) => {
       sized[i] = { ...sized[i]!, x: positions[k]!.x, y: positions[k]!.y };
@@ -269,6 +275,17 @@ function collectEdgesDeep(
   }
 }
 
+function crossAxisPos(align: Align, pad: number, cross: number, size: number): number {
+  switch (align) {
+    case "start":
+      return pad;
+    case "center":
+      return pad + Math.round((cross - size) / 2);
+    case "end":
+      return pad + (cross - size);
+  }
+}
+
 function computeFlowPositions(
   els: readonly Rect[],
   mode: FlowMode,
@@ -276,12 +293,14 @@ function computeFlowPositions(
   gap: number,
   padLeft: number,
   padTop: number,
+  align: Align,
 ): { x: number; y: number }[] {
   if (mode === "row") {
+    const maxH = els.reduce((m, el) => Math.max(m, el.h), 0);
     const out: { x: number; y: number }[] = [];
     let cursor = padLeft;
     for (const el of els) {
-      out.push({ x: cursor, y: padTop });
+      out.push({ x: cursor, y: crossAxisPos(align, padTop, maxH, el.h) });
       cursor += el.w + gap;
     }
     return out;
@@ -290,10 +309,11 @@ function computeFlowPositions(
     const n = cols !== undefined && cols > 0 ? Math.floor(cols) : els.length || 1;
     return gridPositions(els, n, gap, padLeft, padTop);
   }
+  const maxW = els.reduce((m, el) => Math.max(m, el.w), 0);
   const out: { x: number; y: number }[] = [];
   let cursor = padTop;
   for (const el of els) {
-    out.push({ x: padLeft, y: cursor });
+    out.push({ x: crossAxisPos(align, padLeft, maxW, el.w), y: cursor });
     cursor += el.h + gap;
   }
   return out;

@@ -25,10 +25,13 @@ import {
   type SourceSpan,
 } from "../diagnostics/index.js";
 import {
+  ALIGNS,
   DIRECTIONS,
+  isAlign,
   isDirection,
   LAYOUT_MODES,
   isLayoutMode,
+  type Align,
   type Direction,
   type LayoutMode,
 } from "../layout/defaults.js";
@@ -53,7 +56,7 @@ import type {
 import { contentHash, SyntheticIdAllocator } from "./synthetic-id.js";
 
 const ALLOWED_PROPS = {
-  doc: ["id", "direction", "layout", "gap", "pad", "cols"],
+  doc: ["id", "direction", "layout", "gap", "pad", "cols", "align"],
   frame: [
     "id",
     "name",
@@ -62,6 +65,7 @@ const ALLOWED_PROPS = {
     "gap",
     "pad",
     "cols",
+    "align",
     "x",
     "y",
     "w",
@@ -135,6 +139,7 @@ export function lower(ast: AstNode | null): LowerResult {
   });
   const direction = readDirection(ast.attrs, ctx);
   const layout = readLayoutMode(ast.attrs, ctx);
+  const align = readAlign(ast.attrs, ctx);
   const doc: IRDoc = {
     kind: "doc",
     ...idHeader,
@@ -142,6 +147,7 @@ export function lower(ast: AstNode | null): LowerResult {
     children: [],
     ...(direction === undefined ? {} : { direction }),
     ...(layout === undefined ? {} : { layout }),
+    ...(align === undefined ? {} : { align }),
     ...numericAttrs(ast.attrs, ctx, ["gap", "pad", "cols"] as const),
   };
   for (const child of ast.children) {
@@ -190,6 +196,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
   checkUnknownProps("frame", node.attrs, ctx);
   const direction = readDirection(node.attrs, ctx);
   const layout = readLayoutMode(node.attrs, ctx);
+  const align = readAlign(node.attrs, ctx);
   const frame: IRFrame = {
     kind: "frame",
     ...assignId(node.attrs, node.span, ctx, {
@@ -202,6 +209,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
     ...optionalString(node.attrs, "name"),
     ...(direction === undefined ? {} : { direction }),
     ...(layout === undefined ? {} : { layout }),
+    ...(align === undefined ? {} : { align }),
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
     ...numericAttrs(node.attrs, ctx, ["gap", "pad", "cols"] as const),
   };
@@ -445,6 +453,21 @@ function readLayoutMode(attrs: Attrs, ctx: Ctx): LayoutMode | undefined {
     error(
       "ir/bad-layout-mode",
       `'layout' must be one of ${LAYOUT_MODES.join(", ")} (got '${raw}')`,
+      attr.span,
+    ),
+  );
+  return undefined;
+}
+
+function readAlign(attrs: Attrs, ctx: Ctx): Align | undefined {
+  const attr = attrs.align;
+  if (attr === undefined) return undefined;
+  const raw = attr.value;
+  if (isAlign(raw)) return raw;
+  ctx.diagnostics.push(
+    error(
+      "ir/bad-align",
+      `'align' must be one of ${ALIGNS.join(", ")} (got '${raw}')`,
       attr.span,
     ),
   );
