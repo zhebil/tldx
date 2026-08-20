@@ -14,9 +14,10 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, generated at `d7abc03`
-  (Phase A head). No hypothesis has been judged yet; the first Phase B wake
-  compares against this file.
+- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 12
+  from the B1 candidate (cross-axis `align`, default `center`). Judged results
+  so far live in `docs/layout-hypotheses.md` - read it before proposing a
+  hypothesis.
 
 ---
 
@@ -432,10 +433,11 @@ One hypothesis per wake. Never batch. Never stop.
 
 Ordered. Take from the top. Strike through when resolved.
 
-- [ ] **B1** `align` attribute (`start`/`center`/`end`) on row/col containers.
-  Evidence: in `scratch.tldsl` the `core` frame is 196 tall among siblings of
-  268/268/556/484, top-aligned — the centre of a hexagonal diagram sits pinned
-  to the top edge. `dsl.md` declares `align` and nothing implements it.
+- [x] ~~**B1** `align` attribute (`start`/`center`/`end`) on row/col
+  containers.~~ **KEPT** _(wake 12)_ - shipped with the implicit default
+  flipped from `start` to `center`, which is the part the frozen corpus could
+  actually see. 5 candidate / 0 champion / 1 structural tie. Ledger entry in
+  `docs/layout-hypotheses.md`.
 - [ ] **B2** Real text measurement instead of `len * 9 + 48`. Height is
   currently pinned at 60 and text never wraps, so `a10` is a 426px box for one
   line. Try: wrap at a max width, measure per-line, grow height.
@@ -721,3 +723,34 @@ anything that outlives the loop.)_
   it" - after A10, `dsl.md` no longer declares `align` at all. The measurement
   behind B1 still stands; only the citations are stale. Do not treat the
   rewritten `dsl.md` as evidence that `align` was considered and dropped.
+
+- **(wake 12, B1)** `sparse-graph.tldsl.jsx` produced a **byte-identical**
+  report under both variants - no container in it has children of differing
+  cross-axis size. One sixth of the bench is blind to any cross-axis
+  hypothesis, and a judge handed two identical reports will still pick one,
+  injecting a coin flip into a strict-majority rule. It was recorded as a
+  structural tie instead. Future wakes: diff the reports first and only judge
+  the files that actually differ. Do **not** "fix" the fixture.
+- **(wake 12, B1)** `align` is applied to `row` and `col` only. `grid` still
+  anchors each child at its cell's top-left even when `colWidths`/`rowHeights`
+  are ragged, which is the same defect B1 just fixed one dimension up. Cheap
+  follow-up hypothesis; kept out of B1 because the cross axis of a grid is
+  ambiguous (per-cell, two-dimensional) and needed its own decision.
+- **(wake 12, B1)** Centring measures the cross extent as `max(child.w)` over
+  the flowed children, i.e. the **content** box - so a `<frame>` with an
+  explicit `w` wider than its widest child does *not* centre its children in
+  the frame. Defensible (the alternative needs a second pass, since the frame's
+  own width is only known after its children are placed), but it is a real
+  inconsistency: `align="center"` means two different things depending on
+  whether `w` is set.
+- **(wake 12, B1)** `docs/dsl.md` does not document `align` - A10 deleted the
+  stale declaration and B1 shipped the real thing without re-adding it. The
+  language now has an attribute no doc mentions. Same for the `ir/bad-align`
+  diagnostic code.
+- **(wake 12, B1)** All five judges independently reached for the same
+  mechanism: centring turns a flow into a *spine*, and edges bound to shape
+  centres then run straight along it. Edge geometry, not whitespace, is what
+  moved the verdict. That is direct evidence for B4 (bind edges to sides
+  instead of centres) - and a warning that B4's own evidence
+  ("`usecases` has seven outgoing edges all bound to its centre") was measured
+  against the *old* champion. Re-measure before building it.

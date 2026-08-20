@@ -21,14 +21,14 @@ layout-report: tests/corpus/deep-nesting.tldsl.jsx
 == Geometry ==
 id             parent        x    y    w    h
 l1             deep-nesting  0    0    560  776
-l1-gateway     l1            24   56   120  60
-l1-config      l1            24   132  120  60
+l1-gateway     l1            220  56   120  60
+l1-config      l1            220  132  120  60
 l2             l1            24   208  512  544
-l2-router      l2            44   260  120  60
-l2-metrics     l2            44   334  120  60
+l2-router      l2            220  260  120  60
+l2-metrics     l2            220  334  120  60
 l3             l2            44   408  472  324
-l3-handler     l3            60   456  120  60
-l3-validator   l3            60   528  129  60
+l3-handler     l3            220  456  120  60
+l3-validator   l3            216  528  129  60
 l4             l3            60   600  440  116
 l4-parser      l4            72   644  120  60
 l4-normalizer  l4            202  644  138  60
@@ -40,8 +40,8 @@ aspect ratio: 0.72
 fill ratio (leaf area / canvas area): 0.155
 overlapping shape pairs: 0
 edge-edge crossings: 0
-total edge length: 2155
-mean edge length: 269
+total edge length: 2128
+mean edge length: 266
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
 source-order violations per container:
@@ -52,9 +52,9 @@ source-order violations per container:
   l4 (row): 0
 left-edge alignment groups per container:
   deep-nesting: 1 groups over 1 children
-  l1: 1 groups over 3 children
-  l2: 1 groups over 3 children
-  l3: 1 groups over 3 children
+  l1: 2 groups over 3 children
+  l2: 2 groups over 3 children
+  l3: 3 groups over 3 children
   l4: 3 groups over 3 children
 
 == ASCII Render (100x60 cells; 1 cell = 5.6 x 12.9 px) ==
@@ -62,53 +62,53 @@ left-edge alignment groups per container:
 |                                                                                                  |
 |                                                                                                  |
 |                                                                                                  |
-|   |--------------------|                                                                         |
-|   |                    |                                                                         |
-|   |Gateway             |                                                                         |
-|   |          .         |                                                                         |
-|   |          ...       |                                                                         |
-|   |--------------------|                                                                         |
-|   |--------------------|                                                                         |
-|   |           .   ..   |                                                                         |
-|   |Config    ..     .  |                                                                         |
-|   |          ..      . |                                                                         |
-|   |          ..       .|                                                                         |
-|   |--------------------|.                                                                        |
+|                                      |--------------------|                                      |
+|                                      |                    |                                      |
+|                                      |Gateway             |                                      |
+|                                      |          .         |                                      |
+|                                      |          ..        |                                      |
+|                                      |--------------------|                                      |
+|                                      |--------------------|                                      |
+|                                      |          . .       |                                      |
+|                                      |Config    .  .      |                                      |
+|                                      |          .  .      |                                      |
+|                                      |          .   .     |                                      |
+|                                      |--------------------|                                      |
 |   +Service-----------------------------------------------------------------------------------+   |
-|   |           ..          ..                                                                 |   |
-|   |           ..            .                                                                |   |
-|   |           ..             .                                                               |   |
-|   |   |--------------------|  ..                                                             |   |
-|   |   |        ..          |    .                                                            |   |
-|   |   |Router  ..          |     .                                                           |   |
-|   |   |        ..          |      ..                                                         |   |
-|   |   |--------------------|        .                                                        |   |
-|   |   |--------------------|         .                                                       |   |
-|   |   |         ..         |          ..                                                     |   |
-|   |   |Metrics  ..         |            .                                                    |   |
-|   |   |         ..         |             .                                                   |   |
-|   |   |          .         |              ..                                                 |   |
-|   |   |--------------------|                .                                                |   |
+|   |                                             .    .                                       |   |
+|   |                                             .     .                                      |   |
+|   |                                             .      .                                     |   |
+|   |                                  |--------------------|                                  |   |
+|   |                                  |          .       . |                                  |   |
+|   |                                  |Router    .       . |                                  |   |
+|   |                                  |          .        .|                                  |   |
+|   |                                  |--------------------|                                  |   |
+|   |                                  |--------------------|                                  |   |
+|   |                                  |          .         |                                  |   |
+|   |                                  |Metrics   .         |.                                 |   |
+|   |                                  |          .         |.                                 |   |
+|   |                                  |          .         | .                                |   |
+|   |                                  |--------------------|  .                               |   |
 |   |   +Module----------------------------------------------------------------------------+   |   |
-|   |   |           .                           ..                                         |   |   |
-|   |   |           .                             .                                        |   |   |
-|   |   |           .                              .                                       |   |   |
-|   |   |  |--------------------|                   ..                                     |   |   |
-|   |   |  |         .          |                     .                                    |   |   |
-|   |   |  |Handler  .          |                      .                                   |   |   |
-|   |   |  |         .          |                       ..                                 |   |   |
-|   |   |  |--------------------|                         .                                |   |   |
-|   |   |  |---------------------|                         .                               |   |   |
-|   |   |  |          .          |                          ..                             |   |   |
-|   |   |  |Validator .          |                            .                            |   |   |
-|   |   |  |          .          |                             .                           |   |   |
-|   |   |  |          .          |                              ..                         |   |   |
-|   |   |  |---------------------|                                .                        |   |   |
+|   |   |                                         .             .                          |   |   |
+|   |   |                                         .             .                          |   |   |
+|   |   |                                         .              .                         |   |   |
+|   |   |                              |--------------------|    .                         |   |   |
+|   |   |                              |          .         |     .                        |   |   |
+|   |   |                              |Handler   .         |     .                        |   |   |
+|   |   |                              |        ...         |      .                       |   |   |
+|   |   |                              |--------------------|      .                       |   |   |
+|   |   |                             |----------------------|      .                      |   |   |
+|   |   |                             |   ..      .          |       .                     |   |   |
+|   |   |                             |Validator  .          |       .                     |   |   |
+|   |   |                             |.                     |        .                    |   |   |
+|   |   |                           ..|                      |        .                    |   |   |
+|   |   |                         ..  |----------------------|         .                   |   |   |
 |   |   |  +Unit------------------------------------------------------------------------+  |   |   |
-|   |   |  |          .                                             ..                  |  |   |   |
-|   |   |  |           .                                              .                 |  |   |   |
+|   |   |  |                  ..                                        .               |  |   |   |
+|   |   |  |                ..                                          .               |  |   |   |
 |   |   |  | |--------------------| |-----------------------| |-----------------------| |  |   |   |
-|   |   |  | |         .          | |                       | |         ..            | |  |   |   |
+|   |   |  | |          ..        | |                       | |          .            | |  |   |   |
 |   |   |  | |Parser   ...........|.|Normalizer.............|.|Serializer..           | |  |   |   |
 |   |   |  | |                    | |                       | |                       | |  |   |   |
 |   |   |  | |                    | |                       | |                       | |  |   |   |
@@ -130,32 +130,32 @@ layout-report: tests/corpus/hexagonal.tldsl.jsx
 == Geometry ==
 id                parent            x     y    w     h
 hex               hexagonal         0     0    1198  636
-driving-adapters  hex               24    56   152   268
-http              driving-adapters  40    104  120   60
-cli               driving-adapters  40    176  120   60
-tests             driving-adapters  40    248  120   60
-driving-ports     hex               224   56   197   268
-p-create-order    driving-ports     240   104  147   60
-p-list-orders     driving-ports     240   176  138   60
-p-create-session  driving-ports     240   248  165   60
-core              hex               469   56   224   196
-usecases          core              485   104  129   60
-domain            core              485   176  192   60
+driving-adapters  hex               24    200  152   268
+http              driving-adapters  40    248  120   60
+cli               driving-adapters  40    320  120   60
+tests             driving-adapters  40    392  120   60
+driving-ports     hex               224   200  197   268
+p-create-order    driving-ports     249   248  147   60
+p-list-orders     driving-ports     254   320  138   60
+p-create-session  driving-ports     240   392  165   60
+core              hex               469   236  224   196
+usecases          core              517   284  129   60
+domain            core              485   356  192   60
 driven-ports      hex               741   56   206   556
-p-orders-repo     driven-ports      757   104  138   60
-p-users-repo      driven-ports      757   176  129   60
-p-sessions        driven-ports      757   248  156   60
+p-orders-repo     driven-ports      775   104  138   60
+p-users-repo      driven-ports      780   176  129   60
+p-sessions        driven-ports      766   248  156   60
 p-hasher          driven-ports      757   320  174   60
-p-payments        driven-ports      757   392  120   60
-p-notifications   driven-ports      757   464  165   60
-p-clock           driven-ports      757   536  120   60
-driven-adapters   hex               995   56   179   484
-postgres          driven-adapters   1011  104  120   60
-redis             driven-adapters   1011  176  120   60
-argon2            driven-adapters   1011  248  120   60
-stripe            driven-adapters   1011  320  120   60
-ses               driven-adapters   1011  392  120   60
-system-clock      driven-adapters   1011  464  147   60
+p-payments        driven-ports      784   392  120   60
+p-notifications   driven-ports      762   464  165   60
+p-clock           driven-ports      784   536  120   60
+driven-adapters   hex               995   92   179   484
+postgres          driven-adapters   1025  140  120   60
+redis             driven-adapters   1025  212  120   60
+argon2            driven-adapters   1025  284  120   60
+stripe            driven-adapters   1025  356  120   60
+ses               driven-adapters   1025  428  120   60
+system-clock      driven-adapters   1011  500  147   60
 
 == Metrics ==
 canvas: 1198 x 636
@@ -163,8 +163,8 @@ aspect ratio: 1.88
 fill ratio (leaf area / canvas area): 0.227
 overlapping shape pairs: 0
 edge-edge crossings: 2
-total edge length: 6139
-mean edge length: 279
+total edge length: 5634
+mean edge length: 256
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
 source-order violations per container:
@@ -179,37 +179,37 @@ left-edge alignment groups per container:
   hexagonal: 1 groups over 1 children
   hex: 5 groups over 5 children
   driving-adapters: 1 groups over 3 children
-  driving-ports: 1 groups over 3 children
-  core: 1 groups over 2 children
-  driven-ports: 1 groups over 7 children
-  driven-adapters: 1 groups over 6 children
+  driving-ports: 3 groups over 3 children
+  core: 2 groups over 2 children
+  driven-ports: 6 groups over 7 children
+  driven-adapters: 2 groups over 6 children
 
 == ASCII Render (100x27 cells; 1 cell = 12.0 x 23.6 px) ==
 +Hexagonal (ports and adapters)--------------------------------------------------------------------+
 |                                                                                                  |
-| +Driving adap+   +Driving ports--+   +Domain core------+   +Driven ports----+   +Driven adapter+ |
-| |            |   |               |   |                 |   |                |   |              | |
-| ||---------| |   ||-----------|  |   ||----------|     |   | |----------|   |   | |--------|   | |
-| ||HTTP API.|.|...||CreateOrder|..|...||Use cases.|.....|...|.|OrdersRepo|...|...|.|Postgres|   | |
-| ||      ...| |  .||...        |  |...||...  .....|.....|   | |          |   |...|.|.       |   | |
-| ||---------|.|.. ||----------||..|  .||---------------||...|.|---------||...|   | |--------|   | |
-| ||CLI .... | |...||ListOrders|   |.. ||Entities + rule||.. | |UsersRepo|    |   | |Redis   |   | |
-| ||         | |  .||...       |...|   ||         .... .||  .|.|         |    | ..|.|.       |   | |
-| ||---------|.|.. ||------------| |   +|---------------|+...| |-----------|..|.  | |--------|   | |
-| ||Tests... | |   ||CreateSessio| |                 .....   |.|SessionStor|  |   | |Argon2  |   | |
-| ||         | |   ||            | |                  . .... | |..         |  | ..|.|.       |   | |
-| +|---------|-+   +|------------|-+                   .  . .| |-------------||.  | |--------|   | |
-|                                                       .. ..|.|PasswordHashe||   | |Stripe  |   | |
-|                                                         .  | |..           ||...|.|.       |   | |
-|                                                          . |.|--------|----||   | |--------|   | |
-|                                                           .| |Payments|     |   | |AWS SES |   | |
-|                                                            |.|--------|     | ..|.|--------|   | |
-|                                                            | |------------|.|.  | |-----------|| |
-|                                                            | |Notification| |   | |SystemClock|| |
-|                                                            | |------------| | ..|.|-----------|| |
-|                                                            | |--------|.....|.  +--------------+ |
-|                                                            | |Clock...|     |                    |
-|                                                            | |--------|     |                    |
+|                                                            +Driven ports----+                    |
+|                                                            |                |                    |
+|                                                            |  |----------|  |   +Driven adapter+ |
+|                                                            |  |OrdersRepo|  |   |              | |
+|                                                            |  | ...      |..|...|..|---------| | |
+|                                                            |  |----------|  |  .|..|Postgres | | |
+| +Driving adap+   +Driving ports--+                         |..|UsersRepo.|..|.. |  |---------| | |
+| |            |   |               |                      ...|  |...       |  |   |  |---------| | |
+| ||---------| |   | |-----------| |   +Domain core------+  .|.|------------| |  .|..|Redis    | | |
+| ||HTTP API.|.|...|.|CreateOrder| |   |             ....|.. | |SessionStore|.|.. |  |---------| | |
+| ||      ...| |  .|.|..         |.|...|...|---------|...|...|.|.           | |   |  |---------| | |
+| ||---------|.|.. | |----------|| |  .|...|Use cases|...|.. | |-------------||  .|..|Argon2   | | |
+| ||CLI .... | |...| |ListOrders|..|.. | ..|---------|...|  .|.|PasswordHashe||.. |  |---------| | |
+| ||         | |  .|.|..        |  |...||---------------||...| |             ||   |  |---------| | |
+| ||---------|.|.. ||------------|.|   ||Entities + rule||.. |.|-|---------|-||  .|..|Stripe   | | |
+| ||Tests... | |   ||CreateSessio| |   ||---------------||  .|.  |Payments.|..|.. |  |---------| | |
+| ||---------| |   ||------------| |   +-----------------+...| ..|---------|  |   |  |AWS SES  | | |
+| +------------+   +---------------+                         |.|-------------||  .|..|.....    | | |
+|                                                            | |Notifications||.. | |-----------|| |
+|                                                            | |-------------||   | |SystemClock|| |
+|                                                            |   |---------|  |  .|.|......     || |
+|                                                            |   |Clock....|..|.. | |-----------|| |
+|                                                            |   |---------|  |   +--------------+ |
 |                                                            +----------------+                    |
 +--------------------------------------------------------------------------------------------------+
 ```
@@ -222,19 +222,19 @@ left-edge alignment groups per container:
 layout-report: tests/corpus/long-labels.tldsl.jsx
 
 == Geometry ==
-id              parent       x  y     w    h
-gateway         long-labels  0  0     903  60
-auth            long-labels  0  100   885  60
-rate-limiter    long-labels  0  200   903  60
-router          long-labels  0  300   912  60
-orders          long-labels  0  400   921  60
-inventory       long-labels  0  500   903  60
-payments        long-labels  0  600   894  60
-notifier        long-labels  0  700   912  60
-audit           long-labels  0  800   948  60
-reporting       long-labels  0  900   939  60
-note-reporting  long-labels  0  1000  200  80
-note-payments   long-labels  0  1120  200  80
+id              parent       x    y     w    h
+gateway         long-labels  23   0     903  60
+auth            long-labels  32   100   885  60
+rate-limiter    long-labels  23   200   903  60
+router          long-labels  18   300   912  60
+orders          long-labels  14   400   921  60
+inventory       long-labels  23   500   903  60
+payments        long-labels  27   600   894  60
+notifier        long-labels  18   700   912  60
+audit           long-labels  0    800   948  60
+reporting       long-labels  5    900   939  60
+note-reporting  long-labels  374  1000  200  80
+note-payments   long-labels  374  1120  200  80
 
 == Metrics ==
 canvas: 948 x 1200
@@ -242,76 +242,76 @@ aspect ratio: 0.79
 fill ratio (leaf area / canvas area): 0.509
 overlapping shape pairs: 0
 edge-edge crossings: 0
-total edge length: 1402
+total edge length: 1400
 mean edge length: 175
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
 source-order violations per container:
   long-labels (col): 0
 left-edge alignment groups per container:
-  long-labels: 1 groups over 12 children
+  long-labels: 8 groups over 12 children
 
 == ASCII Render (100x60 cells; 1 cell = 9.5 x 20.0 px) ==
-|---------------------------------------------------------------------------------------------|     
-|The API gateway receives every inbound request and forwards it to the correct internal servic|     
-|                                              .                                              |     
-|---------------------------------------------------------------------------------------------|     
-                                              ..                                                    
-|-------------------------------------------------------------------------------------------|       
-|The authentication service checks the bearer token and rejects the request if it has expire|       
-|                                             ..                                            |       
-|-------------------------------------------------------------------------------------------|       
-                                               .                                                    
-|---------------------------------------------------------------------------------------------|     
-|The rate limiter tracks request counts per client and returns a 429 once the quota is exceede|     
-|                                              .                                              |     
-|---------------------------------------------------------------------------------------------|     
-                                                .                                                   
-|----------------------------------------------------------------------------------------------|    
-|The router inspects the request path and dispatches it to the handler registered for that rout|    
-|                                               .                                              |    
-|----------------------------------------------------------------------------------------------|    
-                                                .                                                   
-|-----------------------------------------------------------------------------------------------|   
-|The order service validates the cart contents and calculates tax before creating a pending orde|   
-|                                               .                                               |   
-|-----------------------------------------------------------------------------------------------|   
-                                               ..                                                   
-|---------------------------------------------------------------------------------------------|     
-|The inventory service reserves stock for each line item and releases the hold if payment fail|     
-|                                              . .                                            |     
-|---------------------------------------------------------------------------------------------|     
-                                               . .                                                  
-|--------------------------------------------------------------------------------------------|      
-|The payment service charges the customer's card through the processor and records the outcom|      
-|--------------------------------------------------------------------------------------------|      
-                                               . .                                                  
-|----------------------------------------------------------------------------------------------|    
-|The notification service sends a confirmation email once the order has been successfully place|    
-|                                               ..                                             |    
-|----------------------------------------------------------------------------------------------|    
+  |----------------------------------------------------------------------------------------------|  
+  |The API gateway receives every inbound request and forwards it to the correct internal service|  
+  |                                               .                                              |  
+  |----------------------------------------------------------------------------------------------|  
+                                                  .                                                 
+   |--------------------------------------------------------------------------------------------|   
+   |The authentication service checks the bearer token and rejects the request if it has expired|   
+   |                                              .                                             |   
+   |--------------------------------------------------------------------------------------------|   
+                                                  .                                                 
+  |----------------------------------------------------------------------------------------------|  
+  |The rate limiter tracks request counts per client and returns a 429 once the quota is exceeded|  
+  |                                               .                                              |  
+  |----------------------------------------------------------------------------------------------|  
+                                                  .                                                 
+  |----------------------------------------------------------------------------------------------|  
+  |The router inspects the request path and dispatches it to the handler registered for that rout|  
+  |                                               .                                              |  
+  |----------------------------------------------------------------------------------------------|  
+                                                  .                                                 
+ |------------------------------------------------------------------------------------------------| 
+ |The order service validates the cart contents and calculates tax before creating a pending order| 
+ |                                                .                                               | 
+ |------------------------------------------------------------------------------------------------| 
+                                                  .                                                 
+  |----------------------------------------------------------------------------------------------|  
+  |The inventory service reserves stock for each line item and releases the hold if payment fails|  
+  |                                               .                                              |  
+  |----------------------------------------------------------------------------------------------|  
+                                                  .                                                 
+   |--------------------------------------------------------------------------------------------|   
+   |The payment service charges the customer's card through the processor and records the outcom|   
+   |--------------------------------------------------------------------------------------------|   
+                                                  .                                                 
+  |----------------------------------------------------------------------------------------------|  
+  |The notification service sends a confirmation email once the order has been successfully place|  
+  |                                               .                                              |  
+  |----------------------------------------------------------------------------------------------|  
                                                   .                                                 
 |--------------------------------------------------------------------------------------------------|
 |The audit log service records every state transition so support staff can reconstruct what happene|
 |                                                 .                                                |
 |--------------------------------------------------------------------------------------------------|
                                                                                                     
-|-------------------------------------------------------------------------------------------------| 
-|The reporting service aggregates completed orders nightly and publishes a summary to the dashboar| 
-|                                                                                                 | 
-|-------------------------------------------------------------------------------------------------| 
+ |-------------------------------------------------------------------------------------------------|
+ |The reporting service aggregates completed orders nightly and publishes a summary to the dashboar|
+ |                                                                                                 |
+ |-------------------------------------------------------------------------------------------------|
                                                                                                     
-|--------------------|                                                                              
-|                    |                                                                              
-|Reporting reads from|                                                                              
-|                    |                                                                              
-|--------------------|                                                                              
+                                       |--------------------|                                       
+                                       |                    |                                       
+                                       |Reporting reads from|                                       
+                                       |                    |                                       
+                                       |--------------------|                                       
                                                                                                     
-|--------------------|                                                                              
-|                    |                                                                              
-|Payment charges are |                                                                              
-|                    |                                                                              
-|--------------------|                                                                              
+                                       |--------------------|                                       
+                                       |                    |                                       
+                                       |Payment charges are |                                       
+                                       |                    |                                       
+                                       |--------------------|                                       
 ```
 
 ---
@@ -322,21 +322,21 @@ left-edge alignment groups per container:
 layout-report: tests/corpus/sequence.tldsl.jsx
 
 == Geometry ==
-id   parent    x  y     w    h
-s1   sequence  0  0     219  60
-s2   sequence  0  100   255  60
-s3   sequence  0  200   237  60
-s4   sequence  0  300   246  60
-s5   sequence  0  400   219  60
-s6   sequence  0  500   282  60
-s7   sequence  0  600   264  60
-s8   sequence  0  700   237  60
-s9   sequence  0  800   237  60
-s10  sequence  0  900   219  60
-s11  sequence  0  1000  219  60
-s12  sequence  0  1100  237  60
-s13  sequence  0  1200  255  60
-s14  sequence  0  1300  237  60
+id   parent    x   y     w    h
+s1   sequence  32  0     219  60
+s2   sequence  14  100   255  60
+s3   sequence  23  200   237  60
+s4   sequence  18  300   246  60
+s5   sequence  32  400   219  60
+s6   sequence  0   500   282  60
+s7   sequence  9   600   264  60
+s8   sequence  23  700   237  60
+s9   sequence  23  800   237  60
+s10  sequence  32  900   219  60
+s11  sequence  32  1000  219  60
+s12  sequence  23  1100  237  60
+s13  sequence  14  1200  255  60
+s14  sequence  23  1300  237  60
 
 == Metrics ==
 canvas: 282 x 1360
@@ -344,76 +344,76 @@ aspect ratio: 0.21
 fill ratio (leaf area / canvas area): 0.526
 overlapping shape pairs: 0
 edge-edge crossings: 0
-total edge length: 1311
-mean edge length: 101
+total edge length: 1300
+mean edge length: 100
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
 source-order violations per container:
   sequence (col): 0
 left-edge alignment groups per container:
-  sequence: 1 groups over 14 children
+  sequence: 6 groups over 14 children
 
 == ASCII Render (100x60 cells; 1 cell = 2.8 x 22.7 px) ==
-|----------------------------------------------------------------------------|                      
-|1. Request received                  .                                      |                      
-|                                      ..                                    |                      
-|----------------------------------------------------------------------------|                      
-|-----------------------------------------------------------------------------------------|         
-|2. Auth token validated                   ..                                             |         
-|                                            .                                            |         
-|-----------------------------------------------------------------------------------------|         
-                                            .                                                       
-|----------------------------------------------------------------------------------|                
-|3. Rate limit checked                    .                                        |                
-|----------------------------------------------------------------------------------|                
-                                          .                                                         
-|-------------------------------------------------------------------------------------|             
-|4. Request body parsed                    .                                          |             
-|                                         .                                           |             
-|-------------------------------------------------------------------------------------|             
-|----------------------------------------------------------------------------|                      
-|5. Schema validated                   .                                     |                      
-|                                     ..                                     |                      
-|----------------------------------------------------------------------------|                      
-                                           ...                                                      
+           |----------------------------------------------------------------------------|           
+           |1. Request received                   .                                     |           
+           |                                      .                                     |           
+           |----------------------------------------------------------------------------|           
+     |----------------------------------------------------------------------------------------|     
+     |2. Auth token validated                     .                                           |     
+     |                                            .                                           |     
+     |----------------------------------------------------------------------------------------|     
+                                                  .                                                 
+        |----------------------------------------------------------------------------------|        
+        |3. Rate limit checked                    .                                        |        
+        |----------------------------------------------------------------------------------|        
+                                                  .                                                 
+      |--------------------------------------------------------------------------------------|      
+      |4. Request body parsed                     .                                          |      
+      |                                           .                                          |      
+      |--------------------------------------------------------------------------------------|      
+           |----------------------------------------------------------------------------|           
+           |5. Schema validated                   .                                     |           
+           |                                      .                                     |           
+           |----------------------------------------------------------------------------|           
+                                                  .                                                 
 |--------------------------------------------------------------------------------------------------|
-|6. Idempotency key checked                      ..                                                |
+|6. Idempotency key checked                       .                                                |
 |--------------------------------------------------------------------------------------------------|
-                                                .                                                   
-|--------------------------------------------------------------------------------------------|      
-|7. Business rule applied                     .                                              |      
-|                                            .                                               |      
-|--------------------------------------------------------------------------------------------|      
-|----------------------------------------------------------------------------------|                
-|8. Inventory reserved                     .                                       |                
-|                                         .                                        |                
-|----------------------------------------------------------------------------------|                
-                                          .                                                         
-|----------------------------------------------------------------------------------|                
-|9. Order row inserted                    .                                        |                
-|----------------------------------------------------------------------------------|                
-                                        .                                                           
-|----------------------------------------------------------------------------|                      
-|10. Payment charged                  .                                      |                      
-|                                     .                                      |                      
-|----------------------------------------------------------------------------|                      
-|----------------------------------------------------------------------------|                      
-|11. Order confirmed                  .                                      |                      
-|                                     .                                      |                      
-|----------------------------------------------------------------------------|                      
-                                        .                                                           
-|----------------------------------------------------------------------------------|                
-|12. Receipt generated                    .                                        |                
-|----------------------------------------------------------------------------------|                
-                                           .                                                        
-|-----------------------------------------------------------------------------------------|         
-|13. Notification queued                     .                                            |         
-|                                           .                                             |         
-|-----------------------------------------------------------------------------------------|         
-|----------------------------------------------------------------------------------|                
-|14. Response returned                     .                                       |                
-|                                         .                                        |                
-|----------------------------------------------------------------------------------|                
+                                                  .                                                 
+   |--------------------------------------------------------------------------------------------|   
+   |7. Business rule applied                      .                                             |   
+   |                                              .                                             |   
+   |--------------------------------------------------------------------------------------------|   
+        |----------------------------------------------------------------------------------|        
+        |8. Inventory reserved                    .                                        |        
+        |                                         .                                        |        
+        |----------------------------------------------------------------------------------|        
+                                                  .                                                 
+        |----------------------------------------------------------------------------------|        
+        |9. Order row inserted                    .                                        |        
+        |----------------------------------------------------------------------------------|        
+                                                  .                                                 
+           |----------------------------------------------------------------------------|           
+           |10. Payment charged                   .                                     |           
+           |                                      .                                     |           
+           |----------------------------------------------------------------------------|           
+           |----------------------------------------------------------------------------|           
+           |11. Order confirmed                   .                                     |           
+           |                                      .                                     |           
+           |----------------------------------------------------------------------------|           
+                                                  .                                                 
+        |----------------------------------------------------------------------------------|        
+        |12. Receipt generated                    .                                        |        
+        |----------------------------------------------------------------------------------|        
+                                                  .                                                 
+     |----------------------------------------------------------------------------------------|     
+     |13. Notification queued                     .                                           |     
+     |                                            .                                           |     
+     |----------------------------------------------------------------------------------------|     
+        |----------------------------------------------------------------------------------|        
+        |14. Response returned                    .                                        |        
+        |                                         .                                        |        
+        |----------------------------------------------------------------------------------|        
 ```
 
 ---
@@ -512,31 +512,31 @@ layout-report: tests/corpus/wide-fanout.tldsl.jsx
 == Geometry ==
 id        parent       x  y     w    h
 hub       wide-fanout  0  0     138  60
-leaf-1    wide-fanout  0  100   120  60
-leaf-2    wide-fanout  0  200   120  60
-leaf-3    wide-fanout  0  300   120  60
-leaf-4    wide-fanout  0  400   120  60
-leaf-5    wide-fanout  0  500   120  60
-leaf-6    wide-fanout  0  600   120  60
-leaf-7    wide-fanout  0  700   120  60
-leaf-8    wide-fanout  0  800   120  60
-leaf-9    wide-fanout  0  900   120  60
-leaf-10   wide-fanout  0  1000  129  60
-leaf-11   wide-fanout  0  1100  129  60
-leaf-12   wide-fanout  0  1200  129  60
-leaf-13   wide-fanout  0  1300  129  60
-leaf-14   wide-fanout  0  1400  129  60
-leaf-15   wide-fanout  0  1500  129  60
-leaf-16   wide-fanout  0  1600  129  60
-leaf-17   wide-fanout  0  1700  129  60
-leaf-18   wide-fanout  0  1800  129  60
-mini-hub  wide-fanout  0  1900  129  60
-mini-1    wide-fanout  0  2000  120  60
-mini-2    wide-fanout  0  2100  120  60
-mini-3    wide-fanout  0  2200  120  60
-mini-4    wide-fanout  0  2300  120  60
-mini-5    wide-fanout  0  2400  120  60
-mini-6    wide-fanout  0  2500  120  60
+leaf-1    wide-fanout  9  100   120  60
+leaf-2    wide-fanout  9  200   120  60
+leaf-3    wide-fanout  9  300   120  60
+leaf-4    wide-fanout  9  400   120  60
+leaf-5    wide-fanout  9  500   120  60
+leaf-6    wide-fanout  9  600   120  60
+leaf-7    wide-fanout  9  700   120  60
+leaf-8    wide-fanout  9  800   120  60
+leaf-9    wide-fanout  9  900   120  60
+leaf-10   wide-fanout  5  1000  129  60
+leaf-11   wide-fanout  5  1100  129  60
+leaf-12   wide-fanout  5  1200  129  60
+leaf-13   wide-fanout  5  1300  129  60
+leaf-14   wide-fanout  5  1400  129  60
+leaf-15   wide-fanout  5  1500  129  60
+leaf-16   wide-fanout  5  1600  129  60
+leaf-17   wide-fanout  5  1700  129  60
+leaf-18   wide-fanout  5  1800  129  60
+mini-hub  wide-fanout  5  1900  129  60
+mini-1    wide-fanout  9  2000  120  60
+mini-2    wide-fanout  9  2100  120  60
+mini-3    wide-fanout  9  2200  120  60
+mini-4    wide-fanout  9  2300  120  60
+mini-5    wide-fanout  9  2400  120  60
+mini-6    wide-fanout  9  2500  120  60
 
 == Metrics ==
 canvas: 138 x 2560
@@ -544,74 +544,74 @@ aspect ratio: 0.05
 fill ratio (leaf area / canvas area): 0.548
 overlapping shape pairs: 0
 edge-edge crossings: 0
-total edge length: 21101
+total edge length: 21100
 mean edge length: 844
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
 source-order violations per container:
   wide-fanout (col): 0
 left-edge alignment groups per container:
-  wide-fanout: 1 groups over 26 children
+  wide-fanout: 3 groups over 26 children
 
 == ASCII Render (100x60 cells; 1 cell = 1.4 x 42.7 px) ==
 Dispatcher                                                                                          
-                                                 ..                                                 
-|-------------------------------------------------------------------------------------|             
-|Worker 1                                  .. .....                                   |             
-|-------------------------------------------------------------------------------------|             
-Worker 2                                   .  .....                                                 
-                                             ......                                                 
-Worker 3                                    ......                                                  
-                                           . .....                                                  
-|-------------------------------------------------------------------------------------|             
-|Worker 4                                  .. ....                                    |             
-|-------------------------------------------------------------------------------------|             
-Worker 5                                   . .. ..                                                  
-                                            ... ..                                                  
-Worker 6                                    ..  ..                                                  
-                                           ...  ..                                                  
-|-------------------------------------------------------------------------------------|             
-|Worker 7                                  ..  ...                                    |             
-|-------------------------------------------------------------------------------------|             
-|Worker 8                                  ..  ..                                     |             
-|-------------------------------------------------------------------------------------|             
-Worker 9                                   .   ..                                                   
-                                              ...                                                   
-Worker 10                                     ...                                                   
-                                              ...                                                   
-|--------------------------------------------------------------------------------------------|      
-|Worker 11                                    ...                                            |      
-|--------------------------------------------------------------------------------------------|      
-Worker 12                                     ..                                                    
-                                              ..                                                    
-Worker 13                                     ..                                                    
-                                              ..                                                    
-|--------------------------------------------------------------------------------------------|      
-|Worker 14                                    ..                                             |      
-|--------------------------------------------------------------------------------------------|      
-Worker 15                                     ..                                                    
-                                              ..                                                    
-Worker 16                                     ..                                                    
-                                              ..                                                    
-|--------------------------------------------------------------------------------------------|      
-|Worker 17                                    .                                              |      
-|--------------------------------------------------------------------------------------------|      
-|Worker 18                                    .                                              |      
-|--------------------------------------------------------------------------------------------|      
-Scheduler                                     .                                                     
-                                             ..                                                     
-Task 1                                      ...                                                     
-                                           ...                                                      
-|-------------------------------------------------------------------------------------|             
-|Task 2                                    ...                                        |             
-|-------------------------------------------------------------------------------------|             
-Task 3                                     ...                                                      
-                                            .                                                       
-Task 4                                     ..                                                       
-                                           ..                                                       
-|-------------------------------------------------------------------------------------|             
-|Task 5                                    .                                          |             
-|-------------------------------------------------------------------------------------|             
-Task 6                                     .                                                        
+                                                  .                                                 
+      |--------------------------------------------------------------------------------------|      
+      |Worker 1                                   .                                          |      
+      |--------------------------------------------------------------------------------------|      
+      Worker 2                                    .                                                 
+                                                  .                                                 
+      Worker 3                                    .                                                 
+                                                  .                                                 
+      |--------------------------------------------------------------------------------------|      
+      |Worker 4                                   .                                          |      
+      |--------------------------------------------------------------------------------------|      
+      Worker 5                                    .                                                 
+                                                  .                                                 
+      Worker 6                                    .                                                 
+                                                  .                                                 
+      |--------------------------------------------------------------------------------------|      
+      |Worker 7                                   .                                          |      
+      |--------------------------------------------------------------------------------------|      
+      |Worker 8                                   .                                          |      
+      |--------------------------------------------------------------------------------------|      
+      Worker 9                                    .                                                 
+                                                  .                                                 
+    Worker 10                                     .                                                 
+                                                  .                                                 
+    |-------------------------------------------------------------------------------------------|   
+    |Worker 11                                    .                                             |   
+    |-------------------------------------------------------------------------------------------|   
+    Worker 12                                     .                                                 
+                                                  .                                                 
+    Worker 13                                     .                                                 
+                                                  .                                                 
+    |-------------------------------------------------------------------------------------------|   
+    |Worker 14                                    .                                             |   
+    |-------------------------------------------------------------------------------------------|   
+    Worker 15                                     .                                                 
+                                                  .                                                 
+    Worker 16                                     .                                                 
+                                                  .                                                 
+    |-------------------------------------------------------------------------------------------|   
+    |Worker 17                                    .                                             |   
+    |-------------------------------------------------------------------------------------------|   
+    |Worker 18                                    .                                             |   
+    |-------------------------------------------------------------------------------------------|   
+    Scheduler                                     .                                                 
+                                                  .                                                 
+      Task 1                                      .                                                 
+                                                  .                                                 
+      |--------------------------------------------------------------------------------------|      
+      |Task 2                                     .                                          |      
+      |--------------------------------------------------------------------------------------|      
+      Task 3                                      .                                                 
+                                                  .                                                 
+      Task 4                                      .                                                 
+                                                  .                                                 
+      |--------------------------------------------------------------------------------------|      
+      |Task 5                                     .                                          |      
+      |--------------------------------------------------------------------------------------|      
+      Task 6                                      .                                                 
                                                                                                     
 ```
