@@ -1,5 +1,0 @@
-<doc id="good">
-  <box id="user"  label="User" />
-  <box id="login" label="Login" />
-  <edge id="e1" from="user" to="login" />
-</doc>
