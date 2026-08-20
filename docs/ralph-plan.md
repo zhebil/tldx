@@ -138,9 +138,41 @@ next task.
   contract alone only asserts the code, which is why it slipped.
   `npm run check` green (36 files, 285 tests); `npm run build:cli` green.
 
-- [ ] **A4 — Wire `.tldsl.jsx` into `compileFile`.**
+- [x] **A4 — Wire `.tldsl.jsx` into `compileFile`.** _(wake 5)_
   Dispatch on extension. `.tldsl` keeps working for now. Nothing downstream of
   `ast.ts` changes.
+  **Done.** `CompileFileDeps` gains a required `execute: ExecutePort`;
+  `compileFile` dispatches on a `.jsx` suffix, hands `(source, path)` to the
+  port, short-circuits to `{ sceneJson: null, diagnostics }` on the diagnostics
+  arm, and otherwise feeds `result.ast` into the same `lower → layout → emit`
+  chain the text parser feeds. Nothing downstream of `ast.ts` moved. Threaded
+  through `watchAndServe` → `runServe` → `main.ts`, which now wires
+  `createJsxExecute()` into both subcommands. `runCheck`'s PostToolUse skip
+  guard accepted only `.tldsl`, which silently swallowed every `.tldsl.jsx`;
+  it now accepts both.
+  Wake 4's three-disagreeing-`SourceSpan.file`-shapes note is **resolved**. The
+  rule picked: *every diagnostic's `span.file` is expressed the same way the
+  caller expressed `path`*. Because a span only reaches the outside world
+  through a `Diagnostic` (`emit`/`SceneJSON` never carry one), that is a
+  `.map()` over the returned diagnostics in `compileFile`, not an AST walk -
+  and it is a no-op for the text parser, which is what makes it safe. A
+  sibling-imported component's span survives as `foo/Parts.jsx`, not flattened
+  onto the entry.
+  **Review caught a second real bug**, this one invisible to the test suite:
+  `createJsxExecute` used `dirname(path)` verbatim as esbuild's
+  `absWorkingDir`, so a **relative** entry path - exactly what the CLI and the
+  PostToolUse hook pass - died with *"The working directory ... is not an
+  absolute path"*, and the span it produced was double-prefixed. Every existing
+  test passed because the contract harness and the e2e fixtures all build
+  absolute paths from `tmpdir()`. Found by running `npm run dev:cli -- check`
+  on a relative path by hand. The adapter now resolves the entry once in
+  `execute()` and every span it returns is absolute (which is what
+  `compileFile` normalises back); pinned by an adapter test that deliberately
+  builds a cwd-relative path.
+  `npm run check` green (36 files, 294 tests). Verified by hand:
+  `check <relative>.tldsl.jsx` exits 0 silently on the good fixture, prints
+  `tests/e2e/fixtures/check-jsx-broken.tldsl.jsx:2:9: error[runtime/threw]` and
+  exits 1 on the broken one, and still exits 0 silently on `src/cli/main.ts`.
 
 - [ ] **A5 — Unknown-prop rejection in `lower.ts`.**
   `<Box lable="x" />` and `<Box className="..." />` must produce
@@ -371,3 +403,26 @@ anything that outlives the loop.)_
   7's "syntax errors report one at a time" regression - for build errors the
   agent still sees the whole batch. Only *thrown* errors are one-at-a-time.
   Worth saying in A10's docs rewrite.
+
+- **(wake 5, A4)** `CompileFileResult` deliberately drops the `inputs` array
+  the `ExecutePort` success arm carries - nothing consumes it yet. **A6 owns
+  widening it** (`{ sceneJson; diagnostics; inputs }`) and feeding it to the
+  watcher; the data is already there, it is thrown away in one place in
+  `compileFile`.
+- **(wake 5, A4)** Two different extension gates now exist by design and could
+  drift: `compileFile` dispatches on a bare `.jsx` suffix (so a hypothetical
+  `foo.jsx` passed to it directly would take the JSX front end), while
+  `cli/check.ts` gates on `.tldsl.jsx` specifically, which is what keeps the
+  PostToolUse hook from firing on every React component in a repo. A8 touches
+  the hook matcher - keep the two consistent then, or collapse them onto one
+  shared predicate.
+- **(wake 5, A4)** The new adapter test for relative entry paths has to
+  `mkdtemp` **inside `process.cwd()`** (a cwd-relative path is the whole point
+  of the test), so a crash between `mkdtemp` and its `finally` leaves a
+  `tldsl-execute-jsx-relative-*` directory in the repo root. Untracked and
+  harmless, but it is why `git add .` stays banned.
+- **(wake 5, A4)** `tests/e2e/fixtures/check-jsx-broken.tldsl.diagnostics.txt`
+  asserts the message `Error: boom`, which comes from the first line of V8's
+  `Error.prototype.stack`. Stable on Node 20-25, but it is a V8 format
+  dependency in a golden file - if it ever goes flaky across Node versions,
+  assert the code and span and drop the message text.
