@@ -686,8 +686,22 @@ Ordered. Take from the top. Strike through when resolved.
     B20's gate reopened, which the corpus has no file to justify. Ledger entry
     in `docs/layout-hypotheses.md`.
 
-- [ ] **B8** Frame title width participates in frame sizing. Frame `name` is
-  never measured, so long titles overflow.
+- [x] ~~**B8** Frame title width participates in frame sizing. Frame `name` is
+  never measured, so long titles overflow.~~ **STRUCK - measured no-op**
+  _(wake 25)_ - the premise was measured before anything was built, and it is
+  false on the frozen corpus. New tool `tools/text-metrics.mts` reads the real
+  `getBoundingClientRect()` of every rendered label out of headless chromium at
+  an asserted zoom 1, so the numbers are canvas units. The widest title/frame
+  ratio anywhere in the corpus is **0.61** (`driving-adapters`, a 92.3px title
+  in a 152px frame); `deep-nesting`'s four frames sit at 0.08-0.11. A width
+  floor cannot bind, so the candidate would be byte-identical on all six files
+  and no judge was spent. Rendered frame labels run **5.4-6.8 px/char** at 14px
+  tall; the repo's only text constant (`AVG_CHAR_PX = 9`) is calibrated for the
+  much larger box-label font and still would not bind (16 x 9 = 144 < 152), so
+  there is no defensible estimator that makes B8 do anything here. Revive only
+  if the corpus gains a frame whose title outruns its content - a corpus change,
+  which is its own hypothesis. The measurement's real finding is vertical and
+  survives as **B22**/**B23**. Ledger entry in `docs/layout-hypotheses.md`.
 - [ ] **B9** Note sizing: notes reserve a fixed 200×80 in layout but tldraw
   resizes stickies to fit, so reserved space and rendered space disagree.
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
@@ -708,6 +722,31 @@ Ordered. Take from the top. Strike through when resolved.
   defect, not an ordering one. Passes the source-order gate by construction
   because no child moves relative to its siblings. Watch the canvas-area gate:
   padding one container to match another grows the parent.
+
+- [ ] **B22** _(from B8's measurement, wake 25)_ Reclaim the frame's unused
+  interior title band. `FRAME_PAD_TOP = FRAME_TITLE_PX (32) + FRAME_PAD_INNER`
+  reserves 32px of title chrome *inside* every frame, and
+  `src/domain/ports/layout.fake.ts:11` states the assumption out loud - "so
+  chrome never overlaps". It is wrong: tldraw draws the frame label **outside**,
+  in the band `[top-23, top-9]`, and draws nothing inside. So every frame is
+  32px taller than it needs to be and its first child row sits 32px below where
+  `pad` asked. Drop `FRAME_TITLE_PX` from `padTop` and judge. Changes all six
+  corpus files, and compounds four levels deep on `deep-nesting`. Do this before
+  B23 - it is the half the corpus can actually see.
+
+- [ ] **B23** _(from B8's measurement, wake 25)_ Reserve the frame title's
+  *exterior* band. The label occupies 23px above the frame's top edge and is
+  14px tall, and nothing in layout reserves it, so a frame placed under a
+  sibling can have its title drawn on top of that sibling. On `deep-nesting`
+  this already near-misses three times: `l2`'s band `185-199` against
+  `l1-config` ending at 192, `l3`'s `385-399` against `l2-metrics` ending at
+  394, `l4`'s `577-591` against `l3-validator` ending at 588 - saved only
+  because titles are left-aligned at the frame's left edge while children are
+  centred (`l2`'s title spans `x 24-66`, `l1-config` starts at `x 220`).
+  Objective gate 2 is blind to it: a title is not a shape, so it contributes no
+  overlapping shape pair. Note the risk that this is unjudgeable for the same
+  reason B8 was - the corpus near-misses but never collides, so the change may
+  be a no-op on the render. Measure the collision count first, before building.
 
 - [ ] **B11** Wrap box labels at a width derived from the document's target
   aspect ratio instead of a constant. B2 showed wrapping itself is not the

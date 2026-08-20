@@ -1181,3 +1181,81 @@ current and was not regenerated.
 
 ---
 
+## B8 — frame title width participates in frame sizing _(wake 25)_ — **STRUCK, measured no-op**
+
+**Hypothesis.** `sizeFrame` computes `w = frame.w ?? contentW` and never looks at
+`frame.name`, so a long frame title overflows its frame. Fix: floor the frame's
+width at the title's width.
+
+**No candidate was built, and no judge was spent.** The premise was measured
+first and it is false on the frozen corpus: every frame title is comfortably
+narrower than its frame, so the floor can never bind and the change would be
+byte-identical on all six files.
+
+**How it was measured.** Not by estimating - by reading the real numbers out of
+the browser. `tools/text-metrics.mts` (new this wake) starts `serve`, loads the
+viewer in headless chromium at **zoom 1**, and reports the rendered
+`getBoundingClientRect()` of every shape's label. Camera zoom is 1, confirmed by
+the rendered frame widths matching `tools/layout-report.mts`'s canvas units
+exactly, so these are canvas pixels and directly comparable to the layout rects.
+
+`hexagonal.tldsl.jsx`, every frame in the file:
+
+| frame | title | rendered title w | frame w | ratio |
+|---|---|---|---|---|
+| `hex` | Hexagonal (ports and adapters) | 162.3 | 1198 | 0.14 |
+| `driving-adapters` | Driving adapters | 92.3 | 152 | **0.61** |
+| `driving-ports` | Driving ports | 76.3 | 197 | 0.39 |
+| `core` | Domain core | 74.3 | 224 | 0.33 |
+| `driven-ports` | Driven ports | 72.3 | 206 | 0.35 |
+| `driven-adapters` | Driven adapters | 88.3 | 179 | 0.49 |
+
+`deep-nesting.tldsl.jsx` is not close either - four frames named `System`,
+`Service`, `Module`, `Unit` measuring 47.3, 48.0, 49.3 and 33.3px in frames
+560, 512, 472 and 440 wide - ratios 0.08 to 0.11.
+
+The worst case in the whole corpus is `driving-adapters` at 0.61. A title would
+need **~1.6x more characters** to reach its own frame's width.
+
+**Why any honest estimator gives the same answer.** The rendered frame label is
+a 14px-tall line at **5.4-6.8 px per character** (162.3px for 30 chars, 92.3px
+for 16, 74.3px for 11). The repo's only existing text constant is
+`AVG_CHAR_PX = 9` in `src/domain/layout/defaults.ts`, and that is calibrated for
+the *box-label* font, which is far larger - reusing it would over-estimate the
+title by ~50% and still not bind (16 x 9 = 144 < 152). There is no defensible
+constant that makes B8 do anything here, and picking one that did would be
+tuning an estimator to manufacture an effect.
+
+**The real finding is vertical, and B8's framing hid it.** The same measurement
+shows the frame title is drawn **outside** the frame: `labelTop` is **23px above**
+the frame's top edge and the line is **14px** tall, so the title occupies the band
+`[top-23, top-9]` and *nothing at all* is drawn inside the frame's top. Layout
+believes the opposite. `FRAME_PAD_TOP = FRAME_TITLE_PX (32) + FRAME_PAD_INNER (32)`
+reserves 32px of title chrome *inside* every frame, and
+`src/domain/ports/layout.fake.ts:11` states the assumption in a comment - "so
+chrome never overlaps". Two consequences with opposite signs:
+
+- **32px is reserved inside where nothing draws.** Every frame is 32px taller
+  than it needs to be and its first child row sits 32px below where `pad` asked.
+  On `deep-nesting` that compounds four levels deep.
+- **0px is reserved outside where the title does draw.** On `deep-nesting` the
+  title band of each nested frame already intrudes into the child above it:
+  `l2`'s band is `y 185-199` against `l1-config` ending at `y 192` (7px), `l3`'s
+  is `385-399` against `l2-metrics` ending at `394` (9px), `l4`'s is `577-591`
+  against `l3-validator` ending at `588` (11px). None of the three *collides*,
+  and only because titles are left-aligned at the frame's left edge while the
+  children are centred - `l2`'s title spans `x 24-66` and `l1-config` starts at
+  `x 220`. Objective gate 2 cannot see this at all: the title is not a shape, so
+  it contributes no overlapping shape pair.
+
+Both halves survive as **B22** (reclaim the interior 32px) and **B23** (reserve
+the exterior band), split because they are independently judgeable - B22 changes
+all six files today, B23 is a latent defect the corpus only near-misses.
+
+**Verdict: STRUCK.** `src/` is untouched, so `docs/layout-champion.md` is still
+current and was not regenerated. The wake's artefact is `tools/text-metrics.mts`
+and this entry. Do not retry B8 as a width floor; revive it only if the corpus
+gains a frame whose title genuinely outruns its content, and that is a corpus
+change, which is its own hypothesis.
+
+---
