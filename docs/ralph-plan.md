@@ -489,14 +489,19 @@ Ordered. Take from the top. Strike through when resolved.
   the IR edge list. Added to the protocol's gate list above. Champion baseline
   recorded in `docs/layout-hypotheses.md`.
 
-- [ ] **B18** Short-edge arrowhead floor: keep centre anchors
+- [x] ~~**B18** Short-edge arrowhead floor: keep centre anchors
   (`isPrecise: false`) for any edge whose endpoint rects are closer than a small
   multiple of the arrowhead size, and only use a precise anchor when there is
-  room to draw a head. Evidence: B15's `deep-nesting` loss and its `wide-fanout`
-  win were both decided by two short hub-to-neighbour edges, on whether tldraw
-  drew a visible arrowhead or a bare dot at the target - the same mechanism with
-  the sign flipped by gap size. Independent of routing style, so worth fixing
-  whatever happens to elbows.
+  room to draw a head.~~ **STRUCK - vacuous** _(wake 20)_ - never measured,
+  because there is nothing to measure. B18 was written while B15's side anchors
+  were live; B15 reverted, so no production code sets `normalizedAnchor` or
+  `isPrecise` at all. `arrowShape()`'s only writer is
+  `contracts/builders.ts:261-262`, which defaults every terminal to
+  `{0.5, 0.5}` / `isPrecise: false`; grepping `src/` for either symbol outside
+  tests and snapshots returns nothing. "Keep centre anchors for short edges" is
+  therefore a description of the champion, not a change to it. Revive only if
+  some future hypothesis reintroduces precise anchors - at which point this is
+  the floor it needs, not a hypothesis of its own.
 
 - [x] ~~**B15** Elbow arrows + B13 side anchors, gated per edge to the edges
   that have room to route: keep `kind: "elbow"` and the side anchor only if the
@@ -574,11 +579,23 @@ Ordered. Take from the top. Strike through when resolved.
   boundary, which is a *continuous* side anchor, so snapping to four fixed side
   midpoints coarsens it. Survives only as part of **B13**. Ledger entry in
   `docs/layout-hypotheses.md`.
-- [ ] **B5** Edge-aware child ordering *within* a `col` container: keep source
+- [x] ~~**B5** Edge-aware child ordering *within* a `col` container: keep source
   order as the tie-break but let a container opt into sorting children to line
-  up with a neighbouring container's connected children. Evidence: 7 ports
-  against 6 adapters gives every port→adapter arrow a constant 72px up-left
-  slope.
+  up with a neighbouring container's connected children.~~ **STRUCK -
+  unjudgeable as written** _(wake 20)_ - never measured. It has no form this
+  loop can score. Automatic reordering is rejected by objective gate 3 *by
+  construction*: `sourceOrderViolations()` walks `c.children` in IR order and
+  counts every pair whose placement is not monotone, so a candidate that
+  reorders a `col` scores one violation per moved child and never reaches a
+  judge. The opt-in form dodges the gate but is an authored attribute the frozen
+  corpus cannot exercise - the exact wall B4 hit at wake 15, where the authored
+  half had to be split off and only the automatic half (B4a) was measurable.
+  Reviving it needs a *decision*, not a wake: either the project relaxes the
+  source-order gate (it currently encodes "source order is sacred", which is the
+  premise A0 and the corpus were both built on), or the corpus gains a file that
+  opts in - and corpus changes are their own hypothesis. The underlying evidence
+  is real and survives as **B19**, which realigns *positions* without touching
+  child order.
 - [ ] **B6** Spacing as a function of edge density rather than the constant 40.
 - [ ] **B7** Aspect-ratio targeting for the doc root: currently defaulting to
   `col` makes tall skinny documents (1198 × 2940). Try wrapping top-level
@@ -596,6 +613,16 @@ Ordered. Take from the top. Strike through when resolved.
   the gate was real but not directional. B4a measured the other half and it
   loses on its own too, for the mirror-image reason. Sequencing them cannot
   work; they have to ship together.
+- [ ] **B19** _(successor to the struck B5)_ Cross-container **alignment**
+  without reordering: when two sibling containers are connected child-to-child,
+  keep both children lists in source order and instead shift the shorter
+  container's flow origin (or pad its cross axis) so the connected pairs line
+  up. Evidence is B5's, unchanged: 7 ports against 6 adapters gives every
+  port->adapter arrow a constant 72px up-left slope, which is a *position*
+  defect, not an ordering one. Passes the source-order gate by construction
+  because no child moves relative to its siblings. Watch the canvas-area gate:
+  padding one container to match another grows the parent.
+
 - [ ] **B11** Wrap box labels at a width derived from the document's target
   aspect ratio instead of a constant. B2 showed wrapping itself is not the
   problem - a fixed 320px cap is. Pick the cap so the resulting canvas moves
