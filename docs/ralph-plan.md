@@ -100,7 +100,7 @@ next task.
   caching is a non-issue". The real A3 adapter fails that test if it caches by
   path. `npm run check` green (35 files, 276 tests).
 
-- [ ] **A3 — `infra/execute-jsx/` adapter.**
+- [x] **A3 — `infra/execute-jsx/` adapter.** _(wake 4)_
   esbuild **bundle** (not transform) with `jsx: "automatic"`,
   `jsxImportSource: "tldsl"`, `jsxDev: true`, `metafile: true`, `sourcemap`,
   `"tldsl"` aliased to the bundled runtime, `node_modules` external.
@@ -109,6 +109,34 @@ next task.
   through the sourcemap to one `runtime/threw` diagnostic with a real line.
   Return `metafile.inputs` alongside the AST.
   Done when: contract test covers success, throw, and infinite-loop-terminates.
+  **Done.** `createJsxExecute()` in `src/infra/execute-jsx/execute-jsx.ts`.
+  esbuild is now a real `dependency`, contained to this folder the same way
+  `elkjs` is contained to `infra/layout-elk/` (eslint group + dep-cruiser rule).
+  The entry's *contents* come from the `source` argument and never from disk:
+  a plugin claims the entry path in `onResolve` (esbuild's own resolver refuses
+  a path whose on-disk content is irrelevant) and serves `source` in `onLoad`,
+  so the resolved path stays the real one - `jsxDEV`'s `source.fileName` and
+  every downstream span depend on that, and it is what makes the contract's
+  "no cross-call state" scenario pass. The `"tldsl"` alias resolves
+  extensionless off `import.meta.url`, so the same code picks `src/runtime/*.ts`
+  under vitest/tsx and `dist/runtime/*.js` from a build (`npm run build:cli`
+  verified). The bundle goes to a fresh `Worker(bootstrap, { eval: true })` per
+  call - no temp files - where `Module#_compile` runs it under the entry's own
+  path, so thrown frames read `<path>:line:col` and `node:module`'s `SourceMap`
+  maps the topmost one back to the original line (pinned: a throw on line 3
+  reports line 3). 2s hardcoded budget, then `terminate()` and
+  `runtime/timeout`.
+  Two additions beyond the task's wording, both flagged in "Discovered work"
+  by earlier wakes: `ExecuteResult`'s success arm widened to
+  `{ ast; inputs: string[] }` (absolute, from `metafile.inputs`, transitive
+  imports pinned by an adapter test), and a build failure got its own code
+  `runtime/compile` plus a fifth contract scenario.
+  Review caught one real bug the subagent shipped: esbuild's
+  `BuildFailure.location.file` is relative to `absWorkingDir`, not
+  `process.cwd()`, so every compile diagnostic pointed at a path under the repo
+  root instead of the user's file. Fixed, and pinned by an adapter test - the
+  contract alone only asserts the code, which is why it slipped.
+  `npm run check` green (36 files, 285 tests); `npm run build:cli` green.
 
 - [ ] **A4 — Wire `.tldsl.jsx` into `compileFile`.**
   Dispatch on extension. `.tldsl` keeps working for now. Nothing downstream of
@@ -319,3 +347,27 @@ anything that outlives the loop.)_
 - **(wake 1)** `dump-tmp.mts` lost its `--stack` flag (the `stackLayout` export it
   called no longer exists). It still dumps geometry via `ElkLayoutAdapter`, which
   is what the A0 acceptance check needed. A9 deletes it anyway.
+
+- **(wake 4)** `mappedSpan()` always reports `span.file = path`, discarding the
+  sourcemap entry's `originalSource`. For a throw inside an *imported* component
+  file that is a wrong file with a right-for-the-other-file line. It is that way
+  because the contract asserts `span.file === h.path` and esbuild's sourcemap
+  `sources` are relative to the outfile dir, so honouring `originalSource`
+  needs a resolution rule and a contract change. Revisit in A4 when multi-file
+  diagrams become normal.
+- **(wake 4)** `jsxDEV`'s `source.fileName` is relative to `absWorkingDir`
+  (= the entry's own directory), so an AST span from `<Doc>` carries a bare
+  basename while the adapter's own diagnostics carry absolute paths. Two span
+  shapes in one pipeline; `contracts/diagnostic.ts` documents `SourceSpan.file`
+  as relative to the watch root, which is a third. A4 has to pick one and
+  normalise at the boundary.
+- **(wake 4)** `packages: "external"` leaves a bare `require()` in the bundle
+  for any real npm package a diagram imports, resolved in the worker from
+  `Module._nodeModulePaths(dirname(entry))`. Nothing tests it. Also untested:
+  what a `.tldsl.jsx` that imports `react` does (decision 1 wants it to fail
+  loudly).
+- **(wake 4)** esbuild reports *all* build errors, and the adapter maps every
+  one to its own `runtime/compile` diagnostic. That partly walks back decision
+  7's "syntax errors report one at a time" regression - for build errors the
+  agent still sees the whole batch. Only *thrown* errors are one-at-a-time.
+  Worth saying in A10's docs rewrite.
