@@ -273,9 +273,40 @@ next task.
   exit 0) and every corpus file plus `scratch.tldsl.jsx` exiting 0 silently
   through the real CLI.
 
-- [ ] **A8 — Delete the text parser.**
+- [x] **A8 — Delete the text parser.** _(wake 9)_
   `tokenize.ts`, `parse.ts`, their tests, `.tldsl` dispatch. Update the
   PostToolUse matcher to `.tldsl.jsx`. One commit, clearly labelled.
+  **Done.** 1090 LOC of front end gone (`tokenize.ts` 360 + `parse.ts` 350 +
+  tests 383), plus `auth.tldsl`, `check-good.*`, `check-broken.*`.
+  `compileFile` no longer dispatches on extension at all — every path runs
+  through `ExecutePort` — and `runCheck`'s skip guard accepts `.tldsl.jsx`
+  only, which collapses the two gates the wake-5 note warned could drift.
+  `ast.ts` is untouched; it is the AST contract the JSX runtime produces.
+  Two things the plan's one-line description did not anticipate, both
+  resolved rather than deferred:
+  1. `lower.test.ts` and `stack.test.ts` used `parse()` as a *terse AST
+     fixture builder*, and cannot use the JSX component library instead
+     (`domain/` may not import `src/runtime/`). New test-only
+     `domain/parser/ast.fixture.ts` exports `astBuilders(file)`; `*.fixture.ts`
+     joins `*.fake.ts` in `tsconfig.build.json`'s exclude. Its per-attribute
+     synthetic column exists so the `ir/unknown-prop` test can still tell an
+     attribute's `nameSpan` from its element's span — the first cut stamped
+     one span on everything, which made that assertion vacuous.
+  2. `serve-fixture.test.ts` copied `auth.tldsl` into a temp dir; nothing in
+     the delete list mentioned it and it would have failed with ENOENT.
+  Four tests deleted rather than ported, all pinning behaviour that is now
+  structurally unreachable (`execute()`'s success arm always carries a node):
+  the parse-error arm, `"never calls execute for a .tldsl path"`, and the two
+  that relied on an empty file lowering to a null AST with no diagnostics.
+  `auth-fixture.test.ts`'s grammar check was *rewritten* against
+  `auth.tldsl.jsx` through the real esbuild adapter rather than dropped; the
+  parity gate went, having nothing left to compare.
+  Verified myself: `npm run check` exit 0 (35 files / 272 tests, down from 37
+  / 321 — the delta is the parser's own 49 tests), `npm run build` exit 0, and
+  by hand through the real CLI — corpus and `scratch.tldsl.jsx` exit 0
+  silently, `check-jsx-broken.tldsl.jsx` still prints
+  `2:9: error[runtime/threw]` and exits 1, and a non-`.tldsl.jsx` path is
+  now skipped silently.
 
 - [ ] **A9 — Layout report tool.**
   `tools/layout-report.mts <file>` printing, deterministically:
@@ -571,3 +602,26 @@ anything that outlives the loop.)_
   `auth-fixture.test.ts`, and that file's *first* `describe` too — it calls
   `parse()` directly and dies with the text parser. `check-not-tldsl.txt`
   stays; it is the skip case.
+
+- **(wake 9, A8)** `watchAndServe` still has a defensive branch for
+  `sceneJson === null` with **no** diagnostics, and it is now unreachable and
+  untested: the only front end left always returns a non-null `AstNode` on
+  success, and `lower()` never returns a null IR without emitting a
+  diagnostic. Its test was deleted. Either delete the branch or leave it as
+  belt-and-braces, but it is dead code as of this wake.
+- **(wake 9, A8)** `ast.fixture.ts`'s spans are synthetic — every element sits
+  at line 1 column 1 and attribute *i* at column *i+2*. Any future diagnostic
+  whose value depends on real source geometry (a length, a multi-line span, a
+  column that must match the text) cannot be pinned in a `domain/` unit test
+  any more; it has to move up to an e2e test that runs the real JSX front end.
+  The `ir/unknown-prop` test lost its `length: 5` assertion this way.
+- **(wake 9, A8)** `docs/dsl.md` still documents the deleted text grammar in
+  full, and `domain/parser/ast.ts`'s header says unknown elements are
+  "rejected at parse time" when the rejection now lives in
+  `runtime/components.ts`. **A10 owns both.** `docs/architecture.md`'s
+  PostToolUse snippet needs no change — it matches `Write|Edit` and lets
+  `runCheck` filter.
+- **(wake 9, A8)** The directory `src/domain/parser/` now holds only `ast.ts`,
+  `index.ts` and `ast.fixture.ts`. The name is a lie — nothing parses. Worth
+  renaming to `domain/ast/` at some point, but it touches ~20 import sites and
+  `CONTEXT.md`, so it was not done inside A8.
