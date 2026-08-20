@@ -286,6 +286,7 @@ describe("ElkLayoutAdapter: direction", () => {
       idExplicit: false,
       span: span(),
       direction,
+      layout: "auto",
       children: [
         { kind: "box", id: "a", idExplicit: true, span: span() },
         { kind: "box", id: "b", idExplicit: true, span: span() },
