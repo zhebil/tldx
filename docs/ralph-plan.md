@@ -14,11 +14,13 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, still the wake-12
-  revision (the B1 candidate: cross-axis `align`, default `center`). Unchanged
-  since - B2, B3, B4a, B13, B14, B15 and B6 all reverted after judging, and B7
-  rejected at an objective gate before judging. Judged results so far live in
-  `docs/layout-hypotheses.md` - read it before proposing a hypothesis.
+- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 22
+  for **B20** (topology-gated doc-root aspect wrap), which sits on top of the
+  wake-12 B1 revision (cross-axis `align`, default `center`). Those are the only
+  two hypotheses ever kept - B2, B3, B4a, B13, B14, B15 and B6 all reverted
+  after judging, and B7 was rejected at an objective gate before judging. Judged
+  results live in `docs/layout-hypotheses.md` - read it before proposing a
+  hypothesis.
 
 ---
 
@@ -622,12 +624,21 @@ Ordered. Take from the top. Strike through when resolved.
   indifferent to which children the edges connect. Survives as **B20** and
   **B21**. Ledger entry in `docs/layout-hypotheses.md`.
 
-- [ ] **B20** _(successor to B7)_ Gate the doc-root aspect wrap on **topology**:
-  apply it when the top-level children form a fan or carry no edges at all, skip
-  it when they form a chain (each child having at most one in- and one out-edge,
-  covering most of the container). B7's implementation is entirely reusable -
-  `bestGridCols` is not what failed - so this is a predicate, not a rewrite.
-  Expect `sequence` to be untouched and `long-labels` / `wide-fanout` to wrap.
+- [x] ~~**B20** _(successor to B7)_ Gate the doc-root aspect wrap on
+  **topology**: apply it when the top-level children form a fan or carry no
+  edges at all, skip it when they form a chain (each child having at most one
+  in- and one out-edge, covering most of the container).~~ **KEPT** _(wake 22)_
+  - 2 candidate / 0 champion / 4 structural ties, all five objective gates
+  passed, and the first hypothesis kept since B1 at wake 12. The prediction held
+  exactly: `sequence` is byte-identical to the champion (the gate skips it),
+  `long-labels` and `wide-fanout` wrap. Ships as an exported
+  `formsChain(childIds, edges)` over `collectAutoEdges`' direct-child-resolved
+  edges, plus B7's `bestGridCols` rebuilt unchanged. The finding is that **a
+  layout rule may consult edge topology to decide whether to apply itself** -
+  B7's wrap was not mistuned, it was blind. Two confounds recorded in the ledger
+  and not to be leaned on: the `long-labels` win was decided on note legibility
+  (B9's defect, given room rather than fixed), and `wide-fanout` still draws
+  eighteen unrouted chords. Ledger entry in `docs/layout-hypotheses.md`.
 
 - [ ] **B21** _(successor to B7)_ Serpentine (boustrophedon) row direction for a
   wrapped grid, so a chain's wrap-back edge becomes a short vertical hop instead
@@ -1135,3 +1146,39 @@ anything that outlives the loop.)_
   every metric in the report. Worth folding into B9's wake rather than spending
   its own, since both are "the estimator and the renderer disagree about a
   shape's size".
+
+- **(wake 22)** `docs/layout-champion.md` had drifted out of date and nobody
+  noticed for three wakes. It was last regenerated at wake 12 (B1), so it
+  predated the gate-5 metric that wake 19 added to `tools/layout-report.mts` -
+  every stored section was missing its `arrow paths crossing a non-endpoint
+  shape:` line. It did not affect any verdict, because the protocol regenerates
+  the champion report fresh at step 2 of every wake and compares against *that*,
+  never against the stored file. But the stored file is what a human or a future
+  wake would read to answer "what does the champion look like?", and for three
+  wakes the answer omitted the metric that rejected B7. **Regenerate
+  `docs/layout-champion.md` whenever `layout-report.mts` gains a metric, not
+  only when a hypothesis is KEPT** - the protocol's step 7 only mentions the
+  latter.
+
+- **(wake 22)** The doc-root axis is now down to **two** decidable corpus files.
+  Wake 21 recorded that three of six are structurally blind to a doc-root
+  hypothesis (`deep-nesting` and `hexagonal` have one top-level child,
+  `sparse-graph` sets `layout="auto"`); B20 makes `sequence` a fourth *by
+  design*, since the whole point of the chain gate is to leave chains untouched.
+  So `long-labels` and `wide-fanout` are the entire electorate for anything that
+  changes doc-root placement, and at wake 22 they both voted the same way. Any
+  future doc-root hypothesis is deciding a 2-0 or a 1-1, and 1-1 reverts by the
+  tie rule - which means the axis is now very hard to move and very cheap to
+  fool. A corpus file with several top-level siblings and a non-chain topology
+  would be the single highest-value corpus addition; it is its own hypothesis,
+  judged on whether it covers a real diagram shape, and it invalidates the
+  champion report.
+
+- **(wake 22)** `hybridLayout` now writes `layout` and `cols` back onto the
+  positioned doc, so `IRDocPositioned.layout` means "the mode actually used",
+  not "the mode the author wrote". Two consequences. `tools/layout-report.mts`
+  depends on this to pick the right source-order rule, so it is load-bearing
+  rather than cosmetic. And a doc that authored nothing now reports
+  `layout: "grid"`, which is a **behavioural change visible to anything that
+  reads the positioned IR** - only the report does today, but `emit/` or the
+  viewer could grow such a reader without noticing the distinction.

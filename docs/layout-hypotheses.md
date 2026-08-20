@@ -951,3 +951,105 @@ than at the aspect target, which was never the part that failed:
 
 The `bestGridCols` scoring function itself is not implicated by anything
 measured here. If B20 or B21 revives the wrap, reuse it as written.
+
+---
+
+## B20 — topology-gated doc-root aspect wrap — **KEPT**
+
+_(wake 22)_
+
+**Hypothesis (backlog, verbatim).** "Gate the doc-root aspect wrap on
+**topology**: apply it when the top-level children form a fan or carry no edges
+at all, skip it when they form a chain (each child having at most one in- and
+one out-edge, covering most of the container). B7's implementation is entirely
+reusable - `bestGridCols` is not what failed - so this is a predicate, not a
+rewrite."
+
+**What was built.** +250/-8 across `src/domain/layout/stack.ts` (+105/-7) and
+`src/domain/layout/stack.test.ts` (11 new tests). Two parts.
+
+*B7's wrap, rebuilt* (it was `git restore`d at wake 21, so it had to be written
+again from the ledger): `TARGET_ASPECT = 16 / 9`; a pure `gridExtent(els, cols,
+gap)` mirroring `gridPositions`' column-max / row-max arithmetic; an exported
+`bestGridCols(els, gap, target?)` scanning `cols` from 1 to `n` for the minimum
+`|log((w / h) / target)|`, ties keeping the smaller `cols`. `layoutContainer`
+takes a `mayAutoGrid` flag and returns the mode and column count it actually
+used; `hybridLayout` sets that flag only for the doc root and only when the
+author set neither `layout` nor `cols`, then writes the used mode/cols back onto
+the positioned doc. That write-back is load-bearing, not cosmetic:
+`tools/layout-report.mts` picks its source-order rule from `doc.layout ?? "col"`,
+and a row-major grid violates the col rule on every wrap.
+
+*The new part, the gate*: an exported `formsChain(childIds, edges)`, true iff
+there is at least one edge, every direct child has resolved in- and out-degree
+`<= 1`, and the edges cover most of the container (`edges.length * 2 >=
+childIds.length`). Edges are resolved to direct children by the pre-existing
+`collectAutoEdges` rather than by a second traversal. The wrap applies only when
+`!formsChain(...)`; a chain falls through to the implicit `col` unchanged.
+
+**Objective gates — all five passed.**
+
+| corpus file | canvas champion → candidate | area ratio | overlaps | source-order | arrow crossings |
+| --- | --- | --- | --- | --- | --- |
+| deep-nesting | 560x776 → 560x776 | 1.00 | 0 → 0 | 0 → 0 | 10 → 10 |
+| hexagonal | 1198x636 → 1198x636 | 1.00 | 0 → 0 | 0 → 0 | 5 → 5 |
+| long-labels | 948x1200 → 1927x580 | 0.98 | 0 → 0 | 0 → 0 | 6 → **1** |
+| sequence | 282x1360 → 282x1360 | 1.00 | 0 → 0 | 0 → 0 | 0 → 0 |
+| sparse-graph | 680x460 → 680x460 | 1.00 | 0 → 0 | 0 → 0 | 0 → 0 |
+| wide-fanout | 138x2560 → 983x460 | 1.28 | 0 → 0 | 0 → 0 | 186 → **36** |
+
+`npm run check` green (36 files / 296 tests, up from 285). **The gate did its
+job:** `sequence` is byte-identical to the champion, where B7 took it from 0
+arrow-path crossings to 3 and was rejected for it. No new overlap, no
+source-order violation, worst area ratio 1.28x against the 1.5x ceiling.
+
+**Judgement.** Four of six files are geometrically identical between the two
+sides - `sequence` and `sparse-graph` produce byte-identical reports, and
+`deep-nesting` / `hexagonal` differ only in the mode *label* (`(col)` → `(grid)`)
+because a grid of one child is a col of one child. No judge was spent on those
+four; they are structural ties. The two files that genuinely differ were judged
+blind, A/B randomised per file, PNGs plus reports:
+
+- **long-labels** _(A = champion, B = candidate)_ → **candidate**. "In A the two
+  notes are rendered on top of each other and over the audit/reporting boxes
+  into an unreadable mush, while B keeps both notes legible and separated with
+  only minor label grazing, so B is the only layout where all the diagram's
+  content can actually be read."
+- **wide-fanout** _(A = candidate, B = champion)_ → **candidate**. "A actually
+  shows the hub-and-spoke fan-out from Dispatcher and Scheduler with legible
+  labels, while B collapses the whole diagram into one cramped vertical chain
+  that misrepresents the topology and overlaps every label with the through-going
+  arrow."
+
+**Verdict: 2 candidate / 0 champion / 4 structural ties → KEPT.** The candidate
+wins strictly more files than it loses. `docs/layout-champion.md` regenerated.
+
+**What this actually establishes, and what it does not.** The finding is narrow
+and worth stating precisely: *a layout rule may consult the edge topology to
+decide whether to apply itself.* B7 failed because the wrap was topology-blind,
+not because targeting 16:9 was wrong, and gating the same wrap on a three-line
+predicate flipped it from rejected-at-gate-5 to a 2-0 win. This is the first
+kept hypothesis since B1 at wake 12, and the first one whose mechanism is a
+*predicate* rather than a placement rule.
+
+Two caveats recorded so they are not mistaken for support later. (a) The
+`long-labels` win was decided on **note legibility**, not on aspect ratio - the
+judge's whole sentence is about the two stickies overlapping in the champion.
+That is B9's defect (notes reserve a fixed box, tldraw resizes stickies to fit)
+being relieved by a wider canvas, exactly the same confound that produced B6's
+single `long-labels` win at wake 20. The wrap did not fix it; it gave it room.
+B9 is still owed its own wake. (b) `wide-fanout` finally scoring a win does not
+mean its defect is fixed. Wake 21 recorded that the render still shows eighteen
+independent straight chords from one hub, and that is still true here - the
+judge preferred the raster because the *corridor* was unreadable, not because
+the fan is now well routed. The 186 → 36 crossing drop is real and still leaves
+36.
+
+**Where this leaves the corpus.** Three of six files were already structurally
+blind to any doc-root hypothesis (wake 21's note: `deep-nesting` and `hexagonal`
+have one top-level child, `sparse-graph` sets `layout="auto"`). B20 adds a
+fourth, `sequence`, *by design* - the gate's entire purpose is to leave chains
+alone. So the doc-root axis can now be decided by at most two files, and both of
+them voted the same way here. A future doc-root hypothesis has almost no corpus
+left to be wrong on; treat a 2-0 on this axis as weaker evidence than a 2-0
+elsewhere.
