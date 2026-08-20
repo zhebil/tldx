@@ -402,6 +402,9 @@ One hypothesis per wake. Never batch. Never stop.
    - Any overlapping shape pair that the champion did not have.
    - Any source-order violation in a `row`/`col`/`grid` container.
    - Canvas area more than 1.5× the champion's on any corpus file.
+   - `arrow paths crossing a non-endpoint shape` higher than the champion's on
+     any corpus file _(added wake 19; see B17)_. This is the only gate that can
+     see an arrow change at all - the other four are tautologies for one.
    A rejection here is still a result — record it and move on.
 
 5. **Subjective judgement.** Delegate to a **fable** subagent, once per corpus
@@ -475,15 +478,16 @@ rather than falling back to text-only judging.
 
 Ordered. Take from the top. Strike through when resolved.
 
-- [ ] **B17** _(tooling wake, not an A/B)_ A fifth objective gate:
+- [x] ~~**B17** _(tooling wake, not an A/B)_ A fifth objective gate:
   `tools/layout-report.mts` (or a sibling) counts, from the **emitted scene**
   plus the layout rects, how many arrow paths cross a non-endpoint shape's rect
    - and for `kind: "elbow"` it must trace the actual L-legs, not the
-  centre-to-centre chord. Reject a candidate that raises the count on any file.
-  Evidence: five arrow hypotheses (B3, B4a, B13, B14, B15) have now been judged
-  on four gates that are structurally blind to arrows, so every arrow wake spends
-  six judge calls to learn something a number could have said. This gate would
-  have rejected B4a, B14, and the `hexagonal` half of B15 for free.
+  centre-to-centre chord. Reject a candidate that raises the count on any
+  file.~~ **BUILT** _(wake 19)_ - `layoutReport` now emits the scene and traces
+  each arrow from its binding records, so the metric follows whatever a
+  candidate actually emits (`kind`, `normalizedAnchor`, `isPrecise`) rather than
+  the IR edge list. Added to the protocol's gate list above. Champion baseline
+  recorded in `docs/layout-hypotheses.md`.
 
 - [ ] **B18** Short-edge arrowhead floor: keep centre anchors
   (`isPrecise: false`) for any edge whose endpoint rects are closer than a small
@@ -1001,3 +1005,22 @@ anything that outlives the loop.)_
   `demo-render.png`, `demo.tldsl.jsx`), first noted at wake 14 and still not
   cleaned. It is now five wakes old. `demo.tldsl.jsx` may be worth keeping as a
   fixture; the other two are byproducts and should be gitignored or removed.
+
+- **(wake 19)** The new gate's champion baseline puts a number on a defect the
+  judges have described in prose since wake 16: `wide-fanout` scores **186**
+  arrow-path/box crossings against 0-10 for every other corpus file. It is an
+  outlier by an order of magnitude, and the cause is layout, not arrows - a
+  26-box vertical corridor that no anchor or routing change can rescue. It still
+  has no backlog entry of its own; B7 (aspect-ratio targeting) is the nearest
+  thing, and a hypothesis aimed squarely at fanning a hub's children into a
+  block rather than a column would now have an objective number to move.
+- **(wake 19)** The elbow branch of `arrowPath` is unexercised by the corpus -
+  everything emits `kind: "arc"` today, so only the direct unit tests cover it.
+  Whichever wake next ships elbows should sanity-check the traced route against
+  the PNG before trusting the gate's verdict on that candidate, because the
+  model is a mid-split approximation of tldraw's router, not the router.
+- **(wake 19)** The gate deliberately ignores frames, to stay independent of the
+  existing frame-boundary metric. That leaves one blind spot: an arrow that
+  tunnels through a *frame's* interior without touching a box is invisible to
+  both metrics when the frame is an ancestor of one endpoint. Not worth a wake
+  until a hypothesis is plausibly affected by it.

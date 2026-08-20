@@ -709,3 +709,65 @@ Requeued, in order:
   size, because a precise anchor over a short gap renders as a directionless
   stub. This is the defect that decided both `deep-nesting` and `wide-fanout`
   here, and it is worth fixing on its own terms whatever happens to routing.
+
+---
+
+## B17 — a fifth objective gate that can see arrows _(wake 19)_ — **BUILT**
+
+Not an A/B. No hypothesis was judged this wake and the champion is unchanged.
+
+**Problem.** Five arrow hypotheses (B3, B4a, B13, B14, B15) were each put in
+front of six blind judges after passing four objective gates that *cannot fail*
+for an arrow change: an arrow moves no shape, so overlap, source order, canvas
+area and `npm run check` all come back byte-identical by construction. Every
+arrow wake spent its whole gate step learning nothing, and wake 18 established
+that a chord-based clearance test is the wrong predicate anyway - the gate tests
+the centre-to-centre chord while the router draws an L.
+
+**Built.** `layoutReport` now calls `emit(doc)` and derives arrow paths from the
+**emitted scene**, not from the IR edge list:
+
+- endpoints come from the arrow's two `binding` records, resolved back to the
+  absolute layout rect through `toId`; the point is the rect centre unless
+  `props.isPrecise` is true, in which case it is `props.normalizedAnchor`
+  applied to the rect. A candidate that changes anchors moves the metric.
+- `arrowPath(p, q, kind)` is exported and pure. Non-elbow kinds trace one
+  straight segment. `kind: "elbow"` traces a three-leg orthogonal route split on
+  the wider axis at the midpoint - a model of tldraw's mid-split router, not the
+  router itself, and marked as such in the source.
+- the metric counts `(arrow, shape)` pairs where any leg of the traced path
+  passes through a non-endpoint shape's rect, deflated 0.5px per side so
+  touching does not count. Exact Liang-Barsky clip, not sampled.
+- **frames are excluded** on purpose: `edges crossing a frame boundary they
+  don't belong to` already counts those, and including them would make the two
+  gates redundant rather than independent.
+
+Reported as `arrow paths crossing a non-endpoint shape: N`, immediately after
+the frame-boundary line.
+
+**Champion baseline** (wake-12 revision, `kind: "arc"`, centre anchors):
+
+| corpus file | crossings |
+| --- | --- |
+| deep-nesting | 10 |
+| hexagonal | 5 |
+| long-labels | 6 |
+| sequence | 0 |
+| sparse-graph | 0 |
+| wide-fanout | **186** |
+
+Two things fall out of the baseline immediately. `sequence` and `sparse-graph`
+are clean, so any arrow hypothesis that puts a line through a box on those files
+is now rejectable without spending a judge. And `wide-fanout`'s 186 is the
+numeric form of the defect three separate judges have named unprompted since
+wake 16: a 26-box vertical corridor whose hub edges pierce every box in the
+column. That file's problem was never the arrows.
+
+**Gate direction.** A candidate is rejected if the count rises on *any* corpus
+file. It is not a reward signal - lowering it is evidence for the judge to weigh,
+not a win on its own.
+
+**Verified.** `npm run check` green, 285 tests. The elbow branch is covered by
+direct `arrowPath` unit tests only; nothing in the corpus emits `kind: "elbow"`
+today, so the first hypothesis that flips it back is also the first real
+exercise of that branch.
