@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { compileFile } from "../../src/app/compile-file.js";
 import {
   arrowBinding,
   arrowShape,
@@ -25,6 +26,9 @@ import {
 } from "../../src/contracts/builders.js";
 import type { SceneJSON, TLRecord } from "../../src/contracts/scene-json.js";
 import { parse } from "../../src/domain/parser/index.js";
+import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
+import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
+import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(HERE, "fixtures");
@@ -214,4 +218,30 @@ describe("e2e fixture: auth scene spec", () => {
     expect(docs).toHaveLength(1);
     expect(pages).toHaveLength(1);
   });
+});
+
+// Parity gate for the JSX pivot (docs/jsx-pivot.md, A7): kept alive until
+// A8 deletes the text parser, proving both front ends emit the same scene.
+describe("e2e fixture: auth.tldsl vs auth.tldsl.jsx parity", () => {
+  it(
+    "compiles to byte-identical SceneJSON through both front ends",
+    async () => {
+      const deps = {
+        fs: createNodeFsRead(),
+        layout: new ElkLayoutAdapter(),
+        execute: createJsxExecute(),
+      };
+
+      const textResult = await compileFile(join(FIXTURES, "auth.tldsl"), deps);
+      const jsxResult = await compileFile(join(FIXTURES, "auth.tldsl.jsx"), deps);
+
+      expect(textResult.diagnostics).toEqual([]);
+      expect(jsxResult.diagnostics).toEqual([]);
+      expect(textResult.sceneJson).not.toBeNull();
+      expect(jsxResult.sceneJson).not.toBeNull();
+
+      expect(JSON.stringify(jsxResult.sceneJson)).toBe(JSON.stringify(textResult.sceneJson));
+    },
+    30_000,
+  );
 });
