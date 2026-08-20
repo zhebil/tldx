@@ -35,7 +35,7 @@ runExecuteContract("FakeExecute", async (): Promise<ExecuteHarness> => {
     path: PATH,
     okSource: (boxId) => {
       const source = `OK:${boxId}:${String(n++)}`;
-      fake.setResult(source, { ast: docWithBox(PATH, boxId) });
+      fake.setResult(source, { ast: docWithBox(PATH, boxId), inputs: [PATH] });
       return source;
     },
     throwingSource: () => {
@@ -66,6 +66,20 @@ runExecuteContract("FakeExecute", async (): Promise<ExecuteHarness> => {
       });
       return source;
     },
+    compileErrorSource: () => {
+      const source = `COMPILE_ERROR:${String(n++)}`;
+      fake.setResult(source, {
+        diagnostics: [
+          {
+            severity: "error",
+            code: "runtime/compile",
+            message: "bundle failed to build",
+            span: { file: PATH, line: 1, column: 1 },
+          },
+        ],
+      });
+      return source;
+    },
     dispose: async () => undefined,
   };
 });
@@ -82,6 +96,7 @@ describe("FakeExecute (fake-specific affordances)", () => {
       children: [],
       span: { file: "/a/b.tldsl.jsx", line: 1, column: 1 },
     });
+    expect(result.inputs).toEqual(["/a/b.tldsl.jsx"]);
   });
 
   it("records calls in order with source and path", async () => {
@@ -108,9 +123,9 @@ describe("FakeExecute (fake-specific affordances)", () => {
       children: [],
       span: { file: "/p", line: 2, column: 2 },
     };
-    fake.setResult("src", { ast: first });
-    expect(await fake.execute("src", "/p")).toEqual({ ast: first });
-    fake.setResult("src", { ast: second });
-    expect(await fake.execute("src", "/p")).toEqual({ ast: second });
+    fake.setResult("src", { ast: first, inputs: ["/p"] });
+    expect(await fake.execute("src", "/p")).toEqual({ ast: first, inputs: ["/p"] });
+    fake.setResult("src", { ast: second, inputs: ["/p"] });
+    expect(await fake.execute("src", "/p")).toEqual({ ast: second, inputs: ["/p"] });
   });
 });

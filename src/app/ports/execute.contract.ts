@@ -24,6 +24,8 @@ export interface ExecuteHarness {
   throwingSource(): string;
   /** Source for a module that never returns. */
   infiniteSource(): string;
+  /** Source with a genuine JS/JSX syntax error - fails to build, never runs. */
+  compileErrorSource(): string;
   dispose(): Promise<void>;
 }
 
@@ -54,6 +56,7 @@ export function runExecuteContract(
           if (!("ast" in result)) throw new Error("expected ast result");
           expect(result.ast.kind).toBe("doc");
           expect(findBox(result.ast, "a")).toBe(true);
+          expect(result.inputs).toContain(h.path);
         } finally {
           await h.dispose();
         }
@@ -93,6 +96,27 @@ export function runExecuteContract(
           if (!("diagnostics" in result)) throw new Error("expected diagnostics result");
           const timedOut = result.diagnostics.find((d) => d.code === "runtime/timeout");
           expect(timedOut).toBeDefined();
+        } finally {
+          await h.dispose();
+        }
+      },
+      timeoutMs,
+    );
+
+    it(
+      "compile error: resolves with runtime/compile diagnostics",
+      async () => {
+        const h = await make();
+        try {
+          const result = await h.port.execute(h.compileErrorSource(), h.path);
+          expect("diagnostics" in result).toBe(true);
+          if (!("diagnostics" in result)) throw new Error("expected diagnostics result");
+          expect(result.diagnostics.length).toBeGreaterThan(0);
+          for (const d of result.diagnostics) {
+            expect(d.severity).toBe("error");
+          }
+          const compileError = result.diagnostics.find((d) => d.code === "runtime/compile");
+          expect(compileError).toBeDefined();
         } finally {
           await h.dispose();
         }

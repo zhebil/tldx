@@ -34,6 +34,6 @@ export class FakeExecute implements ExecutePort {
   execute(source: string, path: string): Promise<ExecuteResult> {
     this.callLog.push({ source, path });
     const programmed = this.results.get(source);
-    return Promise.resolve(programmed ?? { ast: defaultAst(path) });
+    return Promise.resolve(programmed ?? { ast: defaultAst(path), inputs: [path] });
   }
 }
