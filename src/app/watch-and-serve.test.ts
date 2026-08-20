@@ -19,7 +19,7 @@ const VALID_DOC = `<doc id="auth">
 const ANOTHER_VALID_DOC = `<doc id="auth">
   <box id="login" label="Login" />
   <box id="dash" label="Dashboard" />
-  <note id="readme" label="ok" />
+  <note id="readme">ok</note>
 </doc>`;
 
 const PARSE_BROKEN = `<doc id="d"><box id="b"`;
