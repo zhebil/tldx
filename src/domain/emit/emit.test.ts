@@ -85,7 +85,7 @@ describe("domain/emit", () => {
     expect(scene.store["shape:a"]?.y).toBe(60);
   });
 
-  it("emits a note as a note shape and drops its IR w/h", () => {
+  it("emits a sticky as a note shape and drops its IR w/h", () => {
     const scene = emit(
       doc([
         note({
@@ -95,6 +95,7 @@ describe("domain/emit", () => {
           y: 6,
           w: 200,
           h: 80,
+          sticky: true,
         }),
       ]),
     );
@@ -113,16 +114,37 @@ describe("domain/emit", () => {
     });
   });
 
-  it("sets note growY to the reserved height above tldraw's 200 base, 0 when short", () => {
+  it("sets sticky growY to the reserved height above tldraw's 200 base, 0 when short", () => {
     const tall = emit(
-      doc([note({ id: "n2", text: "long", x: 0, y: 0, w: 200, h: 500 })]),
+      doc([note({ id: "n2", text: "long", x: 0, y: 0, w: 200, h: 500, sticky: true })]),
     );
     expect((tall.store["shape:n2"]?.props as Record<string, unknown>).growY).toBe(300);
 
     const short = emit(
-      doc([note({ id: "n3", text: "short", x: 0, y: 0, w: 200, h: 150 })]),
+      doc([note({ id: "n3", text: "short", x: 0, y: 0, w: 200, h: 150, sticky: true })]),
     );
     expect((short.store["shape:n3"]?.props as Record<string, unknown>).growY).toBe(0);
+  });
+
+  it("emits a non-sticky note as a geo rectangle with IR w/h and a warm fill", () => {
+    const scene = emit(
+      doc([note({ id: "n4", text: "two sentences of context", x: 5, y: 6, w: 240, h: 90 })]),
+    );
+    const shape = scene.store["shape:n4"];
+    expect(shape?.type).toBe("geo");
+    expect(shape?.x).toBe(5);
+    expect(shape?.y).toBe(6);
+    const props = shape?.props as Record<string, unknown>;
+    expect(props.w).toBe(240);
+    expect(props.h).toBe(90);
+    expect(props.color).toBe("yellow");
+    expect(props.fill).toBe("semi");
+    expect(props.richText).toEqual({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "two sentences of context" }] },
+      ],
+    });
   });
 
   it("emits an edge as an arrow shape plus two bindings with default-center attach", () => {
@@ -290,6 +312,7 @@ function note(input: {
   y: number;
   w: number;
   h: number;
+  sticky?: boolean;
 }): IRNotePositioned {
   return {
     kind: "note",

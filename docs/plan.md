@@ -696,7 +696,7 @@ Two traps, both paid for already:
      diagonals survive), or placement, which is the trick that has now worked
      twice (T6 took `wide-fanout` 10 -> 0 by moving boxes, not arrows).
 
-- [ ] **T7. Notes: shape, and attachment.**
+- [x] **T7. Notes: shape, and attachment.**
   Two changes, shipped together because the second is only worth having once
   the first makes a note readable.
 
@@ -741,6 +741,44 @@ Two traps, both paid for already:
   preceding it in source order; total canvas area drops on `multi-region` and
   `long-labels`; and a note's text wraps to a readable width rather than a
   200px column.
+
+  **Done - all five acceptance clauses met.** `<Note>` emits a `geo` rectangle
+  (`color: "yellow"`, `fill: "semi"`) sized by T0's `fitBoxWidth` /
+  `boxHeightForWidth` instead of a 200px sticky; a new `<Sticky>` component
+  keeps the old `noteShape` path, so B9 is alive for `<Sticky>` and dead for
+  `<Note>`. `<Note on="id">` leaves its container's flow (reusing the exclusion
+  hard-pinned children already get) and `src/domain/layout/attach.ts` places it
+  24px off the target on the first clear side of right/below/left/above.
+  **The numbers: canvas area -41% on `long-labels` (2064x1066 -> 1538x848),
+  -32% on `multi-region` (900x1222 -> 900x832), -9% on `release-pipeline`;
+  corpus crossings 11 -> 9; crowded pairs 0; overlapping shape pairs 0
+  everywhere.** Attached notes measure exactly 24px from their target and
+  overlap nothing; unattached notes measure 40px, 40px and 96px from the shape
+  preceding them in source order, all under the 120px bound. `npm run check`
+  green (41 files, 380 tests). Only the three note-bearing renders changed.
+
+  Three choices, all recorded because they are the reversible half of this task:
+
+  - **A geo note receives its container's shared box width but never votes on
+    it, and never takes the shared height.** Not optional: `release-pipeline`
+    is a grid of 62px-tall boxes, and letting a note vote on the shared height
+    makes every box in the file ~300px tall. In a container with no flowed
+    boxes the note falls back to its own `fitBoxWidth`.
+  - **Attached notes are re-parented to the document root** with absolute
+    coordinates. tldraw frames clip their children, so a note parented to a
+    frame and placed beside that frame is invisible. Growing the frame instead
+    would move its siblings, which the acceptance forbids.
+  - **The overlap-check whitelist this task asks for was not built.** Every
+    candidate placement is separated from its target by a 24px gap, so an
+    attached pair can never overlap and there is nothing for a whitelist to
+    exempt. See `## Questions for the human`.
+
+  `on` naming an edge resolves to a 1x1 rect at the midpoint of the two
+  endpoint *centres*, ignoring the arc bow T3-T5 add. That is enough - the
+  note only has to land near the edge. A `flow()` edge has a synthesized id;
+  it is addressable like any other, and `ir/note-target-not-found` names the
+  id when it does not resolve. The unattached-note fallback needed no code: a
+  note already flows in source order directly after the content it follows.
 
 - [ ] **T8. Reclaim dead whitespace.**
   Frames carry large empty margins - `hexagonal`'s outer frame has roughly
@@ -1330,6 +1368,19 @@ as-is.
   fallback. Built and measured - an exact no-op on all eight files, byte-identical
   route maps and PNGs. Tried three times now.
 
+- **T7 - the attached-pair overlap whitelist.** T7 asks for overlap checks to
+  whitelist a note and the shape it is attached to, so a deliberate annotation
+  does not trip the "overlapping shape pairs" gate in `tools/layout-report.mts`.
+  **Default taken:** not built. `attach.ts` separates every candidate placement
+  from its target by a 24px gap, so an attached pair cannot overlap; a whitelist
+  today exempts nothing. Measured 0 overlapping pairs on the new fixture.
+  **Alternatives:** build it now against a future overlap-permitting mode; or
+  add an explicit `over` / `inside` prop that places a note on top of its
+  target, at which point the whitelist becomes load-bearing.
+  **What the default costs:** nothing today. It becomes a real gap the moment
+  someone adds a placement that is allowed to overlap - the gate would then
+  report a false positive and there is no exemption path.
+
 ## Discovered work
 
 Append here. Do not act on these during the wake that finds them; they get
@@ -1338,6 +1389,26 @@ promoted into the task list by the human.
 - Anchor syntax `id.anchor` collides with dotted namespaced ids, so a component
   cannot prefix its children with `${ns}.` - filed as a bd bug (P1). Blocks any
   task that wants author-specified anchors.
+
+- `attach.ts` counts a frame's own rect as an obstacle, so a note attached to a
+  box in the middle of a large frame is pushed outside the frame entirely
+  rather than into the frame's own empty space. That is the right answer given
+  re-parenting, but it means an attached note can end up far from a deeply
+  nested target. T8 (reclaim dead whitespace) will make this worse, not better.
+- The attached-note placement is greedy and order-dependent: notes are placed
+  in document order and each becomes an obstacle for the next. Two notes on the
+  same target will stack right/below rather than being distributed.
+- `<Sticky>` is exported and lowered but no corpus fixture or e2e test renders
+  one, so B9's `growY` path is now covered only by unit tests. If T13 adds
+  fixtures, one should carry a `<Sticky>`.
+- `long-labels` lost its last two crossings for free when the note columns
+  collapsed. It is now a zero-crossing file, which makes `deep-nesting` (3) and
+  `hexagonal` (6) the entire remaining crossing residue - both purely diagonal.
+- The `other` crossing bucket is now empty corpus-wide. `crossing-classify.mts`
+  still prints it.
+- A geo `<Note>` uses the box label path, so it inherits box text centring.
+  A multi-sentence annotation would read better start-aligned; that is T10's
+  surface (`align`), not something to hardcode here.
 - `flow()` edges carry no source span; diagnostics report them at `.:0:0`
   (bd bug, P2).
 - **`tests/corpus/sequence.tldsl.jsx` is misnamed.** It is a linear 14-step

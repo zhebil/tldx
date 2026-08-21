@@ -148,7 +148,14 @@ function baseShapeFields(input: ShapeBase): ShapeBaseFields {
 }
 
 export function boxShape(
-  input: ShapeBase & { w: number; h: number; text?: string; geo?: string },
+  input: ShapeBase & {
+    w: number;
+    h: number;
+    text?: string;
+    geo?: string;
+    color?: string;
+    fill?: string;
+  },
 ): TLRecord {
   return {
     ...baseShapeFields(input),
@@ -157,9 +164,9 @@ export function boxShape(
       w: input.w,
       h: input.h,
       geo: input.geo ?? "rectangle",
-      color: "black",
+      color: input.color ?? "black",
       labelColor: "black",
-      fill: "none",
+      fill: input.fill ?? "none",
       dash: "draw",
       size: "m",
       font: "draw",

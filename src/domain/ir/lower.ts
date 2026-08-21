@@ -72,7 +72,7 @@ const ALLOWED_PROPS = {
     "h",
   ],
   box: ["id", "label", "x", "y", "w", "h", "maxW"],
-  note: ["id", "x", "y", "w", "h"],
+  note: ["id", "on", "x", "y", "w", "h"],
   edge: ["id", "from", "to"],
 } as const;
 
@@ -157,6 +157,8 @@ export function lower(ast: AstNode | null): LowerResult {
 
   // Pass 2: resolve edge references now that all ids exist.
   resolveEdges(doc, ctx);
+  // Pass 3: resolve note `on` targets now that dangling edges are gone too.
+  resolveNoteTargets(doc, ctx);
 
   return { ir: doc, diagnostics };
 }
@@ -246,6 +248,8 @@ function lowerNote(node: AstNote, ctx: Ctx): IRNote {
     }),
     span: node.span,
     text: node.text,
+    ...(node.sticky ? { sticky: true as const } : {}),
+    ...optionalString(node.attrs, "on"),
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
   };
 }
@@ -407,6 +411,51 @@ function resolveEdges(doc: IRDoc, ctx: Ctx): void {
   });
 }
 
+/**
+ * Drops an unresolvable `<Note on="...">` back to a plain flowed note
+ * (leaves everything else about it intact) rather than dropping the note
+ * itself - unlike an edge with a bad endpoint, a note is still meaningful
+ * content without its attachment.
+ */
+function resolveNoteTargets(doc: IRDoc, ctx: Ctx): void {
+  const ids = collectAddressableIds(doc);
+  walkNotes(doc, (note) => {
+    if (note.on === undefined || ids.has(note.on)) return note;
+    ctx.diagnostics.push(
+      error(
+        "ir/note-target-not-found",
+        `note 'on' references unknown id '${note.on}'`,
+        note.span,
+      ),
+    );
+    const { on: _on, ...rest } = note;
+    void _on;
+    return rest;
+  });
+}
+
+/** Ids of every box/frame/note/edge in the document - valid `on` targets. Excludes the `<doc>` root itself. */
+function collectAddressableIds(
+  el: IRElement,
+  into: Set<string> = new Set(),
+): Set<string> {
+  if (el.kind !== "doc") into.add(el.id);
+  if (el.kind === "doc" || el.kind === "frame") {
+    for (const c of el.children) collectAddressableIds(c, into);
+  }
+  return into;
+}
+
+function walkNotes(
+  container: IRDoc | IRFrame,
+  fix: (note: IRNote) => IRNote,
+): void {
+  container.children = container.children.map((c) => (c.kind === "note" ? fix(c) : c));
+  for (const c of container.children) {
+    if (c.kind === "doc" || c.kind === "frame") walkNotes(c, fix);
+  }
+}
+
 function collectIds(el: IRElement, into: Set<string> = new Set()): Set<string> {
   into.add(el.id);
   if (el.kind === "doc" || el.kind === "frame") {
@@ -476,11 +525,11 @@ function readAlign(attrs: Attrs, ctx: Ctx): Align | undefined {
 
 function optionalString(
   attrs: Attrs,
-  name: "label" | "name",
-): { label?: string } | { name?: string } {
+  name: "label" | "name" | "on",
+): { label?: string } | { name?: string } | { on?: string } {
   const raw = getRaw(attrs, name);
   if (raw === undefined) return {} as { label?: string };
-  return { [name]: raw } as { label?: string } | { name?: string };
+  return { [name]: raw } as { label?: string } | { name?: string } | { on?: string };
 }
 
 function numericAttrs<K extends string>(

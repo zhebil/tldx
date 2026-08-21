@@ -47,7 +47,8 @@ This is the entire surface exported from `"tldsl"`. There is no `<Group>`,
 | `<Doc>` | container | root of the diagram |
 | `<Frame>` | container | visual container - tldraw frame chrome (border + title) |
 | `<Box />` | leaf | labelled box |
-| `<Note>text</Note>` | leaf | sticky note; text is the **children**, not a prop |
+| `<Note>text</Note>` | leaf | warm-filled geo box annotation; text is the **children**, not a prop |
+| `<Sticky>text</Sticky>` | leaf | real tldraw sticky note (fixed 200px width); same props as `<Note>` |
 | `<Edge />` | leaf | arrow between two ids |
 | `flow("a", "b", "c")` | function | returns `[Edge a->b, Edge b->c, ...]`; splice with `{flow(...)}` |
 
@@ -64,7 +65,7 @@ line number and the allowed list.
 | `<Doc>` | `id`, `direction`, `layout`, `gap`, `pad`, `cols` |
 | `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h` |
 | `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW` |
-| `<Note>` | `id`, `x`, `y`, `w`, `h` |
+| `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h` |
 | `<Edge>` | `id`, `from`, `to` |
 
 `x`/`y`/`w`/`h`/`gap`/`pad`/`cols`/`maxW` are numbers written as strings
@@ -121,6 +122,34 @@ just strings) but are rejected at lowering, not supported:
 
 `flow("a", "b", "c")` is sugar for consecutive edges - use it for a simple
 chain, use explicit `<Edge>`s for anything non-linear.
+
+## Attaching a note
+
+`on` pins a `<Note>` (or `<Sticky>`) to whatever it's annotating instead of
+leaving it to flow in source order:
+
+```jsx
+<Note on="api-gateway">Only the gateway terminates TLS.</Note>
+<Note on="e-orders-payments">Retries are idempotent here.</Note>
+```
+
+`on` names any box, frame, note, or edge id in the document (not just
+siblings). An id that doesn't resolve is `ir/note-target-not-found`; the
+note falls back to normal flow placement rather than being dropped.
+
+A note attached to an **edge** is placed at the midpoint of the edge's two
+endpoint shapes' centres - a straight-chord approximation that ignores any
+bow a same-axis skip edge is drawn with, since the note only needs to land
+near the edge, not trace its curve.
+
+An attached note does not participate in layout: it never resizes a row/
+column/grid, and it never pushes a sibling. After the rest of the document
+is placed, it's parked 24px off one side of its target (right, then below,
+then left, then above - whichever is clear of every other shape, or least
+overlapping if none is fully clear), centred on the target on the other
+axis. It is also **re-parented to the document root** regardless of where
+it was declared - tldraw frames clip their children, so a note left parented
+to a frame and placed outside that frame's bounds would be invisible.
 
 ## Reuse
 
@@ -185,6 +214,7 @@ Diagnostics an author will hit:
 | `ir/missing-id` | an addressable element (`<Box>`, `<Frame>`) has no `id` |
 | `ir/duplicate-id` | two elements claim the same `id` |
 | `ir/unknown-reference` | an edge's `from`/`to` doesn't resolve to any id |
+| `ir/note-target-not-found` | a `<Note>`/`<Sticky>` `on` doesn't resolve to any id |
 | `ir/missing-edge-endpoint` | `<Edge>` is missing `from` or `to` |
 | `ir/unknown-prop` | an attribute isn't in the allowed set for that element |
 | `ir/bad-layout-mode` | `layout` isn't `row`/`col`/`grid`/`auto`/`free` |

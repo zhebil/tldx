@@ -11,7 +11,9 @@
  * `estimatedNoteSize`, explicit `w`/`h` wins, hard-pinned children (`x` AND
  * `y` set) keep their coordinates verbatim and are excluded from the flow /
  * the auto placer, edges pass through unchanged, and child coordinates are
- * parent-relative.
+ * parent-relative. A `<Note on="...">` is excluded from the flow the same
+ * way (sized, but not arranged or counted toward the container's bounding
+ * box) - `layout/attach.ts` places it after this whole pass finishes.
  */
 
 import type {
@@ -39,6 +41,7 @@ import {
   type Direction,
   type LayoutMode,
 } from "./defaults.js";
+import { attachNotes } from "./attach.js";
 
 const DEFAULT_GAP = 40;
 const SKIP_ROW_GAP_FACTOR = 2;
@@ -86,12 +89,12 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
     placeAuto,
     mayAutoGrid,
   );
-  return {
+  return attachNotes({
     ...ir,
     layout: usedMode,
     ...(usedCols === undefined ? {} : { cols: usedCols }),
     children,
-  };
+  });
 }
 
 function resolveMode(mode: LayoutMode | undefined): LayoutMode {
@@ -108,8 +111,13 @@ async function sizeElement(
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
     }
     case "note": {
-      const size = estimatedNoteSize(el.text);
-      return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
+      if (el.sticky) {
+        const size = estimatedNoteSize(el.text);
+        return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
+      }
+      const w = el.w ?? fitBoxWidth(el.text);
+      const h = el.h ?? boxHeightForWidth(el.text, w);
+      return { ...el, x: el.x ?? 0, y: el.y ?? 0, w, h };
     }
     case "frame":
       return sizeFrame(el, placeAuto);
@@ -175,6 +183,7 @@ async function layoutContainer(
     .filter((i) => {
       const c = children[i]!;
       if (c.kind === "edge" || c.kind === "doc") return false;
+      if (c.kind === "note" && c.on !== undefined) return false;
       return !(c.x !== undefined && c.y !== undefined);
     });
 
@@ -272,9 +281,16 @@ async function layoutContainer(
  * width in the container, capped per-box by `maxW` if set - then re-wraps
  * each to its final width; a `row` leaves widths alone. Either way, every
  * flowed box (no explicit `h`) then gets the same height, the tallest in the
- * container. Frames keep their content-derived size and notes their fixed
- * sticky width; stretching either would blow the aspect target or can't be
- * emitted at all, so only `box` children participate.
+ * container. Frames keep their content-derived size and sticky notes their
+ * fixed sticky width; stretching either would blow the aspect target or
+ * can't be emitted at all, so only `box` children vote on the shared size.
+ *
+ * A geo `<Note>` (non-sticky) *receives* the container's shared box width in
+ * `col`/`grid` (so it lines up with its siblings) but never votes on it, and
+ * never receives the shared height - its height is always re-derived from
+ * its own text at whatever width it lands on. Otherwise every box in a
+ * grid like `release-pipeline` (62px-tall boxes) would inherit a note's
+ * multi-line height and balloon to ~300px.
  */
 function applyContainerBoxSizing(
   children: readonly IRElement[],
@@ -298,6 +314,19 @@ function applyContainerBoxSizing(
       const w = box.maxW === undefined ? sharedW : Math.min(sharedW, box.maxW);
       sized[i] = { ...sized[i]!, w, h: boxHeightForWidth(box.label, w) };
     }
+    if (sharedW === 0) {
+      for (const i of boxIdx) sharedW = Math.max(sharedW, sized[i]!.w);
+    }
+
+    const geoNoteIdx = flowedIndices.filter((i) => {
+      const c = children[i]!;
+      return c.kind === "note" && !(c as IRNote).sticky;
+    });
+    for (const i of geoNoteIdx) {
+      const noteEl = children[i] as IRNote;
+      if (noteEl.w !== undefined) continue;
+      sized[i] = { ...sized[i]!, w: sharedW, h: boxHeightForWidth(noteEl.text, sharedW) };
+    }
   }
 
   let sharedH = 0;
@@ -316,6 +345,7 @@ function boundingBox(
   let maxY = 0;
   children.forEach((c, i) => {
     if (c.kind === "edge" || c.kind === "doc") return;
+    if (c.kind === "note" && c.on !== undefined) return;
     const s = sized[i]!;
     maxX = Math.max(maxX, s.x + s.w);
     maxY = Math.max(maxY, s.y + s.h);

@@ -13,9 +13,11 @@
  *   shapes parent to `page:main`, frame children parent to the frame's
  *   shape id. Shape `x | y` is whatever layout produced (frame-relative when
  *   nested), preserved verbatim.
- * - Notes drop their IR `w` (tldraw stickies are always 200 wide) but keep
- *   `h` as `growY` above tldraw's 200 base height, so the drawn note is as
- *   tall as layout reserved.
+ * - `<Note>` (non-sticky) emits as a `geo` rectangle sized like a box (IR
+ *   `w`/`h` pass through verbatim), warm-filled (`color: "yellow", fill:
+ *   "semi"`) to read as an annotation. `<Sticky>` (`note.sticky`) keeps the
+ *   old path: drops IR `w` (tldraw stickies are always 200 wide) and keeps
+ *   `h` as `growY` above tldraw's 200 base height.
  * - Edges become an `arrow` shape (`x: 0, y: 0`, parented to the page) plus
  *   two `binding` records anchoring start/end to the referenced shapes with
  *   default-center attach. The 13-anchor scheme is phase 1. A same-axis skip
@@ -105,13 +107,26 @@ function emitBox(box: IRBoxPositioned, parentId: string): TLRecord {
 }
 
 function emitNote(note: IRNotePositioned, parentId: string): TLRecord {
-  return noteShape({
+  if (note.sticky) {
+    return noteShape({
+      id: shapeId(note.id),
+      parentId,
+      x: note.x,
+      y: note.y,
+      text: note.text,
+      growY: Math.max(0, note.h - NOTE_SIZE),
+    });
+  }
+  return boxShape({
     id: shapeId(note.id),
     parentId,
     x: note.x,
     y: note.y,
+    w: note.w,
+    h: note.h,
     text: note.text,
-    growY: Math.max(0, note.h - NOTE_SIZE),
+    color: "yellow",
+    fill: "semi",
   });
 }
 

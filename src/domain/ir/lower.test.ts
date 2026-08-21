@@ -313,3 +313,65 @@ describe("lower: ir/unknown-prop", () => {
     expect(codes).toEqual(["ir/unknown-prop"]);
   });
 });
+
+describe("lower: note sticky marker", () => {
+  it("<Sticky> lowers to a note IR node with sticky: true", () => {
+    const ast = doc({}, [note({ id: "n" }, "hi", true)]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const noteIr = ir!.children[0]!;
+    if (noteIr.kind !== "note") throw new Error("expected note");
+    expect(noteIr.sticky).toBe(true);
+  });
+
+  it("<Note> does not set sticky", () => {
+    const ast = doc({}, [note({ id: "n" }, "hi")]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const noteIr = ir!.children[0]!;
+    if (noteIr.kind !== "note") throw new Error("expected note");
+    expect(noteIr.sticky).toBeUndefined();
+  });
+});
+
+describe("lower: note 'on' target", () => {
+  it("keeps 'on' when it resolves to a box", () => {
+    const ast = doc({}, [box({ id: "a" }), note({ on: "a" }, "hi")]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const noteIr = ir!.children[1]!;
+    if (noteIr.kind !== "note") throw new Error("expected note");
+    expect(noteIr.on).toBe("a");
+  });
+
+  it("keeps 'on' when it resolves to a frame, note, or edge", () => {
+    const ast = doc({}, [
+      frame({ id: "f" }, [box({ id: "a" }), box({ id: "b" }), edge({ id: "e", from: "a", to: "b" })]),
+      note({ id: "n1", on: "f" }, "on a frame"),
+      note({ id: "n2", on: "n1" }, "on another note"),
+      note({ id: "n3", on: "e" }, "on an edge"),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const [n1, n2, n3] = ir!.children.slice(1) as { on?: string }[];
+    expect(n1?.on).toBe("f");
+    expect(n2?.on).toBe("n1");
+    expect(n3?.on).toBe("e");
+  });
+
+  it("ir/note-target-not-found drops 'on' but keeps the note", () => {
+    const ast = doc({}, [note({ id: "n", on: "ghost" }, "hi")]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/note-target-not-found"]);
+    const noteIr = ir!.children[0]!;
+    if (noteIr.kind !== "note") throw new Error("expected note");
+    expect(noteIr.on).toBeUndefined();
+    expect(noteIr.text).toBe("hi");
+  });
+
+  it("does not reject 'on' as an unknown prop", () => {
+    const ast = doc({}, [box({ id: "a" }), note({ on: "a" }, "hi")]);
+    const { codes } = lowerAst(ast);
+    expect(codes).not.toContain("ir/unknown-prop");
+  });
+});

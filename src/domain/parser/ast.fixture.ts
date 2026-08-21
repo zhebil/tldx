@@ -43,8 +43,14 @@ export function astBuilders(file = "test.tldsl") {
     box(props: Props): AstBox {
       return { kind: "box", attrs: attrs(props), span: elSpan };
     },
-    note(props: Props, text: string): AstNote {
-      return { kind: "note", attrs: attrs(props), text, span: elSpan };
+    note(props: Props, text: string, sticky = false): AstNote {
+      return {
+        kind: "note",
+        attrs: attrs(props),
+        text,
+        ...(sticky ? { sticky: true } : {}),
+        span: elSpan,
+      };
     },
     edge(props: Props): AstEdge {
       return { kind: "edge", attrs: attrs(props), span: elSpan };

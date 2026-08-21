@@ -151,6 +151,20 @@ export function Note(props: Props, source?: JsxSource): AstNote {
   };
 }
 
+/** Same AST node kind as `<Note>` (`"note"`), marked `sticky: true` so the
+ * pipeline keeps it on the old fixed-width tldraw-sticky path (hypothesis
+ * B9) instead of sizing it as a geo box. Not exposed as a `<Note>` prop. */
+export function Sticky(props: Props, source?: JsxSource): AstNote {
+  const span = toSpan(source);
+  return {
+    kind: "note",
+    attrs: propsToAttrs(props, span),
+    text: noteBody(props.children),
+    sticky: true,
+    span,
+  };
+}
+
 export function Edge(props: Props, source?: JsxSource): AstEdge {
   const span = toSpan(source);
   assertNoChildren(props.children, "Edge");

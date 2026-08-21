@@ -47,6 +47,8 @@ export type AstNote = {
   attrs: Attrs;
   /** Body text; whitespace-trimmed at the edges, internal whitespace kept. */
   text: string;
+  /** Set by the `<Sticky>` runtime component; `<Note>` leaves this unset. Not a user-facing prop. */
+  sticky?: boolean;
   span: SourceSpan;
 };
 

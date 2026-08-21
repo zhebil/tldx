@@ -361,3 +361,48 @@ only when both perpendicular bands are disjoint, and `isCrossing` then requires
 an obstacle tall (or wide) enough to bridge that gap; no box in this corpus is.
 It was reverted. Bowing these edges needs a genuinely different routing
 strategy, which T6b's own text rules out.
+
+## After T7 - notes as geo shapes, and `on` attachment
+
+| file | canvas before | canvas after | area | crossings before | crossings after |
+|---|---|---|---|---|---|
+| long-labels | 2064 x 1066 | **1538 x 848** | **-41%** | 2 | **0** |
+| multi-region | 900 x 1222 | **900 x 832** | **-32%** | 0 | 0 |
+| release-pipeline | 1350 x 978 | **1350 x 888** | **-9%** | 0 | 0 |
+
+Corpus total **11 -> 9 crossings**, crowded pairs 0 -> 0, overlapping shape
+pairs 0 everywhere. The five other files are byte-identical; only
+`docs/renders/{long-labels,multi-region,release-pipeline}.png` changed.
+Buckets: same-axis skip 0, cross-container 9, fan 0, other 0 - `long-labels`'s
+two `other` crossings went with its note columns.
+
+**Shape.** `<Note>` now emits a `geo` rectangle (`color: "yellow"`,
+`fill: "semi"`) sized by T0's box path - `fitBoxWidth` / `boxHeightForWidth` -
+instead of a tldraw sticky. A sticky is hardcoded 200px wide and can only grow
+downward, which turned `note-payments` into a 200 x 662 column of five-word
+lines. In a `col`/`grid` a geo note *receives* the container's shared box width
+so it lines up with its siblings, but never votes on that width and never
+takes the shared height: `release-pipeline` is a grid of 62px-tall boxes, and
+letting a note vote on the shared height would have made every box in the file
+~300px tall.
+
+`<Sticky>` is a new component that keeps the old path, so hypothesis B9
+(reserve the height tldraw will actually draw, via `growY`) is alive for
+`<Sticky>` and dead for `<Note>`.
+
+**Attachment.** `<Note on="target-id">` places the note beside what it
+annotates. `src/domain/layout/attach.ts` runs at the end of `hybridLayout`:
+the note is excluded from its container's flow (the same exclusion hard-pinned
+children get), then placed 24px off the target on the first of
+right/below/left/above that overlaps nothing, and **re-parented to the document
+root** with absolute coordinates - tldraw frames clip their children, so a note
+parented to a frame and placed beside that frame would be invisible. An `on`
+naming an edge resolves to a 1x1 rect at the midpoint of the two endpoint
+centres, ignoring the arc bow T3-T5 add.
+
+Measured on `tests/e2e/fixtures/attached-notes.tldsl.jsx` (a new fixture, not
+in the corpus - no corpus file uses `on`): both node-attached notes sit exactly
+24px from their target and overlap nothing, canvas 1054 x 428, 0 overlapping
+pairs. The unattached-note criterion (within 120px of the shape preceding it in
+source order) holds across the corpus with no new code: 40px in `long-labels`
+and `release-pipeline`, 96px in `multi-region`.

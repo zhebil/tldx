@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { lower } from "../ir/lower.js";
-import type { IRBoxPositioned, IRElementPositioned, IRFramePositioned } from "../ir/index.js";
+import type {
+  IRBoxPositioned,
+  IRElementPositioned,
+  IRFramePositioned,
+  IRNotePositioned,
+} from "../ir/index.js";
 import type { AstNode } from "../parser/ast.js";
 import { astBuilders } from "../parser/ast.fixture.js";
 
-import { BOX_ASPECT_TARGET, estimatedBoxSize } from "./defaults.js";
+import { BOX_ASPECT_TARGET, boxHeightForWidth, estimatedBoxSize, fitBoxWidth } from "./defaults.js";
 import {
   bestGridCols,
   findFanGroups,
@@ -16,7 +21,7 @@ import {
   type AutoPlacer,
 } from "./stack.js";
 
-const { box, doc, edge, frame } = astBuilders();
+const { box, doc, edge, frame, note } = astBuilders();
 
 /**
  * Trivial deterministic stub placer: lays nodes out in a row (source order)
@@ -56,6 +61,12 @@ function frameById(children: readonly IRElementPositioned[], id: string): IRFram
   const el = children.find((c) => c.kind === "frame" && c.id === id);
   if (el === undefined) throw new Error(`no frame '${id}'`);
   return el as IRFramePositioned;
+}
+
+function noteById(children: readonly IRElementPositioned[], id: string): IRNotePositioned {
+  const el = children.find((c) => c.kind === "note" && c.id === id);
+  if (el === undefined) throw new Error(`no note '${id}'`);
+  return el as IRNotePositioned;
 }
 
 describe("hybridLayout", () => {
@@ -783,5 +794,48 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     );
     const capped = boxById(result.children, "capped");
     expect(capped.w).toBe(100);
+  });
+});
+
+describe("note sizing: geo <Note> vs sticky <Sticky>", () => {
+  it("a geo note sizes like a box - wraps to a readable width, not a 200px sticky column", async () => {
+    const text =
+      "Two sentences of context about this diagram. It should read like an annotation, not a filing cabinet.";
+    const result = await layoutAst(doc({ layout: "col" }, [note({ id: "n" }, text)]));
+    const n = noteById(result.children, "n");
+    const expectedW = fitBoxWidth(text);
+    expect(n.w).toBe(expectedW);
+    expect(n.h).toBe(boxHeightForWidth(text, expectedW));
+    expect(n.w).not.toBe(200);
+  });
+
+  it("a geo note in a grid takes the shared box width but not the shared box height", async () => {
+    const longText =
+      "A fairly long annotation that will wrap onto several lines once boxed at the shared width.";
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2 }, [
+        box({ id: "a", label: "A" }),
+        box({ id: "b", label: "B" }),
+        note({ id: "n" }, longText),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const n = noteById(result.children, "n");
+    expect(n.w).toBe(a.w);
+    expect(n.h).toBe(boxHeightForWidth(longText, a.w));
+    expect(n.h).not.toBe(a.h);
+  });
+
+  it("a sticky note still sizes 200 wide, ignoring the container's shared box width", async () => {
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2 }, [
+        box({ id: "a", label: "A much wider label than the note needs" }),
+        note({ id: "n" }, "hi", true),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const n = noteById(result.children, "n");
+    expect(a.w).toBeGreaterThan(200);
+    expect(n.w).toBe(200);
   });
 });

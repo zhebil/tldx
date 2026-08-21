@@ -61,6 +61,10 @@ export type IRBox = IRBase & {
 export type IRNote = IRBase & {
   kind: "note";
   text: string;
+  /** True for `<Sticky>` (real tldraw sticky, `noteShape`); false/absent for `<Note>` (geo box). */
+  sticky?: boolean;
+  /** Id of the box/frame/note/edge this note annotates. Validated at lower time (`ir/note-target-not-found`); placed by `domain/layout/attach.ts`. */
+  on?: string;
   x?: number;
   y?: number;
   w?: number;

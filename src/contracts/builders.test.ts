@@ -90,6 +90,11 @@ describe("record factories", () => {
     });
   });
 
+  it("boxShape accepts color/fill overrides", () => {
+    const shape = boxShape({ id: "shape:a", x: 0, y: 0, w: 100, h: 50, color: "yellow", fill: "semi" });
+    expect(shape.props).toMatchObject({ color: "yellow", fill: "semi" });
+  });
+
   it("boxShape carries rich text when text is provided", () => {
     const shape = boxShape({
       id: "shape:a",
