@@ -1,3 +1,24 @@
+**BLOCKED ON HUMAN - T6b.**
+
+T6b was built exactly as written (shipped, commit `78a6cd3`, do not revert) and
+reaches `cross-container` 15 -> 9. Its acceptance asks for <= 5. Two wakes have
+now confirmed, from absolute coordinates rather than inference, that no
+mechanism this task permits closes that gap: all nine survivors come from six
+edges whose endpoint x-bands *and* y-bands are both disjoint, so `deriveAxis`
+returns `null` and the edge is declined before the bow, the anchors or the lanes
+are ever consulted. Widening `deriveAxis` to a dominant-axis fallback was built
+and measured - an exact no-op on all eight files. Bowing a diagonal chord needs
+a detour waypoint or a placement change, and T6b's own "do not invent a second
+mechanism" forbids both.
+
+The three resolutions are written under T6b. Option 1 changes least; option 3 is
+the only one that makes the criterion true as written. The choice is the
+human's - the loop will not make it.
+
+Delete this header to unblock.
+
+---
+
 # tldsl layout plan
 
 The ordered worklist for the layout loop. **This file is the only state that
@@ -651,6 +672,43 @@ Two traps, both paid for already:
 
   T5's box **was** re-checked and **is now ticked**: the corpus measures zero
   crowded pairs in every file.
+
+  **Re-verified in a later wake, from the coordinates, not from this write-up.**
+  `crossing-classify` still reports cross-container 9 (total 11). The six edges
+  behind those nine pairs, with the overlap of their endpoint bands:
+
+  | edge | x overlap | y overlap |
+  |---|---|---|
+  | `deep-nesting` `e-handler-parser` | -33 | -130 |
+  | `deep-nesting` `e-serializer-gateway` | -8 | -538 |
+  | `hexagonal` `hx-4` `http -> p-create-session` | -80 | -86 |
+  | `hexagonal` `hx-9` `usecases -> p-orders-repo` | -80 | -123 |
+  | `hexagonal` `hx-14` `usecases -> p-notifications` | -80 | -123 |
+  | `hexagonal` `hx-15` `usecases -> p-clock` | -80 | -197 |
+
+  Every one is negative on both axes. There is no axis-aligned cross-container
+  crossing left in the corpus - the bucket name outlived its contents, and what
+  survives in it is a different failure mode wearing the same label. The four
+  `hexagonal` `usecases -> p-*` rows are one source fanning into a column of
+  ports offset from it on both axes; the -80 is the container gutter.
+
+  **Three resolutions, for the human:**
+
+  1. **Accept 9 as the floor and tick T6b.** Changes least. The shipped change
+     is a clear win on its own terms - 17 -> 11 crossings, `deep-nesting` 9 -> 3,
+     all four crowded pairs gone - and the half of the criterion about crowded
+     pairs and regressions is fully met.
+  2. **Re-word the acceptance** to cover only cross-container edges that are
+     axis-aligned. By that reading the bucket went 15 -> 0 and T6b passed
+     outright.
+  3. **Add a task that owns diagonal edges**, and let T6b's number stand until
+     it lands. This is the only option that makes <= 5 true as written. Two
+     shapes it could take, both already in Discovered work: a detour waypoint in
+     `routing.ts` (needs a real segment-vs-rect test - `segmentHitsRect` in
+     `arrow-truth.mts` already is one, and `isCrossing`'s demand for
+     perpendicular overlap with *both* endpoints is a second independent reason
+     diagonals survive), or placement, which is the trick that has now worked
+     twice (T6 took `wide-fanout` 10 -> 0 by moving boxes, not arrows).
 
 - [ ] **T7. Notes: shape, and attachment.**
   Two changes, shipped together because the second is only worth having once
@@ -1447,3 +1505,10 @@ promoted into the task list by the human.
 - **The `other` bucket has never been looked at.** `long-labels`' two crossings
   have been 2 since T4 and no task in the list targets them. They are now 18% of
   the remaining total.
+- **The `cross-container` bucket label now lies about its contents.** After
+  T6b every crossing in it is diagonal; not one is axis-aligned. Classifying by
+  container relationship made sense when the parent gate was the thing blocking
+  routing, and that gate is gone. `tools/crossing-classify.mts` would say more
+  with a `diagonal` bucket applied before `cross-container`, which would read as
+  `diagonal 9, other 2` and stop a future wake reaching for a container fix that
+  cannot bite.
