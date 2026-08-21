@@ -54,6 +54,14 @@ You are an orchestrator. Delegate the doing; keep decomposition and review.
   **haiku** subagent. Ask for conclusions, not file dumps.
 - Review every subagent's diff yourself. A subagent reporting success is not
   evidence of success - read the diff and read the check output.
+- **When a task depends on an external API, read that API's docs or its type
+  definitions before building.** Not from memory. Three separate assumptions in
+  this project's history turned out wrong on inspection: that ELK had been
+  removed (it is wired per-container and working), that screenshotting the
+  viewport was the only way to capture a diagram (`editor.toImage` crops to
+  content), and several guesses about what hooks can do. Every one was cheap to
+  check and expensive to have wrong. `node_modules/**/*.d.ts` is authoritative
+  for a library; published docs are authoritative for a platform.
 - **Look at the PNGs yourself.** Most tasks here are about what the diagram
   looks like. A passing number on a diagram that now looks worse is a failed
   task; say so and leave the box unchecked.
@@ -88,6 +96,9 @@ You are an orchestrator. Delegate the doing; keep decomposition and review.
   Never touch `main`. Never `git add .` - stage the files you changed.
 - **One task per wake**, even if the next one looks trivial. The value is in
   small reversible steps with a written record.
+- **Not every task produces code.** T19 produces a design doc and explicitly
+  forbids code; T24 produces prose. Delivering the artefact the task asks for is
+  completing it - do not add an implementation nobody asked for.
 - If `npm run check` cannot be made green within the wake, revert the change,
   record the failure under the task, and commit that record alone.
 - **`docs/layout-hypotheses.md`, `docs/layout-champion.md` and

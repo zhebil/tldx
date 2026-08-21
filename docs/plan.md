@@ -896,3 +896,11 @@ promoted into the task list by the human.
   task that wants author-specified anchors.
 - `flow()` edges carry no source span; diagnostics report them at `.:0:0`
   (bd bug, P2).
+- **`tests/corpus/sequence.tldsl.jsx` is misnamed.** It is a linear 14-step
+  chain, not a UML sequence diagram - a `<Pipeline>` in disguise. Nothing in the
+  corpus is a real sequence diagram. The name is a trap for whoever reads the
+  corpus next and should be `linear-chain`, but renaming touches a fixture, so
+  it needs to be a deliberate task rather than a drive-by.
+- `docs/baselines/wake-*` and `docs/layout-champion.md` are still in the tree and
+  still describe pre-`2484ffa` geometry. T1 marks them historical; nothing has
+  deleted them.
