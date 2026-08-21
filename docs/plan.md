@@ -1434,7 +1434,7 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   B21b's rejection reason is now stale for a different reason than expected: it
   died on `wide-fanout` 36 -> 43, and `wide-fanout` no longer wraps.
 
-- [ ] **T18. Re-examine the row-gap corridor (B25/B32/B33).**
+- [x] **T18. Re-examine the row-gap corridor (B25/B32/B33).**
   Three kept changes widen grid row gaps in proportion to edges crossing them.
   They were tuned against stale geometry, and if T3-T5 route those edges around
   instead of through, the corridor is now paying for clearance nobody needs.
@@ -1442,6 +1442,24 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   **Acceptance:** if crossings do not rise when it is removed, remove it - that
   is roughly 150 lines and three layers of special case bought back. If
   crossings do rise, record by how much and keep it.
+
+  **Kept. Removing it costs 3 crossings: 13 -> 16.** No code changed - this wake
+  measured the removal and put the file back byte-identical. The two halves were
+  measured separately: both on (today) **13**; `skipRowGaps` alone, without the
+  `hasSkipEdge` pre-gap that feeds `bestGridCols` **14**; the pre-gap alone,
+  without `skipRowGaps` **17**; neither **16**. The mechanism is non-monotonic -
+  the pre-gap on its own is *worse than removing everything*, because it only
+  changes which column count `bestGridCols` picks and then leaves the row
+  boundaries too tight to use it. The full corridor is the best of the four.
+  All three new crossings land in `release-pipeline`, and they are `other`, not
+  skips: with 40px row gaps it wraps to 4 columns instead of 5 and three chords
+  cut straight through `Canary 5%`, `Manual approval` and `Notify Slack`.
+  Confirmed in the pixels, not just the counter - rendered both variants and
+  compared. The corridor's price on that file is +280px of height (row
+  boundaries 160/160/80 against a 40px base gap), which buys back three arrows
+  that would otherwise be drawn over box interiors. T3-T6b did not make the
+  corridor redundant; they route *cross-container* edges, and every edge the
+  corridor serves is same-container grid traffic.
 
 ### Phase 7 - round-trip
 
@@ -2461,6 +2479,24 @@ promoted into the task list by the human.
   `src`), so the userland module is unlinted. That is fine for a fixture, but
   it also means nothing mechanically stops a fixture-side module from
   importing out of `src/domain/`.
+
+### From T18
+
+- **`SKIP_ROW_GAP_FACTOR` is load-bearing for column choice, not for clearance.**
+  Its only job is to give `bestGridCols` a pessimistic pre-gap so it picks a
+  wider grid; `skipRowGaps` then sets the real boundary. Measured alone it makes
+  things worse (17 vs 16 with nothing). The two are one mechanism in two places
+  and should never be tuned independently.
+- **The corridor is ~55 lines, not the ~150 the task assumed.**
+  `hasSkipEdge` (20), `skipRowGaps` (30), two constants and two call sites.
+  The estimate the task carried was inherited from the B25/B32/B33 write-ups.
+- **Only `release-pipeline` exercises the corridor at all.** Every other corpus
+  file is unchanged byte-for-byte with it removed. One fixture is deciding
+  whether ~55 lines stay - the same corpus-of-two thinness T17 found for
+  wrap order.
+- **`SKIP_ROW_GAP_MAX` is reached on the first two row boundaries of
+  `release-pipeline`** (gap 40 -> 160). Nothing has ever measured whether the
+  cap is in the right place; it just happens to bind there.
 
 ### From T17
 
