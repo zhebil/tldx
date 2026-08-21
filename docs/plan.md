@@ -1129,7 +1129,7 @@ to come after Phase 1.
 
 ### Phase 4 - a corpus worth judging
 
-- [ ] **T13. Add three realistic diagrams.**
+- [x] **T13. Add three realistic diagrams.**
   Comes after Phase 3 deliberately: adding realistic fixtures before styling
   exists means adding three more black-and-white wireframes and restyling them
   later.
@@ -1148,6 +1148,26 @@ to come after Phase 1.
   fixtures stay the files to measure.
   **Acceptance:** all three compile with zero diagnostics, render, and are added
   to `docs/baseline.md`.
+
+  Added `checkout-services` (4 tiers, 16 shapes, 10 labeled edges),
+  `request-lifecycle` (one `col` chain, two short-circuit branches, 12 shapes)
+  and `order-states` (10 states, 12 edges, two cycles, `layout="auto"`) to
+  `tests/corpus/`. All three compile clean through the existing
+  `corpus.test.ts` discovery, render, and are tabled in `docs/baseline.md`.
+  Crossings 1 / 0 / 3, label overlaps 0 / 0 / 1, zero overlapping shape pairs
+  in all three. **No `src/` file changed**, so the eight gate fixtures are
+  byte-identical and every earlier table stands.
+
+  The renders taught three things the reports did not. T12's clearance rule is
+  exact to the pixel and a tie loses - `assets` sets a 134.27px gap and is still
+  squished, while `quote` on the same gap is fine; worked around with an
+  explicit `gap`, since widening the margin means editing T12's tests. `auto` is
+  exempt from the clearance rule and ELK never sees a label size, so the state
+  machine needed `gap="96"` *and* `direction="DOWN"` - vertical arrows squished
+  zero labels where `RIGHT` squished seven. And `fill="solid"` with
+  `labelColor="white"` is unreadable, because tldraw's solid geo fill is a pale
+  tint. The one visible defect left is the cycle back-edge running through two
+  boxes, exactly the case this task predicted nothing routes.
 
 ### Phase 5 - primitives
 
@@ -2061,3 +2081,26 @@ promoted into the task list by the human.
   by nothing. It is not test-generated (the only other `kernel` match in the tree
   is a comment about FSEvents in `chokidar-watch.test.ts`). Either commit it as a
   fixture or delete it; leaving it untracked makes every `git status` noisy.
+- **T13: the clearance rule has no slack, so the label that sets the gap is the
+  one that wraps.** `arrowLabelWidth("assets") = 70.27` gives a 134.27px gap and
+  tldraw *still* squished `assets`, while `quote` (62.67) on a 136px gap was
+  fine. A 2-4px slack constant on `ARROW_LABEL_MARGIN` would fix every case, but
+  `stack.test.ts:323` and `:385` hardcode `+ 64`, so it is a three-file change
+  and belongs to T12's surface. Worked around fixture-side with explicit `gap`.
+- **T13: `auto` is exempt from the clearance rule and ELK is never told a label
+  exists.** `elk-layout.ts` passes node sizes and `elk.spacing.nodeNode` only;
+  edge labels are invisible to it. `RIGHT` squished seven of twelve labels on
+  the state machine at the default gap. Passing edge-label dimensions to ELK as
+  label nodes is the real fix; `gap` + `direction="DOWN"` is the workaround.
+- **T13: `direction="DOWN"` is dramatically better than `RIGHT` for a labeled
+  `auto` graph** - zero squished labels vs seven, canvas aspect 0.32 vs 2.71 -
+  because a vertical arrow gives its label unlimited horizontal room. If a
+  future primitive picks the layout engine (T16), it should probably pick the
+  direction too.
+- **T13: `fill="solid"` + `labelColor="white"` is unreadable.** tldraw's solid
+  geo fill is a pale tint of the shape colour, not the colour itself. There is
+  no way to get a dark-filled box with light text through the current prop set.
+- **T13: a labeled edge that skips a container drops its label on the skipped
+  container.** `checkout -> postgres` past a `Payments` frame parks `orders`
+  inside it. Reordering the doc so the two containers are adjacent was the only
+  fix available; same residue class as the open T6b cross-container question.

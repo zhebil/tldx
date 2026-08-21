@@ -532,3 +532,53 @@ edges (`on failure`, `writes`, `retries`) are still squished - their bodies are
 wider than tall, so the 64px rule applies to them too, but the gap that would
 clear them is horizontal space a `col` container's gap cannot provide. See
 `docs/plan.md` `## Questions for the human`.
+
+## After T13 - three realistic diagrams
+
+Three fixtures added to `tests/corpus/`. They are **not gates**: the eight
+stress fixtures above stay the files to measure, and no `src/` file changed, so
+every number in every table above is untouched. These are the files to look at
+when asking "is this good".
+
+| file | canvas | shapes | frames | arrows | crossings | label overlaps | png |
+|---|---|---|---|---|---|---|---|
+| checkout-services | 869 x 640 | 16 | 4 | 10 | 1 | 0 | 1865 x 1408 |
+| request-lifecycle | 934 x 642 | 12 | 2 | 8 | 0 | 0 | 1996 x 1412 |
+| order-states | 532 x 1644 | 12 | 1 | 12 | 3 | 1 | 1192 x 3416 |
+
+`overlapping shape pairs` is 0 on all three. `checkout-services` is a four-tier
+service architecture (Edge / Core / Data / Payments) with coloured traffic;
+`request-lifecycle` is one `col` chain with two short-circuit branches;
+`order-states` is a ten-state machine with two cycles on `layout="auto"`.
+
+### What the renders showed that the reports did not
+
+**The label-clearance rule is exact to the pixel, and a tie loses.** In a `row`,
+the label that *sets* the gap renders squished while every other label in the
+same row renders fine. `arrowLabelWidth("assets") = 70.27`, so the clearance is
+`134.27`, so the gap is `134.27` - and tldraw still wrapped `assets` into
+`asset`/`s`, while `quote` (62.67, riding the same 136px gap) rendered on one
+line. The mechanism works; it just has no slack. Worked around fixture-side with
+an explicit `gap="152"`, because widening `ARROW_LABEL_MARGIN` means editing the
+two `stack.test.ts` cases that hardcode `+ 64` and that is T12's surface, not
+T13's.
+
+**`auto` is exempt from the clearance rule, and it shows.** ELK is handed node
+sizes and `elk.spacing.nodeNode`, never a label size. At the default gap the
+state machine came back as two crammed rows with seven wrapped labels. Two
+fixture-side knobs fixed it without touching the engine: `gap="96"` (which does
+reach ELK, as `nodeNode` and `nodeNodeBetweenLayers = gap * 1.5`) and
+`direction="DOWN"`. Vertical arrows give a label the full horizontal room it
+wants, so `DOWN` squished **zero** labels where `RIGHT` squished seven. Canvas
+went 1467 x 542 (aspect 2.71) to 532 x 1644 (aspect 0.32).
+
+**The cycle back-edge is the one visible defect, exactly where T13 predicted.**
+`awaiting payment -> paid` runs straight up through `Shipped` and `Delivered`,
+and its `captured` label lands on `Shipped` - the single label overlap in the
+three files. A back-edge is a same-axis skip that runs backwards, and nothing in
+Phase 1 routes inside an `auto` container.
+
+**`fill="solid"` plus `labelColor="white"` is unreadable.** tldraw's solid geo
+fill is a pale tint of the shape colour, not the colour itself, so white label
+text on it is near-invisible. Dropped from all three fixtures; worth knowing
+before any future fixture reaches for a "highlighted" box.
