@@ -2379,7 +2379,7 @@ only test it gets against material T24 did not choose.
   (59 files, 657 tests); no `src/` touched, so `docs/renders/` and
   `docs/baseline.md` are unchanged.
 
-- [ ] **T34. Triage the ledger.**
+- [x] **T34. Triage the ledger.**
   Read every entry. Group duplicates - several diagrams will hit the same
   underlying gap from different directions, and that is the signal worth acting
   on. Order by severity, then by how many diagrams each affects. Write the
@@ -2388,6 +2388,32 @@ only test it gets against material T24 did not choose.
   papercuts, say so and strike T35-T38 rather than inventing work to fill them.
   **Acceptance:** an ordered list exists, duplicates are merged, and each entry
   names the tasks that will consume it. No code.
+
+  Written as `## Triage (T34)` at the top of `docs/diagram-defects.md`: a ranked
+  table plus a paragraph per group. The 21 entries collapse to **eight
+  mechanisms**, and the merging is the result - four separate authoring wakes
+  each rediscovered "the edge label goes at the midpoint and nothing is reserved
+  for it" (D13/D11/D8/D9) from a different direction, and D1/D5/D14/D21 are one
+  fact - an edge is a straight segment between two shape centres and nothing
+  else is consulted - seen from four angles.
+
+  Not a papercut ledger: 3 blockers, 4 `wrong`, 9 `ugly`, 5 `papercut`, so
+  T35-T38 stand. Ordered by severity then breadth, they take the top four rows:
+  **T35** the path model (D1, D5, D14 - one mechanism, one wake; D21's
+  obstacle-aware routing is the bigger face and stays open), **T36** `layout="auto"`
+  reaching ELK with none of its three inputs (D7 - the only blocker outside
+  group 1, one diagram, one adapter), **T37** edge-label placement (D13 first -
+  it is the `wrong` one, and labels colliding with *each other* are invisible to
+  both `layout-report` and `arrow-truth`), **T38** arrow-label text measure and
+  wrap (D6, D9 - the only group where the render shows a string the author never
+  wrote). Groups 5-8 (sizing caps, notation props, stretch, the silent
+  toolchain) are ranked and left open.
+
+  Two tie-breaks worth naming. D7 is ranked second on severity alone despite
+  hitting one diagram of six. Group 4 is ranked above group 5 at equal breadth
+  because falsified text outranks displaced text. Nothing was struck - no entry
+  turned out to be a design decision. No code, no `src/` touched;
+  `npm run check` green.
 
 - [ ] **T35. Fix the top defect.**
 - [ ] **T36. Fix the next defect.**

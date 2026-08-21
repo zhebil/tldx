@@ -5,6 +5,115 @@ What broke when tldsl was pointed at diagrams it was not designed around
 logs what it hit and moves on - it does not fix anything, and it does not
 reshape the diagram to avoid the defect.
 
+## Triage (T34)
+
+Twenty-one entries, six diagrams, eight distinct mechanisms. Grouped below and
+ordered by severity first, then by how many of the six Phase-9 diagrams each
+group damages. This is not a papercut ledger: three entries are blockers and
+four are `wrong`, and the top group touches every diagram in the corpus.
+
+The four fix wakes T35-T38 take the top four rows. Everything below row 4 stays
+open; nothing is struck, because nothing here turned out to be a design
+decision.
+
+| # | Group | Entries | Severity | Diagrams | Consumed by |
+|---|---|---|---|---|---|
+| 1 | **An edge is a straight segment between two shape centres, and that is the whole path model** | D1, D5, D14 (+ D21, D8 routing half) | blocker | 6 / 6 | **T35** |
+| 2 | **`layout="auto"` reaches ELK with none of its inputs** | D7 | blocker | 1 / 6 | **T36** |
+| 3 | **An edge label is stamped at the geometric midpoint and nothing reserves room for it** | D13, D11, D8 (label half), D9 (clearance half) | wrong | 5 / 6 | **T37** |
+| 4 | **Arrow label text is measured and wrapped by a different path than box label text** | D6, D9 (wrap half) | wrong | 3 / 6 | **T38** |
+| 5 | **A shape is sized by its own contents and the documented cap does not hold** | D3, D16, D20 | wrong | 3 / 6 | open |
+| 6 | **The primitive set cannot say what the notation requires** | D17, D18, D2, D4 | ugly | 4 / 6 | open |
+| 7 | **Sibling tiers are each sized to their own contents, so a layered stack is ragged** | D10 | ugly | 1 / 6 | open |
+| 8 | **The toolchain is silent, and its diagnostics name elements the author did not write** | D15, D12, D19 | papercut | 6 / 6 | open |
+
+### 1. The path model - D1, D5, D14, and half of D21 and D8 → T35
+
+The single mechanism behind two blockers and a `wrong`. An edge resolves to one
+straight segment between two shapes and nothing else is consulted - not the
+other edges on the same pair, not the endpoints being the same shape, not what
+lies between. Each entry is that one fact seen from a different angle:
+
+- **D1** - *n* edges on the same pair produce *n* identical segments, so seven of
+  eight TCP messages vanish and three labels smear into `SYNKACK`.
+- **D5** - an edge to itself is a zero-length segment, so the self-transition
+  every state machine has draws nothing and drops its label on the frame border.
+- **D14** - the one separation rule that does exist scales with nothing useful:
+  ~165px of bow on a 413px-apart pair (out of its frame and across a neighbour's),
+  and none at all on a 130px-apart pair, which is D1's collapse again.
+- **D21** and **D8**'s routing half are the obstacle-aware face of the same gap -
+  a 1,100px chord through two frame borders and a box. Bigger job; stays open
+  after T35.
+
+**T35 takes D1, D5 and D14** - separation between edges on a shared pair, and a
+loop for a self-edge. Those three are one mechanism and one wake. D21 and D8's
+routing half remain open.
+
+### 2. `layout="auto"` - D7 → T36
+
+The only blocker not in group 1, and the narrowest: one diagram, one adapter.
+None of the three inputs reaches placement - `a -> b -> c -> d` packs as a 2x2
+block, `gap="40"` and `gap="400"` render byte-identical at ELK's 20px default,
+and `direction` is inert. Ranked second on severity despite touching one
+diagram, because the primitive advertised for "graph-shaped things with no
+natural reading order" currently does aspect-fitted grid packing.
+
+### 3. Edge-label placement - D13, D11, D8's label half, D9's clearance half → T37
+
+The largest cluster by breadth and the one four separate authoring wakes each
+rediscovered. The placement is unconditional: midpoint of the segment,
+regardless of occupancy.
+
+- **D11** - the label lands on a foreign shape. Three labels on one box in
+  `c4-container`; `origin pull` across `app-3`; `rejected` on `Deploy to
+  production`.
+- **D13** - eight fan labels land in one 33px band and collide with *each other*,
+  which no tool counts. `publishOrderPlacPaymenpublishPaymentCaptured`.
+- **D9**'s clearance half - a row *does* widen its gap for an edge between
+  adjacent children (`labelClearanceGap`), but the span it reserves is ~50px
+  short, and it reserves nothing at all for an edge that skips a sibling.
+- **D8**'s label half - an auto container has no `labelClearanceGap` equivalent
+  at all.
+
+The asymmetry is the finding: clearance exists for the easy case and is absent
+for every other. **T37 should take D13 first** - it is the `wrong` one, and
+labels colliding with each other is invisible to both `layout-report` and
+`arrow-truth`.
+
+### 4. Arrow-label text - D6, D9's wrap half → T38
+
+The only group where the render shows a string the author did not write, which
+is why it outranks group 5 at equal breadth. Spaces draw at ~zero width
+(`recv FIN / send ACK` → `recvFIN/sendACK`) and single words break mid-word
+(`dequeue` → `dequeu`/`e`). Both are the failure T0 fixed for box labels, in a
+code path T0 never reached; the same string on a `<Box>` in the same font is
+correct. T32 killed the `font="sans"` workaround - the loss survives it, and is
+uneven *within* one label, which is what justification with no word-spacing
+budget looks like.
+
+### 5-8. Open after T38
+
+- **5. Sizing caps (D3, D16, D20).** `wrong`, because D3 deletes a state from the
+  render. One prop failing three ways: `maxW` rejected on `<Note>`/`<Sticky>`
+  though documented there, `maxW` accepted and ignored on a diamond that is a row
+  child (492px against a 200px cap), and the only cap that works is `w`, a
+  hand-tuned coordinate the skill tells authors never to write.
+- **6. Notation gaps (D17, D18, D2, D4).** Four independent missing props, each
+  small and each blocking a standard notation: no `dash` on `<Frame>` (so a C4
+  boundary is a hairline while the external systems are boldly dashed), no
+  `person` or `cylinder` in `geo` (but `heart` and `star` are there), an unnamed
+  container captioning itself "Frame", one `gap` for both grid axes.
+- **7. Stretch (D10).** `align="stretch"` is rejected, so four tiers of a layered
+  architecture come out 540/520/1569/616px wide and the horizontal bands that
+  carry the reading are destroyed.
+- **8. The toolchain (D15, D12, D19).** `check` validates the IR, not the
+  diagram: it printed nothing on a render that had lost three of its four topics.
+  Not one of these 21 defects was found by `check` - every one was found by
+  looking at a PNG. Alongside it, diagnostics name `<frame>` and `<note>` for
+  elements written as `<Group>` and `<Sticky>`, and a `\n` in a label attribute
+  renders as two literal characters with no diagnostic.
+
+
 ## Schema
 
 One `###` section per defect, numbered in the order they were found. Numbers are
