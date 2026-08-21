@@ -406,3 +406,41 @@ in the corpus - no corpus file uses `on`): both node-attached notes sit exactly
 pairs. The unattached-note criterion (within 120px of the shape preceding it in
 source order) holds across the corpus with no new code: 40px in `long-labels`
 and `release-pipeline`, 96px in `multi-region`.
+
+---
+
+## After T8 - frame chrome reserved where it is actually drawn
+
+| file | canvas before | canvas after | area | png before | png after |
+|---|---|---|---|---|---|
+| deep-nesting | 594 x 790 | **594 x 752** | **-4.8%** | 1316 x 1708 | 1316 x 1632 |
+| hexagonal | 1354 x 650 | **1354 x 616** | **-5.2%** | 2836 x 1428 | 2836 x 1360 |
+| multi-region | 900 x 832 | **900 x 766** | **-7.9%** | 1928 x 1792 | 1928 x 1660 |
+
+The other five corpus files are byte-identical, canvas and render both.
+Crossings are unchanged at **9** (deep-nesting 3, hexagonal 6; buckets
+same-axis skip 0, cross-container 9, fan 0, other 0), crowded pairs 0,
+overlapping shape pairs 0 everywhere.
+
+**The measurement.** tldraw draws a frame's name heading entirely outside the
+frame, above its top edge. `FrameHeading.js` positions the DOM node with
+`bottom: 100%`; `FrameShapeUtil.toSvg` draws the heading rect at
+`y = labelBounds.y - 6` with `height = labelBounds.height`, and
+`getFrameHeadingSize` returns `Box(0, -opts.height, w, opts.height)` with
+`getFrameHeadingOpts` fixing `height: 24`. The heading therefore occupies
+y in [-30, -6] relative to the frame's own top edge and **zero pixels inside
+it**. `sizeFrame` was adding `FRAME_TITLE_PX = 32` to every frame's top padding
+to clear chrome that is not there, which is why every leaf-only frame in
+`hexagonal` had a 48px top margin against a 16px bottom one.
+
+**The change.** `FRAME_TITLE_PX` 32 -> 30 (the measured extent), and `sizeFrame`
+reserves it only when the frame has a frame child - a *nested* frame's heading
+is the one heading that does intrude into a parent's padding. A frame whose
+children are all boxes or notes now gets `padTop = pad`, symmetric with its
+other three sides.
+
+**Why only three files moved.** Five of the eight corpus files contain no
+`<Frame>` at all (`long-labels`, `release-pipeline`, `sequence`,
+`sparse-graph`, `wide-fanout`), so no frame-chrome change can move their
+geometry. T8's acceptance asked for four; three is the arithmetic ceiling and
+all three were taken. See `docs/plan.md` `## Questions for the human`.

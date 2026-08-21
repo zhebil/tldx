@@ -160,10 +160,25 @@ describe("hybridLayout", () => {
     const sizeA = estimatedBoxSize("A");
     const sizeB = estimatedBoxSize("B");
     expect(a.x).toBe(10);
-    expect(a.y).toBe(10 + 32); // pad + FRAME_TITLE_PX
+    expect(a.y).toBe(10); // pad only - box-only children don't need title clearance
     expect(b.y).toBe(a.y + sizeA.h + 5);
     expect(f.w).toBe(Math.max(sizeA.w, sizeB.w) + 10 + 10);
     expect(f.h).toBe(b.y + sizeB.h + 10);
+  });
+
+  it("reserves title clearance above the first child when a frame has a nested frame", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        frame({ id: "outer", layout: "col", pad: 10, gap: 5 }, [
+          frame({ id: "inner", layout: "col", pad: 10, gap: 5 }, [
+            box({ id: "a", label: "A" }),
+          ]),
+        ]),
+      ]),
+    );
+    const outer = frameById(result.children, "outer");
+    const inner = frameById(outer.children, "inner");
+    expect(inner.y).toBe(10 + 30); // pad + FRAME_TITLE_PX
   });
 
   it("keeps a hard-pinned child's coordinates verbatim and out of the flow", async () => {

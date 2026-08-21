@@ -128,7 +128,8 @@ async function sizeFrame(frame: IRFrame, placeAuto: AutoPlacer): Promise<IRFrame
   const mode = resolveMode(frame.layout);
   const gap = frame.gap ?? DEFAULT_GAP;
   const pad = frame.pad ?? FRAME_PAD_INNER;
-  const padTop = pad + FRAME_TITLE_PX;
+  const hasFrameChild = frame.children.some((c) => c.kind === "frame");
+  const padTop = pad + (hasFrameChild ? FRAME_TITLE_PX : 0);
   const { children, w: contentW, h: contentH } = await layoutContainer(
     frame.children,
     mode,

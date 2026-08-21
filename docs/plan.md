@@ -780,7 +780,7 @@ Two traps, both paid for already:
   id when it does not resolve. The unattached-note fallback needed no code: a
   note already flows in source order directly after the content it follows.
 
-- [ ] **T8. Reclaim dead whitespace.**
+- [x] **T8. Reclaim dead whitespace.**
   Frames carry large empty margins - `hexagonal`'s outer frame has roughly
   110px of empty canvas above its first child and 50px below its last. Measure
   what tldraw's frame chrome actually needs (a title is 14px tall by
@@ -788,6 +788,49 @@ Two traps, both paid for already:
   and set the constants from the measurement.
   **Acceptance:** canvas area drops on at least four files, with zero new
   overlaps and no label or title clipped in the renders.
+
+  **The measurement, from tldraw's source rather than the render.** A frame's
+  name heading is drawn entirely *outside* the frame, above its top edge:
+  `FrameHeading.js` positions the DOM node with `bottom: 100%`, and
+  `FrameShapeUtil.toSvg` draws the heading rect at `y = labelBounds.y - 6` with
+  `height = labelBounds.height`, where `getFrameHeadingSize` returns
+  `Box(0, -opts.height, w, opts.height)` and `getFrameHeadingOpts` fixes
+  `height: 24`. So the heading occupies exactly y in [-30, -6] relative to the
+  frame's own top edge, and **zero pixels inside it**. The 32px `FRAME_TITLE_PX`
+  that `sizeFrame` added to every frame's top padding was protecting against
+  chrome that is not there.
+
+  **What was built.** `FRAME_TITLE_PX` 32 -> **30** (the measured extent), its
+  doc comment rewritten to say it is clearance *above* a frame, and `sizeFrame`
+  now adds it only when the frame has a frame child - a nested frame's heading
+  is the one thing that does intrude into a parent's top padding. A frame whose
+  children are all boxes or notes now gets `padTop = pad`, symmetric with its
+  other three sides. Three lines of production code; `stack.test.ts` gained a
+  test for the nested-frame branch and had the box-only case corrected.
+
+  **The numbers.** Canvas area dropped on **three** files, not four:
+  deep-nesting 594x790 -> 594x752 (-4.8%), hexagonal 1354x650 -> 1354x616
+  (-5.2%), multi-region 900x832 -> 900x766 (-7.9%). The other five are
+  byte-identical, and so are their renders. Overlapping shape pairs 0
+  everywhere, crossings unchanged at 9 (deep-nesting 3, hexagonal 6), crowded
+  pairs 0. Looked at all three renders: every frame title still sits clear
+  above its frame and nothing is clipped; the inner frames of `hexagonal` and
+  `deep-nesting`'s `Unit` now hug their contents instead of carrying a 48px top
+  margin against a 16px bottom one.
+
+  **Why four files was unreachable.** Only three of the eight corpus files
+  contain a `<Frame>` at all - `long-labels`, `release-pipeline`, `sequence`,
+  `sparse-graph` and `wide-fanout` have none, so no change to frame chrome can
+  move their canvas by a single pixel. Three is the ceiling, and all three were
+  taken. Logged under `## Questions for the human`.
+
+  **Not fixed, deliberately.** A nested frame that is *not* the first child in
+  a `col` still has its heading drawn into the gap above it, and
+  `deep-nesting`'s gaps are 12-16px against the 30px the heading needs. It does
+  not read as broken today only because headings are left-aligned and the boxes
+  above are centred, so they miss each other horizontally. Reserving that
+  clearance properly would *grow* the canvas, which is the opposite of this
+  task; filed to Discovered work.
 
 ### Phase 3 - styling
 
@@ -1368,6 +1411,23 @@ as-is.
   fallback. Built and measured - an exact no-op on all eight files, byte-identical
   route maps and PNGs. Tried three times now.
 
+- **T8 - only three files could shrink.** T8's acceptance asks for a canvas
+  area drop on at least four files; the shipped change reached three
+  (deep-nesting -4.8%, hexagonal -5.2%, multi-region -7.9%).
+  **Default taken:** accepted three and ticked the box. Only three of the eight
+  corpus files contain a `<Frame>`, so a frame-chrome measurement cannot reach
+  a fourth - the number in the acceptance was written before anyone counted the
+  frames. Accepting changes least: the mechanism is correct, measured from
+  tldraw's own source, and every file it can touch it did touch.
+  **Alternatives:** (2) re-word the acceptance as "every corpus file that
+  contains a frame", which the change meets outright; (3) widen T8's scope to
+  non-frame whitespace - gaps, box padding, the note column - which would move
+  the other five but is a different task with a different risk profile, and the
+  authored `gap`/`pad` values live in frozen corpus fixtures.
+  **What the default costs:** nothing measurable. The risk is a future reader
+  taking "3 of 8" as a partial failure of the mechanism rather than as the
+  corpus having only 3 candidates.
+
 - **T7 - the attached-pair overlap whitelist.** T7 asks for overlap checks to
   whitelist a note and the shape it is attached to, so a deliberate annotation
   does not trip the "overlapping shape pairs" gate in `tools/layout-report.mts`.
@@ -1598,3 +1658,30 @@ promoted into the task list by the human.
   with a `diagonal` bucket applied before `cross-container`, which would read as
   `diagonal 9, other 2` and stop a future wake reaching for a container fix that
   cannot bite.
+- **A nested frame's heading still lands in the gap above it.** T8 measured the
+  heading at y in [-30, -6] outside the frame, and reserves that clearance only
+  in a parent's *top padding*. A frame that is the second or later child of a
+  `col` gets whatever `gap` the author set - 12, 14 and 16 in `deep-nesting`,
+  all short of 30 - so its title is drawn over the band the previous sibling
+  occupies. It reads fine today by luck: headings are left-aligned at the frame
+  edge and the boxes above are centre-aligned, so they miss each other
+  horizontally. Fixing it means an extra leading gap before every frame child in
+  `computeFlowPositions`/`gridPositions` (there is already a `rowGaps`
+  mechanism), and it would *grow* the canvas, which is why T8 did not do it.
+- **Five of eight corpus files have no `<Frame>`.** `long-labels`,
+  `release-pipeline`, `sequence`, `sparse-graph` and `wide-fanout` are flat.
+  Any task whose acceptance counts "at least N files" needs to check first how
+  many files can possibly respond to the mechanism - T8's four was unreachable
+  for this reason. It is also a gap in the corpus itself: nothing exercises a
+  frame that contains both boxes and a nested frame *and* is wide rather than
+  deep.
+- **`FRAME_PAD_TOP` is now used only by `src/domain/ports/layout.fake.ts`.**
+  The real path (`sizeFrame`) composes its own top padding from `pad` plus a
+  conditional `FRAME_TITLE_PX`, so the fake and the engine no longer agree on
+  what a frame's top padding is. Harmless while the fake is only asserting
+  relative placement, but it is a divergence that will mislead someone.
+- **`estimatedBoxSize`'s `BOX_LABEL_PAD_X` is 32 and the frame inner pad is
+  also 32,** so a box sitting flush in a frame has 64px between its glyphs and
+  the frame border. Nobody has measured whether 32 is what tldraw's own label
+  padding needs, the way T0 measured the glyph advances. The same trick that
+  found `BOX_CHAR_PX = 14` was wrong would apply here.

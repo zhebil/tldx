@@ -39,11 +39,16 @@ const NOTE_PAD = 16;
 const NOTE_CHAR_PX = 15;
 const NOTE_LINE_H = 30;
 
-/** Tldraw frame title chrome. The first row of children must clear it. */
-export const FRAME_TITLE_PX = 32;
+/**
+ * Tldraw draws the frame heading rect at y in [-30, -6] relative to the
+ * frame's own top edge - outside the frame, not inside it. So this is the
+ * clearance a frame needs *above* it, reserved only by a frame that contains
+ * a nested frame.
+ */
+export const FRAME_TITLE_PX = 30;
 /** Inner padding inside a frame, applied uniformly except top (see below). */
 export const FRAME_PAD_INNER = 32;
-/** Top padding = chrome + inner so children don't sit under the title bar. */
+/** Inner padding plus clearance for a nested frame's heading. */
 export const FRAME_PAD_TOP = FRAME_TITLE_PX + FRAME_PAD_INNER;
 
 export type Direction = "RIGHT" | "DOWN" | "LEFT" | "UP";
