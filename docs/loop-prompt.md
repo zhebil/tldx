@@ -146,9 +146,14 @@ You are an orchestrator. Delegate the doing; keep decomposition and review.
   Never touch `main`. Never `git add .` - stage the files you changed.
 - **One task per wake**, even if the next one looks trivial. The value is in
   small reversible steps with a written record.
-- **Not every task produces code.** T19 produces a design doc and explicitly
-  forbids code; T24 produces prose. Delivering the artefact the task asks for is
-  completing it - do not add an implementation nobody asked for.
+- **Not every task produces code.** Several tasks produce a design doc, prose, a
+  ledger entry, or a diagram, and some forbid touching `src/` outright.
+  Delivering the artefact the task asks for is completing it - do not add an
+  implementation nobody asked for.
+- **When a task says it may not fix what it finds, it may not fix it.** Phase 9
+  splits authoring from fixing on purpose: a wake that does both will reshape
+  the diagram around each defect until the render looks fine, and the defect
+  never gets written down. Log it and move on.
 - If `npm run check` cannot be made green within the wake, revert the change,
   record the failure under the task, and commit that record alone.
 - **`docs/layout-hypotheses.md` and `docs/layout-champion.md` are historical.**

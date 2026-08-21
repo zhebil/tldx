@@ -1980,7 +1980,7 @@ the design:
   Also fixed while testing: `${TMPDIR}` ends in `/` on macOS, so the injected
   render path read `T//tldsl-render/...`. One line.
 
-- [ ] **T26. `/tldsl:sync`.** *Blocked on T19 and T21.*
+- [ ] **T26. `/tldsl:sync`.** *(T19 and T21 have landed; this is unblocked.)*
   Reads `tldsl overlay show`, rewrites the JSX, runs `tldsl verify` until it
   passes, leaves a normal reviewable diff. This is `absorb` from Phase 7,
   delivered as a command rather than a subprocess holding an API key.
@@ -1989,6 +1989,150 @@ the design:
   **Acceptance:** the canvas-first case from T22 works end to end through the
   command; `tldsl verify` passes afterwards with an empty overlay; the diff is
   reviewable and touches nothing unrelated.
+
+---
+
+### Phase 9 - polish, and proof against diagrams nobody designed the tool around
+
+Everything up to here was built against eight corpus fixtures that were written
+to exercise the layout engine. That is circular: the tool has only ever been
+asked to draw diagrams chosen because it could draw them. This phase points it
+at diagrams the world already agreed on - a TCP handshake, a layered web stack,
+a state machine - and treats whatever breaks as the real backlog.
+
+**The rule that makes this phase work: authoring wakes do not fix anything.**
+
+A wake that authors a diagram and fixes the engine in the same pass will do
+neither honestly - it will quietly reshape the diagram around each defect until
+the render looks fine, and the defect never gets written down. So:
+
+- **Authoring tasks** (T28-T33) write the diagram the way the *subject* demands,
+  not the way the tool prefers. When something is ugly, wrong, or impossible,
+  they log it and move on. They may not touch `src/`.
+- **Fix tasks** (T35-T38) drain that log. They may not add diagrams.
+
+If an authoring task finds nothing wrong, say so plainly and tick it. An empty
+finding is a real result; inventing a defect to look productive is not.
+
+**Author each diagram the way a user would.** Read `skills/tldsl/SKILL.md` and
+work from that. If you need something the skill does not mention, that is itself
+a defect worth logging - the skill is the product surface, and this phase is the
+only test it gets against material T24 did not choose.
+
+- [ ] **T27. The defect ledger and the authoring protocol.**
+  Create `docs/diagram-defects.md`. One entry per defect, each with: the diagram
+  that provoked it, what was attempted, what happened, a severity
+  (**blocker** the diagram cannot be expressed / **wrong** it renders but says
+  something false / **ugly** it reads badly / **papercut** authoring friction),
+  and a repro - the smallest `.tldsl.jsx` that shows it, saved under
+  `examples/repro/`.
+  Severity is about the *diagram*, not the fix. A one-line fix to something that
+  makes a diagram unreadable is still a blocker.
+  **Acceptance:** the file exists with the schema written at the top and zero
+  entries. No code.
+
+- [ ] **T28. TCP connection lifecycle.**
+  The three-way handshake, data transfer, and the four-way teardown, as a
+  sequence between two participants - SYN, SYN-ACK, ACK, then FIN, ACK, FIN, ACK,
+  with the state names (`SYN_SENT`, `ESTABLISHED`, `TIME_WAIT`) on the
+  participant that holds them.
+  **This is the archetype the corpus has never had**, and the one that settles
+  the long-standing open question about whether sequence diagrams are in scope.
+  Two vertical lifelines with ordered horizontal arrows between them is not
+  something any current primitive expresses; expect this to be the richest
+  source of entries in the ledger. Do not build a sequence primitive here - log
+  what is missing.
+  **Acceptance:** `examples/tcp-lifecycle.tldsl.jsx` exists, `tldsl check` is
+  clean, the PNG has been looked at, and every gap is in the ledger.
+
+- [ ] **T29. TCP state machine.**
+  The eleven-state diagram - `CLOSED`, `LISTEN`, `SYN_RCVD`, `SYN_SENT`,
+  `ESTABLISHED`, `FIN_WAIT_1`, `FIN_WAIT_2`, `CLOSING`, `TIME_WAIT`,
+  `CLOSE_WAIT`, `LAST_ACK` - with transitions labelled `event / action`.
+  Use `layout="auto"`; this is the graph ELK exists for. **Self-transitions and
+  cycles are the thing to watch**: a state machine needs an edge from a node to
+  itself, and nothing in the corpus has ever asked for one. If `from === to` is
+  rejected, or renders as nothing, that is a blocker entry.
+  **Acceptance:** `examples/tcp-states.tldsl.jsx`, check clean, PNG reviewed,
+  gaps logged.
+
+- [ ] **T30. A layered web application architecture.**
+  Browser, CDN, load balancer, a horizontally scaled app tier, cache, primary
+  and replica databases, object storage, and a background worker fed by a queue.
+  The everyday diagram this tool most needs to be good at. Include the things
+  real ones have and the corpus does not: a replica pair with a replication
+  arrow between them, a component that talks to three tiers at once, and an
+  external dependency drawn outside the system boundary.
+  **Acceptance:** `examples/web-architecture.tldsl.jsx`, check clean, PNG
+  reviewed, gaps logged.
+
+- [ ] **T31. An event-driven microservice topology.**
+  Six or seven services around a message bus, with both publish and subscribe
+  edges, a dead-letter path, and a saga spanning three services. Stresses
+  many-to-one and one-to-many through a single hub - the shape T6's fan
+  placement was built for, on a graph it has never seen.
+  **Acceptance:** `examples/event-driven.tldsl.jsx`, check clean, PNG reviewed,
+  gaps logged.
+
+- [ ] **T32. A C4 container diagram.**
+  Follow the C4 convention properly: a system boundary, containers inside it
+  with technology annotations, external systems and people outside it, and every
+  edge labelled with both purpose and protocol. C4 has explicit conventions this
+  tool has never been measured against - the interesting question is how much of
+  it is expressible and how much needs new vocabulary.
+  **Acceptance:** `examples/c4-container.tldsl.jsx`, check clean, PNG reviewed,
+  gaps logged.
+
+- [ ] **T33. A CI/CD pipeline with branches and a gate.**
+  Commit through build, unit tests, integration tests, a manual approval gate,
+  staging, smoke tests, production, plus a rollback path returning to a previous
+  stage. **The rollback edge is the point**: an arrow that flows backwards
+  against the layout axis is exactly the shape that produced the worst render in
+  this project's history, and Phase 1's routing was tuned without one in the
+  corpus.
+  **Acceptance:** `examples/cicd-pipeline.tldsl.jsx`, check clean, PNG reviewed,
+  gaps logged.
+
+- [ ] **T34. Triage the ledger.**
+  Read every entry. Group duplicates - several diagrams will hit the same
+  underlying gap from different directions, and that is the signal worth acting
+  on. Order by severity, then by how many diagrams each affects. Write the
+  ordered list at the top of `docs/diagram-defects.md`.
+  **Do not fix anything in this wake.** If triage shows the whole ledger is
+  papercuts, say so and strike T35-T38 rather than inventing work to fill them.
+  **Acceptance:** an ordered list exists, duplicates are merged, and each entry
+  names the tasks that will consume it. No code.
+
+- [ ] **T35. Fix the top defect.**
+- [ ] **T36. Fix the next defect.**
+- [ ] **T37. Fix the next defect.**
+- [ ] **T38. Fix the next defect.**
+  Four wakes, each taking the highest unfixed entry from T34's ordered list.
+  Same rules as the rest of the plan: smallest test at the right layer,
+  `npm run check` green, re-render every affected example and look at it.
+  Mark the entry fixed in the ledger with the commit that did it.
+  A defect that turns out to be a design decision rather than a bug gets struck
+  in the ledger with the reason - that is a result too. If the ledger empties
+  early, strike the remaining tasks; do not invent defects.
+
+- [ ] **T39. Re-test the skill on unseen material.**
+  T24 tested the skill against a diagram T24 chose. Give a subagent **only**
+  `skills/tldsl/SKILL.md` and one sentence - "draw the OSI seven-layer model
+  with an example protocol at each layer" - and no other context, no examples
+  directory, no corpus. Whatever it produces is the measurement.
+  **Acceptance:** the diagram compiles on the first attempt and renders legibly.
+  If it does not, the fix is to the skill, not to the prompt you gave it - and
+  the failure goes in the ledger with what the skill failed to say.
+
+- [ ] **T40. Regression gate.**
+  Run `tldsl check` and `tldsl render` over every file in `tests/corpus/` and
+  `examples/`, including everything Phase 9 added. Nothing may fail to compile
+  and nothing may have regressed visually against the renders taken when it was
+  written.
+  **Acceptance:** every file compiles, every PNG has been looked at, and any
+  regression is either fixed or logged with the commit that caused it. Record
+  the final corpus-wide crossing and crowded-pair numbers in `docs/baseline.md`
+  so there is one honest end-state measurement.
 
 ---
 
