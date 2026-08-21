@@ -2061,7 +2061,7 @@ work from that. If you need something the skill does not mention, that is itself
 a defect worth logging - the skill is the product surface, and this phase is the
 only test it gets against material T24 did not choose.
 
-- [ ] **T27. The defect ledger and the authoring protocol.**
+- [x] **T27. The defect ledger and the authoring protocol.**
   Create `docs/diagram-defects.md`. One entry per defect, each with: the diagram
   that provoked it, what was attempted, what happened, a severity
   (**blocker** the diagram cannot be expressed / **wrong** it renders but says
@@ -2072,6 +2072,23 @@ only test it gets against material T24 did not choose.
   makes a diagram unreadable is still a blocker.
   **Acceptance:** the file exists with the schema written at the top and zero
   entries. No code.
+
+  `docs/diagram-defects.md` exists: a copy-paste `D<n>` entry template in a
+  fenced block, the four severities spelled out as what the defect does to the
+  *diagram* (blocker cannot be expressed / wrong renders something false / ugly
+  reads badly / papercut cost the author something), and an `## Entries` section
+  reading "None yet." Nothing else changed - no `src/`, no fixtures, and the
+  defects already sitting in Discovered work were deliberately **not**
+  pre-loaded, since an entry is supposed to be the output of an authoring wake
+  that actually hit it and can point at a repro.
+
+  Two small calls. `examples/repro/` was not created empty; the first entry that
+  needs it creates it, and a `.gitkeep` for a directory with no files yet is
+  noise. And **entry numbers are `D<n>`, never reused** - the ledger says so at
+  the top, so a fixed defect's number stays readable in the commit that fixed
+  it rather than being recycled onto something unrelated. `npm run check` green
+  (59 files / 657 tests, unchanged); no geometry moved, so `docs/renders/` and
+  `docs/baseline.md` are untouched.
 
 - [ ] **T28. TCP connection lifecycle.**
   The three-way handshake, data transfer, and the four-way teardown, as a
