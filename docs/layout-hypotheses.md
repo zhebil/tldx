@@ -2058,3 +2058,123 @@ is the right shape of function. The obvious successor is to scale the widening
 with the *magnitude* of the skip (a hub reaching 18 flow positions away needs
 more corridor than one reaching 2) and to spend the budget where gate 4 has
 room, which is the axis the file is not already long in. Filed as **B32**.
+
+---
+
+## B32 — per-boundary skip corridor _(wake 38)_ — **KEPT (weak)**
+
+B25 established that a corridor between grid rows is worth real canvas but
+spent it uniformly: every row boundary of a grid carrying any skip edge got the
+same ×2. B32 replaces the flat factor with one derived per boundary from how
+many skip edges actually cross it.
+
+**Premise measured before building** (B8's lesson, and B32's own instruction).
+Two questions had to be answered before writing code.
+
+*Is there a gradient, or is the corpus bimodal?* Only two corpus files have skip
+edges at all. `long-labels` has 4, with flow distances `[2, 2, 2, 4]`.
+`wide-fanout` has 23, distances `[2,2,3,3,4,4,5,...,18,19]` - a smooth ramp, not
+a hub-or-nothing spike. So the premise survives.
+
+*Which derivation?* B32 offered two: the maximum skip distance, or the count of
+skip edges crossing each row boundary. **The max-distance derivation was
+rejected on the measurement**, before any code: it points the wrong way for gate
+4. `wide-fanout` reaches 19 and `long-labels` reaches 4, so max-distance scaling
+demands the most corridor from the file that is already the closest to the area
+cap, and the least from the one with room to spare. Per-boundary crossing counts
+have the opposite shape - they *free* budget, because most boundaries are
+crossed by far fewer chords than the densest one:
+
+| boundary | `long-labels` | `wide-fanout` |
+| --- | --- | --- |
+| 0→1 | 2 | 14 |
+| 1→2 | 0 | 8 |
+| 2→3 | 2 | 2 |
+| 3→4 | 1 | 2 |
+| 4→5 | 0 | — |
+
+Two of `long-labels`' five boundaries are crossed by nothing at all and were
+paying the full ×2 anyway.
+
+**The diff.** `src/domain/layout/stack.ts`, +44/-8, plus tests. A new exported
+pure `skipRowGaps(flowedIds, edges, cols, gap)` returns one gap per row
+boundary, `gap * min(SKIP_ROW_GAP_MAX, 1 + crossings)` with
+`SKIP_ROW_GAP_MAX = 4`. `gridPositions` and `computeFlowPositions` take
+`rowGaps: readonly number[]` instead of a scalar. A `resolveCols(cols, n)`
+helper is shared by the call site and `computeFlowPositions`' grid branch so
+both resolve the column count the same way.
+
+**`SKIP_ROW_GAP_FACTOR = 2` deliberately survives.** It is still what
+`bestGridCols` gets as its `preGap` estimate. The per-boundary gaps cannot be
+computed before `cols` is known and `cols` is chosen from the extent, so the
+column count keeps using the flat estimate - which leaves the chosen `cols`
+byte-identical to the champion's on every corpus file, and confines this wake's
+causal claim to row spacing alone.
+
+**Why the cap is 4 and not 3.** At cap 3 every one of `wide-fanout`'s four
+boundaries saturates, so the candidate degenerates to a flat ×3 there and the
+hypothesis would only ever have been tested on `long-labels`. Cap 4 keeps the
+gradient visible on both files (160/160/120/120 rather than a flat 120) and
+still lands inside gate 4.
+
+**All five objective gates pass, and gate 5 improves again.**
+
+| corpus file | gate 5 champion | gate 5 B32 | canvas champion | canvas B32 | area |
+| --- | --- | --- | --- | --- | --- |
+| deep-nesting | 10 | 10 | 560 x 776 | 560 x 776 | 1.00× |
+| hexagonal | 5 | 5 | 1198 x 636 | 1198 x 636 | 1.00× |
+| long-labels | 1 | 1 | 1927 x 1362 | 1927 x 1362 | 1.00× |
+| sequence | 0 | 0 | 282 x 1360 | 282 x 1360 | 1.00× |
+| sparse-graph | 0 | 0 | 680 x 460 | 680 x 460 | 1.00× |
+| wide-fanout | **31** | **28** | 983 x 620 | 983 x 860 | 1.39× |
+
+Overlapping shape pairs 0 and source-order violations 0 on both changed files;
+edge-edge crossings unmoved (1 and 0). `npm run check` green, 38 files / 315
+tests (7 new). No corpus fixture was touched, and the three B25 tests passed
+unedited.
+
+**`long-labels` is a pure redistribution.** Its five boundaries go from
+`80,80,80,80,80` to `120,40,120,80,40` - the same 400px total, the same
+1927 x 1362 canvas, every pixel of corridor merely moved to where a skip chord
+crosses. That makes it the cleanest possible test of the hypothesis: no area was
+bought, so any verdict is about placement alone.
+
+| file | A | B | verdict | for the candidate |
+| --- | --- | --- | --- | --- |
+| long-labels | candidate | champion | B | **loss** |
+| wide-fanout | champion | candidate | B | **win** |
+
+1 win, 1 loss. Losses are not strictly greater than wins, so **KEPT** under the
+step-6 rule. Four files were structural ties (report and PNG byte-identical) and
+never went to a judge. The randomiser split the labels this time, one each way.
+
+`wide-fanout` won on the mechanism the metric measures: *"B's wider row gaps
+give the Dispatcher's 18-way fan room to spread, so arrows arrive at box tops
+instead of slashing through the Worker 7-10 labels as they visibly do in A's
+tighter rows"*.
+
+**`long-labels` lost, and the reason is the most useful thing in this entry.**
+The judge: *"Layout B's uniform 80px row gaps give the router-to-orders diagonal
+a clean corridor and an evenly rhythmed grid, while Layout A stretches the
+gateway row gap to 120px yet squeezes rate-limiter and orders to a 40px gap,
+forcing that same diagonal arrow through a cramped slot right against the box
+edges."* Two separate defects, and neither is about the scaling function:
+
+1. **The predicate counts skip edges, but the renderer draws long diagonals for
+   flow-adjacent ones too.** `router → orders` is adjacent in flow order
+   (`|Δpos| = 1`), so `skipRowGaps` gives its boundary nothing - yet in a
+   2-column grid an adjacent pair can still land in different rows and be drawn
+   as a long diagonal needing exactly the corridor the predicate withheld.
+   `hasSkipEdge`'s flow-distance test was chosen to break the `cols` circularity
+   (see B25) and it is the right test for *whether* to widen; it is the wrong
+   test for *where*. The successor should count every edge that crosses a row
+   boundary, skip or not. Filed as **B33**.
+2. **Uneven rhythm is itself a cost the metric cannot see.** The judge named the
+   "evenly rhythmed grid" before it named the arrow. A variable row gap makes a
+   grid read as several loosely stacked bands, and that legibility cost is paid
+   on every boundary while the corridor benefit is collected on only some.
+
+So B32 is kept on the letter of the rule and on one genuine win, but it is a
+**weak keep**: the loss is real, it was on the file where the change cost
+nothing, and it points at a specific defect rather than at noise. If the wake-40
+drift audit finds drift, this is the first entry to bisect.
