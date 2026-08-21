@@ -169,6 +169,16 @@ blocker.
   is not the string the author wrote. The shipped diagram passes `font="sans"`
   on every edge, which is a documented prop, and keeps the evidence here.
 - **Repro:** `examples/repro/d6-arrow-label-spaces.tldsl.jsx`
+- **Also seen in:** `examples/c4-container.tldsl.jsx` (T32), which **corrects
+  the font claim above**. Every edge in that file carries `font="sans"` and the
+  spaces still go: `Reads from and writes to [JDBC]` renders `Reads from` /
+  `and writesto`, `Visits bigbank.com/ib using [HTTPS]` renders
+  `bigbank.com/ibusing`, `Sends e-mail using [SMTP]` renders `Sends e-mailusing`.
+  Verified at native resolution, not on a downscaled export. `sans` is not a
+  workaround, it only makes the loss less frequent - and the loss is uneven
+  within one label, some gaps widened and others closed, which is what a
+  justification pass with no word-spacing budget looks like. See also D9, which
+  saw the same thing in `streaming replication`.
 - **Status:** open
 
 ### D7. `layout="auto"` does not lay the graph out
@@ -266,6 +276,15 @@ blocker.
   outside an auto container: the placement is unconditional, so any edge long
   enough to cross a tier will do it.
 - **Repro:** `examples/repro/d11-edge-label-over-shape.tldsl.jsx`
+- **Also seen in:** `examples/c4-container.tldsl.jsx` (T32), where the same
+  unconditional placement puts **three** labels on one box. `arrow-truth`:
+  `label-overlap: c030096a-0 over mobile-app`, `c99fd976-0 over mobile-app`,
+  `d5654050-0 over mobile-app` - the SPA's API call, the staff member's mainframe
+  access and the e-mail back to the customer all have their midpoint inside
+  `Mobile App`, so its own three-line label is under three foreign ones. Note
+  the asymmetry with D9: a row *does* widen its gap to clear the label of an
+  edge between two **adjacent** children, and reserves nothing at all for an
+  edge that skips one.
 - **Status:** open
 
 ### D12. `<Group>` requires an `id`, the skill does not say so, and the error names `<frame>`
@@ -373,4 +392,68 @@ blocker.
   wrong, and an author cannot tell which without running `check`.
 - **Repro:** `examples/repro/d16-note-maxw-rejected.tldsl.jsx` (compiles, with
   the comment naming the prop to add back)
+- **Status:** open
+
+### D17. A `<Frame>` cannot be a C4 boundary: no `dash`, and its name is the smallest text on the canvas
+
+- **Diagram:** `examples/c4-container.tldsl.jsx`
+- **Severity:** ugly
+- **Attempted:** `<Frame id="ibs" name="Internet Banking System" dash="dashed">`
+  around the five containers. The dashed boundary is not decoration in C4 - it
+  is the notation that says "this is the system we are talking about, everything
+  outside it is somebody else's", and it is the one line every C4 diagram has.
+- **Happened:** `error[ir/unknown-prop]: 'dash' is not supported on '<frame>'
+  (allowed: id, name, direction, layout, gap, pad, cols, align, x, y, w, h,
+  color)`. `color` is the only style a frame takes, so there is no way to draw
+  the boundary differently from any other container. What ships is worse than
+  neutral: a `<Box dash="dashed">` **is** allowed, so in the render the two
+  external systems are boldly dashed while the boundary is a hairline solid
+  rectangle - C4's emphasis exactly inverted. The name is drawn in small system
+  text above the top-left corner, ~30px tall on a 5824x2820 export, which makes
+  the most important string in the diagram the smallest one on it.
+- **Repro:** `examples/repro/d17-frame-boundary-undashed.tldsl.jsx` (compiles;
+  the comment says which prop to add to get the error, and rendering it shows
+  the dashed external box beside the hairline boundary)
+- **Status:** open
+
+### D18. `geo` has no `person` and no `cylinder`, the two shapes C4 mandates
+
+- **Diagram:** `examples/c4-container.tldsl.jsx`
+- **Severity:** ugly
+- **Attempted:** `geo="person"` on the two actors and `geo="cylinder"` on the
+  database. C4 identifies elements by shape before you read a word of them: a
+  person is a stick figure or a head-and-shoulders box, a datastore is a
+  cylinder.
+- **Happened:** Both rejected with `error[ir/invalid-style-value]: 'geo' must be
+  one of arrow-down, arrow-left, arrow-right, arrow-up, check-box, cloud,
+  diamond, ellipse, heart, hexagon, octagon, oval, pentagon, rectangle,
+  rhombus-2, rhombus, star, trapezoid, triangle, x-box`. The set is tldraw's geo
+  shapes verbatim, and it contains `heart` and `star` but neither of the two
+  shapes the most widely used architecture notation is built on. Both fell back
+  to `geo="ellipse"` plus a colour, so in the render a person and a database are
+  the same shape as each other, distinguished only by blue versus green.
+- **Repro:** `examples/repro/d18-no-person-or-cylinder-geo.tldsl.jsx`
+- **Status:** open
+
+### D19. A `\n` in a label attribute renders as the characters `\n`, and multiline labels are undocumented
+
+- **Diagram:** `examples/c4-container.tldsl.jsx`
+- **Severity:** papercut
+- **Attempted:** A C4 element is three lines - name, bracketed type, one-line
+  description - so every box wanted a multiline label. The obvious thing to
+  write is `label="Web Application\n[Container: Java, Spring MVC]\nDelivers the
+  SPA."`.
+- **Happened:** `check` accepts it with no diagnostic and the box renders the
+  two literal characters `\` and `n` in the middle of its text. That is JSX
+  behaviour - a string *attribute* does not process escapes - but the tool sees
+  a label containing a backslash and an `n` and says nothing about it, and the
+  render is the first place anyone finds out. The working form is
+  `label={"a\nb"}` and it wraps correctly on three lines; `maxW` on a `<Box>`
+  is accepted and wraps within each line (unlike on `<Note>`/`<Sticky>`, D16).
+  Neither multiline labels nor the expression form appears anywhere in
+  `skills/tldsl/SKILL.md`, which shows `maxW` only as "caps how wide a label may
+  run before wrapping" - so the one prop the author needs to write a C4 box is
+  found by experiment.
+- **Repro:** `examples/repro/d19-literal-newline-in-label.tldsl.jsx` (both forms
+  side by side; both pass `check`, only one is a label)
 - **Status:** open

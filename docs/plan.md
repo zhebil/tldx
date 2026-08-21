@@ -2272,7 +2272,7 @@ only test it gets against material T24 did not choose.
   topics, the labels still smear. `npm run check` green, no `src/` touched, so
   `docs/renders/` and `docs/baseline.md` are unchanged.
 
-- [ ] **T32. A C4 container diagram.**
+- [x] **T32. A C4 container diagram.**
   Follow the C4 convention properly: a system boundary, containers inside it
   with technology annotations, external systems and people outside it, and every
   edge labelled with both purpose and protocol. C4 has explicit conventions this
@@ -2280,6 +2280,53 @@ only test it gets against material T24 did not choose.
   it is expressible and how much needs new vocabulary.
   **Acceptance:** `examples/c4-container.tldsl.jsx`, check clean, PNG reviewed,
   gaps logged.
+
+  `examples/c4-container.tldsl.jsx` exists and `tldsl check` is clean: the
+  canonical Big Bank internet-banking subject, with two people and two external
+  systems in chrome-free `<Group>`s above and below a `<Frame>` boundary holding
+  the five containers (web app, SPA, mobile app, API app, database), every
+  element carrying its C4 three-line label and every one of the eleven edges
+  carrying purpose *and* protocol - `Reads from and writes to [JDBC]`,
+  `Makes API calls to [XML/HTTPS]`, `Sends e-mail using [SMTP]`.
+
+  **Most of C4 turned out expressible, and the parts that are not are notation,
+  not layout.** Two discoveries worth carrying forward. Multiline labels work
+  via `label={"a\nb"}` - the expression form, not the string-attribute form -
+  which is what a C4 element needs and what nothing in the corpus had used;
+  and `maxW` **is** accepted on `<Box>` and wraps within each line, which is
+  the opposite of D16's finding on `<Note>`/`<Sticky>`. Applying `maxW="240"`
+  is authoring, not a workaround: C4 containers are fixed-width boxes, and
+  without it the five containers sit on one 9474px line at aspect ratio 5.38.
+
+  **The numbers.** `layout-report`: 0 overlapping shape pairs, 6 edge-edge
+  crossings, 2 edges crossing a frame boundary they don't belong to, canvas
+  2848x1226, fill ratio 0.221. `arrow-truth`: 3 arrow paths crossing a
+  non-endpoint shape and **3 labels on one box** - `Mobile App` carries the
+  SPA's API call, the staff member's mainframe access and the e-mail to the
+  customer on top of its own three-line label. The PNG was rendered and read.
+  It is legible - the second-best render of Phase 9 after T30 - and the
+  containers read left to right in C4's order.
+
+  **Three new entries, D17-D19, plus recurrences on D6 and D11.** D17 (ugly) -
+  a `<Frame>` takes only `color`, so the dashed system boundary that is C4's
+  central piece of notation is `ir/unknown-prop`; worse, a `<Box>` *can* be
+  dashed, so the render shows boldly dashed external systems around a hairline
+  solid boundary, C4's emphasis inverted. D18 (ugly) - `geo` has `heart` and
+  `star` but no `person` and no `cylinder`, so an actor and a datastore are
+  both ellipses distinguished only by colour. D19 (papercut) - `label="a\nb"`
+  as a string attribute passes `check` silently and renders the two characters
+  `\n` inside the box; the working expression form is documented nowhere in the
+  skill. **D6 is corrected**: it claimed `font="sans"` fixes the vanishing
+  spaces, and all eleven edges here are `sans` and still render `writesto`,
+  `bigbank.com/ibusing`, `e-mailusing` - verified at native resolution. D11 gains
+  the asymmetry that explains it: a row widens its gap to clear the label of an
+  edge between **adjacent** children and reserves nothing for an edge that skips
+  one.
+
+  Nothing was worked around and nothing was reshaped. The boundary stays
+  undashed, the people stay ellipses, and the three labels stay stacked on
+  `Mobile App`. `npm run check` green (59 files, 657 tests); no `src/` touched,
+  so `docs/renders/` and `docs/baseline.md` are unchanged.
 
 - [ ] **T33. A CI/CD pipeline with branches and a gate.**
   Commit through build, unit tests, integration tests, a manual approval gate,
@@ -3546,3 +3593,25 @@ promoted into the task list by the human.
   Folded into D16 rather than given a number of its own, but if D12 gets a fix
   that maps IR node kinds back to the authored component name, this is the
   second case it should cover.
+- **T32: `gap` on a row is advisory, and the override is invisible.** The C4
+  boundary is written `gap="64"` and the rendered gaps between its five
+  containers are 394, 393, 394 and 393px - six times what was asked - because
+  the row widens until each adjacent pair's edge label fits (the mechanism D9
+  calls `labelClearanceGap`). The behaviour is right and the diagram would be
+  worse without it, but a number the author wrote is silently multiplied by six
+  and nothing says so. Related to the D9/D11 asymmetry, and probably the same
+  code: the same pass that over-pays for adjacent labels pays nothing for
+  skipping ones.
+- **T32: `maxW` sizes each box independently, so C4's equal containers are not
+  equal.** With `maxW="240"` on all five, the rendered widths are 236, 215, 227,
+  236 and 296 - each box shrinks to its own longest wrapped line. C4 draws
+  containers as a uniform grid of identical boxes and the raggedness reads as
+  accidental. This is D10 one level down: D10 is sibling *frames* sized to their
+  contents, this is sibling *boxes*, and a `minW`, or an `align="stretch"` that
+  worked, would answer both.
+- **T32: nothing in the corpus had ever used a multiline label before this
+  wake.** `label={"a\nb"}` works, and the whole of C4's element notation
+  depends on it. Every diagram in `examples/` before T32 puts the type and the
+  description in a `<Note>` or leaves them out. If the skill gains one example
+  from this phase, it should be a three-line box label - it is the single
+  highest-value thing found in T32 and D19 only logs that it is undocumented.
