@@ -14,13 +14,14 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 22
-  for **B20** (topology-gated doc-root aspect wrap), which sits on top of the
-  wake-12 B1 revision (cross-axis `align`, default `center`). Those are the only
-  two hypotheses ever kept - B2, B3, B4a, B13, B14, B15 and B6 all reverted
-  after judging, and B7 was rejected at an objective gate before judging. Judged
-  results live in `docs/layout-hypotheses.md` - read it before proposing a
-  hypothesis.
+- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 28
+  for **B9** (a note reserves the space tldraw actually draws), which sits on
+  top of the wake-22 **B20** revision (topology-gated doc-root aspect wrap) and
+  the wake-12 **B1** revision (cross-axis `align`, default `center`). Those
+  three are the only hypotheses ever kept - B2, B3, B4a, B13, B14, B15 and B6
+  all reverted after judging, and B7 was rejected at an objective gate before
+  judging. Judged results live in `docs/layout-hypotheses.md` - read it before
+  proposing a hypothesis.
 
 ---
 
@@ -753,9 +754,18 @@ Ordered. Take from the top. Strike through when resolved.
   if the corpus gains a frame whose title outruns its content - a corpus change,
   which is its own hypothesis. The measurement's real finding is vertical and
   survives as **B22**/**B23**. Ledger entry in `docs/layout-hypotheses.md`.
-- [ ] **B9** Note sizing: notes reserve a fixed 200×80 in layout but tldraw
-  resizes stickies to fit, so reserved space and rendered space disagree.
-
+- [x] ~~**B9** Note sizing: notes reserve a fixed 200×80 in layout but tldraw
+  resizes stickies to fit, so reserved space and rendered space disagree.~~
+  **KEPT** _(wake 28)_ - premise measured first and it was understated: tldraw
+  draws a sticky 200 wide with a 168px text column, and both corpus notes render
+  **564px** of text into the 80px layout reserved for them, ink running from
+  `y 318` to `y 882` straight through four box labels while the report says
+  `overlapping shape pairs: 0`. `estimatedNoteSize(text)` now returns
+  `200 x max(200, lines * 30 + 32)` over a naive wrap, and `emitNote` passes the
+  reserved height on as `growY` so the drawn sticky matches. One voting file
+  (`long-labels`; the other five have no notes and are byte-identical), judge
+  chose the candidate. Gate 4 passed on rendered extents and failed on reported
+  ones - see the ledger entry, and the discovered-work item it filed.
 - [ ] **B24** _(restored from the revert pile, wake 26)_ Re-apply
   `docs/patches/b13-elbow-side-anchors.patch` - elbow arrows and automatic side
   anchors, shipped together - and re-judge under the loosened verdict rule. B13
@@ -826,6 +836,19 @@ Ordered. Take from the top. Strike through when resolved.
   *toward* ~16:9, not past it. Overlapped B7, which was rejected at gate 5; the
   overlap now transfers to B20, so do B20 first if it lands and this reduces to
   choosing the cap from the width B20 already wants.
+
+- [ ] **B26** _(from B9's measurement, wake 28)_ Calibrate `AVG_CHAR_PX` against
+  a real browser. B9 established that a layout dimension may be measured rather
+  than guessed, and `estimatedBoxSize`'s flat 9px per character is now the last
+  estimator in the repo with no measured basis. `tools/text-metrics.mts` already
+  prints `labelW` beside `shapeW` for every box, so the calibration is a
+  reading, not a hypothesis - but changing the constant moves every box in every
+  corpus file, so run it through the full protocol. **Measure the premise before
+  building** (B8's lesson): if the current constant already sits within a few
+  percent of the measured width, this strikes like B8 did. The champion's
+  `long-labels` numbers suggest boxes over-reserve by a flat 32px of padding
+  rather than by a per-character error, which would make the real finding
+  `BOX_PAD_X`, not `AVG_CHAR_PX`.
 
 ---
 
@@ -1368,3 +1391,23 @@ anything that outlives the loop.)_
   proposing another doc-root placement rule, check which of the six files can
   physically see it; wake 22 already recorded that at most two can, and B21b
   found both of those are the wrong topology for wrap-order work.
+
+- **(wake 28)** **Gate 4 compares layout-model canvases, so a layout that
+  under-reserves gets a free pass on area.** B9 is 2.00x the champion's
+  *reported* canvas and 1.32x its *rendered* one, because the champion's report
+  claims 580px of height for a file whose ink reaches 882. The gate as written
+  would have rejected the fix for the very defect it could not see. It was
+  passed on the rendered comparison and both numbers were recorded. Fix the gate
+  properly: compute the champion's canvas from rendered ink extents (the pieces
+  exist - `tools/text-metrics.mts` returns per-label rects, `tools/screenshot.mts`
+  has the browser), or at minimum add the note text's drawn height to the
+  reported canvas. Until then, gate 4 is only trustworthy for files whose
+  reserved rects and drawn ink agree.
+
+- **(wake 28)** **`AVG_CHAR_PX = 9` is now the last unmeasured estimator.**
+  `estimatedNoteSize` is calibrated against real browser metrics as of B9;
+  `estimatedBoxSize` still guesses 9px per character for box labels. The same
+  tool that settled the note can settle this - `tools/text-metrics.mts` already
+  prints `labelW` next to `shapeW` for every box in a file, and the champion's
+  `long-labels` numbers show boxes reserving a consistent 32px more than their
+  label needs. Filed as **B26** in the backlog rather than done inline.

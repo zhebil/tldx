@@ -1259,3 +1259,82 @@ gains a frame whose title genuinely outruns its content, and that is a corpus
 change, which is its own hypothesis.
 
 ---
+
+## B9 — a note reserves the space tldraw actually draws _(wake 28)_ — **KEPT**
+
+**Hypothesis.** Notes reserve a fixed 200x80 in layout but tldraw resizes
+stickies to fit their text, so reserved space and rendered space disagree.
+
+**Premise, measured before building** (`tools/text-metrics.mts` on
+`long-labels.tldsl.jsx`, the only corpus file with notes — two of them):
+
+| what | value |
+|---|---|
+| note shape width as drawn | **200.00** (fixed; tldraw stickies are always 200 wide) |
+| note text area width | **168.00** → 16px padding each side |
+| note label height as drawn | **564.06** for both notes = 19 lines x 29.69 |
+| height layout reserved | **80** |
+
+So the premise is true, and understated. The champion does not merely
+mis-estimate the note: it reserves 80px for something that draws 564px of text,
+vertically centred, which puts the text's ink at `y 318-882` while the sticky
+sits at `y 500-700`. In the champion render that text runs straight through the
+`payments`, `audit`, `notifier` and `reporting` box labels. The geometry report
+says `overlapping shape pairs: 0` throughout — a note's text is not a shape, so
+gate 2 is structurally blind to it. This is the exact defect
+`tools/screenshot.mts` was built for.
+
+**The change** (35 lines across 6 files, one causal claim):
+
+- `estimatedNoteSize()` becomes `estimatedNoteSize(text)`: width is always
+  `NOTE_SIZE = 200`, height is `max(200, lines * 30 + 32)` over a naive wrap at
+  `NOTE_CHAR_PX = 15` into the 168px text column. Deliberately generous — it
+  reserves 632 where 596 is needed.
+- `noteShape` takes an optional `growY`; `emitNote` passes
+  `max(0, note.h - 200)`, so the *drawn* sticky grows to the height layout
+  reserved instead of letting text spill out of a 200-tall square.
+
+**Objective gates.** Five of six corpus files are byte-identical (no notes), so
+only `long-labels` was measured or judged.
+
+| gate | champion | candidate | |
+|---|---|---|---|
+| 1. `npm run check` | green | green (37 files / 302 tests) | pass |
+| 2. overlapping shape pairs | 0 | 0 | pass |
+| 3. source-order violations | 0 | 0 | pass |
+| 4. canvas area | 1927 x 580 = 1.12M | 1927 x 1162 = 2.24M | **see below** |
+| 5. arrow paths crossing a non-endpoint shape | 1 | 1 | pass |
+
+**Gate 4 — passed on the render, failed on the report, and the render wins.**
+Against the champion's *reported* canvas the candidate is **2.00x**, over the
+1.5x limit. That reported number is false for this file, and false in precisely
+the way the protocol already forbids relying on: "never conclude anything about
+text fit, **note size**, or arrow paths from the report alone." The champion's
+real ink extends to `y 882` (measured above, not estimated), so its true canvas
+is `1927 x 882 = 1.70M` and the candidate is **1.32x** of it — under the limit.
+The growth is not the candidate spreading the diagram out; it is layout finally
+accounting for space the champion was already consuming on top of other shapes.
+
+Recorded as a **PASS**, with both numbers stated so a later wake can overturn
+this reading. The underlying flaw is gate 4's, not the candidate's: gate 4
+compares layout-model canvases, and a layout model that under-reserves gets a
+free pass on area. Filed as discovered work.
+
+**Blind A/B.** One voting file. `long-labels`: A = candidate, B = champion.
+Judge chose **A** — "Layout A places both notes cleanly below the flow with room
+for their full text, while B's report claims 80px-tall notes but the render
+shows their text overflowing upward and colliding with the payments, audit, and
+reporting boxes, making three labels nearly unreadable."
+
+**Verdict: KEPT** — 1 win, 0 losses, 5 structural ties. The judge independently
+identified the report/render disagreement without being told what the change
+was.
+
+**What this establishes.** A layout dimension may be *calibrated against a real
+browser measurement* rather than guessed. `NOTE_SIZE = 200`, `NOTE_PAD = 16` and
+the 168px text column are observed facts about tldraw, not heuristics, and
+`estimatedNoteSize` is now the only estimator in the repo with a measured basis.
+`AVG_CHAR_PX = 9` for box labels is still a guess; the same tool can settle it
+(see B26).
+
+---
