@@ -81,7 +81,7 @@ describe("computeEdgeRoutes", () => {
     expect(route!.endAnchor).toEqual({ x: 0, y: 0.5 });
   });
 
-  it("leaves edges whose endpoints sit in different containers straight", () => {
+  it("leaves a cross-container edge straight when nothing sits between its endpoints", () => {
     const ir = doc("root", [
       frame({
         id: "f1",
@@ -166,6 +166,62 @@ describe("computeEdgeRoutes", () => {
     expect(ce).toBeDefined();
     expect(ad!.bend).toBeLessThan(0);
     expect(ce!.bend).toBeLessThan(0);
+    expect(ce!.bend).toBeCloseTo(-12, 5);
+    expect(ad!.bend).toBeCloseTo(-33.5, 5);
+    expect(Math.abs(ad!.bend)).toBeGreaterThan(Math.abs(ce!.bend));
+  });
+
+  it("routes a cross-container edge, bowing around obstacles outside both endpoints' containers", () => {
+    // Same geometry as the plain "bows a chord over two boxes" test above,
+    // but a and d each sit inside their own top-level frame while b and c
+    // stay outside any frame. The chord still needs to clear b and c, so it
+    // should bow exactly like the non-nested case (frames aren't obstacles).
+    const ir = doc("root", [
+      frame({ id: "f1", x: 0, y: 0, w: 100, h: 50, children: [box({ id: "a", x: 0, y: 0, w: 100, h: 50 })] }),
+      box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+      box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
+      frame({ id: "f2", x: 450, y: 0, w: 100, h: 50, children: [box({ id: "d", x: 0, y: 0, w: 100, h: 50 })] }),
+      edge({ id: "ad", from: "a", to: "d" }),
+    ]);
+    const routes = computeEdgeRoutes(ir);
+    const route = routes.get("ad");
+    expect(route).toBeDefined();
+    expect(route!.bend).toBeCloseTo(-13.5, 5);
+    expect(route!.startAnchor).toEqual({ x: 0.5, y: 0 });
+    expect(route!.endAnchor).toEqual({ x: 0.5, y: 0 });
+  });
+
+  it("groups cross-container edges by lowest common ancestor for lane assignment", () => {
+    // Same shapes/spans as "lanes overlapping-span skips in the same row"
+    // above (ad skips b/c, ce skips d, spans overlap 350..500), but a and e
+    // are nested one level inside frames f1/f5, both siblings under an
+    // "outer" frame alongside top-level b/c/d. ad's endpoints (f1, outer)
+    // and ce's endpoints (outer, f5) both resolve to the same LCA, "outer",
+    // so they land in the same lane group exactly as the flat case: ce
+    // (shorter span) keeps rank 0 (-12), ad ranks above it (-33.5).
+    const ir = doc("root", [
+      frame({
+        id: "outer",
+        x: 0,
+        y: 0,
+        w: 700,
+        h: 50,
+        children: [
+          frame({ id: "f1", x: 0, y: 0, w: 100, h: 50, children: [box({ id: "a", x: 0, y: 0, w: 100, h: 50 })] }),
+          box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+          box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
+          box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
+          frame({ id: "f5", x: 600, y: 0, w: 100, h: 50, children: [box({ id: "e", x: 0, y: 0, w: 100, h: 50 })] }),
+        ],
+      }),
+      edge({ id: "ad", from: "a", to: "d" }),
+      edge({ id: "ce", from: "c", to: "e" }),
+    ]);
+    const routes = computeEdgeRoutes(ir);
+    const ad = routes.get("ad");
+    const ce = routes.get("ce");
+    expect(ad).toBeDefined();
+    expect(ce).toBeDefined();
     expect(ce!.bend).toBeCloseTo(-12, 5);
     expect(ad!.bend).toBeCloseTo(-33.5, 5);
     expect(Math.abs(ad!.bend)).toBeGreaterThan(Math.abs(ce!.bend));

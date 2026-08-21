@@ -309,3 +309,55 @@ a solid wedge of ink for the first ~15% of their length near `Dispatcher`.
 `crowdedPairs` scores that 0 because the arcs diverge well before the
 one-third-of-length threshold, so the metric is not lying, but the eye still
 sees a blob. Both the aspect and the wedge are in Discovered work.
+
+## After T6b - cross-container routing (criterion NOT met)
+
+`npx tsx tools/crossing-classify.mts tests/corpus/*.tldsl.jsx`
+
+| file | crossings (T6) | crossings (T6b) | crowded pairs (T6) | crowded pairs (T6b) |
+|---|---|---|---|---|
+| deep-nesting | 9 | **3** | 4 | **0** |
+| hexagonal | 6 | 6 | 0 | 0 |
+| long-labels | 2 | 2 | 0 | 0 |
+| multi-region | 0 | 0 | 0 | 0 |
+| release-pipeline | 0 | 0 | 0 | 0 |
+| sequence | 0 | 0 | 0 | 0 |
+| sparse-graph | 0 | 0 | 0 | 0 |
+| wide-fanout | 0 | 0 | 0 | 0 |
+| **total** | **17** | **11** | **4** | **0** |
+
+Buckets: same-axis skip 0, cross-container **15 -> 9**, fan 0, other 2.
+Arrow counts per file are unchanged and no rendered path is under 15px, so
+nothing was bought by deleting an arrow. Only `docs/renders/deep-nesting.png`
+changed on disk.
+
+**The corpus now has zero crowded pairs**, which is the first time T5's
+criterion has held everywhere - see T5 in `docs/plan.md`.
+
+The change is the two gates T6b names, widened together in
+`src/domain/layout/routing.ts`: the `from.parentId !== to.parentId` bail in
+`computeCandidate`, and the `s.parentId === from.parentId` predicate building
+`crossed`. `RouteCandidate.parentId` became the **lowest common ancestor** of
+the two endpoints' parents, since a cross-container edge has no single parent
+and that field is only a lane-grouping key. Nothing else moved: `deriveAxis`,
+the `others`/`gap` scan and the overshoot viability test already ranged over
+all shapes.
+
+`deep-nesting`'s vertical chain was four bare collinear segments stacked into
+one stroke, piercing Config, Router, Metrics, Handler and Validator with four
+arrowheads on a single line. It is now four separate arcs, none of which
+touches a box.
+
+**Why the criterion (cross-container <= 5) was not met.** All nine survivors
+are genuinely diagonal: neither the x-ranges nor the y-ranges of their
+endpoints overlap, so `deriveAxis` returns `null`. `hexagonal`'s six
+(`usecases -> p-notifications`, `usecases -> p-clock`, `usecases ->
+p-orders-repo`, `http -> p-create-session`) and `deep-nesting`'s three
+(`l3-handler -> l4-parser`, `l4-serializer -> l1-gateway` twice) are all of
+this kind. Widening `deriveAxis` to fall back to the dominant axis
+(`|dx| > |dy|`) was built and measured: **an exact no-op on all eight files**,
+byte-identical route maps and byte-identical PNGs. The fallback is reachable
+only when both perpendicular bands are disjoint, and `isCrossing` then requires
+an obstacle tall (or wide) enough to bridge that gap; no box in this corpus is.
+It was reverted. Bowing these edges needs a genuinely different routing
+strategy, which T6b's own text rules out.

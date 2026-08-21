@@ -406,9 +406,10 @@ Two traps, both paid for already:
   rather than left as-is, because the anchored chord changes what the old test
   was approximating.
 
-- [>] **T5. Lanes for parallel skips.** *Deferred to T6b - skip it, do not take
-  it as the top task. Its mechanism shipped; its box is re-checked when T6b
-  lands.*
+- [x] **T5. Lanes for parallel skips.** *Ticked by T6b, which was what it was
+  deferred to. The whole corpus now measures **zero** crowded pairs, so the
+  acceptance below holds as written. The note further down explains why the box
+  sat unchecked for three wakes and is kept as the record.*
   Once skips bow, two skips over overlapping spans bow into each other and
   become one thick illegible stroke. Assign each a distinct bend magnitude,
   ordered by span length so the longest chord takes the outermost lane.
@@ -599,6 +600,57 @@ Two traps, both paid for already:
   15 to at most 5; `deep-nesting`'s four crowded pairs gone; no file regresses
   on either crossings or crowded pairs. Then re-check T5's criterion and tick
   its box if it now holds.
+
+  **Built as specified. The box stays unchecked: half the criterion is not met,
+  and that half is not reachable by the mechanism this task describes.** The
+  change itself is a clear win and is shipped - do not revert it, and do not
+  rebuild it.
+
+  What was built, exactly the two gates named above, widened together in
+  `src/domain/layout/routing.ts`: the `from.parentId !== to.parentId` bail in
+  `computeCandidate` is gone, and the `crossed` filter no longer requires
+  `s.parentId === from.parentId`. `RouteCandidate.parentId` became the
+  **lowest common ancestor** of the two endpoints' parents (new `ancestorChain`
+  / `lowestCommonAncestor` helpers), because a cross-container edge has no
+  single parent and that field is only the lane-grouping key. Nothing else
+  moved - `deriveAxis`, the `others`/`gap` scan and the overshoot viability
+  test already ranged over every shape, exactly as this task predicted. Frames
+  stay excluded from `crossed`: `tools/arrow-truth.mts` only collects `geo` and
+  `note` tldraw shapes, so a frame border is never scored as a crossing.
+
+  **The numbers: 17 -> 11 crossings, cross-container 15 -> 9, crowded pairs
+  4 -> 0.** `deep-nesting` 9 -> 3 and its four crowded pairs are gone; no other
+  file moved and none regressed on either metric. Arrow counts per file are
+  unchanged and no rendered path is under 15px, so nothing was bought by
+  deleting an arrow. `npm run check` green (40 files, 360 tests). Only
+  `docs/renders/deep-nesting.png` changed. Looked at it against the previous
+  render: the vertical chain used to be four collinear segments stacked into
+  one stroke, piercing five boxes with four arrowheads on a single line; it is
+  now four separate arcs and none of them touches a box.
+
+  **Why cross-container <= 5 was not reached.** All nine survivors are
+  genuinely diagonal - neither the x-ranges nor the y-ranges of their endpoints
+  overlap, so `deriveAxis` returns `null` and the edge is declined before any
+  of the routing machinery runs. They are `hexagonal`'s `usecases ->
+  p-notifications` (x2), `usecases -> p-clock` (x2), `usecases ->
+  p-orders-repo`, `http -> p-create-session`, and `deep-nesting`'s
+  `l3-handler -> l4-parser` and `l4-serializer -> l1-gateway` (x2). Verified
+  from the absolute coordinates in `tools/layout-report.mts`, not inferred.
+
+  `deriveAxis` is arguably a third trigger gate rather than a second mechanism,
+  so widening it was built and measured before writing this: fall back to the
+  dominant axis, `horizontal` when `|dx| > |dy|` else `vertical`. **It is an
+  exact no-op on all eight files** - byte-identical route maps, byte-identical
+  PNGs. The fallback is reachable only when both perpendicular bands are
+  disjoint, and `isCrossing` then demands an obstacle tall (or wide) enough to
+  bridge that gap; no box in this corpus is. Reverted, and recorded here so it
+  is not tried a fourth time. Bowing a diagonal chord needs a genuinely
+  different routing strategy - a detour waypoint, or moving the endpoints -
+  which this task's own "do not invent a second mechanism" rules out. That is
+  the contradiction, and the plan says report it rather than improvise.
+
+  T5's box **was** re-checked and **is now ticked**: the corpus measures zero
+  crowded pairs in every file.
 
 - [ ] **T7. Notes: shape, and attachment.**
   Two changes, shipped together because the second is only worth having once
@@ -1367,3 +1419,31 @@ promoted into the task list by the human.
   main table.** Crowded pairs are tracked in the "After T5" section instead.
   Whoever next revises the baseline should decide whether crowding earns a
   column of its own alongside crossings, since it is now a standing check.
+- **Diagonal edges are now the entire crossing residue, and nothing in the task
+  list owns them.** After T6b the corpus is 11 crossings: nine cross-container
+  diagonals plus `long-labels`' two `other`. Every one of the nine is declined
+  at `deriveAxis` because the endpoints share neither an x- nor a y-range. Bows
+  cannot help - the dominant-axis fallback was measured as an exact no-op (see
+  T6b). The two candidate mechanisms are a detour waypoint (multi-point arrow
+  path, a real departure from single-bend routing) and moving the endpoints so
+  they share an axis (placement, which is how T6 solved `wide-fanout`). The
+  second is the same trick that has worked twice; `hexagonal`'s six all come
+  from one source fanning into a column of ports it is not aligned with.
+- **`src/domain/layout/routing.ts` contains two literal NUL bytes** in the
+  `assignLanes` group-key template literal, in place of what should be spaces or
+  a separator character. Pre-existing since T5, unrelated to T6b. It does not
+  affect correctness - NUL is a valid JS string char and equality still groups
+  right - but it makes git treat the file as binary (`Bin 11682 -> 12373 bytes`
+  instead of a diff) and breaks plain `grep` on it. Both cost a wake real time.
+  Worth one line of cleanup.
+- **`isCrossing` requires an obstacle to overlap the perpendicular band of
+  *both* endpoints.** That is right for an axis-aligned skip and wrong for
+  anything else: a box sitting squarely in the middle of a diagonal chord is
+  not "crossed" by this predicate unless it happens to straddle both endpoint
+  bands. It is the second reason the diagonal residue survives, independent of
+  `deriveAxis`, and any future diagonal work has to replace it with an actual
+  segment-vs-rectangle test - `segmentHitsRect` in `tools/arrow-truth.mts`
+  already is one.
+- **The `other` bucket has never been looked at.** `long-labels`' two crossings
+  have been 2 since T4 and no task in the list targets them. They are now 18% of
+  the remaining total.
