@@ -8,26 +8,9 @@ import type {
   IRFramePositioned,
 } from "../../src/domain/ir/index.js";
 import type { LayoutMode } from "../../src/domain/layout/defaults.js";
-import { arrowPath, layoutReport } from "../../tools/layout-report.mjs";
+import { layoutReport } from "../../tools/layout-report.mjs";
 
 describe("tools/layout-report", () => {
-  it("counts an arrow path crossing a non-endpoint box, but not without one", () => {
-    const a = box({ id: "a", x: 0, y: 0, w: 100, h: 50 });
-    const mid = box({ id: "mid", x: 150, y: 0, w: 100, h: 50 });
-    const c = box({ id: "c", x: 300, y: 0, w: 100, h: 50 });
-    const eAC = edge({ id: "e-ac", from: "a", to: "c" });
-
-    const withMiddle = layoutReport(doc({ children: [a, mid, c, eAC] }));
-    expect(withMiddle.split("\n")).toContain("arrow paths crossing a non-endpoint shape: 1");
-
-    const withoutMiddle = layoutReport(doc({ children: [a, c, eAC] }));
-    expect(withoutMiddle.split("\n")).toContain("arrow paths crossing a non-endpoint shape: 0");
-
-    const eAB = edge({ id: "e-ab", from: "a", to: "mid" });
-    const adjacentOnly = layoutReport(doc({ children: [a, mid, c, eAB] }));
-    expect(adjacentOnly.split("\n")).toContain("arrow paths crossing a non-endpoint shape: 0");
-  });
-
   it("pins overlap, crossing, and source-order counts on a hand-built doc", () => {
     // Two overlapping boxes (a, b) at the top level, ordered [b, a] so a
     // row-mode source-order violation fires; a frame (f) with two stacked
@@ -89,33 +72,6 @@ describe("tools/layout-report", () => {
     expect(line).toBeDefined();
     const count = Number(line!.split(": ")[1]);
     expect(count).toBeGreaterThan(0);
-  });
-});
-
-describe("arrowPath", () => {
-  it("splits an elbow route on the wider axis", () => {
-    expect(arrowPath({ x: 0, y: 0 }, { x: 100, y: 10 }, "elbow")).toEqual([
-      { x: 0, y: 0 },
-      { x: 50, y: 0 },
-      { x: 50, y: 10 },
-      { x: 100, y: 10 },
-    ]);
-  });
-
-  it("splits an elbow route on the taller axis", () => {
-    expect(arrowPath({ x: 0, y: 0 }, { x: 10, y: 100 }, "elbow")).toEqual([
-      { x: 0, y: 0 },
-      { x: 0, y: 50 },
-      { x: 10, y: 50 },
-      { x: 10, y: 100 },
-    ]);
-  });
-
-  it("returns a straight chord for non-elbow kinds", () => {
-    expect(arrowPath({ x: 0, y: 0 }, { x: 10, y: 100 }, "arc")).toEqual([
-      { x: 0, y: 0 },
-      { x: 10, y: 100 },
-    ]);
   });
 });
 

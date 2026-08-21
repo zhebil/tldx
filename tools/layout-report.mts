@@ -11,9 +11,7 @@
 
 import { basename } from "node:path";
 
-import type { SceneJSON } from "../src/contracts/scene-json.js";
 import { hasErrors } from "../src/domain/diagnostics/index.js";
-import { emit } from "../src/domain/emit/index.js";
 import { lower } from "../src/domain/ir/index.js";
 import type {
   IRDocPositioned,
@@ -190,151 +188,18 @@ function frameBorders(f: AbsShape): [Pt, Pt][] {
   ];
 }
 
-// -- arrow path tracing (emitted scene) --------------------------------------
-
-/** Traces the on-canvas route of an arrow between two resolved endpoints. */
-export function arrowPath(p: Pt, q: Pt, kind: string): Pt[] {
-  if (kind !== "elbow") return [p, q];
-  // ponytail: mid-split orthogonal route, not tldraw's actual elbow router;
-  // upgrade if the router's real bend point ever needs pinning.
-  if (Math.abs(q.x - p.x) >= Math.abs(q.y - p.y)) {
-    const mx = (p.x + q.x) / 2;
-    return [p, { x: mx, y: p.y }, { x: mx, y: q.y }, q];
-  }
-  const my = (p.y + q.y) / 2;
-  return [p, { x: p.x, y: my }, { x: q.x, y: my }, q];
-}
-
-function stripShapePrefix(id: string): string {
-  return id.startsWith("shape:") ? id.slice("shape:".length) : id;
-}
-
-function endpointPoint(
-  rect: AbsShape,
-  props: { isPrecise?: boolean; normalizedAnchor?: Pt },
-): Pt {
-  if (props.isPrecise === true && props.normalizedAnchor) {
-    return {
-      x: rect.x + props.normalizedAnchor.x * rect.w,
-      y: rect.y + props.normalizedAnchor.y * rect.h,
-    };
-  }
-  return center(rect);
-}
-
-type ArrowPathInfo = { path: Pt[]; fromShapeId: string; toShapeId: string };
-
-function arrowPathsFromScene(scene: SceneJSON, byId: Map<string, AbsShape>): ArrowPathInfo[] {
-  const records = Object.values(scene.store);
-  const arrows = new Map(
-    records
-      .filter((r) => r.typeName === "shape" && r.type === "arrow")
-      .map((r) => [r.id, r] as const),
-  );
-
-  const bindingsByArrow = new Map<string, Record<string, unknown>[]>();
-  for (const r of records) {
-    if (r.typeName !== "binding" || r.type !== "arrow") continue;
-    const fromId = r.fromId as string;
-    if (!arrows.has(fromId)) continue;
-    const list = bindingsByArrow.get(fromId) ?? [];
-    list.push(r);
-    bindingsByArrow.set(fromId, list);
-  }
-
-  const out: ArrowPathInfo[] = [];
-  for (const [arrowId, arrowRecord] of arrows) {
-    const bindings = bindingsByArrow.get(arrowId) ?? [];
-    const startBinding = bindings.find((b) => (b.props as { terminal: string }).terminal === "start");
-    const endBinding = bindings.find((b) => (b.props as { terminal: string }).terminal === "end");
-    if (!startBinding || !endBinding) continue;
-
-    const fromShapeId = stripShapePrefix(startBinding.toId as string);
-    const toShapeId = stripShapePrefix(endBinding.toId as string);
-    const fromRect = byId.get(fromShapeId);
-    const toRect = byId.get(toShapeId);
-    if (!fromRect || !toRect) continue;
-
-    const p = endpointPoint(fromRect, startBinding.props as { isPrecise?: boolean; normalizedAnchor?: Pt });
-    const q = endpointPoint(toRect, endBinding.props as { isPrecise?: boolean; normalizedAnchor?: Pt });
-    const kind = (arrowRecord.props as { kind?: string }).kind ?? "arc";
-    out.push({ path: arrowPath(p, q, kind), fromShapeId, toShapeId });
-  }
-  return out;
-}
-
-/** Liang-Barsky segment/rect clip test - exact, not sampled. */
-function segmentHitsRect(
-  p: Pt,
-  q: Pt,
-  rect: { x: number; y: number; w: number; h: number },
-): boolean {
-  const dx = q.x - p.x;
-  const dy = q.y - p.y;
-  const checks: [number, number][] = [
-    [-dx, p.x - rect.x],
-    [dx, rect.x + rect.w - p.x],
-    [-dy, p.y - rect.y],
-    [dy, rect.y + rect.h - p.y],
-  ];
-  let t0 = 0;
-  let t1 = 1;
-  for (const [pk, qk] of checks) {
-    if (pk === 0) {
-      if (qk < 0) return false;
-      continue;
-    }
-    const r = qk / pk;
-    if (pk < 0) {
-      if (r > t1) return false;
-      if (r > t0) t0 = r;
-    } else {
-      if (r < t0) return false;
-      if (r < t1) t1 = r;
-    }
-  }
-  return t0 <= t1;
-}
-
-function countArrowShapeCrossings(
-  scene: SceneJSON,
-  shapes: AbsShape[],
-  byId: Map<string, AbsShape>,
-): number {
-  const candidates = shapes.filter((s) => s.kind === "box" || s.kind === "note");
-  const paths = arrowPathsFromScene(scene, byId);
-
-  let total = 0;
-  for (const { path, fromShapeId, toShapeId } of paths) {
-    const hit = new Set<string>();
-    for (const s of candidates) {
-      if (s.id === fromShapeId || s.id === toShapeId) continue;
-      const rect = { x: s.x + 0.5, y: s.y + 0.5, w: s.w - 1, h: s.h - 1 };
-      for (let i = 0; i < path.length - 1; i++) {
-        if (segmentHitsRect(path[i]!, path[i + 1]!, rect)) {
-          hit.add(s.id);
-          break;
-        }
-      }
-    }
-    total += hit.size;
-  }
-  return total;
-}
-
 // -- report -----------------------------------------------------------
 
 export function layoutReport(doc: IRDocPositioned): string {
   const { shapes, edges, containers } = walk(doc);
   const byId = new Map(shapes.map((s) => [s.id, s]));
-  const scene = emit(doc);
 
   const lines: string[] = [];
   lines.push("== Geometry ==");
   lines.push(formatGeometryTable(shapes));
   lines.push("");
   lines.push("== Metrics ==");
-  lines.push(...metricsLines(shapes, edges, containers, byId, scene));
+  lines.push(...metricsLines(shapes, edges, containers, byId));
   lines.push("");
   lines.push(renderAscii(shapes, edges, byId));
   return lines.join("\n");
@@ -374,7 +239,6 @@ function metricsLines(
   edges: IREdge[],
   containers: ContainerInfo[],
   byId: Map<string, AbsShape>,
-  scene: SceneJSON,
 ): string[] {
   const out: string[] = [];
 
@@ -456,8 +320,6 @@ function metricsLines(
     }
   }
   out.push(`edges crossing a frame boundary they don't belong to: ${boundaryCrossings}`);
-
-  out.push(`arrow paths crossing a non-endpoint shape: ${countArrowShapeCrossings(scene, shapes, byId)}`);
 
   out.push("source-order violations per container:");
   for (const c of containers) {
