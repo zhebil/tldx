@@ -1271,7 +1271,7 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   3722x204, ...). `docs/renders/` and `docs/baseline.md` stand unchanged.
   `npm run check` green: 43 test files, 514 tests (was 43/468 at T14).
 
-- [ ] **T16. Composite primitives that carry layout semantics.**
+- [x] **T16. Composite primitives that carry layout semantics.**
   The ones worth having are the ones that constrain structure:
   `<Pipeline>` - a row or col whose children are auto-connected in sequence;
   the author stops writing `flow()` and the container is skip-free by
@@ -1285,6 +1285,46 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   available as the escape hatch, but nobody should have to know the string.
   **Acceptance:** a fixture per primitive; each produces zero same-axis skip
   edges by construction, verified with the T2 classifier.
+
+  **Built entirely in `src/runtime/`; `src/domain/` was not touched.** All four
+  are wrappers over the existing `Frame` component, in the same style as T14's
+  `Row`/`Col`/`Grid`. No new IR field, no new entry in `ALLOWED_PROPS`, nothing
+  new for lower/layout/emit to know about. `<Pipeline>` is the only one that is
+  not pure sugar: it returns `[frame, ...flow(...childIds)]` - an array, which
+  `flattenNodes` already walks, so the generated edges land as siblings of the
+  frame exactly where a hand-written `flow()` would have. It throws if a
+  non-edge child has no `id`. `<Graph>` is one line (`layout="auto"`).
+  `<Layers>` and `<Swimlanes>` both force `layout="col"` and rebuild each frame
+  child's attrs with `layout="row"`.
+
+  **`<Pipeline>` defaults rather than forces.** `Frame({ layout: "row",
+  ...props })`, so `<Pipeline layout="col">` works - unlike `Row`/`Col`/`Grid`,
+  which spread props first and override. A pipeline's axis is the author's
+  choice; its *connectivity* is the primitive's contract.
+
+  **`<Layers>` and `<Swimlanes>` differ only in chrome, and that was a free
+  choice.** Both are a col of coerced rows. `<Layers>` additionally marks an
+  **unnamed** tier `group: true`, so a block-schema stack draws its boxes and
+  no tier boxes; a tier that carries a `name` keeps its frame. `<Swimlanes>`
+  never sets `group`, because a lane's label is the point. Logged under
+  `## Questions for the human` - the honest alternative was cross-lane column
+  alignment, which nothing in the engine supports today.
+
+  **Acceptance met, and beaten.** `crossing-classify` reports `same-axis skip=0
+  cross-container=0 fan=0 other=0 total=0` for all four fixtures -
+  `pipeline-build` (1165 x 102, 5 arrows), `layers-stack` (691 x 456, 5),
+  `swimlanes-release` (563 x 440, 8), `graph-topology` (935 x 373, 11). Not one
+  crossing of any bucket. `overlapping shape pairs` is 0 on all four. Nothing
+  in the existing corpus moved: no `src/domain/` change, so every recorded
+  number stands. `npm run check` green at 43 test files / 528 tests (was
+  43/514 at T15). Renders added to `docs/renders/`, table in `docs/baseline.md`
+  under **After T16**.
+
+  **One defect was visible only in the PNG.** In `layers-stack` the
+  `API gateway -> Postgres` edge ran through the "Data tier" frame-name chip
+  when Postgres was leftmost in its tier; every tool reported zero. Fixed
+  fixture-side by reordering that tier (Redis first). `arrow-truth` counts
+  arrows crossing *shapes*, and a frame name chip is not a shape.
 
 - [ ] **T16b. A userland component library, as the composability test.**
   Tier 1 primitives ship in `tldsl`. Domain vocabularies deliberately do not.
@@ -1813,6 +1853,25 @@ as-is.
   someone adds a placement that is allowed to overlap - the gate would then
   report a false positive and there is no exemption path.
 
+- **T16 - `<Layers>` and `<Swimlanes>` are the same mechanism under two
+  names.** T16 describes them as different things (stacked tiers vs. labelled
+  lanes), but both reduce to "a `col` frame whose frame children are forced to
+  `layout="row"`". The only shipped difference is chrome: `<Layers>` marks an
+  unnamed tier `group: true`; `<Swimlanes>` never does.
+  **Default taken:** shipped both, distinguished only by that chrome rule. It
+  changes least - each is four lines over `Frame`, neither touches the engine,
+  and either can be deleted later without moving any geometry.
+  **Alternatives:** (2) build the thing that would make `<Swimlanes>` genuinely
+  distinct - cross-lane column alignment, so the *n*-th box of every lane shares
+  an x-range - which needs a real engine change, since `applyContainerBoxSizing`
+  shares a width within one container and has no notion of sibling containers
+  agreeing; (3) ship only one of the two and let the other be a userland
+  component in T16b, which is arguably where a domain vocabulary belongs.
+  **What the default costs:** a swimlane diagram whose lanes hold different
+  numbers of boxes does not line up into columns - the defining visual property
+  of a swimlane chart. It is written into `docs/dsl.md` as a known limitation,
+  so nobody will be surprised, but the primitive under-delivers on its name.
+
 ## Discovered work
 
 - **T11: `estimatedNoteSize` is still a char-count guess, now a scaled one.**
@@ -2227,3 +2286,34 @@ promoted into the task list by the human.
   values are pinned by unit tests and by a scratch gallery in `/tmp`, which is
   not committed. Until a fixture carries a `geo`, no measured diagram has ever
   contained a non-rectangle box.
+
+### From T16
+
+- **`<Pipeline>` returns an array, which nothing else in the library does.**
+  Every other component returns one `AstNode`; `Pipeline` returns
+  `[frame, ...edges]`. It works because `flattenNodes` walks arrays, but it
+  means a user component wrapping `<Pipeline>` must also return an array or
+  splat it, and TypeScript will not warn them. Worth a line in `docs/dsl.md`
+  if anyone hits it.
+- **A `<Pipeline>` nested inside a `<Layers>` tier would put edges inside a
+  frame.** Layout skips `kind === "edge"` children of a frame in five places in
+  `stack.ts`, so it is handled - but no fixture in the corpus has ever nested an
+  edge inside a frame, so that path is unexercised end to end.
+- **`<Pipeline>` requires an explicit `id` on every child, and every other
+  element in the language does not.** Ids are otherwise synthesised at lower
+  time. The throw is a runtime `Error`, not a diagnostic with a span, so the
+  author gets a stack trace instead of a pointer at the offending child.
+- **`<Layers>` silently discards a tier's `layout`.** An author writing
+  `<Layers><Col>...</Col></Layers>` gets a row and no warning. Same for
+  `<Swimlanes>`. That is the primitive's whole point, but a diagnostic saying
+  so would be kinder than silence.
+- **The four new fixtures are the first corpus files with zero crossings of any
+  bucket.** `sequence` and `sparse-graph` were zero-crossing but also
+  near-trivial; `graph-topology` carries 11 arrows over 8 peers and still
+  crosses nothing. If a future routing change needs a "did I break the easy
+  cases" canary, these four are it.
+- **`fill="solid"` is back in the corpus.** `pipeline-build`'s `publish` and
+  `swimlanes-release`'s `notify` use it as a terminal-state highlight. T13
+  dropped `fill="solid"` because it is unreadable *with* `labelColor="white"`;
+  with the default label colour it reads fine. The T13 note should be narrowed
+  to the pair, not the fill.

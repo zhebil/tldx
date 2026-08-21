@@ -582,3 +582,36 @@ Phase 1 routes inside an `auto` container.
 fill is a pale tint of the shape colour, not the colour itself, so white label
 text on it is near-invisible. Dropped from all three fixtures; worth knowing
 before any future fixture reaches for a "highlighted" box.
+
+## After T16 - composite primitives
+
+Four fixtures added to `tests/corpus/`, one per primitive. Like T13's three,
+they are **not gates**: no `src/domain/` file changed (the four primitives are
+pure `src/runtime/` wrappers over `<Frame>`), so every number in every table
+above is untouched.
+
+| file | canvas | shapes | frames | arrows | crossings | overlapping pairs | png |
+|---|---|---|---|---|---|---|---|
+| pipeline-build | 1165 x 102 | 7 | 1 | 5 | 0 | 0 | 2458 x 332 |
+| layers-stack | 691 x 456 | 11 | 4 | 5 | 0 | 0 | 1510 x 1040 |
+| swimlanes-release | 563 x 440 | 13 | 4 | 8 | 0 | 0 | 1254 x 1008 |
+| graph-topology | 935 x 373 | 9 | 2 | 11 | 0 | 0 | 1998 x 874 |
+
+`crossing-classify` on the four: `same-axis skip=0 cross-container=0 fan=0
+other=0 total=0` for every one. That is the T16 acceptance criterion, and it
+holds not by tuning but by construction - `<Pipeline>` only ever emits
+adjacent-pair edges, and `<Layers>` / `<Swimlanes>` put every tier or lane in
+its own container so a tier-to-tier edge can never be a same-axis skip.
+
+**Zero total crossings, not just zero skips.** Even the cross-container bucket
+is empty on all four, which is more than the criterion asked for. Worth
+noting that `graph-topology` carries 11 arrows over 8 peers on `layout="auto"`
+and still crosses nothing - ELK does well when the primitive stops the author
+from imposing an order that isn't there.
+
+One fixture needed a fixture-side fix found only by looking at the render: in
+`layers-stack` the near-vertical `API gateway -> Postgres` edge clipped the
+"Data tier" frame-name chip when Postgres was the leftmost box in that tier.
+Swapping the tier's box order (Redis first) cleared it. No tool reported this -
+`arrow-truth` counts arrows crossing *shapes*, and a frame's name chip is drawn
+by tldraw outside the geometry the layout controls.

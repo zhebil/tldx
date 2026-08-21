@@ -156,6 +156,70 @@ export function Group(props: Props, source?: JsxSource): AstFrame {
   return { ...Frame(props, source), group: true };
 }
 
+/** A row (default) or col frame whose non-edge children are auto-connected
+ * in sequence via `flow(...)` - skip-free by construction, no hand-written
+ * `flow()` call needed. `layout` on `props` (if any) overrides the row
+ * default. Throws if any non-edge child has no `id`. */
+export function Pipeline(props: Props, source?: JsxSource): AstNode[] {
+  const frame = Frame({ layout: "row", ...props }, source);
+  const ids = frame.children
+    .filter((child) => child.kind !== "edge")
+    .map((child) => {
+      const id = child.attrs.id?.value;
+      if (id === undefined) {
+        throw new Error("<Pipeline> requires every child to have an id");
+      }
+      return id;
+    });
+  return [frame, ...flow(...ids)];
+}
+
+/** Rebuilds `child`'s `attrs` with `layout: "row"`, keyed to the child's own
+ * span. Does not mutate `child`. */
+function withRowLayout(child: AstFrame): AstFrame {
+  const layoutSpan = child.span;
+  return {
+    ...child,
+    attrs: {
+      ...child.attrs,
+      layout: { value: "row", span: layoutSpan, nameSpan: layoutSpan },
+    },
+  };
+}
+
+/** A `layout="col"` frame of tiers - the block-schema shape. Each direct
+ * frame child is coerced to `layout="row"`. A tier with no `name` is also
+ * marked `group: true` (structural, no chrome, no title); a named tier keeps
+ * its frame chrome. Non-frame children (a bare `<Box>` tier) pass through
+ * untouched. */
+export function Layers(props: Props, source?: JsxSource): AstFrame {
+  const frame = Frame({ ...props, layout: "col" }, source);
+  return {
+    ...frame,
+    children: frame.children.map((child) => {
+      if (child.kind !== "frame") return child;
+      const tier = withRowLayout(child);
+      return child.attrs.name === undefined ? { ...tier, group: true } : tier;
+    }),
+  };
+}
+
+/** A `layout="col"` frame of lanes. Each direct frame child is coerced to
+ * `layout="row"` but keeps its chrome - a lane is a labelled frame, unlike a
+ * `<Layers>` tier. Non-frame children pass through untouched. */
+export function Swimlanes(props: Props, source?: JsxSource): AstFrame {
+  const frame = Frame({ ...props, layout: "col" }, source);
+  return {
+    ...frame,
+    children: frame.children.map((child) => (child.kind === "frame" ? withRowLayout(child) : child)),
+  };
+}
+
+/** `layout="auto"` shorthand for relationships with no natural order. */
+export function Graph(props: Props, source?: JsxSource): AstFrame {
+  return Frame({ ...props, layout: "auto" }, source);
+}
+
 export function Box(props: Props, source?: JsxSource): AstBox {
   const span = toSpan(source);
   assertNoChildren(props.children, "Box");

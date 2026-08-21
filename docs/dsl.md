@@ -50,6 +50,10 @@ This is the entire surface exported from `"tldsl"`. There is no `<Shape>`,
 | `<Col>` | container | `<Frame layout="col">` |
 | `<Grid>` | container | `<Frame layout="grid">` |
 | `<Group>` | container | invisible container - lays out like `<Frame>` but draws no frame chrome and reserves no title space |
+| `<Pipeline>` | container | row (default) or col whose children are auto-connected in sequence |
+| `<Layers>` | container | col of tiers - each tier coerced to `layout="row"`, unnamed tiers drawn as `<Group>` |
+| `<Swimlanes>` | container | col of lanes - each lane coerced to `layout="row"`, lanes keep their chrome |
+| `<Graph>` | container | `<Frame layout="auto">` - relationships with no natural order |
 | `<Box />` | leaf | labelled box |
 | `<Note>text</Note>` | leaf | warm-filled geo box annotation; text is the **children**, not a prop |
 | `<Sticky>text</Sticky>` | leaf | real tldraw sticky note (fixed 200px width); same props as `<Note>` |
@@ -77,6 +81,43 @@ frame title to clear. Like `<Frame>`, it requires an explicit `id` - but that
 id names no shape, so **an `<Edge>` pointing at a `<Group>` produces a binding
 to a shape that was never emitted**; point edges at the group's children
 instead.
+
+`<Pipeline>`, `<Layers>`, `<Swimlanes>`, and `<Graph>` are composite
+primitives - thin wrappers over `<Frame>` that carry layout semantics the
+author would otherwise have to spell out by hand. They add no new props;
+everything below is built from `<Frame>`, `<Row>`/`<Col>`, `<Group>`, and
+`flow()`.
+
+`<Pipeline>` is a `<Frame layout="row">` (an explicit `layout="col"` prop
+overrides the row default, unlike `<Row>`/`<Col>`/`<Grid>`, which force their
+mode) whose non-edge children are connected in source order via `flow(...)`
+- the author never writes `flow()` by hand, and the container is skip-free by
+construction since every edge only ever links adjacent children. Every
+non-edge child must carry an explicit `id`; a child without one throws at
+build time.
+
+`<Layers>` is a `layout="col"` frame of stacked tiers - the block-schema
+shape (client tier, service tier, data tier, stacked top to bottom). Each
+direct child that is itself a frame is coerced to `layout="row"` regardless
+of what `layout` it was given. A tier with no `name` is additionally marked
+`group: true` - same structural marker `<Group>` sets, so it draws no chrome
+and no title, just the row of boxes. A tier that *does* carry a `name` keeps
+its frame chrome. A non-frame child (a bare `<Box>` standing in as a
+one-element tier) passes through untouched.
+
+`<Swimlanes>` is the same `layout="col"`-of-coerced-`layout="row"` shape as
+`<Layers>`, but every lane keeps its chrome - a lane is a labelled frame,
+which is the whole point of a swimlane diagram, so `<Swimlanes>` never sets
+`group: true` on a lane the way `<Layers>` does on an unnamed tier. **Known
+limitation: columns do not align across lanes.** Each lane sizes and places
+its own boxes independently, so a three-box lane and a two-box lane do not
+line up vertically - there is no shared grid across lanes.
+
+`<Graph>` is `<Frame layout="auto">` - nothing more than picking the ELK
+engine so the author never types the string `"auto"`. Use it for
+relationships with no natural row/col/tier order (peer services, a topology
+diagram) where `layout="row"`/`"col"`/`"grid"` would force an arrangement
+that isn't there.
 
 ## Props
 

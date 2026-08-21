@@ -1,9 +1,24 @@
 /** @jsxImportSource ../runtime */
 import { describe, expect, it } from "vitest";
 
-import type { AstDoc, AstFrame } from "../domain/parser/ast.js";
+import type { AstDoc, AstFrame, AstNode } from "../domain/parser/ast.js";
 
-import { Box, Col, Doc, Edge, Frame, Grid, Group, Note, Row, flow } from "./index.js";
+import {
+  Box,
+  Col,
+  Doc,
+  Edge,
+  Frame,
+  Graph,
+  Grid,
+  Group,
+  Layers,
+  Note,
+  Pipeline,
+  Row,
+  Swimlanes,
+  flow,
+} from "./index.js";
 import { jsx } from "./jsx-runtime.js";
 
 function stripSpans(node: unknown): unknown {
@@ -91,14 +106,14 @@ describe("JSX runtime - AST shape", () => {
     const lines = spanLines(jsxAst);
 
     // Doc, Frame, 2 named boxes, Note, Edge, and the mapped box all sit on
-    // lines 46-53 in buildTree() above.
+    // lines 61-68 in buildTree() above.
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {
-      expect(line).toBeGreaterThanOrEqual(46);
-      expect(line).toBeLessThanOrEqual(53);
+      expect(line).toBeGreaterThanOrEqual(61);
+      expect(line).toBeLessThanOrEqual(68);
     }
 
-    expect((jsxAst as { span: { line: number } }).span.line).toBe(46);
+    expect((jsxAst as { span: { line: number } }).span.line).toBe(61);
   });
 });
 
@@ -134,6 +149,102 @@ describe("Group", () => {
     expect(g.kind).toBe("frame");
     expect(g.group).toBe(true);
     expect(g.attrs.layout).toBeUndefined();
+  });
+});
+
+describe("Pipeline", () => {
+  it("connects three ids in sequence and defaults to layout=row", () => {
+    const result = (
+      <Pipeline id="p">
+        <Box id="a" label="A" />
+        <Box id="b" label="B" />
+        <Box id="c" label="C" />
+      </Pipeline>
+    ) as AstNode[];
+    const [frame, ...edges] = result;
+
+    expect((frame as AstFrame).attrs.layout?.value).toBe("row");
+    expect(stripSpans(edges)).toEqual([
+      { kind: "edge", attrs: { from: { value: "a" }, to: { value: "b" } } },
+      { kind: "edge", attrs: { from: { value: "b" }, to: { value: "c" } } },
+    ]);
+  });
+
+  it("layout=col overrides the row default", () => {
+    const result = (
+      <Pipeline id="p" layout="col">
+        <Box id="a" label="A" />
+        <Box id="b" label="B" />
+      </Pipeline>
+    ) as AstNode[];
+    const [frame] = result;
+
+    expect((frame as AstFrame).attrs.layout?.value).toBe("col");
+  });
+
+  it("throws when a non-edge child has no id", () => {
+    expect(() =>
+      (
+        <Pipeline id="p">
+          <Box label="A" />
+        </Pipeline>
+      )
+    ).toThrow(/every child to have an id/);
+  });
+});
+
+describe("Layers", () => {
+  it("is a col frame; unnamed frame tiers become row+group, named tiers stay row-only, boxes pass through", () => {
+    const layers = (
+      <Layers id="l">
+        <Frame id="tier1">
+          <Box id="a" label="A" />
+        </Frame>
+        <Frame id="tier2" name="Tier Two">
+          <Box id="b" label="B" />
+        </Frame>
+        <Box id="c" label="C" />
+      </Layers>
+    ) as AstFrame;
+
+    expect(layers.attrs.layout?.value).toBe("col");
+
+    const [tier1, tier2, boxC] = layers.children as AstFrame[];
+    expect(tier1!.attrs.layout?.value).toBe("row");
+    expect(tier1!.group).toBe(true);
+    expect(tier2!.attrs.layout?.value).toBe("row");
+    expect(tier2!.group).toBeUndefined();
+    expect(boxC!.kind).toBe("box");
+  });
+});
+
+describe("Swimlanes", () => {
+  it("is a col frame whose named frame lanes become row and keep their chrome (not grouped)", () => {
+    const lanes = (
+      <Swimlanes id="s">
+        <Frame id="lane1" name="Lane One">
+          <Box id="a" label="A" />
+        </Frame>
+      </Swimlanes>
+    ) as AstFrame;
+
+    expect(lanes.attrs.layout?.value).toBe("col");
+
+    const [lane1] = lanes.children as AstFrame[];
+    expect(lane1!.attrs.layout?.value).toBe("row");
+    expect(lane1!.group).toBeUndefined();
+  });
+});
+
+describe("Graph", () => {
+  it("builds a frame with layout=auto", () => {
+    const g = (
+      <Graph id="g">
+        <Box id="a" label="A" />
+      </Graph>
+    ) as AstFrame;
+
+    expect(g.attrs.layout?.value).toBe("auto");
   });
 });
 
