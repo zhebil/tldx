@@ -59,6 +59,16 @@ You are an orchestrator. Delegate the doing; keep decomposition and review.
   **haiku** subagent. Ask for conclusions, not file dumps.
 - Review every subagent's diff yourself. A subagent reporting success is not
   evidence of success - read the diff and read the check output.
+- **Wait for a subagent by doing nothing at all.** Its result is handed back to
+  you when it finishes. Never poll for it: no `until [ -f ... ]` file watch, no
+  `Monitor` loop, no backgrounded `sleep`, no checking whether the file it is
+  meant to write has appeared yet. The general advice about using `Monitor` with
+  an until-loop is for conditions nothing else will report - a subagent is not
+  one of them, and a wake that burns twenty minutes sleeping in ten-second
+  increments has spent its wake on nothing.
+- **Never background work whose result you need.** Run it in the foreground and
+  read the output. Backgrounding it only means writing a second script to find
+  out what the first one did.
 - **When a task depends on an external API, read that API's docs or its type
   definitions before building.** Not from memory. Three separate assumptions in
   this project's history turned out wrong on inspection: that ELK had been
