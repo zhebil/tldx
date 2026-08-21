@@ -22,6 +22,11 @@ once A is done. The loop never terminates; the human stops it.
   all reverted after judging, and B7 was rejected at an objective gate before
   judging. Judged results live in `docs/layout-hypotheses.md` - read it before
   proposing a hypothesis.
+- Last drift audit (protocol step 9): **wake 30** - epoch established, audit
+  vacuous, nothing to compare against. Epoch saved at
+  `docs/baselines/wake-30/`. **Next audit: wake 35**, and it is the first real
+  one - it blind-A/Bs wake 35's champion against `docs/baselines/wake-30/`.
+  An audit is that wake's whole unit of work; it does not also run a hypothesis.
 
 ---
 
@@ -876,6 +881,13 @@ Ordered. Take from the top. Strike through when resolved.
   rather than by a per-character error, which would make the real finding
   `BOX_PAD_X`, not `AVG_CHAR_PX`.
 
+  _(wake 30)_ The epoch PNG gives this a rendered symptom to aim at, not just a
+  number: in `hexagonal`, `Use cases` and `Entities + rules` are drawn touching,
+  because both labels wrap to two lines and tldraw grows each box past the 60px
+  the layout reserved, eating the 12px gap between them. The report calls the
+  file clean. Whatever B26 changes, that pair separating in the render is the
+  test of it.
+
 ---
 
 ## Blocked notes
@@ -1438,14 +1450,11 @@ anything that outlives the loop.)_
   `long-labels` numbers show boxes reserving a consistent 32px more than their
   label needs. Filed as **B26** in the backlog rather than done inline.
 
-- **(wake 29)** The step-9 drift audit has no baseline to audit against.
-  `docs/baselines/` does not exist and no epoch baseline has ever been saved, so
-  the first wake that runs an audit cannot compare anything - it can only
-  establish the epoch. Whichever wake that is: save
-  `docs/baselines/wake-NN/{reports,pngs}` for all six corpus files, record in
-  the ledger that the audit was vacuous this once, and note that the *next*
-  audit is the first real one. Do not skip it, and do not treat "nothing to
-  compare" as a passed audit.
+- ~~**(wake 29)** The step-9 drift audit has no baseline to audit against.~~
+  **DONE** _(wake 30)_ - `docs/baselines/wake-30/` holds six reports and six
+  PNGs, verified to be the wake-28 champion. The audit was recorded as vacuous,
+  not passed. `docs/baselines/README.md` states the rule that makes the ratchet
+  work: **epoch directories are write-once**. The first real audit is wake 35.
 
 - **(wake 29)** Gate 5 excludes an arrow's own endpoint shapes by construction,
   so a count of 0 does not mean the render is clean. `hexagonal`'s B24 candidate

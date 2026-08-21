@@ -1414,3 +1414,55 @@ box's *own* endpoints are excluded by construction and several of them are
 drawn over box labels. Gate 5 is a floor, not a certificate.
 
 ---
+
+## Wake 30 - drift audit #1 (epoch established, audit vacuous)
+
+_Not a hypothesis. A step-9 drift audit, which counts as the wake's unit of
+work. No candidate was built and no judge was spent._
+
+**Result: VACUOUS.** The audit compares the current champion against the epoch
+baseline saved five wakes earlier. There is no such baseline - `docs/baselines/`
+did not exist, and no epoch has ever been saved since the protocol's step 9 was
+written. Nothing could be compared, so nothing was concluded. This is recorded
+as "vacuous", **not** as "passed": the loop has now run 29 wakes under
+keep-by-default with the drift ratchet never once engaged, and that remains
+unmeasured, not measured-and-clean.
+
+**What was established instead.**
+`docs/baselines/wake-30/` now holds the epoch:
+
+- `reports/*.md` - six `tools/layout-report.mts` outputs, one per corpus file.
+- `pngs/*.png` - six `tools/screenshot.mts` captures of the same six.
+
+The reports were checked line-by-line against `docs/layout-champion.md` and are
+a subset of it on all six files, so the epoch really is the wake-28 champion
+(B1 + B20 + B9) and not something that drifted while being written down. The
+PNGs were eyeballed, not just confirmed non-empty.
+
+`docs/baselines/README.md` records the rule that makes the ratchet mean
+anything: **epoch directories are write-once.** A baseline that gets refreshed
+to match the present cannot detect the present drifting away from the past.
+
+**The next audit is the first real one - wake 35.** It compares wake 35's
+champion against `docs/baselines/wake-30/` on all six files, blind and
+randomised per file, exactly like a hypothesis A/B. Wake 30's champion is the
+A-side of that comparison whether or not anything is kept in between; if
+wakes 31-34 keep nothing, the audit is a formality with six structural ties,
+and if they keep something it is the first evidence the loop has ever had about
+whether keep-by-default decays the output.
+
+**Incidental observation, filed not fixed.** Cropping `hexagonal`'s epoch PNG
+around the `Domain core` frame shows `Use cases` and `Entities + rules` drawn
+touching, their two strokes merging into one line. The report says they are
+clear: `usecases` bottom is 344, `domain` top is 356, a 12px gap, and
+`overlapping shape pairs: 0`. Both labels wrap to two lines and tldraw grows
+each box vertically to fit, which eats the gap the layout reserved.
+
+This is the same class of defect B9 fixed for notes - a reserved rect that the
+renderer does not honour - and it is the concrete cost of the last unmeasured
+estimator, `AVG_CHAR_PX = 9` in `estimatedBoxSize`. Already filed as **B26**;
+this is the first *rendered* evidence for it rather than an argument from
+symmetry with the note case. No change was made - an audit wake does not also
+run a hypothesis.
+
+---
