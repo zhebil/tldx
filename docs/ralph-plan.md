@@ -58,23 +58,26 @@ once A is done. The loop never terminates; the human stops it.
   neither wins nor losses, and the ledger distinguishes a *judged tie* from a
   *structural tie* (a file never sent to a judge because nothing changed). The
   exact prompt wording is fixed in protocol step 5 - use it verbatim.
-- Last drift audit (protocol step 9): **wake 35** - **no drift**. All six corpus
-  files came back a *structural tie* against `docs/baselines/wake-30/`:
-  byte-identical PNGs and identical reports (modulo the gate-5 metric line wake
-  32 deleted from `layout-report.mts`), so no file went to a judge and the
-  ratchet did not engage. Expected, since the only hypothesis kept in between
-  (B27) was reverted at wake 34 - but it confirms that revert was complete to
-  the pixel, and it shows the screenshot pipeline is deterministic across five
-  wakes. Epoch saved at `docs/baselines/wake-35/`. **Next audit: wake 40.**
-  An audit is that wake's whole unit of work; it does not also run a hypothesis.
-  The ratchet still has not been exercised against a champion that actually
-  differs from its epoch - two audits in, drift is undetected, not
-  demonstrated-absent. **Wake 40 will be the first audit that can fire**: B25
-  moved `long-labels` and `wide-fanout` at wake 37, so the champion no longer
-  matches the wake-35 epoch on those two files. **One wrinkle wake 39 added**:
-  the corpus is seven files now and `release-pipeline` has no wake-35 baseline,
-  so it is not comparable and takes no part in the audit. Compare the six that
-  have an epoch; save the fresh epoch over all seven.
+- Last drift audit (protocol step 9): **wake 40** - **no drift, 1-1**, and the
+  first audit with a real delta to judge. Against `docs/baselines/wake-35/`,
+  four of the six comparable files were a *structural tie* (byte-identical PNG
+  and identical report); `release-pipeline` had no wake-35 baseline and took no
+  part. The two that moved were judged blind and split: `long-labels` went to
+  the **epoch**, `wide-fanout` to the **champion**. The older baseline did not
+  win *more* files than it lost, so the ratchet does not engage and nothing is
+  bisected. Epoch saved at `docs/baselines/wake-40/` (seven reports, seven
+  PNGs). **Next audit: wake 45.** An audit is that wake's whole unit of work; it
+  does not also run a hypothesis.
+  Two things to carry forward. **(a)** This is the weakest possible "no drift" -
+  had `wide-fanout` gone the other way the loop would be bisecting B32 right
+  now, so keep-by-default currently rests on a single file. **(b)** The same two
+  files have now split 1-1 on a row-gap change three times (B25, B32, and this
+  audit's two fresh judges who were never told a champion existed). Three
+  independent judge pairs is not noise: `wide-fanout` wants vertical room so its
+  12-way fan-out separates into distinguishable angles, `long-labels` is a
+  note-tall two-column chain that gains nothing and pays edge length. The
+  *effect* is right and the *predicate* is wrong - see the discovered-work entry
+  on fan-out gating.
 
 ---
 
@@ -1867,3 +1870,38 @@ anything that outlives the loop.)_
   voting file. Not urgent - nothing on the backlog does that - but it is the
   mirror of the coverage hole B34 just closed, and it should be closed the same
   way if a hypothesis ever needs it.
+
+- **(wake 40, from drift audit #3)** **The row-gap predicate is measuring the
+  wrong thing, and three independent judge pairs now say so.** `long-labels` and
+  `wide-fanout` have split 1-1 on every row-gap change ever tried - B25, B32,
+  and this wake's audit, whose two judges were separate subagents that were
+  never told a champion existed. The reasoning is consistent across all three:
+  `wide-fanout` wants vertical room because a 12-way fan-out needs distinct
+  arrow angles to stay traceable, and `long-labels` is a two-column chain whose
+  rows are already note-tall, so gap is dead space that only lengthens edges.
+  B25 gates on "this grid carries a skip edge" and B32 scales by crossings.
+  Neither predicate mentions fan-out. **Candidate hypothesis:** scale the row
+  corridor by the maximum out-degree of any node on the upper side of the
+  boundary rather than (or as well as) by skip crossings. Not filed as a backlog
+  entry this wake - an audit is the wake's whole unit of work, and B33 is still
+  unjudged and may move the predicate anyway. File it once B33 settles.
+
+- **(wake 40, from drift audit #3)** **Keep-by-default currently rests on one
+  file.** The ratchet fires when the older epoch wins *more* files than it
+  loses; this audit came back exactly 1-1. Had `wide-fanout` gone the other way,
+  this wake would have ended by scheduling a bisect of B32 - which was itself a
+  *weak* keep on the same 1-1 split. Two weak keeps stacked on the same coin
+  edge is the shape drift would take if it were happening. Nothing to act on
+  yet, but the next audit (wake 45) should be read with this in mind: a second
+  consecutive 1-1 on the same two files means the placement line has been
+  spending wakes without accumulating evidence, and the honest response would be
+  to revert the pair and re-derive rather than keep coin-flipping.
+
+- **(wake 40, from drift audit #3)** **A structural tie on four of six files is
+  now the normal audit outcome, and it makes the audit cheap but narrow.** Only
+  files a change can actually touch get judged, which is correct, but it means
+  an audit's power is bounded by how many corpus files the last five wakes'
+  hypotheses could reach. Five wakes of arrow-attachment work would produce an
+  audit over a completely different subset. Not a problem to fix - just the
+  reason an audit result should never be quoted as "the champion is fine", only
+  as "nothing that moved has regressed".
