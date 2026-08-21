@@ -14,12 +14,14 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 37
-  when **B25 was kept**. The champion is now the wake-37 **B25** revision (a
-  grid whose children carry a skip edge lays its rows out at double the gap) on
-  top of the wake-28 **B9** revision (a note reserves the space tldraw actually
+- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 38
+  when **B32 was kept**. The champion is now the wake-38 **B32** revision (each
+  grid row boundary gets a corridor scaled by how many skip edges cross it,
+  `gap * min(4, 1 + crossings)`) on top of the wake-37 **B25** revision (which
+  established that a grid carrying a skip edge is worth a wider row gap at all),
+  the wake-28 **B9** revision (a note reserves the space tldraw actually
   draws), the wake-22 **B20** revision (topology-gated doc-root aspect wrap) and
-  the wake-12 **B1** revision (cross-axis `align`, default `center`). Those four
+  the wake-12 **B1** revision (cross-axis `align`, default `center`). Those five
   are the only hypotheses still standing - B2, B3, B4a, B13, B14, B15, B6, B27
   and B31 all reverted after judging, and B7 and B24 were rejected at an
   objective gate before judging. Judged results live in
@@ -37,11 +39,16 @@ once A is done. The loop never terminates; the human stops it.
   redirection was right: **B25** moved the corridor into *placement* and became
   the first hypothesis in the loop's history to lower gate 5, taking
   `wide-fanout` from 36 crossings to 31 with two blind wins and no losses. The
-  live line of enquiry is now placement, not terminals - see **B32**.
+  live line of enquiry is now placement, not terminals. Wake 38's **B32** took
+  `wide-fanout` further, 31 to 28, by spending the corridor per row boundary
+  instead of uniformly - but it was a **weak keep** (1 win, 1 loss) and its loss
+  named the next defect precisely: the widening predicate counts *skip* edges,
+  while the renderer draws a long diagonal for any pair that lands in different
+  grid rows, adjacent in flow order or not. See **B33**.
   Gate 5's instrument is `tools/arrow-truth.mts`, which reads the vertices
   tldraw actually drew (the old model-based tracer matched 0 of 84 corpus arrows
   and was deleted at wake 32); the champion baseline is the table at the top of
-  `docs/layout-champion.md`, at 10/5/1/0/0/**31** since wake 37.
+  `docs/layout-champion.md`, at 10/5/1/0/0/**28** since wake 38.
 - **The judge may answer `WINNER: TIE`** since wake 33 (B29). Ties count as
   neither wins nor losses, and the ledger distinguishes a *judged tie* from a
   *structural tie* (a file never sent to a judge because nothing changed). The
@@ -976,18 +983,36 @@ Ordered. Take from the top. Strike through when resolved.
   gate 5: `wide-fanout` 36 → 31, two blind wins, no losses. Ledger entry in
   `docs/layout-hypotheses.md`.
 
-- [ ] **B32** _(successor to B25, wake 37)_ Scale the skip widening with the
-  *size* of the skip instead of a flat ×2. B25 established that a corridor
-  between grid rows is worth real canvas, but its factor is a constant chosen
-  by one measurement on one file: `wide-fanout`'s hub reaches 18 flow positions
-  away and `long-labels`' furthest skip reaches 6, and both get the same
-  doubling. Derive the factor from the maximum skip distance (or from the count
-  of skip edges crossing each row boundary), so a dense fan gets more corridor
-  and a single long-range edge gets less. **Gate 4 is the whole difficulty**:
-  uniform ×3 already fails it on `wide-fanout` at 1.70×, so any per-file
-  scaling must spend the budget on the axis the file is not already long in.
-  Measure the premise first - if the corpus's skip distances are bimodal
-  (a hub or nothing) there is no gradient to exploit and this strikes like B8.
+- [x] ~~**B32** _(successor to B25, wake 37)_ Scale the skip widening with the
+  *size* of the skip instead of a flat ×2.~~ **KEPT (weak) at wake 38.** The
+  premise measurement rejected the max-skip-distance derivation before any code
+  was written - it demands the most corridor from `wide-fanout`, the file
+  already nearest the area cap. The per-boundary crossing count has the opposite
+  shape and *frees* budget: `skipRowGaps` gives each row boundary
+  `gap * min(4, 1 + crossings)`. `wide-fanout` 31 → 28 crossings at 1.39× area,
+  `long-labels` a pure redistribution at 1.00×. 1 win, 1 loss - kept on the
+  step-6 rule, and the loss produced **B33**. Ledger entry in
+  `docs/layout-hypotheses.md`.
+
+- [ ] **B33** _(from B32's loss, wake 38)_ Widen a grid row boundary for **every**
+  edge that crosses it, not only for skip edges. B32's `long-labels` loss was
+  caused by exactly this hole: `router → orders` is flow-*adjacent*
+  (`|Δpos| = 1`) so it counts as no crossing, yet in a 2-column grid it lands in
+  different rows and the renderer draws it as a long diagonal - through the very
+  boundary B32 narrowed to 40px to pay for corridors elsewhere. The judge saw it:
+  *"forcing that same diagonal arrow through a cramped slot right against the box
+  edges"*. Note the asymmetry that makes this coherent rather than a reversal of
+  B25: `hasSkipEdge`'s flow-distance test is the right test for **whether** a
+  grid deserves widening at all (it breaks the `cols` circularity, see B25), and
+  the wrong test for **which boundary** gets it - by the time `skipRowGaps` runs,
+  `cols` is already resolved, so row membership is knowable and the weaker proxy
+  is no longer needed. Change only the crossing count, keep `hasSkipEdge` where
+  it is. **Watch gate 4**: counting every edge can only raise the counts, so on
+  `wide-fanout` more boundaries will saturate at the cap and the file may drift
+  back toward a flat ×4; if it does, the cap is what needs deriving, not the
+  predicate. Also watch for the second defect B32's judge named, which this does
+  not address: an unevenly rhythmed grid is itself a legibility cost, paid on
+  every boundary while the corridor benefit lands on only some.
 
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
@@ -1771,3 +1796,27 @@ anything that outlives the loop.)_
   corpus hypothesis (its own kind of entry, per the honesty rules) adding a
   genuinely multi-row grid with mixed short and long skips, if placement work
   continues past B32.
+
+- **(wake 38, from B32)** **The corpus-coverage entry above is now confirmed,
+  not merely predicted.** B32 got the same two voting files as B25, from the
+  same four structural ties, and it split them 1-1 - which under the step-6 rule
+  is a keep on a coin's edge. The placement line of enquiry is being decided by
+  two files, and one of them (`long-labels`) is a 12-child 2-column grid whose
+  narrowness is what produced the diagonal defect B33 now chases. **Raise the
+  corpus hypothesis before B33 is judged, not after**: a genuinely multi-row grid
+  with mixed short and long skips would give B33 a third voting file and would
+  test whether the "uneven rhythm" cost B32's judge named generalises or is an
+  artefact of two columns.
+
+- **(wake 38, from B32)** **`bestGridCols` is now choosing columns against
+  spacing the grid will not get.** `preGap` still passes the flat
+  `gap * SKIP_ROW_GAP_FACTOR` estimate, deliberately - the per-boundary gaps
+  cannot be known before `cols` is resolved, and freezing the estimate is what
+  kept B32's causal claim confined to row spacing. But the estimate is now
+  systematically wrong in both directions (too low on `wide-fanout`, where every
+  boundary saturates above it; too high on `long-labels`, where two boundaries
+  sit at ×1). The principled fix is a fixed-point iteration - choose `cols`,
+  compute the real `rowGaps`, re-choose `cols`, repeat until stable - which is
+  cheap (`cols` ranges over at most `n` values) and terminating in practice, but
+  it is a second causal claim and belongs in its own wake. Worth filing as a
+  hypothesis once B33 has settled whether the crossing predicate is even final.
