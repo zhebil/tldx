@@ -111,9 +111,10 @@ You are an orchestrator. Delegate the doing; keep decomposition and review.
   completing it - do not add an implementation nobody asked for.
 - If `npm run check` cannot be made green within the wake, revert the change,
   record the failure under the task, and commit that record alone.
-- **`docs/layout-hypotheses.md`, `docs/layout-champion.md` and
-  `docs/baselines/` are historical.** Read the hypotheses ledger before
-  building anything - it records what has already failed and why - but every
-  number in all three predates the box-sizing fix in commit `2484ffa` and
-  describes geometry that no longer exists. Never append to them.
+- **`docs/layout-hypotheses.md` and `docs/layout-champion.md` are historical.**
+  Read the hypotheses ledger before building anything - it records what has
+  already failed and why - but every number in both predates the box-sizing fix
+  in commit `2484ffa` and describes geometry that no longer exists. Never append
+  to them. The `docs/baselines/` epochs they refer to have been deleted; those
+  references are history, not a missing directory to recreate.
 - No `Claude-Session:` trailer and no co-author lines in commit messages.

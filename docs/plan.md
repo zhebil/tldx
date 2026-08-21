@@ -34,8 +34,10 @@ That is fixed (commit `2484ffa`). The consequences for the record:
 
 - **Every arrow-crossing count in `docs/layout-hypotheses.md` is stale.** They
   describe geometry that no longer exists.
-- **`docs/baselines/wake-*` and `docs/layout-champion.md` are stale** for the
-  same reason. Do not read them as current. They are kept only as history.
+- **`docs/layout-champion.md` is stale** for the same reason. Do not read it as
+  current; it is kept only as history. The `docs/baselines/wake-*` epochs were
+  deleted outright - every number in them described the old geometry, and git
+  history holds them if anyone ever needs them back.
 - **The two "closed" lines are re-opened**, not because their reasoning was
   wrong but because their evidence was. See T17 and T18.
 
@@ -222,8 +224,7 @@ Two traps, both paid for already:
   eight corpus files. Write `docs/baseline.md`: one table of per-file crossing
   counts, canvas dimensions and shape counts, plus the commit it was taken at.
   Save the PNGs to `docs/renders/`.
-  Mark `docs/layout-champion.md` and `docs/baselines/` as historical at the top
-  of each; do not delete them.
+  Mark `docs/layout-champion.md` as historical at the top; do not delete it.
   **Acceptance:** `docs/baseline.md` exists, one PNG per file in
   `docs/renders/`, and a second run of `arrow-truth` reproduces the table
   exactly.
@@ -906,6 +907,5 @@ promoted into the task list by the human.
   corpus is a real sequence diagram. The name is a trap for whoever reads the
   corpus next and should be `linear-chain`, but renaming touches a fixture, so
   it needs to be a deliberate task rather than a drive-by.
-- `docs/baselines/wake-*` and `docs/layout-champion.md` are still in the tree and
-  still describe pre-`2484ffa` geometry. T1 marks them historical; nothing has
-  deleted them.
+- `docs/layout-champion.md` is still in the tree and still describes
+  pre-`2484ffa` geometry. T1 marks it historical.
