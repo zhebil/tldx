@@ -1712,3 +1712,103 @@ most.
 
 **Verified.** `npm run check` green: 38 test files, 308 tests (unchanged - the
 diff is documentation only).
+
+
+---
+
+## B30 — B27 re-judged against the corrected gate 5 _(wake 34)_ — **B27 REVERTED**
+
+The first re-trial in the loop's history. B27 (elbow arrows + side anchors,
+gated on container topology) was kept at wake 31 on a 3-2 judge vote plus a
+quantitative case - `hexagonal` 5 -> 0 and `deep-nesting` 10 -> 9 crossings -
+that wake 32 showed came from a tracer matching 0 of 84 real arrows. B30's job
+was to give B27 the gate it never actually passed.
+
+**Framing, per the backlog entry.** The current champion (B27 live) is the
+*candidate*; pre-B27 arc-and-centre-anchor emit is the *alternative*, rebuilt
+with `git revert --no-commit 25fc54e` (clean - nothing has touched
+`emit.ts`/`builders.ts` since). Both sides fully rendered: six reports, six
+PNGs, and `tools/arrow-truth.mts` over the whole corpus, on each tree.
+
+**Gate 5, on real rendered vertices.**
+
+| corpus file | pre-B27 | B27 (candidate) |
+| --- | --- | --- |
+| deep-nesting | 10 | 10 |
+| hexagonal | **5** | **9** |
+| long-labels | 1 | 1 |
+| sequence | 0 | 0 |
+| sparse-graph | 0 | 0 |
+| wide-fanout | 36 | 36 |
+
+**The candidate fails gate 5.** B27 does not take `hexagonal` from 5 to 0; it
+takes it from 5 to 9, nearly doubling the arrows drawn through unrelated boxes
+on the corpus's densest file, and it improves nothing anywhere. Its entire
+measured effect is a regression on one file and a no-op on five. Under step 4
+that is a rejection without a judge.
+
+**The blind A/B was run anyway**, because B30 asked for it and because a
+disagreement between the gate and the judge is itself worth recording. Reports
+were byte-identical on all six files (B27 changes only arrow emit), so voting
+was decided on the PNGs: five differed, `wide-fanout` was byte-identical on both
+(its fan-shaped container keeps every edge on arc, so B27 is literally inert
+there). Randomiser put the candidate at A on 2 of 5.
+
+| file | A | B | verdict | for the candidate |
+| --- | --- | --- | --- | --- |
+| deep-nesting | candidate | pre-B27 | A | win |
+| hexagonal | pre-B27 | candidate | A | **loss** |
+| long-labels | pre-B27 | candidate | B | win |
+| sequence | candidate | pre-B27 | TIE | judged tie |
+| sparse-graph | pre-B27 | candidate | TIE | judged tie |
+| wide-fanout | - | - | - | structural tie |
+
+Judge reasoning, verbatim in the two that separated: `hexagonal` - *"A's
+straight arrows land cleanly on their targets, while B's orthogonal routing runs
+lines directly through unrelated shape interiors and labels (CLI, ListOrders,
+UsersRepo, Payments, Notifications)"*. `deep-nesting` - *"A routes the
+Validator-to-Parser and Serializer edges as clean orthogonal elbows that skirt
+around other boxes, while B draws them as long straight diagonals that slash
+through the Router and Validator shapes"*. `long-labels` preferred elbows for
+the same reason as `deep-nesting`.
+
+**So the two instruments disagree, and the gate wins.** On judge count alone
+the candidate is 2-1-2 and step 6 would keep it. But the two framings of this
+A/B give opposite answers - as candidate B27 dies at gate 5; as *the revert*
+being the candidate, pre-B27 passes every gate and loses the judge 1-2 - and
+that asymmetry is exactly what the protocol's "objective gates run before the
+judge, always" is for. Three things decide it:
+
+1. B27 never legitimately passed gate 5. It passed a fabricated reading of it.
+   Re-running the real gate is restoring a check it was never given, not
+   applying a new rule retroactively.
+2. The gate and the judge agree on cause where they overlap. `hexagonal` is the
+   one file where gate 5 sees a difference, and the blind judge picked pre-B27
+   there citing precisely the defect gate 5 counts - lines through unrelated
+   shape interiors. The candidate's two wins are on files where the crossing
+   count is *identical* (10=10, 1=1), so they are a preference for the look of
+   orthogonal routing, not evidence it routes better.
+3. Keep-by-default is only safe while the gates have force. A change whose sole
+   measured effect is +4 arrows through boxes, surviving on a 2-1 aesthetic
+   vote, would leave gate 5 with no power over the exact class of hypothesis it
+   was rebuilt at wake 32 to police.
+
+**Verdict: B27 REVERTED.** The champion returns to arc arrows with centre
+anchors. `docs/layout-champion.md`'s geometry sections were already
+byte-identical (B27 moved no shape); only the gate-5 table changed, `hexagonal`
+9 -> 5.
+
+**What survives.** The judge's two wins are a real signal and they are not
+thrown away: elbows *do* read better on `deep-nesting` and `long-labels`, which
+are the files where they have a corridor to run in. What B27 got wrong is its
+predicate. Deduped out-degree > 3 marks a container "fan-shaped" and drops it to
+arc, which correctly protected `wide-fanout` and completely failed to protect
+`hexagonal`, whose ports fan out at out-degree 1 per representative and whose
+corridors are still too tight to route in. Filed as **B31**: gate elbows on
+measured clearance rather than on degree.
+
+**Verified.** `npm run check` green on the reverted tree: 38 test files, 301
+tests (the 7 removed are B27's own). Both sides' artefacts regenerated from
+scratch this wake; the champion's arrow-truth numbers on the *unreverted* tree
+reproduced `docs/layout-champion.md`'s table exactly (10/9/1/0/0/36) before the
+revert, which is what makes the pre-B27 column trustworthy.

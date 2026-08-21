@@ -14,26 +14,27 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 31
-  for **B27** (elbow arrows + side anchors, gated on container topology), which
-  sits on top of the wake-28 **B9** revision (a note reserves the space tldraw
-  actually draws), the wake-22 **B20** revision (topology-gated doc-root aspect
-  wrap) and the wake-12 **B1** revision (cross-axis `align`, default `center`).
-  Those four are the only hypotheses ever kept - B2, B3, B4a, B13, B14, B15 and
-  B6 all reverted after judging, and B7 and B24 were rejected at an objective
-  gate before judging. Judged results live in `docs/layout-hypotheses.md` - read
-  it before proposing a hypothesis.
-- **Gate 5 was wrong until wake 32, and B27's case did not survive the fix.**
-  B28 measured the old arrow tracer against the real render: it matched **0 of
-  84** corpus arrows and called `hexagonal` clean where the render has 9
-  crossings. The tracer is deleted; `tools/arrow-truth.mts` reads the vertices
-  tldraw actually drew and is now gate 5's only instrument, with the champion
-  baseline in `docs/layout-champion.md`. B27 was kept on the claim that it took
-  `hexagonal` 5 -> 0 and `deep-nesting` 10 -> 9; against the real render the
-  champion sits at 9 and 10, so that claim is void and B27 rests on a 3-2 judge
-  vote whose two losses were on those same two files. Re-judging it is **B30**,
-  now top of the backlog. **B29** (let the judge return a tie) landed at wake 33,
-  so B30 can now be judged.
+- Champion layout revision: `docs/layout-champion.md`, gate-5 table updated at
+  wake 34 when **B27 was reverted**. The champion is now the wake-28 **B9**
+  revision (a note reserves the space tldraw actually draws) on top of the
+  wake-22 **B20** revision (topology-gated doc-root aspect wrap) and the
+  wake-12 **B1** revision (cross-axis `align`, default `center`). Those three
+  are the only hypotheses still standing - B2, B3, B4a, B13, B14, B15, B6 and
+  now B27 all reverted after judging, and B7 and B24 were rejected at an
+  objective gate before judging. Judged results live in
+  `docs/layout-hypotheses.md` - read it before proposing a hypothesis.
+- **Arrows are back to `arc` with centre anchors, and every arrow hypothesis
+  tried so far has now failed.** B27 was the last one standing; wake 34's B30
+  re-ran it against the corrected gate 5 and it takes `hexagonal` from 5
+  crossings to **9** while moving no other file. Gate 5's instrument is
+  `tools/arrow-truth.mts`, which reads the vertices tldraw actually drew (the
+  old model-based tracer matched 0 of 84 corpus arrows and was deleted at wake
+  32); the champion baseline is the table at the top of
+  `docs/layout-champion.md`. B30 is also the first wake where an objective gate
+  and the judge disagreed - the judge scored B27 2-1-2 - and it is settled in
+  the gate's favour, for the reasons in the B30 ledger entry. The successor,
+  **B31**, keeps the judge's finding (elbows do read better where there is room
+  for them) and replaces B27's degree predicate with a clearance one.
 - **The judge may answer `WINNER: TIE`** since wake 33 (B29). Ties count as
   neither wins nor losses, and the ledger distinguishes a *judged tie* from a
   *structural tie* (a file never sent to a judge because nothing changed). The
@@ -853,6 +854,14 @@ Ordered. Take from the top. Strike through when resolved.
   precisely the two files gate 5 says improved. Recorded as **weak**; the two
   instruments that were meant to settle it are both suspect, filed as B28 and
   B29. Ledger entry in `docs/layout-hypotheses.md`.
+  **REVERTED at wake 34 by B30.** Both suspect instruments were fixed (B28,
+  B29) and the re-trial killed it: against real rendered vertices B27 takes
+  `hexagonal` 5 -> **9**, not 5 -> 0, and moves no other file, so its whole
+  measured effect is a regression and it fails gate 5. The re-run blind A/B
+  scored it 2 wins / 1 loss / 2 judged ties, but its wins are on files where
+  gate 5 is identical and its loss is on the one file gate 5 can see - the
+  blind judge picked pre-B27 there for exactly the defect gate 5 counts.
+  Gates run before the judge. Successor is **B31**.
 
 - [x] ~~**B28** _(from B27, wake 31)_ **Validate gate 5's arrow tracer against a
   real render.** `layoutReport` traces each arrow from its binding records and,
@@ -874,7 +883,7 @@ Ordered. Take from the top. Strike through when resolved.
   long-labels 1, sequence 0, sparse-graph 0, wide-fanout 36. Full entry in
   `docs/layout-hypotheses.md`.
 
-- [ ] **B30** _(from B28, wake 32)_ **Re-judge B27 against the corrected gate
+- [x] ~~**B30** _(from B28, wake 32)_ **Re-judge B27 against the corrected gate
   5.** B27 (elbow + side anchors gated on container topology) was kept 3-2 and
   flagged weak. Its quantitative case was `hexagonal` 5 -> 0 and `deep-nesting`
   10 -> 9 on gate 5; wake 32 established those numbers came from a tracer that
@@ -885,7 +894,35 @@ Ordered. Take from the top. Strike through when resolved.
   the pre-B27 arc-and-centre-anchor emit, run **gate 5 on real vertices** for
   both, and run a fresh randomised blind A/B. If pre-B27 wins, revert B27. This
   is a full A/B and needs its own gates and judge - do not shortcut it into a
-  bare revert.
+  bare revert.~~ **DONE - B27 REVERTED** _(wake 34)_ - the candidate (B27 live)
+  fails gate 5: `hexagonal` 9 against pre-B27's 5, every other file identical,
+  so its only measured effect is a regression. Judge, run anyway and blind,
+  came back 2 wins / 1 loss / 2 judged ties for the candidate over five voting
+  files (`wide-fanout` byte-identical, structural tie) - the first wake where
+  the gate and the judge disagreed. The gate wins, because B27 never passed a
+  real gate 5 in the first place, because the judge's one loss is on the one
+  file the gate can see and cites the same defect, and because both its wins
+  are on files where the crossing count does not move. Successor **B31**.
+  Ledger entry in `docs/layout-hypotheses.md`.
+
+- [ ] **B31** _(from B30, wake 34)_ **Gate elbow arrows on measured clearance,
+  not on degree.** B30 reverted B27 but confirmed its premise on two files:
+  blind judges preferred elbows on `deep-nesting` and `long-labels`, both times
+  because the diagonal chord slashed through a third box. What B27 got wrong is
+  the predicate. Deduped out-degree > 3 marks a container fan-shaped and drops
+  it to arc; that protected `wide-fanout` exactly as intended and did nothing
+  for `hexagonal`, whose port boxes each fan out at out-degree 1 and whose
+  corridors are still far too tight for an L to fit. Degree is a proxy for
+  space, and on the corpus's densest file the proxy is simply wrong. Try the
+  direct test instead: an edge gets elbow + side anchors only when there is
+  actual room - the axis-aligned band between the two endpoint rects contains
+  no third shape, measured on the layout rects. This is **not B15**, which
+  tested the centre-to-centre *chord* and failed because the router draws an L;
+  test the L's own corridor. Gate 5 measures it directly and the target is
+  concrete: `hexagonal` must not rise above 5 while `deep-nesting` and
+  `long-labels` keep the elbows the judge preferred. If no predicate can hold
+  both, the honest conclusion is that arrow *attachment* has been exhausted and
+  the remaining lever is placement (**B25**).
 
 - [x] ~~**B29** _(from B27, wake 31)_ **Let the judge return a tie.** Step 5 tells
   the judge not to hedge, so a visually indistinguishable pair is decided by
@@ -1592,3 +1629,25 @@ anything that outlives the loop.)_
   `window.editor` unconditionally so `tools/arrow-truth.mts` can reach it. That
   is a debug hook shipped in the viewer bundle. Harmless, but if the viewer ever
   becomes something users embed, gate it behind a dev flag.
+
+- **(wake 34, from B30)** **An objective gate and the judge can disagree, and
+  the protocol does not say so out loud.** B30 is the first case: gate 5 rejects
+  B27, the blind judge scores it 2-1-2, and which verdict you reach depends on
+  which side you nominate as the candidate - the gate is a one-sided ratchet
+  (it blocks increases, never rewards decreases) while keep-by-default is a
+  one-sided burden of proof (it protects the status quo), and running the two
+  in the same direction is what makes them agree. Step 4's "objective gates run
+  before the judge, always" settles it in practice, but the plan should probably
+  say explicitly that a re-trial nominates the *incumbent* as the candidate, so
+  the incumbent has to clear the gates it would face if it were proposed today.
+  Not filed as a hypothesis - it is a one-paragraph protocol edit, and it
+  should be written the next time a re-trial actually comes up rather than
+  speculatively.
+
+- **(wake 34, from B30)** **`wide-fanout` is invisible to any arrow-attachment
+  hypothesis and carries 36 of the corpus's 52 crossings.** B27's fan gate made
+  its PNG byte-identical to the champion's, so it structurally ties every time
+  and its 36 crossings never move. Every attachment hypothesis is therefore
+  competing over the other 16. That is the concrete case for **B25** (routing
+  lanes in placement) being the higher-value line of work now that the
+  attachment line is exhausted.
