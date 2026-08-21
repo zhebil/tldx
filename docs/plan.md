@@ -1608,13 +1608,48 @@ trick: the lossless part is mechanical, the lossy part is supervised.
   the applied scene back over SSE (D4 forbade *watching* the overlay file, which
   this is not - but it does mean the server emits a scene nobody asked for).
 
-- [ ] **T21. Fidelity harness.**
+- [x] **T21. Fidelity harness.**
   Build this before absorb, not after. compile -> scene -> apply a canvas
   mutation -> reload -> assert the scene equals the mutated scene, over the
   whole corpus.
   **Acceptance:** passes with real mutations, and **fails loudly when fed a
   deliberately lossy apply** - a harness that has never gone red proves
   nothing.
+
+  `tests/e2e/fidelity/harness.ts` exports `checkFidelity(fixturePath, apply?)`,
+  which boots a real `runServe` over a temp copy of the fixture, reads the base
+  scene off SSE, PUTs a mutated snapshot exercising all five op kinds
+  (`tests/e2e/fidelity/mutate.ts`, the T20 generator moved out intact), reads
+  back the overlay tldsl actually wrote to disk, reconnects - that fresh SSE
+  connection *is* the reload - and finally re-runs the round-trip through the
+  **injected** `apply`. It returns `FidelityFailure[]` rather than throwing, so
+  a caller can hand it a lossy apply and observe red; failures name the fixture,
+  the stage, and the diverging record ids. The `apply` leg is deliberately
+  redundant with the reload leg under the real `applyOverlay` - redundancy is
+  the price of having an injection seam that does not put a test hook in
+  `runServe`.
+
+  The numbers: **52 test files / 609 tests**, up from 51/601 at T20.
+  `tests/e2e/fidelity-corpus.test.ts` runs the harness over all 17 corpus
+  fixtures in 721ms and they are all clean. `tests/e2e/fidelity-harness.test.ts`
+  is the acceptance criterion's teeth: seven deliberately lossy applies
+  (identity, drop each of `moved`/`restyled`/`relabelled`/`added`, ignore
+  `deleted`, truncate relabels) each make the harness go red, and every failure
+  carries `stage: "apply"` - which also proves the real server and reload legs
+  stayed green, so the injected loss is what tripped it and not a flaky server.
+  I ran a lossy apply by hand outside vitest to read the message myself:
+  `checkout-services.tldsl.jsx: applied scene diverges from the canvas in 1
+  record: shape:edge (differs)`. Geometry did not move - no layout code was
+  touched - so `docs/renders/` and `docs/baseline.md` are unchanged.
+
+  One choice worth recording: `tests/e2e/overlay-corpus.test.ts` was **deleted**
+  rather than kept alongside. The harness runs the same mutation generator over
+  the same 17 fixtures and adds the real disk serialization and the real serve
+  reload on top, so keeping both would have been two files asserting one
+  property; the parts worth keeping (the mutation builder and its cascade
+  comment) moved to `mutate.ts` verbatim, and the non-vacuity check that all
+  five op kinds fire is now a harness stage, not a test assertion. T20's
+  acceptance is still covered, by strictly more.
 
 - [ ] **T22. `tldsl absorb`.** *Blocked on the T19 decisions.*
   The model-driven step. Reads JSX plus overlay, rewrites the JSX, empties the
@@ -2698,4 +2733,33 @@ promoted into the task list by the human.
   reference in `round-trip.md` was corrected in place. Worth a glance at whether
   any other doc guesses an ADR number it did not check.
 - **`examples/` is still untracked**, as it has been since T16b. Not mine to
+  commit.
+
+### From T21
+
+- **The `moved` mutation usually lands on an arrow, not a box.**
+  `buildMutatedScene` picks the first shape with numeric `props.w`/`props.h`,
+  and on most fixtures that is an edge - so on `checkout-services` a
+  `moved`-dropping apply diverges in exactly one record, `shape:edge`. The
+  harness still goes red, but the move leg would bite harder (and read more like
+  a real canvas drag) if the picker preferred a geo shape and fell back to an
+  arrow.
+- **The harness copies the fixture's whole directory, not the fixture.**
+  `c4-context.tldsl.jsx` imports `./lib/c4.jsx` and esbuild resolves that
+  against the entry's real directory, so a single-file copy breaks it. The
+  harness does a recursive `cp` of `tests/corpus/` per fixture - 17 copies of a
+  small tree, harmless today. The honest fix is copying the entry plus its
+  resolved import graph, which is a thing the compiler already knows (chokidar
+  is handed exactly that set) and does not expose.
+- **`describeDivergence` only walks `store`.** A divergence in `schema` fails
+  the equality gate but is reported as "0 records", which would be a baffling
+  message. Nothing produces one today because `applyOverlay` passes `schema`
+  through untouched.
+- **Nothing proves `runServe` and `applyOverlay` are the same apply.** The
+  reload leg exercises whatever `watchAndServe` calls; the apply leg exercises
+  what the harness was handed. They agree today because they are literally the
+  same function, but if `serve` ever grew its own apply path the harness would
+  not notice the two drifting - it would just report the reload leg green and
+  the apply leg green independently.
+- **`examples/` is *still* untracked**, unchanged since T16b. Not mine to
   commit.

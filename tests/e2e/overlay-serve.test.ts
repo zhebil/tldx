@@ -22,7 +22,6 @@ import { runServe, type ServeHandle, type ServeIo } from "../../src/cli/serve.js
 import { boxShape } from "../../src/contracts/builders.js";
 import { isOverlay } from "../../src/contracts/overlay.js";
 import type { SceneJSON, TLRecord } from "../../src/contracts/scene-json.js";
-import type { SceneMessage } from "../../src/contracts/scene-message.js";
 import { overlayPathFor } from "../../src/domain/overlay/index.js";
 import { createSystemClock } from "../../src/infra/clock/system-clock.js";
 import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
@@ -31,40 +30,13 @@ import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
 import { createNodeFsWrite } from "../../src/infra/fs/node-fs-write.js";
 import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
 
+import { readFirstSceneMessage } from "./fidelity/harness.js";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(HERE, "fixtures");
 
 function noopIo(): ServeIo {
   return { writeStdout: () => {}, writeStderr: () => {} };
-}
-
-async function readFirstSceneMessage(
-  body: ReadableStream<Uint8Array>,
-  timeoutMs = 10_000,
-): Promise<SceneMessage> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let idx = buf.indexOf("\n\n");
-    while (idx >= 0) {
-      const event = buf.slice(0, idx);
-      buf = buf.slice(idx + 2);
-      if (!event.startsWith(":")) {
-        const dataLines = event.split("\n").filter((l) => l.startsWith("data: "));
-        if (dataLines.length > 0) {
-          const data = dataLines.map((l) => l.slice("data: ".length)).join("\n");
-          return JSON.parse(data) as SceneMessage;
-        }
-      }
-      idx = buf.indexOf("\n\n");
-    }
-  }
-  throw new Error("timed out waiting for SSE message");
 }
 
 function propsOf(record: TLRecord): Record<string, unknown> {

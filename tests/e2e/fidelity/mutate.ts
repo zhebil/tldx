@@ -1,11 +1,10 @@
 /**
  * For every corpus fixture (`tests/corpus/*.tldsl.jsx`), build a synthetic
  * canvas edit that exercises all five overlay operation kinds (D1's table:
- * `moved`, `restyled`, `relabelled`, `deleted`, `added`), diff it against the
- * compiled base with `diffScenes`, and assert `applyOverlay` reproduces the
- * mutated scene exactly with zero diagnostics. This is the round-trip
- * property from round-trip.md D1 exercised against every fixture in the
- * layout bench, not just the hand-picked scenes in domain/overlay/*.test.ts.
+ * `moved`, `restyled`, `relabelled`, `deleted`, `added`). Moved out of
+ * `tests/e2e/overlay-corpus.test.ts` (T21) so `tests/e2e/fidelity/harness.ts`
+ * can share it with the real-server fidelity harness rather than
+ * re-implementing the mutation.
  *
  * Deletion mutates the store the way a real tldraw canvas would: removing a
  * shape cascades to any binding that references it (and the arrow on the
@@ -15,29 +14,8 @@
  * scene that left those references in place, failing the `toEqual`.
  */
 
-import { readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-
-import { describe, expect, it } from "vitest";
-
-import { compileFile } from "../../src/app/compile-file.js";
-import { boxShape, richText } from "../../src/contracts/builders.js";
-import { OVERLAY_VERSION } from "../../src/contracts/overlay.js";
-import type { SceneJSON, TLRecord } from "../../src/contracts/scene-json.js";
-import { applyOverlay, diffScenes, sceneHash } from "../../src/domain/overlay/index.js";
-import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
-import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
-import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const CORPUS_DIR = join(HERE, "..", "corpus");
-
-function discoverCorpusFixtures(): string[] {
-  return readdirSync(CORPUS_DIR)
-    .filter((name) => name.endsWith(".tldsl.jsx"))
-    .sort();
-}
+import { boxShape, richText } from "../../../src/contracts/builders.js";
+import type { SceneJSON, TLRecord } from "../../../src/contracts/scene-json.js";
 
 function propsOf(record: TLRecord): Record<string, unknown> {
   return (record.props as Record<string, unknown> | undefined) ?? {};
@@ -83,7 +61,7 @@ function cascadeDeleteIds(store: Record<string, TLRecord>, rootId: string): Set<
   return deleted;
 }
 
-function buildMutatedScene(name: string, base: SceneJSON): SceneJSON {
+export function buildMutatedScene(name: string, base: SceneJSON): SceneJSON {
   const shapes = Object.values(base.store).filter((r) => r.typeName === "shape");
 
   const withSize = shapes.filter(
@@ -164,48 +142,3 @@ function buildMutatedScene(name: string, base: SceneJSON): SceneJSON {
 
   return { store, schema: base.schema };
 }
-
-describe("overlay corpus: synthetic overlays round-trip cleanly", () => {
-  const fixtures = discoverCorpusFixtures();
-
-  it("discovered at least six fixtures", () => {
-    expect(fixtures.length).toBeGreaterThanOrEqual(6);
-  });
-
-  for (const name of fixtures) {
-    it(
-      `${name}: overlay exercising all five op kinds applies cleanly`,
-      async () => {
-        const path = join(CORPUS_DIR, name);
-        const result = await compileFile(path, {
-          fs: createNodeFsRead(),
-          layout: new ElkLayoutAdapter(),
-          execute: createJsxExecute(),
-        });
-        expect(result.diagnostics).toEqual([]);
-        const base = result.sceneJson;
-        expect(base).not.toBeNull();
-        if (base === null) return;
-
-        const mutated = buildMutatedScene(name, base);
-        const entries = diffScenes(base, mutated);
-        const overlay = { v: OVERLAY_VERSION, basedOn: sceneHash(base), entries };
-
-        const opKinds = new Set<string>();
-        for (const entry of Object.values(entries)) {
-          if (entry.moved !== undefined) opKinds.add("moved");
-          if (entry.restyled !== undefined) opKinds.add("restyled");
-          if (entry.relabelled !== undefined) opKinds.add("relabelled");
-          if (entry.deleted === true) opKinds.add("deleted");
-          if (entry.added !== undefined) opKinds.add("added");
-        }
-        expect(opKinds).toEqual(new Set(["moved", "restyled", "relabelled", "deleted", "added"]));
-
-        const { scene: applied, diagnostics } = applyOverlay(overlay, base);
-        expect(diagnostics).toEqual([]);
-        expect(applied).toEqual(mutated);
-      },
-      30_000,
-    );
-  }
-});
