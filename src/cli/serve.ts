@@ -22,10 +22,10 @@
  *   not need to clean up.
  */
 
-import { watchAndServe } from "../app/watch-and-serve.js";
+import { watchAndServe, type WatchAndServeHandle } from "../app/watch-and-serve.js";
 import type { ClockPort } from "../app/ports/clock.js";
 import type { ExecutePort } from "../app/ports/execute.js";
-import type { FsReadPort } from "../app/ports/fs.js";
+import type { FsReadPort, FsWritePort } from "../app/ports/fs.js";
 import type { LogPort } from "../app/ports/log.js";
 import type { WatchPort } from "../app/ports/watch.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
@@ -39,6 +39,7 @@ export type ServeIo = {
 
 export type ServeDeps = {
   fs: FsReadPort;
+  fsWrite: FsWritePort;
   watch: WatchPort;
   layout: LayoutPort;
   execute: ExecutePort;
@@ -81,6 +82,12 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
 
   const transport = createSseTransport({ clock: deps.clock });
 
+  // `startDevServer` is created before `watchAndServe`, but its
+  // `onOverlayPut` callback needs the watch handle - hold a mutable box the
+  // route handler closes over rather than reordering the two (the dev
+  // server has to be up first so `runServe` can report its bound port).
+  const watchBox: { current?: WatchAndServeHandle } = {};
+
   let server;
   try {
     server = await startDevServer({
@@ -88,6 +95,9 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
       ...(deps.host !== undefined ? { host: deps.host } : {}),
       viewerBundleDir: deps.viewerBundleDir,
       transport,
+      onOverlayPut: async (snapshot) => {
+        await watchBox.current?.putOverlay(snapshot);
+      },
     });
   } catch (err) {
     await transport.close();
@@ -96,12 +106,14 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
 
   const watch = watchAndServe(path, {
     fs: deps.fs,
+    fsWrite: deps.fsWrite,
     watch: deps.watch,
     layout: deps.layout,
     execute: deps.execute,
     transport,
     log: deps.log,
   });
+  watchBox.current = watch;
 
   try {
     await watch.ready;

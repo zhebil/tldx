@@ -50,6 +50,8 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 
+import type { SceneJSON } from "../../contracts/scene-json.js";
+
 /** Subset of the SSE transport this server depends on. */
 export interface DevServerTransportHandler {
   handler(req: IncomingMessage, res: ServerResponse): void;
@@ -70,6 +72,13 @@ export interface StartDevServerOptions {
    * only (no surprise LAN exposure). Override (e.g. `0.0.0.0`) deliberately.
    */
   host?: string;
+  /**
+   * Handler for `PUT /overlay` - the viewer's canvas-edit round-trip
+   * (docs/round-trip.md D4: "the viewer writes the overlay over a plain
+   * `PUT /overlay`, not a websocket"). Omit to 404 the route entirely
+   * (e.g. `tldsl check` never boots a dev server that needs this).
+   */
+  onOverlayPut?: (snapshot: SceneJSON) => Promise<void>;
 }
 
 export interface DevServerHandle {
@@ -99,8 +108,45 @@ function looksLikeTraversal(rawPath: string): boolean {
   return /(?:^|[/\\])\.{1,2}(?:$|[/\\])|[/\\]{2,}/.test(decoded);
 }
 
-function buildApp(bundleRoot: string): Hono {
+function isSceneJsonLike(value: unknown): value is SceneJSON {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  const store = record.store;
+  const schema = record.schema;
+  return (
+    typeof store === "object" &&
+    store !== null &&
+    !Array.isArray(store) &&
+    typeof schema === "object" &&
+    schema !== null &&
+    !Array.isArray(schema)
+  );
+}
+
+function buildApp(
+  bundleRoot: string,
+  onOverlayPut: ((snapshot: SceneJSON) => Promise<void>) | undefined,
+): Hono {
   const app = new Hono();
+
+  // Registered before the blanket 405 guard below - Hono matches routes in
+  // registration order, and that guard returns without calling `next()`.
+  app.put("/overlay", async (c) => {
+    if (onOverlayPut === undefined) return c.body(null, 404);
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.body(null, 400);
+    }
+    if (!isSceneJsonLike(body)) return c.body(null, 400);
+    try {
+      await onOverlayPut(body);
+    } catch {
+      return c.body(null, 500);
+    }
+    return c.body(null, 204);
+  });
 
   // 405 for anything other than GET/HEAD on any path. Registering this
   // before the static handlers means non-GET requests never reach disk.
@@ -170,7 +216,7 @@ export async function startDevServer(
   const host = options.host ?? "127.0.0.1";
   const bundleRoot = resolve(options.viewerBundleDir);
 
-  const app = buildApp(bundleRoot);
+  const app = buildApp(bundleRoot, options.onOverlayPut);
 
   // Use `@hono/node-server`'s `createServer` hook so we can wrap its request
   // listener with our `/events` interceptor. This is the documented escape

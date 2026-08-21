@@ -28,6 +28,7 @@ import { createSystemClock } from "../../src/infra/clock/system-clock.js";
 import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
 import { createChokidarWatch } from "../../src/infra/fs/chokidar-watch.js";
 import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
+import { createNodeFsWrite } from "../../src/infra/fs/node-fs-write.js";
 import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
 import { createStderrLog } from "../../src/infra/log/stderr-log.js";
 import type { SceneMessage } from "../../src/contracts/scene-message.js";
@@ -97,6 +98,7 @@ async function bootServe(
     path: filePath,
     deps: {
       fs: createNodeFsRead(),
+      fsWrite: createNodeFsWrite(),
       watch: createChokidarWatch(),
       layout: new ElkLayoutAdapter(),
       execute: createJsxExecute(),

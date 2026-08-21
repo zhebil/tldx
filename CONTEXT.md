@@ -14,7 +14,7 @@ There are three concentric scopes. **Every section below is MVP-scoped.** Phase 
 
 - **MVP (now):** the smallest slice that proves the thesis (file → live canvas, errors land in agent context within one tool turn).
 - **Phase 1 (later):** remaining feature surface from the original design (`Group`, `<Shape>` kinds, `<Text>`, `<Line>`, full anchor scheme, edge styling). `<import>`/`<use>` and comments-as-stickies are not phase 1 - the former was superseded outright by ES `import`, the latter was rejected as incompatible with the JSX execution model. See `docs/decisions.md` ADR-10, ADR-11.
-- **Phase 2 (later):** round-trip from canvas back to DSL.
+- **Phase 2 (landing):** round-trip from canvas back to DSL. The lossless half is built - canvas edits live in `x.tldsl.overlay.json` and the render is `applyOverlay(overlay, compile(jsx))` (ADR-22, `docs/round-trip.md`). The model-driven `absorb` step that folds an overlay back into JSX is still outstanding.
 
 ### MVP scope
 
@@ -45,7 +45,8 @@ cli/        Composition root / entry point. Parses argv, builds real deps,
 
 app/        Application. Use cases orchestrating the domain pipeline + ports.
   ports/      Port interfaces the use cases depend on. Fakes colocated as
-              <port>.fake.ts. (FsReadPort, WatchPort, TransportPort, LogPort.)
+              <port>.fake.ts. (FsReadPort, FsWritePort, WatchPort,
+              TransportPort, LogPort.)
 
 domain/     Pure compiler core. No imports outside domain/ + contracts/.
   parser/     The AST type (`ast.ts`) shared by `runtime/` (which produces it)
@@ -56,6 +57,9 @@ domain/     Pure compiler core. No imports outside domain/ + contracts/.
               MVP validation (e.g. `<Edge>` endpoints reference real elements).
   layout/     IR → IR-with-positions. Calls the layout port.
   emit/       IR-with-positions → contracts/SceneJSON.
+  overlay/    Canvas edits over a compiled scene. `applyOverlay` (overlay +
+              scene → scene) and its inverse `diffScenes`. Pure; never
+              re-runs layout. See ADR-22 and docs/round-trip.md.
   diagnostics/ Error type + source-span model. NO formatting (cli/ owns that).
   ports/      Port interfaces the domain pipeline depends on (LayoutPort).
               Fakes colocated as <port>.fake.ts.
@@ -82,6 +86,9 @@ contracts/  Wire types shared across layers. Imports NOTHING.
   scene-message.ts    Envelope pushed over the transport: { v, kind, payload }.
   scene-json.ts       The scene payload (currently a re-export/pin of tldraw's
                       scene-JSON shape; treated as our wire format).
+  overlay.ts          The overlay file's shape - a final-state map of canvas
+                      edits keyed by record id. Shared by domain/overlay/
+                      and the viewer, which PUTs its snapshot to /overlay.
 
 viewer/     Separate Vite-built bundle. tldraw + transport client. Imports
             from contracts/ ONLY. Built into a static bundle that
@@ -130,6 +137,7 @@ A boundary becomes a port only when **two adapters justify the seam** (real impl
 | Boundary | Port? | Why / why not |
 |---|---|---|
 | Filesystem read | `app/ports/fs.ts` | Real (node:fs) + InMemoryFs fake. Use cases need it; tests need it instant. |
+| Filesystem write | `app/ports/fs.ts` (`FsWritePort`) | Real (node:fs) + InMemoryFs fake. Only the overlay is written; the same seam that already existed for reads. |
 | Filesystem watch | `app/ports/watch.ts` | Real (chokidar) + controllable fake. Watcher tests need to drive events. `watch(paths, listener)` takes an array, not a single file - a `.tldsl.jsx` entry can pull in imports, and `WatchHandle.update(paths)` re-subscribes to the current set (diffing against what's already watched; an unchanged set emits nothing) after every compile. |
 | Layout engine | `domain/ports/layout.ts` | Real (elkjs, opt-in for `layout="auto"`) + StubLayout. Domain unit tests need determinism. |
 | JSX execution | `app/ports/execute.ts` (`ExecutePort`) | Real (`infra/execute-jsx/`: esbuild bundle + `worker_threads` worker, hard `terminate()` at 2s) + `FakeExecute`. Two adapters justify the seam; `domain/` stays pure by never touching esbuild or the worker directly. |
@@ -151,7 +159,7 @@ Each use case declares only what it needs. `compileFile` does not see a transpor
 
 ## Transport choice
 
-**SSE for MVP.** Push is one-way (CLI → viewer); SSE is simpler to reason about, no upgrade dance, native EventSource in the browser. Reconnect is built in. Websocket is reserved for phase 2 if round-trip needs bidirectional.
+**SSE for MVP.** Push is one-way (CLI → viewer); SSE is simpler to reason about, no upgrade dance, native EventSource in the browser. Reconnect is built in. Round-trip did not need a second transport after all: the viewer writes its canvas edits over a plain `PUT /overlay` on the same dev server, so SSE stays one-way and `TransportPort` is unchanged (ADR-22, `docs/round-trip.md` D4).
 
 ## Scene message contract
 
@@ -213,7 +221,7 @@ The `PostToolUse` hook fires on every `Write|Edit`. `tldsl check` exits 0 with n
 
 Tracked in `docs/roadmap.md`. Highlights:
 
-- Round-trip from canvas back to DSL.
+- `absorb`: folding an overlay back into the JSX source. The overlay half of round-trip is built (ADR-22); rewriting source from it is model-driven and human-invoked, and is not part of the compiler.
 - `Group`, `<Shape>` kinds, `<Text>`, `<Line>`. (`<import>`/`<use>` is not on this list - ES `import` replaced it outright, not deferred.)
 - Full 8-compass-point-plus-fractions anchor scheme; default-center is enough for MVP. (Named anchors and free endpoints are parsed and rejected today: `ir/anchor-not-supported`, `ir/free-endpoint-not-supported`.)
 - Edge styling, head decorators, waypoints, edge labels.

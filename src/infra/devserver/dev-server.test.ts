@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FakeClock } from "../../app/ports/clock.fake.js";
 import { createSseTransport } from "../transport/sse-transport.js";
+import type { SceneJSON } from "../../contracts/scene-json.js";
 import type { SceneMessage } from "../../contracts/scene-message.js";
 
 import { startDevServer, type DevServerHandle } from "./dev-server.js";
@@ -49,7 +50,10 @@ async function closeFetch(
   return fetch(input, { ...init, headers });
 }
 
-async function bootWithBundle(files: Record<string, string>): Promise<Booted> {
+async function bootWithBundle(
+  files: Record<string, string>,
+  onOverlayPut?: (snapshot: SceneJSON) => Promise<void>,
+): Promise<Booted> {
   const bundleDir = await mkdtemp(join(tmpdir(), "tldsl-devserver-"));
   for (const [name, body] of Object.entries(files)) {
     await writeFile(join(bundleDir, name), body, "utf8");
@@ -61,6 +65,7 @@ async function bootWithBundle(files: Record<string, string>): Promise<Booted> {
     port: 0,
     viewerBundleDir: bundleDir,
     transport,
+    ...(onOverlayPut !== undefined ? { onOverlayPut } : {}),
   });
   return { server, transport, bundleDir };
 }
@@ -208,5 +213,90 @@ describe("startDevServer", () => {
 
     expect(res.status).toBe(405);
     expect(res.headers.get("allow") ?? "").toMatch(/GET/);
+  });
+
+  it("still 405s POST on other static routes when onOverlayPut is configured", async () => {
+    booted = await bootWithBundle(
+      { "index.html": "<!doctype html>" },
+      async () => {},
+    );
+
+    const res = await closeFetch(`${booted.server.url}index.html`, {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(405);
+  });
+
+  describe("PUT /overlay", () => {
+    const snapshot: SceneJSON = {
+      store: { "shape:a": { id: "shape:a", typeName: "shape" } },
+      schema: { schemaVersion: 2, sequences: {} },
+    };
+
+    it("404s when no handler is configured", async () => {
+      booted = await bootWithBundle({ "index.html": "<!doctype html>" });
+
+      const res = await closeFetch(`${booted.server.url}overlay`, {
+        method: "PUT",
+        body: JSON.stringify(snapshot),
+      });
+
+      expect(res.status).toBe(404);
+    });
+
+    it("204s and forwards the parsed snapshot to the handler", async () => {
+      let received: SceneJSON | undefined;
+      booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async (s) => {
+        received = s;
+      });
+
+      const res = await closeFetch(`${booted.server.url}overlay`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(snapshot),
+      });
+
+      expect(res.status).toBe(204);
+      expect(received).toEqual(snapshot);
+    });
+
+    it("400s on a malformed body", async () => {
+      booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async () => {});
+
+      const res = await closeFetch(`${booted.server.url}overlay`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ notAScene: true }),
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it("400s on a non-JSON body", async () => {
+      booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async () => {});
+
+      const res = await closeFetch(`${booted.server.url}overlay`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: "not json",
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it("500s when the handler throws", async () => {
+      booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async () => {
+        throw new Error("boom");
+      });
+
+      const res = await closeFetch(`${booted.server.url}overlay`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(snapshot),
+      });
+
+      expect(res.status).toBe(500);
+    });
   });
 });

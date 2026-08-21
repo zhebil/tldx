@@ -35,3 +35,13 @@ export function isFileNotFoundError(err: unknown): err is { code: "ENOENT" } {
     (err as { code?: unknown }).code === "ENOENT"
   );
 }
+
+/**
+ * Filesystem write port. Only the overlay-writing path (`watchAndServe`'s
+ * `putOverlay`) needs to write; kept separate from `FsReadPort` so use cases
+ * that only read (e.g. `compileFile`) don't have to accept a capability they
+ * never call.
+ */
+export interface FsWritePort {
+  write(path: string, content: string): Promise<void>;
+}

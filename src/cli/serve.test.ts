@@ -44,8 +44,10 @@ function makeIo(): ServeIo {
 }
 
 function makeDeps(): ServeDeps {
+  const fs = new InMemoryFs({ "doc.tldsl.jsx": SRC });
   return {
-    fs: new InMemoryFs({ "doc.tldsl.jsx": SRC }),
+    fs,
+    fsWrite: fs,
     watch: new FakeWatch(),
     layout: new StubLayout(),
     execute: new FakeExecute(),

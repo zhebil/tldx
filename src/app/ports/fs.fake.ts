@@ -1,13 +1,13 @@
 /**
- * `InMemoryFs` - canonical fake for `FsReadPort`. Used by app integration
- * tests that exercise use cases without touching disk. Real-adapter parity
- * is enforced by `fs.contract.ts`, which both this fake and the chokidar
- * adapter run against.
+ * `InMemoryFs` - canonical fake for `FsReadPort` and `FsWritePort`. Used by
+ * app integration tests that exercise use cases without touching disk.
+ * Real-adapter parity is enforced by `fs.contract.ts`, which both this fake
+ * and the chokidar adapter run against.
  */
 
-import { FileNotFoundError, type FsReadPort } from "./fs.js";
+import { FileNotFoundError, type FsReadPort, type FsWritePort } from "./fs.js";
 
-export class InMemoryFs implements FsReadPort {
+export class InMemoryFs implements FsReadPort, FsWritePort {
   private readonly files = new Map<string, string>();
 
   constructor(initial?: Record<string, string>) {
@@ -22,6 +22,10 @@ export class InMemoryFs implements FsReadPort {
     const content = this.files.get(path);
     if (content === undefined) throw new FileNotFoundError(path);
     return content;
+  }
+
+  async write(path: string, content: string): Promise<void> {
+    this.files.set(path, content);
   }
 
   /** Test helper - seed or overwrite a file. */

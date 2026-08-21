@@ -5,6 +5,7 @@ import "tldraw/tldraw.css";
 import type { Diagnostic } from "../contracts/diagnostic.js";
 import type { SceneJSON } from "../contracts/scene-json.js";
 
+import { createOverlayWriter, type OverlayWriter } from "./overlay-writer.js";
 import { createSseClient } from "./sse-client.js";
 import { applyMessage, initialViewerState } from "./state.js";
 
@@ -12,6 +13,8 @@ const EVENTS_URL = "/events";
 
 export function ViewerApp(): JSX.Element {
   const editorRef = useRef<Editor | null>(null);
+  const writerRef = useRef<OverlayWriter | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
   const [state, dispatch] = useReducer(applyMessage, initialViewerState);
 
   useEffect(() => {
@@ -25,8 +28,21 @@ export function ViewerApp(): JSX.Element {
   }, []);
 
   useEffect(() => {
+    const writer = createOverlayWriter();
+    writerRef.current = writer;
+    return () => {
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      writer.close();
+      writerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     const editor = editorRef.current;
     if (editor === null || state.scene === null) return;
+    writerRef.current?.noteServerScene(state.scene);
+    if (deepEqual(currentDocumentSnapshot(editor), state.scene)) return;
     pushScene(editor, state.scene);
   }, [state.scene]);
 
@@ -34,8 +50,16 @@ export function ViewerApp(): JSX.Element {
     editorRef.current = editor;
     (window as unknown as { editor?: Editor }).editor = editor;
     if (state.scene !== null) {
+      writerRef.current?.noteServerScene(state.scene);
       pushScene(editor, state.scene);
     }
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = editor.store.listen(
+      () => {
+        writerRef.current?.onCanvasChange(currentDocumentSnapshot(editor));
+      },
+      { source: "user", scope: "document" },
+    );
   }
 
   return (
@@ -50,6 +74,20 @@ export function ViewerApp(): JSX.Element {
 
 function pushScene(editor: Editor, scene: SceneJSON): void {
   editor.loadSnapshot(scene as unknown as TLStoreSnapshot);
+}
+
+function currentDocumentSnapshot(editor: Editor): SceneJSON {
+  return editor.store.getStoreSnapshot("document") as unknown as SceneJSON;
+}
+
+/**
+ * The server re-pushes the applied scene after every overlay write
+ * (`watchAndServe.putOverlay`); reloading an identical snapshot into
+ * tldraw would clear selection and flash the canvas mid-edit, so a scene
+ * that already matches the editor's current document is skipped.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 interface BannerProps {

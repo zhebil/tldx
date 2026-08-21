@@ -1565,7 +1565,7 @@ trick: the lossless part is mechanical, the lossy part is supervised.
   reserved, and `serve` deliberately does not watch the overlay file - watching it
   would let the viewer's own write stomp the canvas being edited.
 
-- [ ] **T20. Overlay apply - the deterministic half.**
+- [x] **T20. Overlay apply - the deterministic half.**
   Schema plus a pure `apply(overlay, scene)` in `domain/`, the viewer writing
   the overlay on canvas edit, and `serve` reading it. This is the whole
   lossless mechanism and it involves no model.
@@ -1573,6 +1573,40 @@ trick: the lossless part is mechanical, the lossy part is supervised.
   five operation kinds applies cleanly; `apply` is a pure function with unit
   tests; and reloading the served page reproduces the pre-reload scene byte for
   byte.
+
+  Built the whole path. `contracts/overlay.ts` holds the final-state schema from
+  D1; `domain/overlay/` holds `applyOverlay` (merge `added`, then field-wise
+  `moved`/`restyled`/`relabelled`, then `deleted` cascaded to a fixpoint) and
+  its inverse `diffScenes`, plus `sceneHash` for `basedOn` and `overlayPathFor`.
+  The viewer turned out not to need any diff logic at all: it PUTs its whole
+  document snapshot and the server diffs it against the last compile, so the
+  round-trip reduces to one property - `applyOverlay(diffScenes(base, cur), base)
+  === cur` - which is unit-tested directly and is what T21's harness will hang
+  off. `watchAndServe` reads and applies the overlay on every compile (absent,
+  unparsable or malformed overlays push the compiled scene unchanged and log a
+  warning; they never become a `kind: "error"` push, which would blank the
+  viewer per ADR-13), and `putOverlay` writes the file and re-pushes the applied
+  scene so the transport's last-message replay serves the *edited* render to a
+  reloading browser.
+
+  The numbers: **51 test files / 601 tests**, up from 44/534 at T18. All 17
+  corpus fixtures build a synthetic overlay exercising all five op kinds and
+  reproduce the mutated scene exactly with zero diagnostics
+  (`tests/e2e/overlay-corpus.test.ts`, which asserts all five kinds are present
+  rather than passing vacuously). The reload criterion is a real e2e:
+  `tests/e2e/overlay-serve.test.ts` boots `runServe`, reads the base scene off
+  SSE, `PUT`s a mutated snapshot, checks the overlay file landed and parses, and
+  asserts a *fresh* SSE connection replays the mutated scene. Geometry did not
+  move - no layout code was touched, so `docs/renders/` and `docs/baseline.md`
+  are unchanged. ADR-22 landed in `docs/decisions.md` and the three stale
+  round-trip lines in `CONTEXT.md` were fixed.
+
+  Two decisions the task left open, both recorded under Questions for the human:
+  `restyled` carries *every* changed prop rather than only the tldsl style
+  vocabulary (fidelity beats purity; the vocabulary claim is about what absorb
+  can map mechanically, not about what may be stored), and `putOverlay` pushes
+  the applied scene back over SSE (D4 forbade *watching* the overlay file, which
+  this is not - but it does mean the server emits a scene nobody asked for).
 
 - [ ] **T21. Fidelity harness.**
   Build this before absorb, not after. compile -> scene -> apply a canvas
@@ -2044,6 +2078,44 @@ as-is.
   **What the default costs:** if round-trip later needs the server to push
   something the viewer must acknowledge, the `PUT` route will not carry it and
   the websocket question reopens. Nothing in the current design needs that.
+
+- **T20 - `restyled` carries any changed prop, not just the tldsl style
+  vocabulary.** D1 says `restyled` is "a partial props patch in the **tldsl
+  style vocabulary**" (`src/domain/ir/styles.ts`). Restricting it to those enums
+  would silently drop a canvas change to `geo`, `spline`, `arrowheadStart`,
+  `growY` or anything else outside the DSL's surface, which contradicts D1's own
+  losslessness headline.
+  **Default taken:** `restyled` is a flat patch of *every* changed prop, plus the
+  two top-level fields a user can actually change from the style panel
+  (`opacity`, `isLocked`, listed in `RESTYLE_RECORD_FIELDS`). It changes least:
+  the schema and D1's flat `{ "color": "red" }` shape are untouched, and for
+  every prop that *is* in the vocabulary the absorb mapping is still the
+  mechanical rename D1 describes.
+  **Alternatives:** (2) restrict to the vocabulary and drop the rest, breaking
+  round-trip for any non-DSL prop; (3) restrict to the vocabulary and add a
+  second op for the remainder, which is two names for one gesture.
+  **What the default costs:** absorb (T22) will meet `restyled` keys it cannot
+  turn into a JSX prop. It has to leave those in the overlay rather than assume
+  every key maps - if it empties the overlay regardless, the render changes.
+
+- **T20 - `putOverlay` pushes the applied scene back over SSE.** D4 says `serve`
+  deliberately does not watch the overlay file, because the viewer's own write
+  would push a fresh scene back and stomp the canvas being edited. But the SSE
+  transport replays its last message to new subscribers, so without *some* push
+  a browser reload is served the pre-edit compile and the edits vanish - which
+  is exactly what this task's acceptance forbids.
+  **Default taken:** after writing the overlay, `putOverlay` pushes
+  `applyOverlay(overlay, lastCompiled)` - the scene the browser already has - so
+  the replay is correct. The stomp D4 feared is avoided in the viewer instead: it
+  skips `loadSnapshot` when the incoming scene already equals its current
+  document. No watcher was added.
+  **Alternatives:** (2) give `TransportPort` a "set the replay value without
+  broadcasting" method; (3) have the viewer re-request the scene over HTTP on
+  load instead of relying on SSE replay.
+  **What the default costs:** a second browser viewing the same diagram receives
+  a full `loadSnapshot` every time the first one nudges a shape. Single local
+  user is the documented scope (round-trip.md "Out of scope"), so this costs
+  nothing today.
 
 ## Discovered work
 
@@ -2595,3 +2667,35 @@ promoted into the task list by the human.
 - **`examples/kernel.tldsl.jsx` is still untracked.** Written during T16b,
   never staged. Either it is a corpus fixture and belongs in git, or it is
   scratch and belongs deleted.
+
+### From T20
+
+- **`tldsl overlay show` and `tldsl reset` still do not exist.** D4 names both as
+  part of the design - `show` to list entries and whether they resolve, `reset`
+  (with a `.bak`) as the escape hatch from an overlay that is masking a JSX edit.
+  T20's acceptance did not ask for them, so they were not built. Until they land
+  the only way out of a bad overlay is deleting the JSON by hand, and the only
+  way to read pending edits is opening it.
+- **Nothing tells the user the overlay file exists.** `docs/dsl.md` and the
+  README do not mention it, and `.gitignore` does not list it. The first time
+  someone drags a box they get an unexplained `x.tldsl.overlay.json` beside their
+  source and, in a repo, an unexplained untracked file. Whether it *should* be
+  gitignored is a real question - it is hand-done work, so probably not - but the
+  silence is not a decision, it is an omission.
+- **The viewer PUTs its entire document store on every debounced edit.** Fine at
+  corpus size over localhost, and it is what keeps all diff logic in `domain/`
+  where it is testable. The ceiling is real for a large diagram on a slow
+  machine; the fix, if it ever bites, is diffing in the viewer against the last
+  server scene and PUTting entries, which moves the logic across the layer
+  boundary into code that can only import `contracts/`.
+- **`diffScenes` cannot represent two things.** A prop removed from a record
+  (tldraw does not do this, so it is theoretical) and a change to a top-level
+  field outside placement and `RESTYLE_RECORD_FIELDS` - `meta` and `type`. A
+  canvas gesture that writes shape `meta` would round-trip silently wrong rather
+  than loudly. Nothing in tldraw's UI writes `meta` today.
+- **`docs/round-trip.md` called this ADR-14; 14 was already taken** by "JSX as
+  syntax - no React, no reconciler". The entry landed as **ADR-22** and the
+  reference in `round-trip.md` was corrected in place. Worth a glance at whether
+  any other doc guesses an ADR number it did not check.
+- **`examples/` is still untracked**, as it has been since T16b. Not mine to
+  commit.

@@ -23,6 +23,7 @@ import { createSystemClock } from "../infra/clock/system-clock.js";
 import { createJsxExecute } from "../infra/execute-jsx/execute-jsx.js";
 import { createChokidarWatch } from "../infra/fs/chokidar-watch.js";
 import { createNodeFsRead } from "../infra/fs/node-fs-read.js";
+import { createNodeFsWrite } from "../infra/fs/node-fs-write.js";
 import { ElkLayoutAdapter } from "../infra/layout-elk/elk-layout.js";
 import { createStderrLog } from "../infra/log/stderr-log.js";
 import { openBrowser } from "../infra/open-browser/open-browser.js";
@@ -114,6 +115,7 @@ const commands: readonly Command[] = [
           path,
           deps: {
             fs: createNodeFsRead(),
+            fsWrite: createNodeFsWrite(),
             watch: createChokidarWatch(),
             layout: new ElkLayoutAdapter(),
             execute: createJsxExecute(),

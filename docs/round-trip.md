@@ -10,8 +10,9 @@ That architecture is not re-argued here. Three layers, one human-invoked step:
    reproduces the current render, then empties the overlay.
 
 Prior art read first: `docs/decisions.md` ADR-13 (last-good scene), ADR-12 (id
-rules), ADR-9 (two CLI modes). This doc proposes ADR-14; the ADR entry lands
-with T20, not with this doc.
+rules), ADR-9 (two CLI modes). This doc proposes a new ADR; the entry landed
+with T20 as **ADR-22** (the number 14 guessed here was already taken by "JSX as
+syntax").
 
 This is a design document. **No code was written for it.** Every section below
 is a decision with a reason, and the last section says what is out of scope.
