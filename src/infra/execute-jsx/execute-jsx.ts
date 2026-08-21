@@ -255,7 +255,10 @@ function threwDiagnostic(stack: string, path: string, mapText: string): Diagnost
 
 /** Finds the topmost frame inside the compiled bundle (frames carry `path`
  * as their filename - see WORKER_BOOTSTRAP) and maps it through the
- * sourcemap to the original file/line/column. */
+ * sourcemap to the original file/line/column. `entry.originalSource` (when
+ * present) is esbuild's source path relative to the entry's own directory -
+ * see the `outfile`/`absWorkingDir` comments in `buildBundle` - so it's
+ * resolved against `dirname(path)` to recover the imported file's path. */
 function mappedSpan(stack: string, path: string, mapText: string): SourceSpan | undefined {
   let map: SourceMap;
   try {
@@ -264,6 +267,7 @@ function mappedSpan(stack: string, path: string, mapText: string): SourceSpan | 
     return undefined;
   }
 
+  const dir = dirname(path);
   const frameRe = new RegExp(`${escapeRegExp(path)}:(\\d+):(\\d+)`);
   for (const line of stack.split("\n")) {
     const match = frameRe.exec(line);
@@ -273,7 +277,7 @@ function mappedSpan(stack: string, path: string, mapText: string): SourceSpan | 
     const entry = map.findEntry(generatedLine - 1, generatedColumn - 1);
     if (!("originalLine" in entry)) continue;
     return {
-      file: path,
+      file: entry.originalSource ? resolvePath(dir, entry.originalSource) : path,
       line: entry.originalLine + 1,
       column: entry.originalColumn + 1,
     };

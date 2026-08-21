@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
@@ -165,6 +165,67 @@ export default function Diagram() {
         const threw = result.diagnostics.find((d) => d.code === "runtime/threw");
         expect(threw).toBeDefined();
         expect(threw?.span?.line).toBe(3);
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+    20000,
+  );
+
+  it(
+    "runtime/threw diagnostic from an imported file names that file, and inputs covers the module graph",
+    async () => {
+      // esbuild resolves relative imports through their real (symlink-free)
+      // path when building the sourcemap's `sources`; on macOS `tmpdir()`
+      // sits under a `/var` -> `/private/var` symlink, so the temp dir is
+      // realpath'd up front to keep every path comparison below exact.
+      const dir = await realpath(await mkdtemp(join(tmpdir(), "tldsl-execute-jsx-imported-throw-")));
+      try {
+        const libDir = join(dir, "lib");
+        await mkdir(libDir);
+        const brokenPath = join(libDir, "broken.jsx");
+        // Line 8 is asserted directly below - keep the throw on that exact
+        // line if this template changes.
+        await writeFile(
+          brokenPath,
+          `import { Box } from "tldsl";
+
+export function Safe({ id, label }) {
+  return <Box id={id} label={label} />;
+}
+
+export function Broken() {
+  throw new Error("boom from imported module");
+}
+`,
+          "utf8",
+        );
+        const path = join(dir, "diagram.tldsl.jsx");
+        const port = createJsxExecute();
+
+        const okDiagramSource = `import { Doc } from "tldsl";
+import { Safe } from "./lib/broken.jsx";
+export default function Diagram() {
+  return <Doc><Safe id="w" label="w" /></Doc>;
+}
+`;
+        const ok = await port.execute(okDiagramSource, path);
+        if (!("ast" in ok)) throw new Error("expected ast result");
+        expect(ok.inputs).toContain(path);
+        expect(ok.inputs).toContain(brokenPath);
+
+        const throwingDiagramSource = `import { Doc } from "tldsl";
+import { Broken } from "./lib/broken.jsx";
+export default function Diagram() {
+  return <Doc><Broken /></Doc>;
+}
+`;
+        const failed = await port.execute(throwingDiagramSource, path);
+        if (!("diagnostics" in failed)) throw new Error("expected diagnostics result");
+        const threw = failed.diagnostics.find((d) => d.code === "runtime/threw");
+        expect(threw).toBeDefined();
+        expect(threw?.span?.file).toBe(brokenPath);
+        expect(threw?.span?.line).toBe(8);
       } finally {
         await rm(dir, { recursive: true, force: true });
       }

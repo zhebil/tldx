@@ -615,3 +615,27 @@ One fixture needed a fixture-side fix found only by looking at the render: in
 Swapping the tier's box order (Redis first) cleared it. No tool reported this -
 `arrow-truth` counts arrows crossing *shapes*, and a frame's name chip is drawn
 by tldraw outside the geometry the layout controls.
+
+## After T16b (userland component library, first multi-file diagram)
+
+One fixture added to `tests/corpus/`: `c4-context.tldsl.jsx`, which imports
+`Person` / `System` / `Container` / `Boundary` from `tests/corpus/lib/c4.jsx` -
+a vocabulary written in userland over `Box` and `Frame`, not shipped by the
+library. Like T13's and T16's additions it is **not a gate**: no `src/domain/`
+file changed, so every number in every table above is untouched. The only
+`src/` change in T16b is `mappedSpan`'s span file (diagnostics, not geometry).
+
+| file | canvas | shapes | frames | arrows | crossings | overlapping pairs | png |
+|---|---|---|---|---|---|---|---|
+| c4-context | 1105 x 460 | 6 | 1 | 4 | 0 | 0 | 2337 x 1048 |
+
+`crossing-classify`: `same-axis skip=0 cross-container=0 fan=0 other=0 total=0`.
+
+Three arrow labels were shortened while rendering this fixture, and the reason
+is a defect rather than taste: tldraw wrapped `reads/writes`, then
+`HTTPS/JSON`, then `persists` mid-word, each time in a corridor that
+`text-metrics.mts` reported as wide enough for it. The corridor the layout
+reserves for a horizontal arrow label is roughly one glyph narrower than what
+tldraw needs, and because the corridor is sized *from* the label, shortening
+the label does not escape the shortfall. Recorded under Discovered work; the
+final labels (`calls`, `reads`, `charges card`) all render on one line.

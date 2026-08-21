@@ -6,7 +6,15 @@
  * compiled from a temp file.
  */
 
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -112,6 +120,11 @@ describe("shorthand-equivalence: Row/Col/Grid produce identical scene JSON to Fr
         }
 
         const tmpDir = mkdtempSync(join(tmpdir(), "tldsl-shorthand-"));
+        // A fixture may relatively import sibling modules (T16b's
+        // c4-context.tldsl.jsx -> ./lib/c4.jsx) - copy them alongside so the
+        // rewritten copy resolves the same imports the original does.
+        const libDir = join(HERE, "lib");
+        if (existsSync(libDir)) cpSync(libDir, join(tmpDir, "lib"), { recursive: true });
         const tmpPath = join(tmpDir, fixture.name);
         writeFileSync(tmpPath, fixture.fixedSource, "utf8");
 

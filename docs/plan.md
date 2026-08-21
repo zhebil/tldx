@@ -1326,7 +1326,7 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   fixture-side by reordering that tier (Redis first). `arrow-truth` counts
   arrows crossing *shapes*, and a frame name chip is not a shape.
 
-- [ ] **T16b. A userland component library, as the composability test.**
+- [x] **T16b. A userland component library, as the composability test.**
   Tier 1 primitives ship in `tldsl`. Domain vocabularies deliberately do not.
   Prove that split is right by building one *outside* the library: a
   fixture-side module defining a small set - C4-ish (`Person`, `System`,
@@ -1348,6 +1348,46 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   renders; editing the *imported* file triggers a reload in `serve`; and a
   deliberate error inside the imported file produces a diagnostic whose span
   points at that file's path and line, not the importing file's.
+
+  **Done.** `tests/corpus/lib/c4.jsx` defines `Person`, `System`, `Container`
+  and `Boundary` as plain functions over `Box`/`Frame`, mapping domain props
+  (`name`, `description`, `technology`, `external`) down to the allowed prop
+  set and picking `geo`/`color` themselves; `tests/corpus/c4-context.tldsl.jsx`
+  imports it and is the first multi-file diagram in the repo. **No library
+  change was needed to express the vocabulary** - nothing in `src/runtime/` or
+  `src/domain/` moved for it, which is the finding: the tier-1 / domain-
+  vocabulary split holds. Numbers: canvas 1105 x 460, overlapping shape pairs
+  0, edge-edge crossings 0, `crossing-classify` `same-axis skip=0
+  cross-container=0 fan=0 other=0 total=0` over 4 arrows.
+
+  One library change *was* forced, by the fourth acceptance clause.
+  `mappedSpan` in `src/infra/execute-jsx/execute-jsx.ts` mapped a thrown
+  frame's line and column through the sourcemap but hardcoded
+  `file: path` - so a throw inside an imported module reported the *entry*
+  file with the imported file's line number, which is worse than no span at
+  all. It now reads `entry.originalSource` (resolved against the entry's
+  directory) and falls back to `path`. A new `execute-jsx` test writes a temp
+  two-file diagram and pins `span.file` at the imported module and
+  `span.line` at 8. Compile errors already carried the right file - esbuild's
+  `BuildFailure.errors[].location` names it - so only the runtime-throw path
+  was wrong.
+
+  Reload is proven as a chain, not end to end: `tests/corpus/multi-file.test.ts`
+  asserts `compileFile`'s `result.inputs` contains `lib/c4.jsx`, and
+  `watch-and-serve.test.ts`'s existing "re-subscribes to the module graph
+  after a successful compile" asserts `watchHandle.update(result.inputs)`.
+  No test starts a real `serve` and touches the imported file.
+
+  Three arrow labels were shortened during the wake (`reads/writes` ->
+  `reads`, `HTTPS/JSON` -> `calls`) because tldraw wrapped each of them
+  mid-word - see Discovered work; the corridor the layout reserves for a
+  horizontal arrow label is about one glyph narrower than what tldraw
+  actually needs.
+
+  `tests/corpus/shorthand-equivalence.test.ts` needed a one-line fix: it
+  copies each fixture into a tmpdir before rewriting shorthands, and did not
+  carry sibling modules along, so the first fixture with a relative import
+  broke it. It now `cpSync`s `tests/corpus/lib` when present.
 
 ### Phase 6 - re-examine what was decided on stale geometry
 
@@ -1872,6 +1912,22 @@ as-is.
   of a swimlane chart. It is written into `docs/dsl.md` as a known limitation,
   so nobody will be surprised, but the primitive under-delivers on its name.
 
+- **T16b - reload on editing an imported file is proven as a chain, not end to end.**
+  Acceptance asked that editing the *imported* file trigger a reload in `serve`.
+  What was verified: `compileFile`'s `result.inputs` contains `lib/c4.jsx`, and
+  `watch-and-serve.test.ts` already pins that `watchHandle.update(result.inputs)`
+  is called after every successful compile. No test starts a real `serve`,
+  touches the imported file and observes a pushed scene.
+  **Default taken:** accept the two-link chain, because it reuses tests that
+  already exist and adds nothing to the process-spawning surface of the suite.
+  **Alternatives:** an `app`-level test driving `watchAndServe` with the fake
+  watch/transport ports and a real two-file fixture on disk (medium cost, no
+  new process); a `tests/e2e/` test that spawns `tldsl serve`, edits the
+  imported file and reads the SSE stream (high cost, flaky).
+  **What the default costs:** if the watch handle ever stops re-subscribing, or
+  chokidar stops reporting changes to a file added mid-session, the suite stays
+  green and multi-file authoring silently stops live-reloading.
+
 ## Discovered work
 
 - **T11: `estimatedNoteSize` is still a char-count guess, now a scaled one.**
@@ -2317,3 +2373,38 @@ promoted into the task list by the human.
   dropped `fill="solid"` because it is unreadable *with* `labelColor="white"`;
   with the default label colour it reads fine. The T13 note should be narrowed
   to the pair, not the fill.
+
+### From T16b
+
+- **tldraw wraps horizontal arrow labels mid-word; the reserved corridor is
+  about one glyph too narrow.** `text-metrics.mts` reports `persists` at
+  labelW 85 in a shapeW 114 corridor - it should fit - yet the render broke it
+  into `persist` + `s`. Same for `reads/writes` and `HTTPS/JSON` at their own
+  corridor widths. Shortening the label does not escape it: the corridor is
+  sized *from* the label, so the shortfall scales with it. T0 fixed exactly
+  this class of bug for box labels by measuring per-glyph advances; arrow
+  labels never got the same treatment, and tldraw appears to add padding
+  inside the label box that the corridor does not account for.
+- **`text-metrics.mts` agrees with the engine, not with tldraw, on arrow
+  labels.** It reported every label above as fitting. Whatever budget tldraw
+  uses for an arrow label is not the one the tool models, so the tool cannot
+  currently catch this defect - only the PNG can.
+- **Nothing prefixes ids inside a userland component.** `c4.jsx`'s components
+  take an explicit `id` and pass it straight through, per the `ns` convention
+  in CONTEXT.md. Reusing `Boundary` twice with the same inner ids is a
+  `ir/duplicate-id`, and the component has no way to help. If domain
+  vocabularies become common this is the next thing authors will hit.
+- **A userland component cannot produce a diagnostic.** `c4.jsx` validates
+  nothing; if it did, its only options are `throw` (a `runtime/threw` stack
+  trace) or silence. `<Pipeline>` has the same problem inside the library
+  (already noted under T16), but in userland there is not even a private API
+  to reach for.
+- **`corpus.test.ts` discovers fixtures non-recursively, which is now load-
+  bearing.** `tests/corpus/lib/c4.jsx` is skipped both because it is in a
+  subdirectory and because it does not end in `.tldsl.jsx`. Any future change
+  to recurse into subdirectories has to keep excluding module files, or the
+  corpus test will try to compile a library as a diagram.
+- **`tests/corpus/` is outside eslint and dep-cruiser** (both scoped to
+  `src`), so the userland module is unlinted. That is fine for a fixture, but
+  it also means nothing mechanically stops a fixture-side module from
+  importing out of `src/domain/`.
