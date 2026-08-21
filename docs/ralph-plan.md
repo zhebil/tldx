@@ -39,11 +39,18 @@ once A is done. The loop never terminates; the human stops it.
   neither wins nor losses, and the ledger distinguishes a *judged tie* from a
   *structural tie* (a file never sent to a judge because nothing changed). The
   exact prompt wording is fixed in protocol step 5 - use it verbatim.
-- Last drift audit (protocol step 9): **wake 30** - epoch established, audit
-  vacuous, nothing to compare against. Epoch saved at
-  `docs/baselines/wake-30/`. **Next audit: wake 35**, and it is the first real
-  one - it blind-A/Bs wake 35's champion against `docs/baselines/wake-30/`.
+- Last drift audit (protocol step 9): **wake 35** - **no drift**. All six corpus
+  files came back a *structural tie* against `docs/baselines/wake-30/`:
+  byte-identical PNGs and identical reports (modulo the gate-5 metric line wake
+  32 deleted from `layout-report.mts`), so no file went to a judge and the
+  ratchet did not engage. Expected, since the only hypothesis kept in between
+  (B27) was reverted at wake 34 - but it confirms that revert was complete to
+  the pixel, and it shows the screenshot pipeline is deterministic across five
+  wakes. Epoch saved at `docs/baselines/wake-35/`. **Next audit: wake 40.**
   An audit is that wake's whole unit of work; it does not also run a hypothesis.
+  The ratchet still has not been exercised against a champion that actually
+  differs from its epoch - two audits in, drift is undetected, not
+  demonstrated-absent.
 
 ---
 
@@ -1651,3 +1658,25 @@ anything that outlives the loop.)_
   competing over the other 16. That is the concrete case for **B25** (routing
   lanes in placement) being the higher-value line of work now that the
   attachment line is exhausted.
+
+- **(wake 35, from drift audit #2)** **The drift ratchet is only informative
+  five wakes after a hypothesis that *survives*.** Audit #1 was vacuous (no
+  baseline); audit #2 compared everything and found a byte-for-byte tie,
+  because the one keep in the window (B27) was reverted inside the same window.
+  A revert-heavy stretch therefore produces audits that cost a wake each and
+  can never fire. Worth considering: skip the audit when the ledger shows no
+  surviving keep since the last epoch, and instead re-save the epoch cheaply -
+  or, better, keep the five-wake cadence but let a vacuous-by-construction
+  audit be a *half* wake that also runs a hypothesis. Not filed as a
+  hypothesis; it is a protocol edit and should wait until a third audit
+  confirms the pattern rather than being generalised from two.
+
+- **(wake 35, from drift audit #2)** **Epoch reports are not diffable across a
+  change to `layout-report.mts`.** Wake 32 deleted the model-based gate-5 line
+  from the tool, so every wake-30 report differs from every later one on that
+  line and a naive `diff` calls all six files changed. The PNGs have no such
+  problem. Recorded in `docs/baselines/README.md` so the next auditor does not
+  mistake a tooling change for drift; if the report format changes again, the
+  same note needs extending. A `--format-version` header on the report would
+  make this self-describing, but that is a tool change for a problem that has
+  cost one grep so far.
