@@ -2257,6 +2257,16 @@ as-is.
 
 ## Discovered work
 
+- **T23: rendering a diagram writes an overlay file into the repo.** Every
+  `tldsl render` (and every `tools/screenshot.mts`) boots the viewer, and the
+  viewer PUTs its snapshot back, so `tests/corpus/sequence.tldsl.overlay.json`
+  appears with 13 `moved` entries that carry only an `index` - tldraw reassigns
+  fractional indexes on mount, and `diffScenes` reports that as a canvas edit.
+  Harmless to the render (the PNGs stay byte-identical) but it litters the
+  working tree during a corpus re-render, and it means an index-only `moved`
+  record is indistinguishable from a real reorder. Either ignore index-only
+  diffs in `diffScenes`, or give `render` a read-only viewer mode.
+
 - **T23: `docs/baseline.md`'s `png` column disagrees with the committed PNGs.**
   The table says `deep-nesting` exports at `1316 x 1708`, computed from the
   layout report's `594 x 790` canvas. tldraw's own page bounds for that file are
