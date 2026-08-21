@@ -1,6 +1,6 @@
 /**
  * Corpus-driven compile check for the Phase B layout bench (see
- * docs/ralph-plan.md A7). Every `*.tldsl.jsx` fixture in this directory
+ * docs/plan.md). Every `*.tldsl.jsx` fixture in this directory
  * must compile clean through the real pipeline (esbuild/worker execute +
  * real ELK layout) - these diagrams are the fixed test bench a long-running
  * layout-tuning loop judges against, so this test only pins "still
