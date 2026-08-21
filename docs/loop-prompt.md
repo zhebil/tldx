@@ -30,6 +30,11 @@ Three things you may do to the plan, and nothing else:
 - **Append to Discovered work.** Never promote your own entry into the task
   list; the human does that.
 
+A task marked *blocked on a human decision* is a hard stop, not a puzzle. Write
+`BLOCKED ON HUMAN` at the top of `docs/plan.md` with the task number, commit
+that, and stop. Do not skip past it to the next task and do not make the
+decision yourself.
+
 If the top task's criterion cannot be measured, or the task contradicts what you
 find in the code, **do not improvise a substitute**. Write the problem under the
 task, leave the box unchecked, commit that, and stop. A wake that reports a
