@@ -440,19 +440,20 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   shorthand form and the `<Frame layout=...>` form produce byte-identical scene
   JSON. **Do not rewrite the fixtures** - write the test against both forms.
 
-- [ ] **T15. Shape vocabulary via tldraw `geo`.**
+- [ ] **T15. `geo` as a prop. No named shape aliases in the library.**
   tldraw's geo shape already supports `rectangle`, `ellipse`, `diamond`,
   `hexagon`, `cloud`, `oval`, `triangle`, `star`, `x-box`, `check-box` and more,
-  all free. Expose `<Box geo="diamond">`, plus named aliases where the name
-  carries meaning: `Decision` (diamond), `Actor` (ellipse), `External` (cloud),
-  `Terminal` (oval).
+  all free. Expose it as `<Box geo="diamond">`.
   **There is no cylinder in tldraw**, so the conventional database shape is not
   available. Use `oval` or accept the gap - do not build a composite shape to
   fake it.
-  **Acceptance:** each alias emits the right `geo`, and `estimatedBoxSize`
-  accounts for the geometry. It currently will not: a diamond's usable inner
-  width is roughly half its bounding box, so a diamond sized like a rectangle
-  will clip its label. Measure with `text-metrics.mts` per geo.
+  Named aliases (`Decision`, `Actor`, `External`, `Terminal`) do **not** go in
+  the library. They are userland - see T16b. The library ships the capability,
+  not the vocabulary.
+  **Acceptance:** each geo value emits correctly, and sizing accounts for the
+  geometry. It currently will not: a diamond's usable inner width is roughly
+  half its bounding box, so a diamond sized like a rectangle clips its label.
+  Measure per geo with `text-metrics.mts` and feed the result into T0's sizing.
 
 - [ ] **T16. Composite primitives that carry layout semantics.**
   The ones worth having are the ones that constrain structure:
@@ -468,6 +469,29 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   available as the escape hatch, but nobody should have to know the string.
   **Acceptance:** a fixture per primitive; each produces zero same-axis skip
   edges by construction, verified with the T2 classifier.
+
+- [ ] **T16b. A userland component library, as the composability test.**
+  Tier 1 primitives ship in `tldsl`. Domain vocabularies deliberately do not.
+  Prove that split is right by building one *outside* the library: a
+  fixture-side module defining a small set - C4-ish (`Person`, `System`,
+  `Container`) or flowchart-ish (`Decision`, `Terminal`, `Process`) - written
+  purely as components over `Box`, `geo` and the tier 1 containers, plus a
+  diagram that imports and uses it.
+
+  **This is an architectural test, not a demo.** If a domain vocabulary cannot
+  be expressed in userland, the primitives are missing something, and that
+  finding matters more than the fixture does. Write down anything that forced a
+  library change.
+
+  It also exercises a path nothing has ever tested: **multi-file diagrams.**
+  Every fixture today is a single file. esbuild bundling and the
+  metafile-driven watch set were built for imports (`docs/jsx-pivot.md`
+  decision 12) but nothing in the repo imports anything.
+
+  **Acceptance:** the component module compiles; the diagram importing it
+  renders; editing the *imported* file triggers a reload in `serve`; and a
+  deliberate error inside the imported file produces a diagnostic whose span
+  points at that file's path and line, not the importing file's.
 
 ### Phase 6 - re-examine what was decided on stale geometry
 
@@ -638,14 +662,20 @@ tasks above by the human, not by the loop.
 4. ~~**Should `BOX_MIN_H` exist?**~~ **Answered:** it is dead code - the
    height formula never goes below it. Folded into T0.
 
-5. **Which primitives are actually worth having (T15, T16)?** The list in those
-   tasks is a guess. The useful question is which archetypes get drawn often
-   enough to deserve a component: block schema, C4 (`Person`, `System`,
-   `Container`, `Component`), flowchart (`Decision`, `Terminal`, `Process`),
-   sequence diagram (lifelines and messages, which needs a genuinely different
-   layout), ER diagram, deployment diagram. Each one added is a vocabulary the
-   author has to learn, so the point of the JSX pivot argues for few and
-   composable over many and specific.
+5. ~~**Which primitives are actually worth having?**~~ **Answered:** tier 1
+   only in the library - `Row`, `Col`, `Grid`, `Group`, `Pipeline`, `Layers`,
+   `Swimlanes`, `Graph`. These carry layout semantics and are
+   archetype-agnostic. Shape aliases and domain vocabularies (C4, flowchart, ER)
+   stay in userland and get built as fixtures instead, which doubles as the test
+   that the primitives are composable enough - see T16b.
+   **Still open: UML sequence diagrams.** They are the one archetype not
+   composable from tier 1 - lifelines are a vertical time axis, messages are
+   ordered events, activation bars are a third dimension - so they cannot be a
+   userland component either. That makes them a separate decision: a third
+   layout engine alongside stack and ELK, or an explicit non-goal. Note that
+   `tests/corpus/sequence.tldsl.jsx` is **not** a sequence diagram, it is a
+   linear 14-step chain, and the name is a trap for whoever reads the corpus
+   next.
 
 6. **Named styling, or raw enums only?** jsx-pivot decision 9 settled on raw
    tldraw enums plus "a thin `variant`", and the `variant` half was never built.
