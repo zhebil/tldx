@@ -25,7 +25,7 @@ npx tsx tools/arrow-truth.mts tests/corpus/*.tldsl.jsx
 | corpus file | arrow paths crossing a non-endpoint shape |
 | --- | --- |
 | deep-nesting | 10 |
-| hexagonal | 9 |
+| hexagonal | 5 |
 | long-labels | 1 |
 | sequence | 0 |
 | sparse-graph | 0 |
