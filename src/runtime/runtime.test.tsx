@@ -1,9 +1,9 @@
 /** @jsxImportSource ../runtime */
 import { describe, expect, it } from "vitest";
 
-import type { AstDoc } from "../domain/parser/ast.js";
+import type { AstDoc, AstFrame } from "../domain/parser/ast.js";
 
-import { Box, Doc, Edge, Frame, Note, flow } from "./index.js";
+import { Box, Col, Doc, Edge, Frame, Grid, Group, Note, Row, flow } from "./index.js";
 import { jsx } from "./jsx-runtime.js";
 
 function stripSpans(node: unknown): unknown {
@@ -114,6 +114,26 @@ describe("flow()", () => {
   it("returns an empty array for fewer than two ids", () => {
     expect(flow()).toEqual([]);
     expect(flow("only-one")).toEqual([]);
+  });
+});
+
+describe("Row / Col / Grid shorthands", () => {
+  it("set layout to row/col/grid respectively, overriding any layout prop passed in", () => {
+    const row = (<Row id="r" layout="grid">{[]}</Row>) as AstFrame;
+    const col = (<Col id="c" layout="grid">{[]}</Col>) as AstFrame;
+    const grid = (<Grid id="g" layout="row">{[]}</Grid>) as AstFrame;
+    expect(row.attrs.layout?.value).toBe("row");
+    expect(col.attrs.layout?.value).toBe("col");
+    expect(grid.attrs.layout?.value).toBe("grid");
+  });
+});
+
+describe("Group", () => {
+  it("builds a frame node marked group: true, with no layout forced", () => {
+    const g = Group({ id: "g", children: [] });
+    expect(g.kind).toBe("frame");
+    expect(g.group).toBe(true);
+    expect(g.attrs.layout).toBeUndefined();
   });
 });
 

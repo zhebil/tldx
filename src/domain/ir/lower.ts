@@ -274,6 +274,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
     ...numericAttrs(node.attrs, ctx, ["gap", "pad", "cols"] as const),
     ...(color === undefined ? {} : { color }),
+    ...(node.group === true ? { group: true } : {}),
   };
   for (const child of node.children) {
     const lowered = lowerNode(child, ctx);

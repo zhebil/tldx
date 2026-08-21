@@ -33,6 +33,8 @@ export type AstFrame = {
   kind: "frame";
   attrs: Attrs;
   children: AstNode[];
+  /** Set by the `<Group>` runtime component; `<Frame>` leaves this unset. Not a user-facing prop. */
+  group?: boolean;
   span: SourceSpan;
 };
 

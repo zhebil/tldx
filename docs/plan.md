@@ -1181,7 +1181,7 @@ router stops having to guess at. A `<Pipeline>` connects its children in
 sequence by construction, so it can never emit a same-axis skip edge - the exact
 defect Phase 1 exists to route around. Semantics beat heuristics.
 
-- [ ] **T14. Layout shorthands: `Row`, `Col`, `Grid`, `Group`.**
+- [x] **T14. Layout shorthands: `Row`, `Col`, `Grid`, `Group`.**
   `<Frame layout="row" gap="40">` is the overwhelmingly common case and it reads
   badly. `Group` is the one that is not pure sugar: an invisible container that
   participates in layout but draws no frame chrome and reserves no title space.
@@ -1190,6 +1190,28 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   **Acceptance:** a test proves that for every existing corpus fixture, the
   shorthand form and the `<Frame layout=...>` form produce byte-identical scene
   JSON. **Do not rewrite the fixtures** - write the test against both forms.
+
+  `Row`/`Col`/`Grid` are three-line wrappers around `Frame` that force `layout`;
+  `Group` is `Frame` plus a `group: true` marker carried on the AST node the way
+  `Sticky` already carries `sticky` - no attr, not authorable, not in
+  `ALLOWED_PROPS`. The whole non-sugar half is two lines of real logic: `stack.ts`
+  excludes group children from the `hasFrameChild` test that reserves
+  `FRAME_TITLE_PX` (a group draws no tldraw title, so nothing needs clearing),
+  and `emit.ts` emits no shape for a group, recursing into its children with the
+  parent's `parentId` and the group's origin folded into their coords. Routing is
+  deliberately left running on the un-flattened tree, since a group *is* a layout
+  container for the purpose of grouping sibling skip edges.
+
+  The acceptance test rewrites each corpus fixture in memory - a stack-paired
+  tag rename of `<Frame layout="row|col|grid">` to `<Row>`/`<Col>`/`<Grid>`,
+  compiled from a temp file - and compares `JSON.stringify(sceneJson)`.
+  **5 of 11 fixtures carry a rewritable frame** (`checkout-services`,
+  `deep-nesting`, `hexagonal`, `multi-region`, `request-lifecycle`; `order-states`
+  is `layout="auto"`, the rest have no `layout=` frame), and all 11 compare
+  byte-identical. No fixture file was touched. `npm run check` green at 43 files
+  / 468 tests, up from 38 / 333 at T1. Geometry did not move: with no group in
+  the corpus every new offset is `+ 0` and the `hasFrameChild` predicate is
+  unchanged, so `docs/renders/` and `docs/baseline.md` stand as they were.
 
 - [ ] **T15. `geo` as a prop. No named shape aliases in the library.**
   tldraw's geo shape already supports `rectangle`, `ellipse`, `diamond`,
@@ -2104,3 +2126,31 @@ promoted into the task list by the human.
   container.** `checkout -> postgres` past a `Payments` frame parks `orders`
   inside it. Reordering the doc so the two containers are adjacent was the only
   fix available; same residue class as the open T6b cross-container question.
+
+### From T14
+
+- **An `<Edge>` pointing at a `<Group>` id emits a dangling binding.** Groups
+  are addressable (frames require an explicit `id`) but emit no shape, so
+  `binding:<edge>-start` can reference a `shape:<groupId>` that is not in the
+  store. Nothing in `lower.ts` or `emit.ts` rejects or redirects it. Two fixes
+  are available: a new lower-time diagnostic (`ir/edge-endpoint-is-group`), or
+  redirecting the binding to the group's bounding descendant. Documented as a
+  limitation in `docs/dsl.md` for now.
+- **`Group` requiring an explicit `id` is arguably wrong.** The id names nothing
+  visible and cannot be usefully referenced (see above). It was kept only
+  because dropping the requirement means special-casing `assignId`'s
+  "addressable elements require an id" rule, which is a bigger change than T14
+  called for.
+- **`applyContainerBoxSizing` never votes on `frame` children**, only `box` and
+  `note`, so a group's siblings are sized as if the group were not there. That
+  is the same behaviour frames already had, but it means a `Group` wrapping two
+  boxes hides those boxes from their uncles' shared-width vote - a real
+  behaviour change for anyone who reaches for `Group` to tidy a row.
+- **`routing.ts` never treats a frame as a bowing obstacle** (`computeCandidate`
+  only considers `box`/`note`), so groups change nothing there. Worth recording
+  because it also means *real* frames are invisible to the router - an arrow
+  will happily bow straight through a nested frame's chrome.
+- **The corpus does not exercise `Group` at all.** Its three claims are pinned
+  only by unit tests. Until a fixture uses one, no render has ever contained a
+  group, and the `+ offsetX` path in `emit.ts` is dead in every measured
+  diagram.

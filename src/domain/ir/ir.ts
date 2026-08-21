@@ -58,6 +58,8 @@ export type IRFrame = IRBase & {
   children: IRElement[];
   /** Pass-through tldraw frame style; frames have no `fill`/`dash` in tldraw's schema. */
   color?: StyleColor;
+  /** True for `<Group>`: lays out like a frame but emits no shape (see `domain/emit/emit.ts`). */
+  group?: boolean;
 };
 
 export type IRBox = IRBase & {

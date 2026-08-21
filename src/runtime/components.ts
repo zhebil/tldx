@@ -135,6 +135,27 @@ export function Frame(props: Props, source?: JsxSource): AstFrame {
   };
 }
 
+/** `layout="row"` shorthand; `layout` on `props` (if any) is overridden. */
+export function Row(props: Props, source?: JsxSource): AstFrame {
+  return Frame({ ...props, layout: "row" }, source);
+}
+
+/** `layout="col"` shorthand; `layout` on `props` (if any) is overridden. */
+export function Col(props: Props, source?: JsxSource): AstFrame {
+  return Frame({ ...props, layout: "col" }, source);
+}
+
+/** `layout="grid"` shorthand; `layout` on `props` (if any) is overridden. */
+export function Grid(props: Props, source?: JsxSource): AstFrame {
+  return Frame({ ...props, layout: "grid" }, source);
+}
+
+/** A `<Frame>` that draws no frame chrome and reserves no title space; still
+ * a layout container (see `domain/emit/emit.ts`'s `group` handling). */
+export function Group(props: Props, source?: JsxSource): AstFrame {
+  return { ...Frame(props, source), group: true };
+}
+
 export function Box(props: Props, source?: JsxSource): AstBox {
   const span = toSpan(source);
   assertNoChildren(props.children, "Box");

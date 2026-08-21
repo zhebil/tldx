@@ -37,8 +37,14 @@ export function astBuilders(file = "test.tldsl") {
     doc(props: Props, children: AstNode[] = []): AstDoc {
       return { kind: "doc", attrs: attrs(props), children, span: elSpan };
     },
-    frame(props: Props, children: AstNode[] = []): AstFrame {
-      return { kind: "frame", attrs: attrs(props), children, span: elSpan };
+    frame(props: Props, children: AstNode[] = [], group = false): AstFrame {
+      return {
+        kind: "frame",
+        attrs: attrs(props),
+        children,
+        ...(group ? { group: true } : {}),
+        span: elSpan,
+      };
     },
     box(props: Props): AstBox {
       return { kind: "box", attrs: attrs(props), span: elSpan };

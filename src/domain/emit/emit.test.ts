@@ -85,6 +85,98 @@ describe("domain/emit", () => {
     expect(scene.store["shape:a"]?.y).toBe(60);
   });
 
+  it("emits no shape for a <Group>; its children fold the group's origin into their own x/y and parent to the group's parent", () => {
+    const scene = emit(
+      doc([
+        frame({
+          id: "g",
+          x: 40,
+          y: 40,
+          w: 400,
+          h: 200,
+          group: true,
+          children: [
+            box({ id: "a", x: 20, y: 60, w: 120, h: 60, label: "A" }),
+            box({ id: "b", x: 180, y: 60, w: 120, h: 60, label: "B" }),
+          ],
+        }),
+      ]),
+    );
+
+    expect(scene.store["shape:g"]).toBeUndefined();
+    expect(scene.store["shape:a"]?.parentId).toBe("page:main");
+    expect(scene.store["shape:b"]?.parentId).toBe("page:main");
+    // group origin (40, 40) folded into each child's frame-relative x/y.
+    expect(scene.store["shape:a"]?.x).toBe(60);
+    expect(scene.store["shape:a"]?.y).toBe(100);
+    expect(scene.store["shape:b"]?.x).toBe(220);
+    expect(scene.store["shape:b"]?.y).toBe(100);
+  });
+
+  it("a nested frame inside a <Group> shifts by the group's origin but keeps its own children relative to itself", () => {
+    const scene = emit(
+      doc([
+        frame({
+          id: "g",
+          x: 40,
+          y: 40,
+          w: 400,
+          h: 200,
+          group: true,
+          children: [
+            frame({
+              id: "inner",
+              x: 20,
+              y: 20,
+              w: 200,
+              h: 150,
+              children: [box({ id: "a", x: 10, y: 10, w: 100, h: 50, label: "A" })],
+            }),
+          ],
+        }),
+      ]),
+    );
+
+    expect(scene.store["shape:inner"]?.parentId).toBe("page:main");
+    expect(scene.store["shape:inner"]?.x).toBe(60);
+    expect(scene.store["shape:inner"]?.y).toBe(60);
+    expect(scene.store["shape:a"]?.parentId).toBe("shape:inner");
+    expect(scene.store["shape:a"]?.x).toBe(10);
+    expect(scene.store["shape:a"]?.y).toBe(10);
+  });
+
+  it("a <Group> nested inside a <Group> folds both origins into its children", () => {
+    const scene = emit(
+      doc([
+        frame({
+          id: "outer",
+          x: 10,
+          y: 10,
+          w: 400,
+          h: 400,
+          group: true,
+          children: [
+            frame({
+              id: "inner",
+              x: 5,
+              y: 5,
+              w: 200,
+              h: 200,
+              group: true,
+              children: [box({ id: "a", x: 1, y: 1, w: 50, h: 50, label: "A" })],
+            }),
+          ],
+        }),
+      ]),
+    );
+
+    expect(scene.store["shape:outer"]).toBeUndefined();
+    expect(scene.store["shape:inner"]).toBeUndefined();
+    expect(scene.store["shape:a"]?.parentId).toBe("page:main");
+    expect(scene.store["shape:a"]?.x).toBe(16);
+    expect(scene.store["shape:a"]?.y).toBe(16);
+  });
+
   it("emits a sticky as a note shape and drops its IR w/h", () => {
     const scene = emit(
       doc([
@@ -605,6 +697,7 @@ function frame(input: {
   name?: string;
   children: IRElementPositioned[];
   color?: string;
+  group?: boolean;
 }): IRFramePositioned {
   const { name, ...rest } = input;
   return {

@@ -182,6 +182,52 @@ describe("hybridLayout", () => {
     expect(inner.y).toBe(10 + 30); // pad + FRAME_TITLE_PX
   });
 
+  it("does not reserve title clearance above the first child when a frame has a nested group", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        frame({ id: "outer", layout: "col", pad: 10, gap: 5 }, [
+          frame({ id: "inner", layout: "col", pad: 10, gap: 5 }, [box({ id: "a", label: "A" })], true),
+        ]),
+      ]),
+    );
+    const outer = frameById(result.children, "outer");
+    const inner = frameById(outer.children, "inner");
+    expect(inner.y).toBe(10); // pad only - a group draws no title, no clearance needed
+  });
+
+  it("lays out a group's children exactly like the equivalent frame's children", async () => {
+    const frameResult = await layoutAst(
+      doc({ layout: "col" }, [
+        frame({ id: "f", layout: "row", pad: 10, gap: 5 }, [
+          box({ id: "a", label: "A" }),
+          box({ id: "b", label: "A longer label" }),
+        ]),
+      ]),
+    );
+    const groupResult = await layoutAst(
+      doc({ layout: "col" }, [
+        frame(
+          { id: "g", layout: "row", pad: 10, gap: 5 },
+          [box({ id: "a", label: "A" }), box({ id: "b", label: "A longer label" })],
+          true,
+        ),
+      ]),
+    );
+    const f = frameById(frameResult.children, "f");
+    const g = frameById(groupResult.children, "g");
+    expect({ w: g.w, h: g.h }).toEqual({ w: f.w, h: f.h });
+    for (const id of ["a", "b"]) {
+      const fromFrame = boxById(f.children, id);
+      const fromGroup = boxById(g.children, id);
+      expect({ x: fromGroup.x, y: fromGroup.y, w: fromGroup.w, h: fromGroup.h }).toEqual({
+        x: fromFrame.x,
+        y: fromFrame.y,
+        w: fromFrame.w,
+        h: fromFrame.h,
+      });
+    }
+  });
+
   it("keeps a hard-pinned child's coordinates verbatim and out of the flow", async () => {
     const result = await layoutAst(
       doc({ layout: "col" }, [

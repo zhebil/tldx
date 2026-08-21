@@ -334,6 +334,26 @@ describe("lower: note sticky marker", () => {
   });
 });
 
+describe("lower: frame group marker", () => {
+  it("<Group> lowers to a frame IR node with group: true", () => {
+    const ast = doc({}, [frame({ id: "g" }, [], true)]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const frameIr = ir!.children[0]!;
+    if (frameIr.kind !== "frame") throw new Error("expected frame");
+    expect(frameIr.group).toBe(true);
+  });
+
+  it("<Frame> does not set group", () => {
+    const ast = doc({}, [frame({ id: "f" }, [])]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const frameIr = ir!.children[0]!;
+    if (frameIr.kind !== "frame") throw new Error("expected frame");
+    expect(frameIr.group).toBeUndefined();
+  });
+});
+
 describe("lower: note 'on' target", () => {
   it("keeps 'on' when it resolves to a box", () => {
     const ast = doc({}, [box({ id: "a" }), note({ on: "a" }, "hi")]);

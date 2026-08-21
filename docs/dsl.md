@@ -39,13 +39,17 @@ dropped.
 
 ## Components
 
-This is the entire surface exported from `"tldsl"`. There is no `<Group>`,
-`<Shape>`, `<Text>`, `<Line>`, `<Import>`, or `<Use>`.
+This is the entire surface exported from `"tldsl"`. There is no `<Shape>`,
+`<Text>`, `<Line>`, `<Import>`, or `<Use>`.
 
 | element | kind | purpose |
 |---|---|---|
 | `<Doc>` | container | root of the diagram |
 | `<Frame>` | container | visual container - tldraw frame chrome (border + title) |
+| `<Row>` | container | `<Frame layout="row">` |
+| `<Col>` | container | `<Frame layout="col">` |
+| `<Grid>` | container | `<Frame layout="grid">` |
+| `<Group>` | container | invisible container - lays out like `<Frame>` but draws no frame chrome and reserves no title space |
 | `<Box />` | leaf | labelled box |
 | `<Note>text</Note>` | leaf | warm-filled geo box annotation; text is the **children**, not a prop |
 | `<Sticky>text</Sticky>` | leaf | real tldraw sticky note (fixed 200px width); same props as `<Note>` |
@@ -54,6 +58,25 @@ This is the entire surface exported from `"tldsl"`. There is no `<Group>`,
 
 `<Doc>` may only appear at the top level - a nested `<Doc>` is
 `ir/nested-doc`.
+
+`<Row>`, `<Col>`, and `<Grid>` are pure sugar for `<Frame layout="row"|"col"|"grid">`
+- same props, same `id` requirement, same everything; they exist because
+`layout="row"` is the overwhelmingly common case and spelling it out every
+time reads badly. Any `layout` prop passed to them is overridden by the
+shorthand's own mode.
+
+`<Group>` is not sugar - it is the only way to group elements for layout
+purposes without drawing a box around them. It accepts the same props as
+`<Frame>` (including `layout`, which defaults to `col` like `<Frame>`) and
+lays its children out exactly the way the equivalent `<Frame>` would, but it
+emits no frame shape: its children are parented to whatever `<Group>`'s own
+parent is, with the group's position folded into their coordinates. A
+`<Frame>` that contains only `<Group>`s (no real nested `<Frame>`) does not
+reserve title clearance above its first child, since there is no nested
+frame title to clear. Like `<Frame>`, it requires an explicit `id` - but that
+id names no shape, so **an `<Edge>` pointing at a `<Group>` produces a binding
+to a shape that was never emitted**; point edges at the group's children
+instead.
 
 ## Props
 

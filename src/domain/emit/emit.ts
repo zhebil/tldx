@@ -76,21 +76,34 @@ export function emit(ir: IRDocPositioned): SceneJSON {
   return sceneJson(records);
 }
 
+/**
+ * `offsetX`/`offsetY` fold in the origin of any enclosing `<Group>` ancestors
+ * between this element and its emitted parent - a group draws no frame shape,
+ * so its children must carry the group's position into their own coords.
+ */
 function emitElement(
   el: IRElementPositioned,
   parentId: string,
   out: TLRecord[],
   routes: Map<string, EdgeRoute>,
+  offsetX = 0,
+  offsetY = 0,
 ): void {
   switch (el.kind) {
     case "box":
-      out.push(emitBox(el, parentId));
+      out.push(emitBox(el, parentId, offsetX, offsetY));
       return;
     case "note":
-      out.push(emitNote(el, parentId));
+      out.push(emitNote(el, parentId, offsetX, offsetY));
       return;
     case "frame":
-      out.push(emitFrame(el, parentId));
+      if (el.group === true) {
+        for (const child of el.children) {
+          emitElement(child, parentId, out, routes, offsetX + el.x, offsetY + el.y);
+        }
+        return;
+      }
+      out.push(emitFrame(el, parentId, offsetX, offsetY));
       for (const child of el.children) {
         emitElement(child, shapeId(el.id), out, routes);
       }
@@ -104,12 +117,12 @@ function emitElement(
   }
 }
 
-function emitBox(box: IRBoxPositioned, parentId: string): TLRecord {
+function emitBox(box: IRBoxPositioned, parentId: string, offsetX: number, offsetY: number): TLRecord {
   return boxShape({
     id: shapeId(box.id),
     parentId,
-    x: box.x,
-    y: box.y,
+    x: box.x + offsetX,
+    y: box.y + offsetY,
     w: box.w,
     h: box.h,
     ...(box.label === undefined ? {} : { text: box.label }),
@@ -124,13 +137,13 @@ function emitBox(box: IRBoxPositioned, parentId: string): TLRecord {
   });
 }
 
-function emitNote(note: IRNotePositioned, parentId: string): TLRecord {
+function emitNote(note: IRNotePositioned, parentId: string, offsetX: number, offsetY: number): TLRecord {
   if (note.sticky) {
     return noteShape({
       id: shapeId(note.id),
       parentId,
-      x: note.x,
-      y: note.y,
+      x: note.x + offsetX,
+      y: note.y + offsetY,
       text: note.text,
       growY: Math.max(0, note.h - NOTE_SIZE),
       ...(note.color === undefined ? {} : { color: note.color }),
@@ -144,8 +157,8 @@ function emitNote(note: IRNotePositioned, parentId: string): TLRecord {
   return boxShape({
     id: shapeId(note.id),
     parentId,
-    x: note.x,
-    y: note.y,
+    x: note.x + offsetX,
+    y: note.y + offsetY,
     w: note.w,
     h: note.h,
     text: note.text,
@@ -159,12 +172,12 @@ function emitNote(note: IRNotePositioned, parentId: string): TLRecord {
   });
 }
 
-function emitFrame(frame: IRFramePositioned, parentId: string): TLRecord {
+function emitFrame(frame: IRFramePositioned, parentId: string, offsetX: number, offsetY: number): TLRecord {
   return frameShape({
     id: shapeId(frame.id),
     parentId,
-    x: frame.x,
-    y: frame.y,
+    x: frame.x + offsetX,
+    y: frame.y + offsetY,
     w: frame.w,
     h: frame.h,
     ...(frame.name === undefined ? {} : { name: frame.name }),
