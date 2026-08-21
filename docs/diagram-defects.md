@@ -193,3 +193,77 @@ blocker.
   still leave labels unaccounted for.
 - **Repro:** `examples/repro/d8-auto-edges-cross-nodes.tldsl.jsx`
 - **Status:** open
+
+### D9. An edge label wraps mid-word, and the row's label clearance is short by ~50px
+
+- **Diagram:** `examples/web-architecture.tldsl.jsx`
+- **Severity:** ugly
+- **Attempted:** `<Edge from="queue" to="worker" label="dequeue" />` between two
+  boxes sitting next to each other in a `<Row gap="96">` - the plainest possible
+  labelled arrow.
+- **Happened:** The label renders as `dequeu` over `e`. A single seven-letter
+  word is broken across two lines mid-word, which is exactly the failure T0
+  fixed for box labels (`Gatewa`/`y`); it never reached arrow labels. The same
+  arrow between the same two boxes with `gap` removed entirely renders
+  identically, and so do `gap="120"` and `gap="144"` - it only comes right
+  between 144 and 160. So the `labelClearanceGap` D8 describes is real but too
+  small: it reserves a span the label does not fit in, and the author's only
+  recourse is to guess a wider `gap` and re-render until the word stops
+  breaking. A second symptom of the same crushing: `streaming replication` on
+  the primary-to-replica arrow renders `streamingreplication`, space collapsed,
+  in `font="sans"` (D6 is the `draw`-font version and has a font workaround;
+  this one does not - `sans` is already the workaround).
+- **Repro:** `examples/repro/d9-arrow-label-mid-word-wrap.tldsl.jsx`
+- **Status:** open
+
+### D10. Sibling tiers in a column are each sized to their own contents, so a layered stack is ragged
+
+- **Diagram:** `examples/web-architecture.tldsl.jsx`
+- **Severity:** ugly
+- **Attempted:** The everyday layered picture - `Edge`, `App tier`, `Data`,
+  `Async` as four named frames stacked in a column inside one system boundary.
+- **Happened:** Each frame is sized to its own children and then centred, so the
+  four tiers come out 540px, 520px, 1569px and 616px wide inside a 1633px
+  boundary, with nothing lined up on either side. A layered architecture diagram is read by its horizontal
+  bands; ragged bands of three different widths destroy that reading, and the
+  widest tier silently sets the system boundary's width while the others float
+  inside it. `align="stretch"` on the parent is the obvious fix and is rejected:
+  `error[ir/bad-align]: 'align' must be one of start, center, end`. Neither
+  `<Layers>` nor `<Swimlanes>` is documented as changing this, and the skill has
+  no other lever - `maxW` caps a label, not a frame.
+- **Repro:** `examples/repro/d10-tiers-not-stretched.tldsl.jsx`
+- **Status:** open
+
+### D11. A cross-tier edge's label is stamped at the midpoint, on top of whatever is there
+
+- **Diagram:** `examples/web-architecture.tldsl.jsx`
+- **Severity:** ugly
+- **Attempted:** `cdn -> objects` ("origin pull"), an ordinary edge that skips
+  the app tier, plus `app-tier -> queue` ("enqueue") which skips the data tier.
+- **Happened:** The label goes at the geometric midpoint of the arrow with no
+  regard for what occupies that point. `origin pull` lands across `app-3`'s
+  label in the shipped render (across `app-1` and `app-2` in the repro, which is
+  narrower), and `enqueue` lands on the `Postgres primary` ellipse. Both pairs
+  of words overprint and neither is readable. This is D8's second half seen
+  outside an auto container: the placement is unconditional, so any edge long
+  enough to cross a tier will do it.
+- **Repro:** `examples/repro/d11-edge-label-over-shape.tldsl.jsx`
+- **Status:** open
+
+### D12. `<Group>` requires an `id`, the skill does not say so, and the error names `<frame>`
+
+- **Diagram:** `examples/web-architecture.tldsl.jsx`
+- **Severity:** papercut
+- **Attempted:** `<Group layout="row" gap="160">` to hold the browser and the
+  external payment API side by side outside the system boundary - `<Group>` is
+  the documented way to get a row with no chrome (it is the workaround D2 names).
+- **Happened:** `error[ir/missing-id]: '<frame>' is addressable and requires an
+  explicit 'id'`. Two things cost time here. The skill's component table writes
+  `<Frame id name>` and `<Box id label>` with their required props but `<Group>`
+  with none, and the prose says a `<Group>` is the one container nothing may
+  point an edge at - so an id looks pointless. And the diagnostic names
+  `<frame>`, a component that does not appear anywhere in the file, so the
+  reported location is the only way to tell which element it means.
+- **Repro:** `examples/repro/d12-group-requires-id.tldsl.jsx` (compiles, as every
+  repro here does; the comment in it says which line to delete to get the error)
+- **Status:** open

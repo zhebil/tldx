@@ -2177,7 +2177,7 @@ only test it gets against material T24 did not choose.
   (D3). `npm run check` green; no `src/` touched, so `docs/renders/` and
   `docs/baseline.md` are unchanged.
 
-- [ ] **T30. A layered web application architecture.**
+- [x] **T30. A layered web application architecture.**
   Browser, CDN, load balancer, a horizontally scaled app tier, cache, primary
   and replica databases, object storage, and a background worker fed by a queue.
   The everyday diagram this tool most needs to be good at. Include the things
@@ -2186,6 +2186,49 @@ only test it gets against material T24 did not choose.
   external dependency drawn outside the system boundary.
   **Acceptance:** `examples/web-architecture.tldsl.jsx`, check clean, PNG
   reviewed, gaps logged.
+
+  `examples/web-architecture.tldsl.jsx` exists and `tldsl check` is clean:
+  browser and an external `Payments API` in a chrome-free `<Group>` above the
+  boundary, then a `system` frame holding four named tiers - `Edge` (CDN, load
+  balancer), `App tier` (app-1..3), `Data` (Redis, Postgres primary, Postgres
+  replica, object storage) and `Async` (job queue, background worker). All three
+  of the things the corpus does not have are in it: the replica pair with a
+  dashed `streaming replication` arrow between them, the worker as the component
+  that talks to three tiers at once (queue, data, and out through the boundary
+  to the payment gateway), and the external dependency drawn outside. Edges
+  pointed at a *frame* id (`app-tier -> cache`, `-> db-primary`, `-> db-replica`,
+  `-> queue`) work fine and are the honest way to say "the whole tier does this";
+  that was the one thing tried that was not in the skill and it needed no
+  workaround. The PNG was rendered and read; it is legible, and the tiers read
+  top to bottom in the right order.
+
+  **Four entries, D9-D12, with repros under `examples/repro/`.** D9 (ugly) - an
+  edge label wraps mid-word: `dequeue` renders `dequeu`/`e` between two adjacent
+  boxes, and removing `gap` or setting it to 120 or 144 changes nothing (it
+  comes right between 144 and 160). This partly corrects D8: `labelClearanceGap`
+  exists but reserves ~50px too little, and the same crush collapses the space
+  in `streaming replication` even in `font="sans"`, which was D6's workaround.
+  D10 (ugly) - the four tiers are 540, 520, 1569 and 616px wide inside a 1633px
+  boundary because each frame is sized to its own contents and centred; a
+  layered diagram is read by its bands and these bands are ragged.
+  `align="stretch"` is rejected with `ir/bad-align` and the skill offers no
+  other lever. D11 (ugly) - a cross-tier edge's label is stamped at the
+  geometric midpoint regardless of what is there, so `origin pull` sits across
+  `app-3` and `enqueue` across the `Postgres primary` ellipse; that is D8's
+  label half seen outside an auto container. D12 (papercut) - `<Group>` requires
+  an `id`, the skill's component table does not say so, and the diagnostic names
+  `<frame>`, an element that appears nowhere in the file.
+
+  Two authoring choices. **Nothing was worked around except D12**, which is
+  unavoidable - the file does not compile without the id. `dequeue` keeps its
+  broken word, `origin pull` keeps sitting on `app-3`, the tiers stay ragged and
+  the note still covers the async frame's border (D3), so the example carries
+  its defects visibly until a fix task drains them. And the repro for D12 is
+  written to *compile*, with a comment naming the line to delete, because every
+  existing repro compiles and T40 gates the whole of `examples/` on that.
+
+  `npm run check` green. No `src/` touched, so `docs/renders/` and
+  `docs/baseline.md` are unchanged.
 
 - [ ] **T31. An event-driven microservice topology.**
   Six or seven services around a message bus, with both publish and subscribe
@@ -3429,3 +3472,22 @@ promoted into the task list by the human.
   and arrows whose endpoints are both inside it, which is why T28's two-lane
   diagram only sometimes triggered it. Deleted by hand this wake so it would not
   be committed.
+- **An edge may point at a frame id, and it is the right way to draw a tier.**
+  `<Edge from="app-tier" to="cache" />` resolves, anchors on the frame's
+  boundary and reads correctly - it says "this whole tier talks to that", which
+  is what a layered diagram means and what three arrows from three
+  interchangeable app servers would have said in nine. The skill never mentions
+  it: it says only that a `<Group>` may not be an endpoint, leaving the reader
+  to infer that frames may. Worth a sentence in `skills/tldsl/SKILL.md` and, if
+  it is meant to be supported, a fixture.
+- **`gap` below some floor is ignored on a row.** In the D9 probes `gap` unset,
+  `gap="96"` and `gap="120"` produced pixel-identical renders; 144 differed and
+  160 differed again. Either the label clearance is taking a max with the
+  author's gap (likely, given D8) or small gaps are being snapped. If it is the
+  max, an author who sets a *deliberately tight* gap gets silently overridden
+  and has no way to see it.
+- **A layered diagram has no primitive that owns the band.** `<Layers>` and
+  `<Swimlanes>` are documented as "a column of tiers", but a tier in every real
+  layered diagram is a full-width band. D10 is the symptom; the underlying
+  question is whether those two components should stretch their children by
+  definition rather than needing an `align` value that does not exist.
