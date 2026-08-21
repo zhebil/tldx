@@ -145,7 +145,7 @@ substitute a different task.
 
 | Command | What it gives you |
 |---|---|
-| `npx tsx tools/screenshot.mts <file> <out.png>` | real render through the viewer, headless chromium |
+| `npx tsx tools/screenshot.mts <file> <out.png> [--frame <id>]` | real render through the viewer, cropped to content |
 | `npx tsx tools/arrow-truth.mts <file...>` | arrow vertices tldraw actually drew, and which shapes they cross |
 | `npx tsx tools/text-metrics.mts <file>` | rendered label widths and heights |
 | `npx tsx tools/layout-report.mts <file>` | geometry report from the scene JSON |
@@ -155,6 +155,11 @@ Two traps, both paid for already:
 
 - **Do not use the playwright MCP browser tools.** They report success and write
   no file. Use `tools/screenshot.mts`.
+- **`screenshot.mts` exports through `editor.toImage`, not the viewport.** The
+  PNG is built from shape records and cropped to content, so it never contains
+  empty grid or tldraw UI, and its size does not depend on the browser window.
+  `--frame <id>` narrows it to one region - note that tldraw draws that frame's
+  *contents*, not its own border or name label.
 - **The geometry report is not the render.** tldraw resizes stickies and wraps
   label text on its own. `layout-report.mts` can say `overlapping shape pairs:
   0` about a diagram whose note visibly covers three shapes. When the report and
