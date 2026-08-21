@@ -281,17 +281,51 @@ Two traps, both paid for already:
   **Acceptance:** `wide-fanout` crossings down by at least half against the
   post-T5 number, and no other file regresses.
 
-- [ ] **T7. Note placement.**
-  A tldraw sticky is 200px wide and that is a tldraw fact, not something layout
-  can override - stop trying to make notes wide. The fixable part is *where*
-  they land. Right now a note is a peer in the main flow, so `multi-region`'s
-  note sits alone in a large empty region below the diagram and `long-labels`
-  gets two tall columns in dead space.
-  Place a note adjacent to the content it follows in source order, or in a
-  gutter column beside the diagram, rather than as a flow participant.
-  **Acceptance:** no note's bounding box is further than 120px from the
-  bounding box of the shape that precedes it in source order, and total canvas
-  area drops on `multi-region` and `long-labels`.
+- [ ] **T7. Notes: shape, and attachment.**
+  Two changes, shipped together because the second is only worth having once
+  the first makes a note readable.
+
+  **Shape.** A tldraw sticky is 200px wide and cannot be widened - `scale`
+  scales the text too, so the aspect never changes. That turns a two-sentence
+  annotation into twenty stacked fragments, and in most corpus renders the note
+  is the worst-looking element on the canvas. Emit `<Note>` as a geo shape with
+  a warm fill instead, so it sizes like a box and inherits T0's
+  container-aware width, word wrap and aspect target. Keep `<Sticky>` emitting
+  the real sticky for when that look is wanted - `noteShape` in
+  `src/contracts/builders.ts` already exists.
+  B9 (a kept hypothesis that exists solely to make layout reserve the space
+  tldraw actually draws for a sticky) becomes dead for `<Note>` and should be
+  scoped down to `<Sticky>` or removed.
+
+  **Attachment.** Annotating a specific node or edge is the common case and
+  there is no way to express it - a note is a flow participant, which is why
+  `multi-region`'s note sits alone in a large empty region and `long-labels`
+  gets two columns in dead space.
+  Add `on`: `<Note on="api-gateway">`, `<Note on="edge-7">`. An attached note is
+  **placed relative to its target after the target is placed, and does not
+  participate in layout** - it must not push siblings around, but it must count
+  toward canvas bounds and overlap checks.
+  - **Default adjacent, not overlapping.** Covering the thing being annotated
+    obscures it. Place on whichever side of the target has the most free space.
+    If a literal on-top placement is wanted later, that is a separate prop, not
+    the default.
+  - **Overlap checks must whitelist an attached pair**, or a deliberate design
+    fires a gate.
+  - **Z-order is already handled** - `builders.ts` assigns per-type indices, so
+    a note renders above a box.
+  - Attaching to an edge needs the edge's midpoint, which after T3-T5 is on a
+    curve rather than a straight line. Attaching to a `flow()` edge is awkward
+    because its id is synthesized; say what happens.
+  - An unattached note keeps a placement heuristic: adjacent to the content it
+    follows in source order, or in a gutter column. Explicit attachment beats
+    inference, so this is the fallback, not the mechanism.
+
+  **Acceptance:** an attached note's bounding box touches or sits within 40px of
+  its target and nothing else; an attached note never changes the position of
+  any other shape; no unattached note is further than 120px from the shape
+  preceding it in source order; total canvas area drops on `multi-region` and
+  `long-labels`; and a note's text wraps to a readable width rather than a
+  200px column.
 
 - [ ] **T8. Reclaim dead whitespace.**
   Frames carry large empty margins - `hexagonal`'s outer frame has roughly
@@ -593,9 +627,13 @@ tasks above by the human, not by the loop.
    arrows cannot take waypoints, so an `auto` container gets ELK placement and
    our arrows. T3-T5 apply there identically.
 
-3. **Are stickies the right shape for notes at all?** 200px fixed width makes any
-   real sentence a twenty-line column. A geo shape with a warm fill would look
-   like a note and size like a box. This changes what `<Note>` emits.
+3. ~~**Are stickies the right shape for notes at all?**~~ **Answered:**
+   `<Note>` becomes a geo shape with a warm fill, so it inherits everything T0
+   gives boxes - container-aware width, word wrap, aspect target - instead of
+   being a special case layout has to work around. `<Sticky>` stays for when an
+   actual sticky is wanted; the code already exists so keeping it costs nothing.
+   **Notes also gain attachment**: a note can be bound to a node or an edge
+   rather than being a flow participant. Folded into T7.
 
 4. ~~**Should `BOX_MIN_H` exist?**~~ **Answered:** it is dead code - the
    height formula never goes below it. Folded into T0.
