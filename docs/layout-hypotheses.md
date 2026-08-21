@@ -1565,3 +1565,109 @@ regression that killed B24, and that part is solid and independently verifiable
 (byte-identical PNG). Whether elbows help at all on the files where the gate
 lets them through is **not** settled by this wake, and the two instruments that
 were supposed to settle it are both suspect.
+
+---
+
+## B28 — gate 5 validated against a real render, and the tracer deleted _(wake 32)_ — **BUILT**
+
+Not an A/B. No hypothesis was judged this wake and the champion layout is
+unchanged - not one shape or arrow moved. What changed is the instrument.
+
+**Problem.** Gate 5 (`arrow paths crossing a non-endpoint shape`, built at wake
+19 as B17) traced each arrow from its binding records and, for `kind: "elbow"`,
+walked the L-legs it *believed* tldraw would draw. Nothing had ever checked that
+belief. B27 (wake 31) produced a direct contradiction: gate 5 scored `hexagonal`
+5 -> 0 and `deep-nesting` 10 -> 9 while the judge, looking at the PNGs of those
+same two files, described arrows piercing boxes and merging into shared trunks.
+The protocol already says the render wins, so the tracer was the suspect.
+
+**Built.** `tools/arrow-truth.mts` serves a diagram, opens it in headless
+chromium, and pulls the real arrow vertices out of the live editor
+(`getShapeGeometry` on each arrow, mapped through `getShapePageTransform`).
+`src/viewer/app.tsx` stashes the editor on `window` so the tool can reach it -
+that one line is the only `src/` change. `tools/serve-harness.mts` is the
+child-process plumbing, factored out of `tools/screenshot.mts`, which now shares
+it.
+
+**The measurement. The tracer matched 0 of 84 corpus arrows.**
+
+| corpus file | arrows | agree | differ |
+| --- | --- | --- | --- |
+| deep-nesting | 8 | 0 | 8 |
+| hexagonal | 22 | 0 | 22 |
+| long-labels | 8 | 0 | 8 |
+| sequence | 13 | 0 | 13 |
+| sparse-graph | 8 | 0 | 8 |
+| wide-fanout | 25 | 0 | 25 |
+
+Agreement was defined generously: same vertex count and every corresponding
+vertex within 2px. Three distinct defects, all confirmed on `hexagonal`:
+
+- **Arrowhead inset.** tldraw stops the terminal ~13.5px short of the bound
+  shape. The tracer ran the full chord. This makes the tracer's path *longer*
+  than reality, so on its own it would over-count, not under-count.
+- **Wrong corridor.** `hx-14` traced `(581.5,344) -> (713,344) -> (713,464) ->
+  (844.5,464)` while tldraw drew `(581.5,344) -> (581.5,404) -> (844.5,404) ->
+  (844.5,450.5)`. The tracer split on the wider *endpoint* axis at the endpoint
+  midpoint; tldraw picks its axis from the two shapes' relative position and
+  bends in the gap between their bounds. 144.5px of deviation, and a completely
+  different corridor - this is where the missed crossings come from.
+- **Spurious vertices.** Where tldraw draws a straight two-point segment
+  (`hx-1`), the tracer emitted a degenerate four-point L.
+
+**The correction.**
+
+| corpus file | gate 5, traced | gate 5, real render |
+| --- | --- | --- |
+| deep-nesting | 9 | **10** |
+| hexagonal | **0** | **9** |
+| long-labels | 1 | 1 |
+| sequence | 0 | 0 |
+| sparse-graph | 0 | 0 |
+| wide-fanout | 36 | 36 |
+
+`hexagonal` is the headline: gate 5 reported a **clean file** where the render
+has nine arrows through boxes. That is exactly the file B27's judge marked as a
+loss, and it vindicates the judge over the metric.
+
+**Decision: delete the tracer rather than improve it.** Reproducing tldraw's
+elbow router faithfully is a research project that would have to be re-verified
+against every tldraw upgrade, and the ground truth is already available from the
+renderer for the cost of a browser the protocol launches anyway (six screenshots
+per wake). `arrowPath`, `arrowPathsFromScene`, `endpointPoint`,
+`stripShapePrefix`, `countArrowShapeCrossings` and `segmentHitsRect` are gone
+from `tools/layout-report.mts` (-138 lines), along with their unit tests, and
+the metric line is no longer in the report. `tools/arrow-truth.mts` is now the
+sole instrument for gate 5.
+
+Its candidate rects come from `getShapePageBounds` rather than from the layout
+rects, so the metric no longer inherits the note-resize error B9 documented.
+That changed none of the six numbers, for a structural reason worth recording:
+**no corpus file contains a `<note>`**, so the corpus cannot currently exercise
+that class of defect at all. Filed under discovered work.
+
+Everything else is unchanged by construction: the counting rule is still 0.5px
+inset per side, endpoints skipped, distinct shapes per arrow, exact
+Liang-Barsky, frames excluded. Verified independently of the implementing agent
+by regenerating all six reports - the new champion is byte-identical to the old
+one with exactly the one metric line removed, nothing else moved.
+
+**What this invalidates.** Every gate-5 number ever recorded for an elbow
+candidate:
+
+- **B24** (wake 29) was **rejected at gate 5 with no judge**, on traced numbers.
+  That rejection is now unsupported. It stays rejected only because nothing has
+  re-run it; it is not evidence.
+- **B27** (wake 31) was kept 3-2 and already flagged weak. Its claimed
+  improvements were `hexagonal` 5 -> 0 and `deep-nesting` 10 -> 9. Against the
+  real render the champion sits at 9 and 10. B27's central quantitative claim
+  does not survive, which leaves a keep resting on a 3-2 judge vote whose two
+  losses were on those same two files.
+
+B27 is **not** reverted this wake - that would be a second unit of work, and
+under the protocol a reverting decision needs its own gates and its own judge.
+Filed as B30, at the top of the backlog.
+
+**Verified.** `npm run check` green: 38 test files, 308 tests. Champion PNGs not
+regenerated - no shape moved, so they cannot have changed.
+

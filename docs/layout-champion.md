@@ -11,6 +11,26 @@ for f in tests/corpus/*.tldsl.jsx; do npx tsx tools/layout-report.mts "$f"; done
 Replace this file whenever a hypothesis is KEPT; it is the comparison baseline
 for the next wake's candidate, per the Phase B protocol in `docs/ralph-plan.md`.
 
+**Gate 5 is not in this file.** `arrow paths crossing a non-endpoint shape` used
+to be reported here, computed from a model of tldraw's arrow router. Wake 32
+measured that model against the real render and it matched 0 of 84 corpus
+arrows, so it was deleted. The metric now comes from `tools/arrow-truth.mts`,
+which reads the vertices tldraw actually drew; its champion baseline is the
+table below.
+
+```bash
+npx tsx tools/arrow-truth.mts tests/corpus/*.tldsl.jsx
+```
+
+| corpus file | arrow paths crossing a non-endpoint shape |
+| --- | --- |
+| deep-nesting | 10 |
+| hexagonal | 9 |
+| long-labels | 1 |
+| sequence | 0 |
+| sparse-graph | 0 |
+| wide-fanout | 36 |
+
 ---
 
 ## deep-nesting.tldsl.jsx
@@ -44,7 +64,6 @@ total edge length: 2128
 mean edge length: 266
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
-arrow paths crossing a non-endpoint shape: 9
 source-order violations per container:
   deep-nesting (grid): 0
   l1 (col): 0
@@ -168,7 +187,6 @@ total edge length: 5634
 mean edge length: 256
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
-arrow paths crossing a non-endpoint shape: 0
 source-order violations per container:
   hexagonal (grid): 0
   hex (row): 0
@@ -248,7 +266,6 @@ total edge length: 4446
 mean edge length: 556
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
-arrow paths crossing a non-endpoint shape: 1
 source-order violations per container:
   long-labels (grid): 0
 left-edge alignment groups per container:
@@ -321,7 +338,6 @@ total edge length: 1300
 mean edge length: 100
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
-arrow paths crossing a non-endpoint shape: 0
 source-order violations per container:
   sequence (col): 0
 left-edge alignment groups per container:
@@ -434,7 +450,6 @@ total edge length: 1440
 mean edge length: 180
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
-arrow paths crossing a non-endpoint shape: 0
 source-order violations per container:
   sparse-graph (auto): 0
 left-edge alignment groups per container:
@@ -523,7 +538,6 @@ total edge length: 10864
 mean edge length: 435
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
-arrow paths crossing a non-endpoint shape: 36
 source-order violations per container:
   wide-fanout (grid): 0
 left-edge alignment groups per container:

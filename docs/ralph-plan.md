@@ -23,12 +23,17 @@ once A is done. The loop never terminates; the human stops it.
   B6 all reverted after judging, and B7 and B24 were rejected at an objective
   gate before judging. Judged results live in `docs/layout-hypotheses.md` - read
   it before proposing a hypothesis.
-- **B27 is kept but flagged weak, and the next two backlog entries are about
-  that.** It won 3-2, but two of the three wins were the judge admitting it
-  could see no difference, and both losses were on the two files gate 5 says it
-  improved. **B28** (validate gate 5's elbow tracer against a real render) and
-  **B29** (let the judge return a tie) are both protocol/tooling wakes, not
-  A/Bs, and both should run before any further arrow hypothesis is judged.
+- **Gate 5 was wrong until wake 32, and B27's case did not survive the fix.**
+  B28 measured the old arrow tracer against the real render: it matched **0 of
+  84** corpus arrows and called `hexagonal` clean where the render has 9
+  crossings. The tracer is deleted; `tools/arrow-truth.mts` reads the vertices
+  tldraw actually drew and is now gate 5's only instrument, with the champion
+  baseline in `docs/layout-champion.md`. B27 was kept on the claim that it took
+  `hexagonal` 5 -> 0 and `deep-nesting` 10 -> 9; against the real render the
+  champion sits at 9 and 10, so that claim is void and B27 rests on a 3-2 judge
+  vote whose two losses were on those same two files. Re-judging it is **B30**,
+  now top of the backlog. **B29** (let the judge return a tie) still stands and
+  should land before any further arrow hypothesis is judged.
 - Last drift audit (protocol step 9): **wake 30** - epoch established, audit
   vacuous, nothing to compare against. Epoch saved at
   `docs/baselines/wake-30/`. **Next audit: wake 35**, and it is the first real
@@ -419,8 +424,13 @@ One hypothesis per wake. Never batch. Never stop.
    - Any source-order violation in a `row`/`col`/`grid` container.
    - Canvas area more than 1.5× the champion's on any corpus file.
    - `arrow paths crossing a non-endpoint shape` higher than the champion's on
-     any corpus file _(added wake 19; see B17)_. This is the only gate that can
-     see an arrow change at all - the other four are tautologies for one.
+     any corpus file _(added wake 19 as B17; re-based on the real render at wake
+     32, see B28)_. This is the only gate that can see an arrow change at all -
+     the other four are tautologies for one. **It comes from
+     `npx tsx tools/arrow-truth.mts tests/corpus/*.tldsl.jsx`, which reads the
+     vertices tldraw actually drew - not from `layout-report.mts`, which no
+     longer carries this metric.** The champion baseline is the table at the top
+     of `docs/layout-champion.md`.
    A rejection here is still a result — record it and move on.
 
 5. **Subjective judgement.** Delegate to a **fable** subagent, once per corpus
@@ -822,7 +832,7 @@ Ordered. Take from the top. Strike through when resolved.
   instruments that were meant to settle it are both suspect, filed as B28 and
   B29. Ledger entry in `docs/layout-hypotheses.md`.
 
-- [ ] **B28** _(from B27, wake 31)_ **Validate gate 5's arrow tracer against a
+- [x] ~~**B28** _(from B27, wake 31)_ **Validate gate 5's arrow tracer against a
   real render.** `layoutReport` traces each arrow from its binding records and,
   for `kind: "elbow"`, walks the L-legs it believes tldraw will draw. Nothing
   has ever checked that belief. B27 produced a direct contradiction: gate 5
@@ -834,7 +844,26 @@ Ordered. Take from the top. Strike through when resolved.
   or the rendered SVG path is the ground truth), diff them against the tracer's
   legs, and fix the tracer. Until this lands, treat every gate-5 number on an
   elbow candidate as unverified - including B24's wake-29 rejection, which was
-  a pure gate-5 call with no judge, and B27's own keep.
+  a pure gate-5 call with no judge, and B27's own keep.~~ **BUILT** _(wake 32)_
+  - the tracer matched **0 of 84** corpus arrows and reported `hexagonal` as a
+  clean file (0 crossings) where the render has **9**. Deleted rather than
+  fixed; `tools/arrow-truth.mts` reads the real vertices and is now gate 5's
+  only instrument. Corrected champion baseline: deep-nesting 10, hexagonal 9,
+  long-labels 1, sequence 0, sparse-graph 0, wide-fanout 36. Full entry in
+  `docs/layout-hypotheses.md`.
+
+- [ ] **B30** _(from B28, wake 32)_ **Re-judge B27 against the corrected gate
+  5.** B27 (elbow + side anchors gated on container topology) was kept 3-2 and
+  flagged weak. Its quantitative case was `hexagonal` 5 -> 0 and `deep-nesting`
+  10 -> 9 on gate 5; wake 32 established those numbers came from a tracer that
+  matches no real arrow, and that the real champion sits at 9 and 10. So B27's
+  keep now rests on a 3-2 judge vote in which two of three wins were "A wins by
+  default" and both losses were on the two files it claimed to improve. Treat
+  the current champion as the candidate and pre-B27 as the alternative: rebuild
+  the pre-B27 arc-and-centre-anchor emit, run **gate 5 on real vertices** for
+  both, and run a fresh randomised blind A/B. If pre-B27 wins, revert B27. This
+  is a full A/B and needs its own gates and judge - do not shortcut it into a
+  bare revert.
 
 - [ ] **B29** _(from B27, wake 31)_ **Let the judge return a tie.** Step 5 tells
   the judge not to hedge, so a visually indistinguishable pair is decided by
@@ -1504,7 +1533,7 @@ anything that outlives the loop.)_
   wrong side. If a future arrow hypothesis reaches 0 on a file, look at the PNG
   before believing the file is solved.
 
-- **(wake 31, from B27)** **Gate 5's elbow tracer does not match tldraw's elbow
+- ~~**(wake 31, from B27)** **Gate 5's elbow tracer does not match tldraw's elbow
   router.** B27's candidate scored `hexagonal` 5 -> 0 and `deep-nesting` 10 -> 9
   on `arrow paths crossing a non-endpoint shape`, and the judge, looking at the
   PNGs for those same two files, described arrows piercing boxes and merging
@@ -1512,10 +1541,27 @@ anything that outlives the loop.)_
   tldraw will draw from the binding records; nothing has ever checked that trace
   against a real render. Until it is checked, gate 5 is not evidence about an
   elbow candidate - which also weakens B24's wake-29 rejection, since that was a
-  pure gate-5 call with no judge. Filed as **B28**.
+  pure gate-5 call with no judge. Filed as **B28**.~~ **DONE** _(wake 32)_ - the
+  tracer matched 0 of 84 corpus arrows and is deleted; gate 5 now reads the real
+  vertices via `tools/arrow-truth.mts`. B27's quantitative case did not survive
+  the correction, re-judging it is **B30**.
 - **(wake 31, from B27)** **The judge cannot return a tie.** Step 5 tells it not
   to hedge, so a pair it finds visually indistinguishable is decided by
   position: two of B27's three wins were "A wins by default". Combined with
   keep-by-default that is a systematic pro-candidate bias in exactly the cases
   carrying no information, and it is invisible in the ledger unless the judge
   volunteers that it saw no difference. Filed as **B29**.
+
+- **(wake 32, from B28)** **No corpus file contains a `<note>`.** Gate 5's
+  candidate rects now come from `getShapePageBounds`, which was meant to stop
+  the metric inheriting the note-resize error B9 documented. It changed none of
+  the six numbers, because the corpus has no notes to resize. B9 is the champion
+  revision that exists specifically to handle notes, and nothing in the corpus
+  exercises it. Adding a note-bearing corpus file is its own hypothesis under
+  the "never edit the corpus to make a hypothesis win" rule - judged on whether
+  it covers a real diagram shape, and it invalidates the champion baseline.
+
+- **(wake 32, from B28)** `src/viewer/app.tsx` now stashes the tldraw editor on
+  `window.editor` unconditionally so `tools/arrow-truth.mts` can reach it. That
+  is a debug hook shipped in the viewer bundle. Harmless, but if the viewer ever
+  becomes something users embed, gate it behind a dev flag.
