@@ -286,7 +286,7 @@ Two traps, both paid for already:
   `docs/layout-champion.md` got a HISTORICAL banner at the top pointing at
   `docs/baseline.md`; it was not deleted.
 
-- [ ] **T2. Classify every crossing.**
+- [x] **T2. Classify every crossing.**
   Do not build a fix before knowing what is being fixed. Extend `arrow-truth`
   (or add a small tool) to label each crossing as one of:
   **same-axis skip** (both endpoints and the crossed shape share a container
@@ -300,6 +300,24 @@ Two traps, both paid for already:
   **If "same-axis skip" is not the largest bucket, stop and write that finding
   prominently** - T3 through T5 are built on the assumption that it is, and the
   plan needs revisiting before they are worth building.
+
+  **Done at `796085d` + this commit.** New `tools/crossing-classify.mts` joins
+  `arrow-truth`'s rendered geometry to the positioned IR's container tree and
+  buckets every `(arrow, crossed shape)` pair; `crossingPairs` was factored out
+  of `arrow-truth` and shared, so the two tools cannot drift on what counts as a
+  crossing. All 60 crossings classify and the buckets sum:
+  **same-axis skip 33, cross-container 15, fan 10, other 2 = 60.**
+  **Same-axis skip is the largest bucket**, so the T3-T5 assumption holds and
+  the plan stands. The split is lopsided per file, though: `wide-fanout`'s 29
+  is 19 skips plus 10 genuine diagonal fan chords, while `deep-nesting` (9) and
+  `hexagonal` (6) are 100% cross-container - a quarter of the corpus that all of
+  Phase 1 as written will not touch. Two free choices, both recorded in
+  `docs/baseline.md`: the axis is derived geometrically rather than from the
+  declared `row`/`col`/`grid` mode (so one grid row counts), and the buckets are
+  applied in the order the task lists them. The T1 open question about ancestor
+  frames is settled by measurement - it is 0 across the whole corpus, so no
+  decision was needed. Geometry did not move, so `docs/renders/` and the T1
+  table are unchanged.
 
 - [ ] **T3. Bend on same-axis skip edges.**
   `bend: 0` is hardcoded at `src/contracts/builders.ts:226`. Give an edge
@@ -1000,3 +1018,24 @@ promoted into the task list by the human.
 - The root container is absent from the geometry table (children of `sequence`
   list `parent=sequence`, but there is no `sequence` row), so `shapes` in the
   baseline excludes the document frame itself.
+- **Phase 1 as written cannot touch 25% of the corpus.** `deep-nesting` (9) and
+  `hexagonal` (6) are 100% `cross-container`, so a T3-T5 that triggers on the
+  `same-axis skip` bucket leaves 15 of 60 crossings alone by construction. Six
+  of `deep-nesting`'s nine are *geometrically* skips - a straight vertical run
+  through a stacked neighbour, `Gateway -> Router` clipping `Config` - and only
+  miss the bucket because the endpoints sit in different frames. Widening T3's
+  trigger from "same container" to "collinear and between, whatever the
+  container" would pick them up for free.
+- **The T1 frame question answered itself.** "Crossed shape is an ancestor frame
+  of an endpoint" is 0 across all eight files, so the ancestor-frame policy needs
+  no decision until a fixture exercises it. `deep-nesting`'s crossed shapes are
+  boxes (`Config`, `Router`, `Metrics`), not the `System`/`Service` frames - the
+  earlier Discovered-work note guessed otherwise.
+- **T3 and T6 overlap on 19 edges.** Every one of `wide-fanout`'s 19 same-axis
+  skips has a source with out-degree 18, so it is simultaneously a fan. Whichever
+  of T3/T6 lands first takes the credit for those 19 and the second will look
+  like it did almost nothing. Measure T3 on the other seven files to isolate it.
+- **`wide-fanout` is a `grid`, and its rows are only a layout artefact.** The
+  classifier had to derive the skip axis from geometry because the container's
+  declared mode is `grid`, which has no single axis. Anything in T3-T6 that
+  reads `layout` to decide an axis will silently do nothing on this file.

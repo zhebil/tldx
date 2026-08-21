@@ -25,9 +25,9 @@ import { formatDiagnostics } from "../src/cli/format-diagnostics.js";
 
 // -- geometry model -----------------------------------------------------------
 
-type ShapeKind = "frame" | "box" | "note";
+export type ShapeKind = "frame" | "box" | "note";
 
-type AbsShape = {
+export type AbsShape = {
   id: string;
   kind: ShapeKind;
   label: string;
@@ -39,15 +39,15 @@ type AbsShape = {
   ancestorFrameIds: string[];
 };
 
-type ContainerInfo = {
+export type ContainerInfo = {
   id: string;
   mode: string;
   children: { id: string; x: number; y: number }[];
 };
 
-type Walked = { shapes: AbsShape[]; edges: IREdge[]; containers: ContainerInfo[] };
+export type Walked = { shapes: AbsShape[]; edges: IREdge[]; containers: ContainerInfo[] };
 
-function walk(doc: IRDocPositioned): Walked {
+export function walk(doc: IRDocPositioned): Walked {
   const shapes: AbsShape[] = [];
   const edges: IREdge[] = [];
   const containers: ContainerInfo[] = [];

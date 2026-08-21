@@ -20,7 +20,7 @@ import { withServedDiagram } from "./serve-harness.mjs";
 
 type Pt = { x: number; y: number };
 
-type ArrowTruth = {
+export type ArrowTruth = {
   arrowId: string;
   kind: string;
   from: string;
@@ -28,9 +28,11 @@ type ArrowTruth = {
   points: Pt[];
 };
 
-type ShapeBounds = { id: string; x: number; y: number; w: number; h: number };
+export type ShapeBounds = { id: string; x: number; y: number; w: number; h: number };
 
-type PageTruth = { arrows: ArrowTruth[]; shapes: ShapeBounds[] };
+export type PageTruth = { arrows: ArrowTruth[]; shapes: ShapeBounds[] };
+
+export type CrossingPair = { arrowId: string; from: string; to: string; crossedId: string };
 
 async function main(): Promise<void> {
   const files = process.argv.slice(2);
@@ -103,26 +105,37 @@ export function segmentHitsRect(
   return t0 <= t1;
 }
 
-function countCrossings(arrows: ArrowTruth[], shapes: ShapeBounds[]): number {
-  let total = 0;
-  for (const { points, from, to } of arrows) {
+/**
+ * One row per (arrow, crossed shape) pair, deduped so one arrow crossing one
+ * shape counts once. Shared by `arrow-truth`'s own count and by
+ * `crossing-classify.mts`, so the two tools cannot drift on what counts as a
+ * crossing.
+ */
+export function crossingPairs(arrows: ArrowTruth[], shapes: ShapeBounds[]): CrossingPair[] {
+  const pairs: CrossingPair[] = [];
+  for (const { arrowId, points, from, to } of arrows) {
     const hit = new Set<string>();
     for (const s of shapes) {
       if (s.id === from || s.id === to) continue;
+      if (hit.has(s.id)) continue;
       const rect = { x: s.x + 0.5, y: s.y + 0.5, w: s.w - 1, h: s.h - 1 };
       for (let i = 0; i < points.length - 1; i++) {
         if (segmentHitsRect(points[i]!, points[i + 1]!, rect)) {
           hit.add(s.id);
+          pairs.push({ arrowId, from, to, crossedId: s.id });
           break;
         }
       }
     }
-    total += hit.size;
   }
-  return total;
+  return pairs;
 }
 
-async function extractTruth(url: string): Promise<PageTruth> {
+function countCrossings(arrows: ArrowTruth[], shapes: ShapeBounds[]): number {
+  return crossingPairs(arrows, shapes).length;
+}
+
+export async function extractTruth(url: string): Promise<PageTruth> {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
