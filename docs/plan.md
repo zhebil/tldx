@@ -355,6 +355,10 @@ to come after Phase 1.
   (`draw|solid|dashed|dotted`). On edges: `color`, `dash`, `arrowheadStart`,
   `arrowheadEnd` (`none|arrow|triangle|square|dot|pipe|diamond|inverted|bar`).
   On notes: `color`.
+  **Defaults are neutral except frames**, which get a very light fill so
+  containment reads without the author styling anything. No `variant` prop -
+  `docs/jsx-pivot.md` decision 9's variant clause is superseded by userland
+  components (T16b), and that supersession should be recorded in that file.
   Add each to `ALLOWED_PROPS` in `src/domain/ir/lower.ts` with value validation
   - an unknown enum value must be a diagnostic with a source span, not a
   silently dropped prop.
@@ -677,12 +681,18 @@ tasks above by the human, not by the loop.
    linear 14-step chain, and the name is a trap for whoever reads the corpus
    next.
 
-6. **Named styling, or raw enums only?** jsx-pivot decision 9 settled on raw
-   tldraw enums plus "a thin `variant`", and the `variant` half was never built.
-   A `variant="danger"` mapping to `color="red" fill="semi"` would make diagrams
-   look consistent without the author picking hues, at the cost of a second
-   vocabulary over the same props. Raw-only is the simpler answer and the one
-   T9-T11 assume.
+6. ~~**Named styling, or raw enums only?**~~ **Answered: raw enums only.** A
+   userland component *is* the variant mechanism - if `<System>` is
+   `<Box color="blue" fill="semi"/>` in a fixture, the library needs no
+   `variant` prop, and a shared palette is a `theme.jsx` exporting constants.
+   The "thin `variant`" clause in `docs/jsx-pivot.md` decision 9 is
+   **superseded**, not deferred.
+   **Library defaults: neutral, with one exception.** A frame gets a very light
+   fill, because containment is structural and always true - "these things are
+   grouped" is never a guess. Colour on a *box* would be a guess, and a wrong
+   colour is worse than none because it implies meaning that is not there. The
+   reference for what good styling looks like is T13's realistic fixtures, so it
+   is demonstrated rather than imposed.
 
 7. ~~**Round-trip scope.**~~ **Answered:** structural changes must be
    supported, not just positions. Resolved into the overlay-plus-absorb design
