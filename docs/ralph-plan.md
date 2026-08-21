@@ -14,14 +14,21 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 28
-  for **B9** (a note reserves the space tldraw actually draws), which sits on
-  top of the wake-22 **B20** revision (topology-gated doc-root aspect wrap) and
-  the wake-12 **B1** revision (cross-axis `align`, default `center`). Those
-  three are the only hypotheses ever kept - B2, B3, B4a, B13, B14, B15 and B6
-  all reverted after judging, and B7 was rejected at an objective gate before
-  judging. Judged results live in `docs/layout-hypotheses.md` - read it before
-  proposing a hypothesis.
+- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 31
+  for **B27** (elbow arrows + side anchors, gated on container topology), which
+  sits on top of the wake-28 **B9** revision (a note reserves the space tldraw
+  actually draws), the wake-22 **B20** revision (topology-gated doc-root aspect
+  wrap) and the wake-12 **B1** revision (cross-axis `align`, default `center`).
+  Those four are the only hypotheses ever kept - B2, B3, B4a, B13, B14, B15 and
+  B6 all reverted after judging, and B7 and B24 were rejected at an objective
+  gate before judging. Judged results live in `docs/layout-hypotheses.md` - read
+  it before proposing a hypothesis.
+- **B27 is kept but flagged weak, and the next two backlog entries are about
+  that.** It won 3-2, but two of the three wins were the judge admitting it
+  could see no difference, and both losses were on the two files gate 5 says it
+  improved. **B28** (validate gate 5's elbow tracer against a real render) and
+  **B29** (let the judge return a tie) are both protocol/tooling wakes, not
+  A/Bs, and both should run before any further arrow hypothesis is judged.
 - Last drift audit (protocol step 9): **wake 30** - epoch established, audit
   vacuous, nothing to compare against. Epoch saved at
   `docs/baselines/wake-30/`. **Next audit: wake 35**, and it is the first real
@@ -790,7 +797,7 @@ Ordered. Take from the top. Strike through when resolved.
   `docs/patches/b24-elbow-side-anchors.patch`. Ledger entry in
   `docs/layout-hypotheses.md`.
 
-- [ ] **B27** _(successor to B24, wake 29)_ Gate elbow arrows and side anchors on
+- [x] ~~**B27** _(successor to B24, wake 29)_ Gate elbow arrows and side anchors on
   **container topology**, the way B20 gates the doc-root wrap. B24 measured a
   clean split: the pair is a strict improvement where the container's children
   form layers or a chain (`hexagonal` 5 -> 0, `deep-nesting` 10 -> 9) and a
@@ -804,7 +811,42 @@ Ordered. Take from the top. Strike through when resolved.
   B20 already exist and are the obvious starting point - a fan predicate is
   their mirror. Gate 5 measures the result directly; the target is `wide-fanout`
   staying at 36 while `hexagonal` reaches 0. **EPIC** for the same reason B13
-  was: elbow and side anchors each lose alone.
+  was: elbow and side anchors each lose alone.~~ **KEPT (weak)** _(wake 31)_ -
+  the gate works exactly as designed: `wide-fanout` fires it, falls back to
+  arc, and its PNG is **byte-identical** to the champion's, so B24's 36 -> 45
+  regression is gone while `hexagonal` reaches 0 and `deep-nesting` 9. All five
+  objective gates passed. Judged 3 wins / 2 losses over five voting files, so
+  keep-by-default applies - but two of the three wins were the judge saying it
+  could see no difference and picking by position, and the two losses were on
+  precisely the two files gate 5 says improved. Recorded as **weak**; the two
+  instruments that were meant to settle it are both suspect, filed as B28 and
+  B29. Ledger entry in `docs/layout-hypotheses.md`.
+
+- [ ] **B28** _(from B27, wake 31)_ **Validate gate 5's arrow tracer against a
+  real render.** `layoutReport` traces each arrow from its binding records and,
+  for `kind: "elbow"`, walks the L-legs it believes tldraw will draw. Nothing
+  has ever checked that belief. B27 produced a direct contradiction: gate 5
+  scored `hexagonal` 5 -> 0 and `deep-nesting` 10 -> 9 while the judge, looking
+  at the PNGs of those same files, saw arrows piercing boxes. Either the tracer
+  or the render is wrong, and the protocol already says the render wins. This
+  is a **tooling wake, not an A/B**: pick one corpus file, extract the arrow
+  paths tldraw actually drew (the viewer has the editor; `getShapePageGeometry`
+  or the rendered SVG path is the ground truth), diff them against the tracer's
+  legs, and fix the tracer. Until this lands, treat every gate-5 number on an
+  elbow candidate as unverified - including B24's wake-29 rejection, which was
+  a pure gate-5 call with no judge, and B27's own keep.
+
+- [ ] **B29** _(from B27, wake 31)_ **Let the judge return a tie.** Step 5 tells
+  the judge not to hedge, so a visually indistinguishable pair is decided by
+  position rather than by content - two of B27's three wins were literally "A
+  wins by default". Under keep-by-default that converts no-information cases
+  into candidate votes whenever the randomiser puts the candidate at A more
+  often, which is what happened at wake 31 (4 of 5). Amend the protocol: allow
+  `WINNER: TIE`, exclude ties from both the win and the loss count, and record
+  them in the ledger table as ties. A candidate whose every voting file comes
+  back a tie is still a KEEP under step 6's "no voting files at all" clause, so
+  this does not re-introduce the revert-everything failure mode - it only stops
+  counting coin flips as evidence. **Also a protocol change, not an A/B.**
 
 - [ ] **B25** _(new, wake 26)_ Routing lanes in **placement**. Every arrow
   hypothesis so far (B3, B4a, B13, B14, B15) changed how arrows *attach*; none
@@ -1461,3 +1503,19 @@ anything that outlives the loop.)_
   scored 0 while still drawing arrows across box labels and into boxes from the
   wrong side. If a future arrow hypothesis reaches 0 on a file, look at the PNG
   before believing the file is solved.
+
+- **(wake 31, from B27)** **Gate 5's elbow tracer does not match tldraw's elbow
+  router.** B27's candidate scored `hexagonal` 5 -> 0 and `deep-nesting` 10 -> 9
+  on `arrow paths crossing a non-endpoint shape`, and the judge, looking at the
+  PNGs for those same two files, described arrows piercing boxes and merging
+  into shared trunks. Gate 5 (B17, wake 19) traces the L-legs it *believes*
+  tldraw will draw from the binding records; nothing has ever checked that trace
+  against a real render. Until it is checked, gate 5 is not evidence about an
+  elbow candidate - which also weakens B24's wake-29 rejection, since that was a
+  pure gate-5 call with no judge. Filed as **B28**.
+- **(wake 31, from B27)** **The judge cannot return a tie.** Step 5 tells it not
+  to hedge, so a pair it finds visually indistinguishable is decided by
+  position: two of B27's three wins were "A wins by default". Combined with
+  keep-by-default that is a systematic pro-candidate bias in exactly the cases
+  carrying no information, and it is invisible in the ledger unless the judge
+  volunteers that it saw no difference. Filed as **B29**.

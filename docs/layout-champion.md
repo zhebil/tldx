@@ -44,7 +44,7 @@ total edge length: 2128
 mean edge length: 266
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
-arrow paths crossing a non-endpoint shape: 10
+arrow paths crossing a non-endpoint shape: 9
 source-order violations per container:
   deep-nesting (grid): 0
   l1 (col): 0
@@ -168,7 +168,7 @@ total edge length: 5634
 mean edge length: 256
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
-arrow paths crossing a non-endpoint shape: 5
+arrow paths crossing a non-endpoint shape: 0
 source-order violations per container:
   hexagonal (grid): 0
   hex (row): 0

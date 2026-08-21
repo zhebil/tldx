@@ -1466,3 +1466,102 @@ symmetry with the note case. No change was made - an audit wake does not also
 run a hypothesis.
 
 ---
+
+---
+
+## B27 — elbow + side anchors gated on container topology _(wake 31)_ — **KEPT (weak)**
+
+Successor to B24, which was rejected at gate 5 at wake 29. B24 measured a clean
+split: elbow arrows plus derived side anchors are a strict improvement on
+layered or chained containers (`hexagonal` 5 -> 0, `deep-nesting` 10 -> 9) and a
+strict regression on a fan (`wide-fanout` 36 -> 45). B27 keeps the pair but
+gates it on the graph, the way B20 gates the doc-root wrap.
+
+### The change
+
+`arrowShape()` gains an optional `kind` (default still `"arc"`), so the choice
+is per-arrow rather than global. `src/domain/emit/emit.ts` computes one
+decision per edge before emitting:
+
+1. Every `<edge>` in the doc is collected, at any nesting depth.
+2. Every box/note/frame gets its ancestor-container chain, root first, with the
+   doc root counting as a container.
+3. An edge's **owning container** is the deepest container common to both
+   endpoints' chains. Each endpoint's **representative** there is the next id
+   down its own chain, or the endpoint itself when its chain ends at the owner.
+4. Edges are grouped by owning container and deduped to distinct
+   `(fromRep, toRep)` pairs. Deduplication is load-bearing: `hexagonal`'s seven
+   parallel port->adapter edges resolve to one `driven-ports -> driven-adapters`
+   pair, so that frame's out-degree is 1, not 7.
+5. A container is **fan-shaped** iff some representative's deduped out-degree
+   exceeds **3**. Rationale for the threshold: with three or fewer out-edges
+   each spoke can leave through a side of its own; at four, two spokes must
+   share a side, which is exactly the shared-trunk defect B24 observed.
+6. Edges owned by a fan-shaped container fall back to `arc` + centre anchors,
+   byte-for-byte what the champion emitted.
+
+This is **not B15**. B15 gated per edge on whether the centre-to-centre *chord*
+was clear and failed because the router draws an L, not a chord. B27 tests no
+geometry at all.
+
+`npm run check` green: 37 files, 309 tests, typecheck / lint / dep-lint clean.
+
+### Objective gates — all five passed
+
+Rects are byte-identical to the champion on every corpus file (this hypothesis
+does not touch layout), so gates 2, 3 and 4 are tautologies. Gate 5:
+
+| file | champion | candidate |
+|---|---|---|
+| `deep-nesting` | 10 | **9** |
+| `hexagonal` | 5 | **0** |
+| `long-labels` | 1 | 1 |
+| `sequence` | 0 | 0 |
+| `sparse-graph` | 0 | 0 |
+| `wide-fanout` | 36 | **36** |
+
+`wide-fanout` is the point of the hypothesis and it worked: the gate fires, the
+file falls back to arc, and its PNG is **byte-identical** to the champion's.
+B24's 36 -> 45 regression is gone.
+
+### Judgement — 5 voting files, 3 wins, 2 losses
+
+`wide-fanout` was a structural tie (identical report *and* identical PNG) and
+was never sent to a judge. A/B assignment was randomised per file and recorded
+before any judge ran; it happened to place the candidate at A on four of five.
+
+| file | candidate side | judge picked | result | reasoning |
+|---|---|---|---|---|
+| `hexagonal` | A | B | **LOSS** | candidate's elbows "pile onto the boxes themselves - arrows pierce vertically through OrdersRepo/UsersRepo and Payments/Notifications/Clock and strike through the CLI and ListOrders labels" |
+| `deep-nesting` | A | B | **LOSS** | candidate "merges the Serializer->Gateway elbow into the already-overloaded trunk and renders the row arrows as ambiguous tiny double-headed marks" |
+| `long-labels` | B | B | **WIN** | candidate "routes auth->router and router->orders as clean, traceable orthogonal elbows", champion leaves auth->router unclear |
+| `sequence` | A | A | **WIN** | "no visible defect distinguishing them, A wins by default" |
+| `sparse-graph` | A | A | **WIN** | "visually indistinguishable ... A wins by default" |
+
+Losses (2) are not strictly greater than wins (3), so the protocol's
+keep-by-default verdict rule says **KEEP**, and the rule was applied literally.
+
+### Why this keep is recorded as weak
+
+Two of the three wins are the judge stating it could see no difference and
+picking by position. Discount those and the real tally is 1 win against 2
+losses. Two things follow, both filed as discovered work rather than acted on
+this wake:
+
+- **Gate 5 and the render disagree about elbows.** The metric says `hexagonal`
+  went 5 -> 0 and `deep-nesting` 10 -> 9; the judge looked at the PNGs and saw
+  arrows piercing boxes on exactly those two files. Gate 5 traces the L-legs it
+  believes tldraw will draw (B17, wake 19), and tldraw's elbow router evidently
+  routes somewhere else. Until that tracer is validated against a real render,
+  gate 5 cannot be trusted to score an elbow candidate - which retroactively
+  weakens B24's rejection too, since that was a pure gate-5 call.
+- **The judge cannot say "tie".** It is instructed not to hedge, so a
+  visually-identical pair becomes a coin flip decided by position. Under
+  keep-by-default that is a systematic pro-candidate bias whenever the candidate
+  lands on A more often than B, which is what happened here.
+
+The honest summary: the topology gate demonstrably fixed the `wide-fanout`
+regression that killed B24, and that part is solid and independently verifiable
+(byte-identical PNG). Whether elbows help at all on the files where the gate
+lets them through is **not** settled by this wake, and the two instruments that
+were supposed to settle it are both suspect.
