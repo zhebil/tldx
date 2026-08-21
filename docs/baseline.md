@@ -133,3 +133,42 @@ added into the sum:
 ## Renders
 
 One PNG per corpus file in `docs/renders/`, named after the fixture.
+
+---
+
+## After T3 (bend on same-axis skip edges)
+
+Same corpus, same layout - only the arrows moved. Shape geometry (canvas,
+shapes, frames, arrows) is byte-identical to the table above; `crossings` and
+the exported `png` size are the only columns that changed, the latter because
+the export crops to content and a bowed arrow can reach past the boxes.
+
+| file | crossings (T1) | crossings (T3) | png |
+|---|---|---|---|
+| deep-nesting | 9 | 9 | 1316 x 1708 |
+| hexagonal | 6 | 6 | 2836 x 1428 |
+| long-labels | 5 | 5 | 4256 x 2283 |
+| multi-region | 6 | **2** | 1928 x 2572 |
+| release-pipeline | 5 | **0** | 2851 x 2107 |
+| sequence | 0 | 0 | 850 x 2904 |
+| sparse-graph | 0 | 0 | 1542 x 1072 |
+| wide-fanout | 29 | **16** | 2486 x 1940 |
+| **total** | **60** | **38** | |
+
+Bucket split at T3, from `tools/crossing-classify.mts`:
+**same-axis skip 11 (was 33), cross-container 15 (was 15), fan 10 (was 10),
+other 2 (was 2).** The change is confined to the bucket it targeted; nothing
+else moved, and no file gained a crossing.
+
+The eleven surviving skips are all the same residue: the arc bows clear over
+the middle of the span but still clips the box immediately beside an endpoint,
+because both terminals still attach at shape centres so the first and last
+stretch of the path runs along the axis. `wide-fanout`'s `e-leaf-5` crossing
+`leaf-1` and `leaf-4` but not `leaf-2` or `leaf-3` is the signature. That is
+exactly what T4 (side anchors) is specified to remove.
+
+Two files are unchanged by construction rather than by failure:
+`deep-nesting` (9) and `hexagonal` (6) are 100% cross-container, which T3 does
+not touch. `multi-region`'s remaining 2 are the middle region, where the
+required bow (~135px) exceeds the 40px gap to the neighbouring region frame on
+both sides, so the edge stays straight rather than plough into a neighbour.

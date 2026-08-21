@@ -319,7 +319,7 @@ Two traps, both paid for already:
   decision was needed. Geometry did not move, so `docs/renders/` and the T1
   table are unchanged.
 
-- [ ] **T3. Bend on same-axis skip edges.**
+- [x] **T3. Bend on same-axis skip edges.**
   `bend: 0` is hardcoded at `src/contracts/builders.ts:226`. Give an edge
   classified as a same-axis skip a non-zero `bend`, magnitude scaled by how far
   it skips (a chord over four boxes needs more clearance than one over one),
@@ -328,6 +328,37 @@ Two traps, both paid for already:
   **Acceptance:** total crossings strictly lower than T1, and **no file gains a
   crossing**. Also eyeball the PNGs: a bend large enough to clear the boxes but
   small enough that the arrow still reads as connecting its two endpoints.
+
+  **Done.** New pure `src/domain/layout/routing.ts` exports
+  `computeEdgeBends(ir)`; `emit()` calls it once and threads a per-edge `bend`
+  into `arrowShape` (which gained an optional `bend`, still defaulting to 0).
+  An edge bends only when both endpoints share a container, share an axis
+  geometrically, and have at least one box/note strictly between them - so
+  adjacent hops and cross-container edges stay dead straight. The magnitude is
+  derived, not tuned: for each crossed shape take the clearance from the chord
+  to its far edge plus a 12px margin, divide by the arc's deviation factor
+  `4t(1-t)` at that shape's position along the span, and take the max. The
+  sign follows the emptier side - each side's gap to the nearest other shape
+  is measured, and a side is only used if the gap is at least the required
+  sag; if neither side has room the edge stays straight rather than bow into a
+  neighbour.
+  **The numbers: 60 crossings -> 38, and no file gained one.**
+  wide-fanout 29->16, release-pipeline 5->0, multi-region 6->2; deep-nesting 9,
+  hexagonal 6, long-labels 5 unchanged. By bucket, same-axis skip 33->11 with
+  cross-container (15), fan (10) and other (2) all untouched, so the change hit
+  exactly the bucket it aimed at. Verified twice with `arrow-truth` and
+  `crossing-classify` independently; `npm run check` green (40 files, 345
+  tests); `docs/renders/` re-rendered and `docs/baseline.md` has a T3 table.
+  Looked at all four changed PNGs: the bows read as hand-drawn, they clear the
+  boxes, and they still obviously connect their endpoints -
+  `release-pipeline`'s Security scan -> Notify Slack sweeping around Manual
+  approval is the best single example.
+  The eleven surviving skips are one residue: the arc clears the middle of the
+  span but still clips the box next to an endpoint, because both terminals
+  still attach at centres. That is precisely T4's job, and it is the direct
+  evidence for why T4 follows T3 rather than replacing it.
+  Free choice recorded: frames are excluded from the "crossed" set (only boxes
+  and notes), matching what `arrow-truth` actually counts as a crossing.
 
 - [ ] **T4. Side anchors together with bend.**
   T3 bows the arrow but it still leaves and enters at shape centres, so the
@@ -1039,3 +1070,23 @@ promoted into the task list by the human.
   classifier had to derive the skip axis from geometry because the container's
   declared mode is `grid`, which has no single axis. Anything in T3-T6 that
   reads `layout` to decide an axis will silently do nothing on this file.
+- **The bend magnitude is derived, not tuned, and it can be very large.**
+  Required sag is `clearance / 4t(1-t)`, which blows up for a crossed shape
+  near an endpoint (small `t`). `multi-region` wants ~135px of bow over a 228px
+  chord - a near-semicircle. Nothing in the corpus hits a pathological value
+  because the viability gate stops it, but a wide box crossed near an endpoint
+  would ask for an enormous arc. A cap (and falling back to straight above it)
+  may be needed once T13 adds real diagrams.
+- **The viability gate silently declines to help.** When neither side has room,
+  T3 leaves the edge straight, so a crowded diagram gets no improvement and no
+  signal that it wanted one. `multi-region`'s middle region is the live case: 2
+  of its 6 crossings survive purely because the region frames are 40px apart.
+  Widening inter-container gaps (a T8-shaped change) would let those bend.
+- **Frames are invisible to the router.** The crossed set is boxes and notes
+  only, matching the metric, so a bow may sail straight through a sibling
+  frame's border and empty interior. It looks acceptable today only because
+  every frame in the corpus is packed with boxes that *are* counted.
+- **PNG export size is now a function of arrow curvature.** `long-labels`,
+  `release-pipeline` and `wide-fanout` all grew by 20-70px because the export
+  crops to content and bows reach past the boxes. Any future test that pins an
+  exported image size will be sensitive to routing changes.

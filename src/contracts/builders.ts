@@ -215,7 +215,7 @@ export function frameShape(
   } satisfies TLRecord;
 }
 
-export function arrowShape(input: ShapeBase): TLRecord {
+export function arrowShape(input: ShapeBase & { bend?: number }): TLRecord {
   return {
     ...baseShapeFields(input),
     type: "arrow",
@@ -223,7 +223,7 @@ export function arrowShape(input: ShapeBase): TLRecord {
       kind: "arc",
       start: { x: 0, y: 0 },
       end: { x: 0, y: 0 },
-      bend: 0,
+      bend: input.bend ?? 0,
       color: "black",
       labelColor: "black",
       size: "m",

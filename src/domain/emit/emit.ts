@@ -18,7 +18,9 @@
  *   tall as layout reserved.
  * - Edges become an `arrow` shape (`x: 0, y: 0`, parented to the page) plus
  *   two `binding` records anchoring start/end to the referenced shapes with
- *   default-center attach. The 13-anchor scheme is phase 1.
+ *   default-center attach. The 13-anchor scheme is phase 1. A same-axis skip
+ *   edge (see `domain/layout/routing.ts`) gets a non-zero `bend` so it bows
+ *   around the shapes between its endpoints instead of drawing through them.
  * - Synthetic-id elements (notes / edges that didn't author an `id`) inherit
  *   IR's content-hash ids (ADR-12), so emit is deterministic across reorder.
  */
@@ -35,6 +37,7 @@ import {
 } from "../../contracts/builders.js";
 import type { SceneJSON, TLRecord } from "../../contracts/scene-json.js";
 import { NOTE_SIZE } from "../layout/defaults.js";
+import { computeEdgeBends } from "../layout/routing.js";
 import type {
   IRBoxPositioned,
   IRDocPositioned,
@@ -51,9 +54,10 @@ export function emit(ir: IRDocPositioned): SceneJSON {
     documentRecord(),
     pageRecord({ id: PAGE_ID }),
   ];
+  const bends = computeEdgeBends(ir);
 
   for (const child of ir.children) {
-    emitElement(child, PAGE_ID, records);
+    emitElement(child, PAGE_ID, records, bends);
   }
 
   return sceneJson(records);
@@ -63,6 +67,7 @@ function emitElement(
   el: IRElementPositioned,
   parentId: string,
   out: TLRecord[],
+  bends: Map<string, number>,
 ): void {
   switch (el.kind) {
     case "box":
@@ -74,11 +79,11 @@ function emitElement(
     case "frame":
       out.push(emitFrame(el, parentId));
       for (const child of el.children) {
-        emitElement(child, shapeId(el.id), out);
+        emitElement(child, shapeId(el.id), out, bends);
       }
       return;
     case "edge":
-      emitEdge(el, out);
+      emitEdge(el, out, bends.get(el.id) ?? 0);
       return;
     case "doc":
       // Nested <doc> is rejected at IR-lowering; defend in depth.
@@ -121,9 +126,9 @@ function emitFrame(frame: IRFramePositioned, parentId: string): TLRecord {
   });
 }
 
-function emitEdge(edge: IREdge, out: TLRecord[]): void {
+function emitEdge(edge: IREdge, out: TLRecord[], bend: number): void {
   const arrowId = shapeId(edge.id);
-  out.push(arrowShape({ id: arrowId, parentId: PAGE_ID, x: 0, y: 0 }));
+  out.push(arrowShape({ id: arrowId, parentId: PAGE_ID, x: 0, y: 0, bend }));
   out.push(
     arrowBinding({
       id: `binding:${edge.id}-start`,

@@ -155,6 +155,20 @@ describe("domain/emit", () => {
     });
   });
 
+  it("gives a same-axis skip edge a non-zero bend", () => {
+    const scene = emit(
+      doc([
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
+        box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
+        edge({ id: "ad", from: "a", to: "d" }),
+      ]),
+    );
+    const props = scene.store["shape:ad"]?.props as { bend: number };
+    expect(props.bend).not.toBe(0);
+  });
+
   it("parents an edge to the page even when the IR nests it inside a frame", () => {
     // Edge bindings carry the connection; arrows live on the page so frame
     // clipping doesn't hide them.
