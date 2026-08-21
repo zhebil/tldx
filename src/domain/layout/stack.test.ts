@@ -6,7 +6,7 @@ import type { AstNode } from "../parser/ast.js";
 import { astBuilders } from "../parser/ast.fixture.js";
 
 import { estimatedBoxSize } from "./defaults.js";
-import { bestGridCols, formsChain, hybridLayout, type AutoPlacer } from "./stack.js";
+import { bestGridCols, formsChain, hasSkipEdge, hybridLayout, type AutoPlacer } from "./stack.js";
 
 const { box, doc, edge, frame } = astBuilders();
 
@@ -373,9 +373,17 @@ describe("hybridLayout doc-root aspect wrap (B20)", () => {
       ]),
     );
     const sizes = labels.map((l) => estimatedBoxSize(l));
+    const edges = [
+      { from: "hub", to: "a" },
+      { from: "hub", to: "b" },
+      { from: "hub", to: "c" },
+    ];
+    const rowGap = hasSkipEdge(labels, edges) ? 80 : 40;
     const expectedCols = bestGridCols(
       sizes.map((s) => ({ x: 0, y: 0, w: s.w, h: s.h })),
       40,
+      undefined,
+      rowGap,
     );
     expect(result.layout).toBe("grid");
     expect(result.cols).toBe(expectedCols);
@@ -417,5 +425,82 @@ describe("hybridLayout doc-root aspect wrap (B20)", () => {
     const a = boxById(result.children, "a");
     expect(a.x).toBe(hub.x);
     expect(a.y).toBeGreaterThan(hub.y);
+  });
+});
+
+describe("hasSkipEdge", () => {
+  it("is true when an edge skips over an intervening child", () => {
+    expect(hasSkipEdge(["a", "b", "c"], [{ from: "a", to: "c" }])).toBe(true);
+  });
+
+  it("is false when edges only connect flow-adjacent children", () => {
+    expect(
+      hasSkipEdge(
+        ["a", "b", "c"],
+        [
+          { from: "a", to: "b" },
+          { from: "b", to: "c" },
+        ],
+      ),
+    ).toBe(false);
+  });
+
+  it("is false for an empty edge list", () => {
+    expect(hasSkipEdge(["a", "b", "c"], [])).toBe(false);
+  });
+
+  it("ignores edges touching ids outside the list", () => {
+    expect(hasSkipEdge(["a", "b"], [{ from: "a", to: "z" }])).toBe(false);
+  });
+});
+
+describe("hybridLayout grid row gap (B25)", () => {
+  it("doubles the row gap when children carry a skip edge, keeping the column gap plain", async () => {
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2 }, [
+        box({ id: "a", label: "A", w: 100, h: 40 }),
+        box({ id: "b", label: "B", w: 100, h: 40 }),
+        box({ id: "c", label: "C", w: 100, h: 40 }),
+        box({ id: "d", label: "D", w: 100, h: 40 }),
+        edge({ id: "e", from: "a", to: "d" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    const c = boxById(result.children, "c");
+    expect(b.x - a.x).toBe(100 + 40);
+    expect(c.y - a.y).toBe(40 + 80);
+  });
+
+  it("keeps the plain gap when edges only connect adjacent grid children", async () => {
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2 }, [
+        box({ id: "a", label: "A", w: 100, h: 40 }),
+        box({ id: "b", label: "B", w: 100, h: 40 }),
+        box({ id: "c", label: "C", w: 100, h: 40 }),
+        box({ id: "d", label: "D", w: 100, h: 40 }),
+        edge({ id: "e1", from: "a", to: "b" }),
+        edge({ id: "e2", from: "c", to: "d" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const c = boxById(result.children, "c");
+    expect(c.y - a.y).toBe(40 + 40);
+  });
+
+  it("leaves a col container's gap unchanged even with a skip edge", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "a", label: "A", w: 100, h: 40 }),
+        box({ id: "b", label: "B", w: 100, h: 40 }),
+        box({ id: "c", label: "C", w: 100, h: 40 }),
+        edge({ id: "e", from: "a", to: "c" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    const c = boxById(result.children, "c");
+    expect(b.y - a.y).toBe(40 + 40);
+    expect(c.y - b.y).toBe(40 + 40);
   });
 });

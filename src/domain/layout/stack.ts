@@ -39,6 +39,7 @@ import {
 } from "./defaults.js";
 
 const DEFAULT_GAP = 40;
+const SKIP_ROW_GAP_FACTOR = 2;
 const TARGET_ASPECT = 16 / 9;
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -207,23 +208,30 @@ async function layoutContainer(
     h = bbox.maxY + pad.bottom;
   } else {
     const flowedEls = flowedIndices.map((i) => sized[i]!);
+    const flowedIds = flowedEls.map((el) => el.id);
     let flowMode: FlowMode = mode as FlowMode;
     let flowCols = cols;
+    let autoEdges: { from: string; to: string }[] | undefined;
     if (mayAutoGrid && mode === "col") {
       const childIds = children
         .filter((c) => c.kind !== "edge" && c.kind !== "doc")
         .map((c) => c.id);
-      const edges = collectAutoEdges(children);
-      if (!formsChain(childIds, edges)) {
+      autoEdges = collectAutoEdges(children);
+      if (!formsChain(childIds, autoEdges)) {
         flowMode = "grid";
-        flowCols = bestGridCols(flowedEls, gap);
+        const preGap = hasSkipEdge(flowedIds, autoEdges) ? gap * SKIP_ROW_GAP_FACTOR : gap;
+        flowCols = bestGridCols(flowedEls, gap, TARGET_ASPECT, preGap);
       }
     }
+    const edges = autoEdges ?? collectAutoEdges(children);
+    const rowGap =
+      flowMode === "grid" && hasSkipEdge(flowedIds, edges) ? gap * SKIP_ROW_GAP_FACTOR : gap;
     const positions = computeFlowPositions(
       flowedEls,
       flowMode,
       flowCols,
       gap,
+      rowGap,
       pad.left,
       pad.top,
       align,
@@ -308,6 +316,25 @@ export function formsChain(
   return edges.length * 2 >= childIds.length;
 }
 
+/**
+ * True iff some edge connects two ids that both appear in `childIds` (flow
+ * order) at positions more than one apart - a skip edge, one with no
+ * corridor because the children it jumps over sit between its endpoints.
+ * Ids not in `childIds` are ignored.
+ */
+export function hasSkipEdge(
+  childIds: readonly string[],
+  edges: readonly { from: string; to: string }[],
+): boolean {
+  const pos = new Map<string, number>();
+  childIds.forEach((id, i) => pos.set(id, i));
+  return edges.some((e) => {
+    const from = pos.get(e.from);
+    const to = pos.get(e.to);
+    return from !== undefined && to !== undefined && Math.abs(from - to) > 1;
+  });
+}
+
 function indexDescendants(
   children: readonly IRElement[],
   ownerId: string,
@@ -349,6 +376,7 @@ function computeFlowPositions(
   mode: FlowMode,
   cols: number | undefined,
   gap: number,
+  rowGap: number,
   padLeft: number,
   padTop: number,
   align: Align,
@@ -365,7 +393,7 @@ function computeFlowPositions(
   }
   if (mode === "grid") {
     const n = cols !== undefined && cols > 0 ? Math.floor(cols) : els.length || 1;
-    return gridPositions(els, n, gap, padLeft, padTop);
+    return gridPositions(els, n, gap, rowGap, padLeft, padTop);
   }
   const maxW = els.reduce((m, el) => Math.max(m, el.w), 0);
   const out: { x: number; y: number }[] = [];
@@ -381,6 +409,7 @@ function gridPositions(
   els: readonly Rect[],
   cols: number,
   gap: number,
+  rowGap: number,
   padLeft: number,
   padTop: number,
 ): { x: number; y: number }[] {
@@ -403,13 +432,18 @@ function gridPositions(
   let y = padTop;
   for (let r = 0; r < rows; r++) {
     rowY.push(y);
-    y += rowHeights[r]! + gap;
+    y += rowHeights[r]! + rowGap;
   }
   return els.map((_, i) => ({ x: colX[i % cols]!, y: rowY[Math.floor(i / cols)]! }));
 }
 
 /** Pure column-max / row-max extent of a row-major grid, no positions. */
-function gridExtent(els: readonly Rect[], cols: number, gap: number): { w: number; h: number } {
+function gridExtent(
+  els: readonly Rect[],
+  cols: number,
+  gap: number,
+  rowGap: number = gap,
+): { w: number; h: number } {
   const rows = Math.ceil(els.length / cols);
   const colWidths = new Array<number>(cols).fill(0);
   const rowHeights = new Array<number>(rows).fill(0);
@@ -420,7 +454,7 @@ function gridExtent(els: readonly Rect[], cols: number, gap: number): { w: numbe
     rowHeights[r] = Math.max(rowHeights[r]!, el.h);
   });
   const w = colWidths.reduce((a, b) => a + b, 0) + gap * (cols - 1);
-  const h = rowHeights.reduce((a, b) => a + b, 0) + gap * (rows - 1);
+  const h = rowHeights.reduce((a, b) => a + b, 0) + rowGap * (rows - 1);
   return { w, h };
 }
 
@@ -433,12 +467,13 @@ export function bestGridCols(
   els: readonly Rect[],
   gap: number,
   target: number = TARGET_ASPECT,
+  rowGap: number = gap,
 ): number {
   if (els.length === 0) return 1;
   let bestCols = 1;
   let bestScore = Infinity;
   for (let cols = 1; cols <= els.length; cols++) {
-    const { w, h } = gridExtent(els, cols, gap);
+    const { w, h } = gridExtent(els, cols, gap, rowGap);
     const score = Math.abs(Math.log(w / h / target));
     if (score < bestScore) {
       bestScore = score;
