@@ -27,7 +27,7 @@ npx tsx tools/arrow-truth.mts tests/corpus/*.tldsl.jsx
 | deep-nesting | 10 |
 | hexagonal | 5 |
 | long-labels | 1 |
-| release-pipeline | 10 |
+| release-pipeline | 8 |
 | sequence | 0 |
 | sparse-graph | 0 |
 | wide-fanout | 28 |
@@ -248,22 +248,22 @@ gateway         long-labels  0    0    903  60
 auth            long-labels  988  0    885  60
 rate-limiter    long-labels  0    180  903  60
 router          long-labels  988  180  912  60
-orders          long-labels  0    280  921  60
-inventory       long-labels  988  280  903  60
-payments        long-labels  0    460  894  60
-notifier        long-labels  988  460  912  60
-audit           long-labels  0    600  948  60
-reporting       long-labels  988  600  939  60
-note-reporting  long-labels  0    700  200  632
-note-payments   long-labels  988  700  200  662
+orders          long-labels  0    320  921  60
+inventory       long-labels  988  320  903  60
+payments        long-labels  0    500  894  60
+notifier        long-labels  988  500  912  60
+audit           long-labels  0    640  948  60
+reporting       long-labels  988  640  939  60
+note-reporting  long-labels  0    740  200  632
+note-payments   long-labels  988  740  200  662
 
 == Metrics ==
-canvas: 1927 x 1362
-aspect ratio: 1.41
-fill ratio (leaf area / canvas area): 0.307
+canvas: 1927 x 1402
+aspect ratio: 1.37
+fill ratio (leaf area / canvas area): 0.298
 overlapping shape pairs: 0
 edge-edge crossings: 1
-total edge length: 4805
+total edge length: 4810
 mean edge length: 601
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
@@ -272,15 +272,16 @@ source-order violations per container:
 left-edge alignment groups per container:
   long-labels: 2 groups over 12 children
 
-== ASCII Render (100x35 cells; 1 cell = 19.3 x 38.9 px) ==
+== ASCII Render (100x36 cells; 1 cell = 19.3 x 38.9 px) ==
 The API gateway receives every inbound request     The authentication service checks the bearer t   
                        ...................................................                          
                        .                                                 .                          
                        .                                                 .                          
 |---------------------------------------------|    |----------------------------------------------| 
 |The rate limiter tracks request counts per cl|    |The router inspects the request path and dispa| 
-|---------------------------------------------|  ..|----------------------------------------------| 
-The order service validates the cart contents an.  The inventory service reserves stock for each l  
+|---------------------------------------------|    |----------------------------------------------| 
+                                           .............                                            
+The order service validates the cart contents an   The inventory service reserves stock for each l  
                         ...................................................                         
                         .                                                                           
                         .                                                                           
@@ -325,26 +326,26 @@ unit           release-pipeline  446   0    138  60
 build          release-pipeline  642   0    147  60
 scan           release-pipeline  883   0    165  60
 integration    release-pipeline  1123  0    201  60
-publish        release-pipeline  0     180  192  60
-staging        release-pipeline  232   180  174  60
-smoke          release-pipeline  446   180  147  60
-approval       release-pipeline  642   180  183  60
-canary         release-pipeline  883   180  129  60
-metrics        release-pipeline  1123  180  165  60
-rollout        release-pipeline  0     400  156  60
-rollback       release-pipeline  232   400  120  60
-notify         release-pipeline  446   400  156  60
-archive        release-pipeline  642   400  201  60
-note-rollback  release-pipeline  883   400  200  392
+publish        release-pipeline  0     220  192  60
+staging        release-pipeline  232   220  174  60
+smoke          release-pipeline  446   220  147  60
+approval       release-pipeline  642   220  183  60
+canary         release-pipeline  883   220  129  60
+metrics        release-pipeline  1123  220  165  60
+rollout        release-pipeline  0     440  156  60
+rollback       release-pipeline  232   440  120  60
+notify         release-pipeline  446   440  156  60
+archive        release-pipeline  642   440  201  60
+note-rollback  release-pipeline  883   440  200  392
 
 == Metrics ==
-canvas: 1324 x 792
-aspect ratio: 1.67
-fill ratio (leaf area / canvas area): 0.221
+canvas: 1324 x 832
+aspect ratio: 1.59
+fill ratio (leaf area / canvas area): 0.211
 overlapping shape pairs: 0
 edge-edge crossings: 7
-total edge length: 9473
-mean edge length: 474
+total edge length: 9516
+mean edge length: 476
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
 source-order violations per container:
@@ -352,19 +353,20 @@ source-order violations per container:
 left-edge alignment groups per container:
   release-pipeline: 6 groups over 17 children
 
-== ASCII Render (100x30 cells; 1 cell = 13.2 x 26.4 px) ==
+== ASCII Render (100x31 cells; 1 cell = 13.2 x 26.8 px) ==
 |-----------|    |--------|      |----------|   |----------|      |-----------|     |--------------|
 |Commit push|....|Lint....|......|Unit tests|...|Build imag|......|Security sc|.....|Integration te|
 |-----------|    |--------|      |----------|   |----------|......|-----------|.....|--------------|
-                                                 ..........  ............                           
-                                        .....................    ..                                 
-                               ..................              ..                                   
-                     ................                       ...                                     
+                                                    ........     ...........                        
+                                            ........   ............                                 
+                                    ...................        ..                                   
+                            ................                 ..                                     
+                    ..............                         ..                                       
 |-------------|..|------------|  |----------|   |-------------|   |---------|       |-----------|   
 |Push to regis|..|Deploy stagi|..|Smoke test|...|Manual approv|...|Canary 5%|.......|Watch metri|   
 |-------------|  |------------|  |----------|   |-------------|   |---------|.......|-----------|   
-          ..                           .            ..          ..............                      
-            ..                         .         ...  ...............                               
+          ..                           .           ..           ..............                      
+            ..                         .         ..   ...............                               
               ..                       .   ..................                                       
                 ..               .......... ........                                                
                   ..  ...........  ..........                                                       
