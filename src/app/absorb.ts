@@ -165,7 +165,9 @@ export async function runAbsorb(args: AbsorbArgs, deps: AbsorbDeps): Promise<Abs
   );
 }
 
-async function readOverlay(fs: FsReadPort, overlayPath: string): Promise<Overlay | null> {
+/** Shared with `app/verify.ts` (`tldsl verify` / `tldsl overlay show`) -
+ *  missing file -> null, unparseable or wrong shape -> null. */
+export async function readOverlay(fs: FsReadPort, overlayPath: string): Promise<Overlay | null> {
   let raw: string;
   try {
     raw = await fs.read(overlayPath);

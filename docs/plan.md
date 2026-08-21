@@ -1980,7 +1980,7 @@ the design:
   Also fixed while testing: `${TMPDIR}` ends in `/` on macOS, so the injected
   render path read `T//tldsl-render/...`. One line.
 
-- [ ] **T26. `/tldsl:sync`.** *(T19 and T21 have landed; this is unblocked.)*
+- [x] **T26. `/tldsl:sync`.** *(T19 and T21 have landed; this is unblocked.)*
   Reads `tldsl overlay show`, rewrites the JSX, runs `tldsl verify` until it
   passes, leaves a normal reviewable diff. This is `absorb` from Phase 7,
   delivered as a command rather than a subprocess holding an API key.
@@ -1989,6 +1989,48 @@ the design:
   **Acceptance:** the canvas-first case from T22 works end to end through the
   command; `tldsl verify` passes afterwards with an empty overlay; the diff is
   reviewable and touches nothing unrelated.
+
+  Shipped as `commands/sync.md` (prose, `/tldsl:sync` for free from the plugin
+  name) plus the two subcommands the task's own table listed as **missing**:
+  `tldsl verify <file>` and `tldsl overlay show <file>`. Both are thin
+  presenters over one new use case, `src/app/verify.ts` - the command computes
+  nothing, which is Phase 8's rule made concrete. `readOverlay` was exported
+  from `app/absorb.ts` rather than copied.
+
+  **What `verify` means, since neither Phase 7 nor T26 defined it.** For each
+  overlay entry, apply *that entry alone* to the freshly compiled scene and
+  compare to the compile: an entry that changes nothing is one the source
+  already expresses. Pass = no overlay, or every entry is a no-op. That is
+  non-vacuous in the way the sync loop needs - it is exactly the check that goes
+  green when a hand-rewrite of the JSX correctly encodes a `moved` entry, and it
+  cannot be faked by deleting overlay entries, because the rewrite is what makes
+  them no-ops. `stale` (`basedOn` against the current `sceneHash`) is reported,
+  never a verdict.
+
+  The numbers: **59 test files / 657 tests**, up from 57/651 at T25;
+  `npm run check` green. `tests/e2e/sync-fixture.test.ts` is the acceptance
+  criterion - T22's canvas-first case (stub `<Doc/>` plus four hand-added
+  shapes) driven through `overlay show` -> `absorb` -> `verify` in the order the
+  command calls them: show exits 0 naming all four ids, absorb exits 0, the
+  overlay on disk ends with zero entries, verify exits 0. I also ran all four
+  branches by hand against a two-box `<Doc layout="col">`: no overlay -> pass;
+  a mixed overlay -> `shape:a moved to (0, 0) (already in the source)` and
+  `shape:b moved to (777, 42); restyled (color)`, verify exit **1** naming only
+  `shape:b`; the overlay rewritten to the source's own coordinates -> verify
+  exit **0** with "the source already expresses all 1 overlay entry". No layout
+  code was touched, so `docs/renders/` and `docs/baseline.md` are unchanged.
+
+  Two choices worth recording. **`verify` is read-only**: when it passes while
+  the overlay still holds entries, it names the redundant file and the command's
+  prose tells the agent to delete it, rather than shipping a `verify --prune`
+  that mutates. D5's rule is "never empty the overlay unless the rewrite
+  verifiably reproduces the render", and a passing `verify` *is* that proof, so
+  the deletion is authorised either way - a flag would only move who runs `rm`.
+  And **step 3 of the command is the model-driven half T22 deferred**: absorb
+  still only generates JSX for added geo/note shapes, so `moved`/`restyled`/
+  `relabelled`/`deleted`/added-arrow entries are rewritten by the agent by hand
+  against `tldsl verify`, which is what "delivered as a command rather than a
+  subprocess holding an API key" was always going to mean.
 
 ---
 
@@ -2490,6 +2532,26 @@ as-is.
   spelled out, no frames, no components, no flow. The half of the Phase 7 pitch
   that says absorb "turns a flat pile of shapes into componentised JSX" is not
   built, and nothing mechanical can build it.
+
+- **T26 - what `tldsl verify` means, and who empties a redundant overlay.** The
+  task's acceptance names `tldsl verify` as if it existed; it did not, and no
+  Phase 7 doc defines it. I defined it as "apply each overlay entry alone to the
+  fresh compile; pass when none of them change anything", and left it read-only.
+  **Default taken:** the definition above, plus prose in `commands/sync.md`
+  telling the agent to `rm` the overlay once `verify` has passed. It changes
+  least - no new flag, no new destructive code path, and D5's rule already
+  authorises the deletion once the check is green.
+  **Alternatives:** (2) `tldsl verify --prune` empties a redundant overlay
+  itself, so the agent never runs `rm`; (3) verify compares against a stored
+  snapshot of the canvas scene instead of the compile, which would catch an
+  agent that edits the JSX *and* the overlay in the same breath, at the cost of
+  a new on-disk artefact; (4) fold verify into `absorb --check` and ship no new
+  subcommand.
+  **What the default costs:** the last step of `/tldsl:sync` is an `rm` the
+  model decides to run, so a model that misreads verify's output can delete an
+  overlay that still held work. The window is small - verify prints the exact
+  path only on the passing branch - but it is a model in the loop where a flag
+  would have been a program.
 
 ## Discovered work
 
@@ -3222,3 +3284,22 @@ promoted into the task list by the human.
 - **The plugin is now three of the four pieces** - `skills/`, `hooks/`,
   `.claude-plugin/`. Only `commands/` (T26) is missing, and T26 is the one task
   that needs core commands that do not exist yet (`overlay show`, `verify`).
+- **`/tldsl:sync` step 3 is unpinned by any test.** The e2e drives the
+  deterministic path (`overlay show` -> `absorb` -> `verify`), which is what the
+  acceptance asked for. The hand-rewrite loop - agent edits JSX until `verify`
+  goes green on a `moved`/`restyled`/`relabelled` entry - was exercised by hand
+  this wake but nothing in `npm run check` covers it, and nothing checks the
+  command's prose still matches the CLI's output strings.
+- **`absorb` and `sync` overlap and nobody says which to reach for.** Both are
+  "fold canvas edits into the source"; `absorb` is the subset a program can do.
+  `skills/tldsl/SKILL.md` mentions neither, so an agent with the skill loaded
+  has no idea the round-trip exists. The workflow section stops at `render`.
+- **`tldsl verify` fails on the index-only overlay the viewer PUTs back.** T23's
+  defect (booting the viewer writes an overlay of `moved: { index }` entries
+  that change nothing a human cares about) now has a second victim: those
+  entries genuinely change the scene's `index` fields, so `verify` reports them
+  as outstanding and `/tldsl:sync` would ask the agent to encode a z-order it
+  never chose. `on-prompt.sh` already over-reports the same thing.
+- **Nothing keeps `commands/sync.md` honest about the CLI.** Same gap as the
+  SKILL.md examples: the command names five subcommands and quotes their
+  behaviour, and a rename or an output-string change breaks it silently.

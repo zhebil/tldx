@@ -17,6 +17,10 @@
  *                        image, cropped to content. Reuses a running
  *                        `tldsl serve` for the file if one is recorded,
  *                        otherwise boots an ephemeral one.
+ *   tldsl verify <file>  Pass/fail: does the JSX source alone reproduce
+ *                        what the overlay says the canvas looked like?
+ *   tldsl overlay show <file>   Report what's pending in a diagram's
+ *                        overlay.
  */
 
 import { realpathSync } from "node:fs";
@@ -36,8 +40,10 @@ import { recordServe } from "../infra/serve-registry/serve-registry.js";
 
 import { runAbsorbCli } from "./absorb.js";
 import { runCheck, type CheckIo } from "./check.js";
+import { runOverlayCli } from "./overlay.js";
 import { runRender } from "./render.js";
 import { runServe } from "./serve.js";
+import { runVerifyCli } from "./verify.js";
 
 type CliIo = CheckIo;
 
@@ -187,6 +193,42 @@ const commands: readonly Command[] = [
           log: createStderrLog(),
           clock: createSystemClock(),
           viewerBundleDir: defaultViewerBundleDir(),
+        },
+        io,
+      }),
+  },
+  {
+    name: "verify",
+    args: "<file>",
+    description: "pass/fail: does the JSX source alone reproduce the overlay's canvas?",
+    run: (rest, io) => {
+      const path = rest[0];
+      if (path === undefined) {
+        io.writeStderr("tldsl verify: missing <file> argument\n");
+        return 1;
+      }
+      return runVerifyCli({
+        path,
+        deps: {
+          fs: createNodeFsRead(),
+          layout: new ElkLayoutAdapter(),
+          execute: createJsxExecute(),
+        },
+        io,
+      });
+    },
+  },
+  {
+    name: "overlay",
+    args: "show <file>",
+    description: "report what's pending in a diagram's overlay",
+    run: (rest, io) =>
+      runOverlayCli({
+        argv: rest,
+        deps: {
+          fs: createNodeFsRead(),
+          layout: new ElkLayoutAdapter(),
+          execute: createJsxExecute(),
         },
         io,
       }),
