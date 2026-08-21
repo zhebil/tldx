@@ -2178,3 +2178,102 @@ So B32 is kept on the letter of the rule and on one genuine win, but it is a
 **weak keep**: the loss is real, it was on the file where the change cost
 nothing, and it points at a specific defect rather than at noise. If the wake-40
 drift audit finds drift, this is the first entry to bisect.
+
+---
+
+## B34 — a genuinely multi-row grid joins the corpus _(wake 39)_ — **CORPUS CHANGE**
+
+Not an A/B. Corpus changes are their own kind of entry under the honesty rules
+in `docs/ralph-plan.md`: judged on whether the corpus covers real diagram
+shapes, never on whether they help a hypothesis, and they invalidate the
+champion report.
+
+**Why now.** Wakes 37 and 38 both said it, and wake 38's instruction was
+explicit: *raise the corpus hypothesis before B33 is judged, not after.* The
+placement line of enquiry - B25, B32, and now B33 - is being decided by two
+files. `deep-nesting`, `hexagonal`, `sequence` and `sparse-graph` resolve to a
+single grid row or to a `col` chain, so they come back a structural tie for any
+row-gap change and never vote. B25 got `long-labels` and `wide-fanout`; B32 got
+the same two and **split them 1-1**, which under step 6 is a keep decided by a
+coin's edge. A third voting file has to be added while the outcome it will
+influence is still unknown; adding one after seeing B33's verdict would be
+indistinguishable from tuning the bench.
+
+**What was added.** `tests/corpus/release-pipeline.tldsl.jsx` - a CI/CD release
+pipeline: 16 short-labelled stages from `Commit pushed` to `Archive artifacts`,
+20 edges, one note. `corpus.test.ts` discovers fixtures by globbing the
+directory, so nothing else had to change; the "at least six fixtures" assertion
+still holds at seven.
+
+Real-shape justification, since that is the only criterion a corpus entry is
+judged on: every structural feature is load-bearing in the diagram it depicts,
+not chosen for the grid. Two parallel verification stages fan out from the
+build and rejoin at the registry push (that is what makes `formsChain` false and
+the doc root a grid at all). `rollback → publish` runs backwards from the very
+end to the middle, because a rollback re-deploys a published image instead of
+rebuilding. Three stages report to one Slack notifier. This is what a release
+pipeline looks like.
+
+**What it exercises that the corpus could not before.** It resolves to a
+**6 × 3 grid** - the first corpus file with more than one interior row boundary
+- with an uneven rhythm the existing files cannot produce:
+
+| boundary | skip crossings | champion gap |
+| --- | --- | --- |
+| row 0 → 1 | 2 (`scan→publish`, `scan→notify`) | 120 = gap × 3 |
+| row 1 → 2 | 4 (`metrics→rollback`, `rollback→publish`, `scan→notify`, `smoke→notify`) | 160 = gap × 4 (capped) |
+
+Flow distances are genuinely mixed: four skips stay inside a row and cross no
+boundary at all (`commit→unit`, `lint→build`, `build→integration`,
+`rollout→archive`), three cross exactly one, and `scan→notify` at Δ10 crosses
+both. This is the "mixed short and long skips" the wake-37 entry asked for, and
+it is the first file where the cap can bind on one boundary while another sits
+below it - so the second cost B32's judge named, *an unevenly rhythmed grid
+reads as loosely stacked bands*, becomes testable rather than an assertion about
+two columns.
+
+It also carries **two flow-adjacent edges that cross a row boundary** -
+`integration → publish` (Δ1, row 0 → row 1) and `metrics → rollout` (Δ1, row 1 →
+row 2). That is precisely the hole B33 was filed against, and it means B33 will
+have this file as a voting file: under B33's predicate boundary 0 gains a
+crossing and widens from ×3 to ×4, while boundary 1 is already saturated. Note
+the direction of the evidence - the file was authored to cover a *shape* the
+corpus lacked, and the fact that B33 can see it is a consequence of that shape,
+not the reason for it. Whether B33 is right remains open; this file is as free
+to convict it as to acquit it.
+
+**Measurements.** Canvas 1324 × 792, aspect 1.67 (the corpus's closest to 16:9),
+fill ratio 0.221, 0 overlapping pairs, 0 source-order violations, 7 edge-edge
+crossings, mean edge length 474.
+
+**Gate 5 baseline: 10** arrow paths crossing a non-endpoint shape, out of 20
+arrows. That is the second-worst ratio in the corpus after `wide-fanout`, which
+is useful: the gate now has a third file with real headroom instead of two files
+pinned at 0 and one at 1.
+
+**Champion regenerated.** `docs/layout-champion.md` gains a
+`release-pipeline.tldsl.jsx` section and a gate-5 table row. The six existing
+sections came back **byte-identical** - the new file perturbs nothing, and the
+diff against the previous champion is additions only, 0 lines removed. Gate 5 is
+now **10 / 5 / 1 / 10 / 0 / 0 / 28** (deep-nesting, hexagonal, long-labels,
+release-pipeline, sequence, sparse-graph, wide-fanout).
+
+**No existing fixture was touched.**
+
+**Two things the render shows that the report does not**, recorded rather than
+papered over.
+
+*`Rollback` wraps mid-word into `Rollbac` / `k`.* The estimator gives the box
+`len * 9 + 48` = 120px and tldraw breaks the word inside it. This was left in
+place. Widening the label to dodge a renderer defect is corpus-doctoring by
+another name, and the defect is invisible to the judge anyway - it is a
+structural constant of the file, present identically on both sides of any A/B.
+What it does buy is a second witness for **B11**/**B26** (text metrics), which
+until now had only `long-labels`, whose labels are long enough that wrapping
+looks intentional. Here it is unmistakably wrong.
+
+*The note is placed as a grid cell and renders taller than its neighbours*
+(200 × 392 against a 60px row), which is B9 behaving as designed - the note
+reserves the space tldraw actually draws - but it means row 2 is visually
+anchored by the note rather than by the boxes. Worth knowing before reading any
+judge's remark about row 2.
