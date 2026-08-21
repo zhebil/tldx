@@ -632,6 +632,133 @@ trick: the lossless part is mechanical, the lossy part is supervised.
 
 ---
 
+## Phase 8 - ship it as a Claude Code plugin
+
+tldsl was built to be agent-agnostic and stays that way: the DSL, the CLI, the
+layout engine and the viewer know nothing about any model. What changes is the
+**delivery mechanism**. The way this gets used is as a Claude Code plugin - a
+skill that teaches the vocabulary, hooks that react to diagram edits, and a
+command that drives the round-trip.
+
+### The rule that keeps the core honest
+
+> **The plugin is a delivery mechanism, not a layer.** Everything a hook, skill
+> or command does is a plain `tldsl` CLI invocation. Delete the plugin directory
+> and the tool still works, just less conveniently.
+
+If validation logic, sync logic or overlay parsing ends up living *inside* a
+hook, "the core is agent-agnostic" becomes a claim nobody can check. As a rule
+it has a test: **every plugin file is either prose or a shell-out.** A hook that
+computes something is a bug.
+
+### What the plugin needs from the core
+
+| Command | State |
+|---|---|
+| `tldsl check <file>` | exists |
+| `tldsl serve <file>` | exists |
+| `tldsl render <file> <out.png>` | **missing** - lives in `tools/screenshot.mts` |
+| `tldsl overlay show <file>` | **missing** - Phase 7 |
+| `tldsl verify <file>` | **missing** - Phase 7, T21 |
+
+`tools/` scripts are development-only: not in `bin`, not built by
+`tsconfig.build.json`, run through `tsx`. A hook cannot call them.
+
+### Confirmed plugin mechanics
+
+Checked against the Claude Code docs, not assumed. The constraints that shape
+the design:
+
+- **Layout.** Only `plugin.json` goes in `.claude-plugin/`. `skills/`,
+  `hooks/hooks.json` and `commands/` sit at the plugin root.
+- **Hooks cannot see skill state.** There is no field exposing which skills are
+  loaded. The gate is the file path: a `matcher` on `Edit|Write` plus the `if`
+  field with a glob, so the hook only spawns for a matching path. That serves the
+  real intent - silence in sessions that have nothing to do with diagrams.
+- **`PostToolUse` fires after the tool ran**, so it observes and injects; it
+  cannot block. `tool_input.file_path` is present uniformly for Write, Edit and
+  MultiEdit.
+- **Context injection** is `hookSpecificOutput.additionalContext` (or plain
+  stdout on `SessionStart` / `UserPromptSubmit`).
+- **A hook cannot attach an image.** It can only emit a path; the agent then
+  Reads it if it wants. That is exactly the intended shape - the render is
+  offered, not forced into context.
+- **`async: true` fires and forgets and cannot inject context.** This is the
+  constraint that decides the render design, below.
+- **Commands are namespaced by plugin name**, so `/tldsl:sync` comes for free.
+
+### Tasks
+
+- [ ] **T23. Promote `render` to a real CLI command.**
+  `tools/screenshot.mts` becomes `tldsl render <file> <out.png>`, built and
+  shipped like `check` and `serve`. Two constraints matter more than the move:
+  - **Reuse a running `serve` if there is one.** This is load-bearing, not an
+    optimisation - see T25. Cold-starting a server plus chromium is the whole
+    5-10 second cost; against a warm `serve` it is just a screenshot. Discovery
+    is part of the task: a pidfile or a well-known port record, not guessing.
+  - **playwright is a `devDependency`** and pulls browser binaries. Making it a
+    hard runtime dependency makes every install heavy for a feature not everyone
+    uses. Make it optional and fail with an actionable
+    `npx playwright install chromium` message.
+  Keep `tools/screenshot.mts` working, or reduce it to a thin wrapper - this
+  plan's own tasks depend on it.
+  **Acceptance:** `tldsl render` works from a built `dist/`, produces the same
+  PNG as the tools script, is measurably faster with a `serve` already running,
+  and errors usefully when playwright is absent.
+
+- [ ] **T24. The skill.**
+  Teaches the vocabulary: the Phase 5 primitives, the Phase 3 styling props, the
+  `on` attachment from T7, and the workflow - `serve` while iterating, `check`
+  before claiming done, `render` to actually look at it.
+  **The skill is prose, not logic**, and it should be short enough to actually
+  get read. A long skill nobody loads is worse than none, because it implies
+  coverage that is not there.
+  **Acceptance:** an agent given only this skill and no other context writes a
+  non-trivial diagram that compiles clean on the first attempt. Test that; do
+  not review the prose and call it done.
+
+- [ ] **T25. The hooks.**
+  Three behaviours, gated by the `if` glob on `*.tldsl.jsx`.
+
+  **Validate on edit.** `PostToolUse` on `Edit|Write` runs `tldsl check` and
+  injects any diagnostics through `additionalContext`. Fast, no browser.
+
+  **Offer the render - synchronously, against a warm `serve`.** The obvious
+  design is a background render, and it does not work: `async: true` hooks
+  cannot inject context, so a backgrounded render has no way to tell the agent
+  where the PNG went. The two-stage workaround (async writes a file, a later
+  `UserPromptSubmit` hook reads it) means the agent sees the previous edit's
+  render, which is worse than nothing.
+  So: if `serve` is running, render synchronously - it is a screenshot against a
+  warm page, fast enough to sit in a hook - and inject the path. If it is not,
+  inject a hint to run `tldsl render` and let the agent decide whether it cares.
+  **This is why T23's serve-reuse is load-bearing.** Do not block the session
+  for a cold chromium start on every edit.
+
+  **Flag unabsorbed canvas changes.** A non-empty `*.tldsl.overlay.json` means
+  source and canvas disagree. `UserPromptSubmit` with `additionalContext`, so it
+  lands at the start of a turn rather than after some unrelated tool call:
+  "N unabsorbed canvas changes in `x.tldsl.jsx` - run `/tldsl:sync`". A glob plus
+  a stat, cheap enough to run every turn, and well inside the 30s cap that event
+  has.
+
+  **Acceptance:** a session that never touches a `.tldsl.jsx` produces zero hook
+  output; a broken diagram surfaces its diagnostic without the agent asking; no
+  hook stalls the session longer than `tldsl check` takes; and with `serve` cold,
+  editing a diagram produces a hint rather than a ten-second pause.
+
+- [ ] **T26. `/tldsl:sync`.** *Blocked on T19 and T21.*
+  Reads `tldsl overlay show`, rewrites the JSX, runs `tldsl verify` until it
+  passes, leaves a normal reviewable diff. This is `absorb` from Phase 7,
+  delivered as a command rather than a subprocess holding an API key.
+  The command is prose driving two CLI calls. If it needs to parse or compute
+  anything itself, the missing piece belongs in the CLI.
+  **Acceptance:** the canvas-first case from T22 works end to end through the
+  command; `tldsl verify` passes afterwards with an empty overlay; the diff is
+  reviewable and touches nothing unrelated.
+
+---
+
 ## Open questions for the human
 
 Do not act on these. They are the discussion surface; they get resolved into
@@ -703,11 +830,14 @@ tasks above by the human, not by the loop.
    definition - the overlay is applied over the compiled scene, so it wins until
    absorbed or reset. Staleness is the remaining risk and T19 has to settle it.
 
-9. **Is `absorb` a CLI command, an agent skill, or both?** It needs a model. A
-   `tldsl absorb` subprocess shelling out to an API is self-contained but adds a
-   key and a dependency to a tool that currently has neither. A skill the user
-   runs from their agent keeps tldsl model-free and puts the diff review where
-   the user already is. The second is smaller and I would start there.
+9. ~~**Is `absorb` a CLI command, an agent skill, or both?**~~ **Answered:** a
+   plugin command, `/tldsl:sync`. The hard part was never the model call, it is
+   the contract - `tldsl overlay show` to read the pending state and
+   `tldsl verify` to prove the result. Both are model-free CLI commands, so
+   absorb reduces to "read the first, edit the JSX, run the second until it
+   passes". tldsl keeps no API key, no network and no model dependency, and the
+   diff review happens where the user already reviews diffs. A CLI `absorb` stays
+   possible later as a thin wrapper over the same two commands. See Phase 8.
 
 ## Discovered work
 
