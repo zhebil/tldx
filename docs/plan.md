@@ -513,7 +513,7 @@ Two traps, both paid for already:
 
 ### Phase 2 - placement that does not create the problem
 
-- [ ] **T6. Fan-out placement.**
+- [x] **T6. Fan-out placement.**
   `wide-fanout` lays eighteen targets of one source into reading-order grid
   rows, so `dispatcher` fires eighteen chords across the entire canvas. When a
   node's out-degree within a container is >= 4 and its targets are otherwise
@@ -528,6 +528,52 @@ Two traps, both paid for already:
   along the same ray from the source, which is exactly what makes
   `hub -> leaf-7` a 100% crowded prefix of `hub -> leaf-14`. Placement that
   fixes crossings and reintroduces collinear overlap has not fixed anything.
+
+  **Done. `wide-fanout` 10 -> 0 crossings, corpus total 27 -> 17, and its two
+  crowded pairs went to 0 as well. No other file moved on either metric.**
+
+  What was built, in `src/domain/layout/stack.ts` only - `routing.ts` is
+  untouched. `findFanGroups` (exported, unit-tested) walks a container's flowed
+  ids and emits one group per source with >= 4 *distinct* targets whose only
+  edge, in or out, is back to that source; parallel edges collapse to one
+  neighbour, so `hexagonal`'s seven `core -> driven-ports` edges do not
+  register. `collapseFanGroups` replaces each group with one synthetic rect at
+  the source's index, `expandFanBlocks` writes the members back once the parent
+  flow has placed the block. The block is **a single unwrapped row, source at
+  its head** - T6's "rows that start at its edge". Gated on `mayAutoGrid`, the
+  same flag the auto-grid uses, so an explicit `layout=`/`cols=` is never
+  silently overridden.
+
+  Why that works: it is a placement change that buys a *routing* change for
+  free. Every fan edge now shares a y-range with its source, so `deriveAxis`
+  resolves to horizontal and T3's bow, T4's side anchors and T5's lanes all
+  fire on edges they had been declining. That is the same reason
+  `hub -> leaf-1..5` already cost zero crossings in the old grid while
+  `hub -> leaf-6..18` cost ten.
+
+  **The column form was built first and measured worse: 10 -> 32.** Recorded so
+  it is not retried. Source on the left, targets stacked in a column beside it,
+  source vertically centred - the chord from the centred source to a target
+  near either end of a 2000px column is steep, so it enters the column's x-band
+  far from its target and travels *inside* that band, slicing every rectangle
+  on the way up. This task's own note above ("no target sits on the ray to
+  another target") is true of that layout and turns out to be irrelevant: it
+  constrains where the chords *end*, not the band they pass through. Placement
+  alone cannot make a diagonal chord safe. Putting the endpoints on a shared
+  axis and letting the existing bow handle it can.
+
+  Looked at the PNG. No arrow touches a box anywhere in the file now; the old
+  render had chords drawn straight through Worker 7's and Worker 8's labels.
+  The costs are real and both went to Discovered work: the canvas is 3722 x 204
+  (was 2453 x 1905), and the 17 nested arcs converge into a solid wedge of ink
+  for the first ~15% of their length at `Dispatcher`. `crowdedPairs` scores that
+  wedge 0 because the arcs diverge before the one-third-of-length threshold -
+  the metric is not wrong, it just does not see convergence at a shared anchor.
+
+  Free choices recorded: fan direction is fixed source-left / targets-right and
+  does not read `direction`; the row never wraps, because any second row loses
+  the shared axis that makes the whole thing work; `minOutDegree` stays at T6's
+  own 4 and was not tuned.
 
 - [ ] **T6b. Route cross-container edges.**
   `computeEdgeRoutes` declines any edge whose endpoints sit in different
@@ -1238,6 +1284,26 @@ promoted into the task list by the human.
   because the viability gate stops it, but a wide box crossed near an endpoint
   would ask for an enormous arc. A cap (and falling back to straight above it)
   may be needed once T13 adds real diagrams.
+- **A fan row does not wrap, so an 18-way fan is 3722px wide.** T6 buys its zero
+  crossings with an unwrapped row; `wide-fanout`'s canvas aspect went from
+  1.29 to 18.2 and its fill ratio is 0.335. Wrapping is not a fix - a second
+  row loses the shared axis that makes the bow fire. A compact wide fan needs
+  orthogonal (elbow) routing, which nothing in the plan owns.
+- **`crowdedPairs` cannot see convergence at a shared anchor.** `wide-fanout`
+  scores 0 while 17 arcs leaving `Dispatcher` are a solid wedge of ink for the
+  first ~15% of their length, because the metric asks for 8px proximity over a
+  *third* of the length. A second check on the first ~20% of each path, or on
+  arcs sharing a source anchor, would catch it.
+- **`findFanGroups` is first-come, first-served in flow order.** Overlapping
+  candidate fans are resolved by whichever source appears earlier among the
+  container's children, and a candidate touching an already-consumed id is
+  dropped whole. Nothing in the corpus has overlapping fans, so this is
+  untested against a real case.
+- **T6's block machinery is general but only the doc root can reach it.** The
+  `mayAutoGrid` gate was chosen so an explicit `layout=`/`cols=` is never
+  overridden, which also means a fan inside an explicitly laid-out `<Frame>`
+  gets nothing. Whether a frame should opt in (`layout="auto-fan"`? a prop?) is
+  a real design question nobody has asked yet.
 - **The viability gate silently declines to help.** When neither side has room,
   T3 leaves the edge straight, so a crowded diagram gets no improvement and no
   signal that it wanted one. `multi-region`'s middle region is the live case: 2

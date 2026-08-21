@@ -264,3 +264,48 @@ to lane in the first place:
 
 Both groups are the same six arrows that still register as crossings, so
 whatever fixes those buckets fixes this residue too.
+
+## After T6 - fan-out placement
+
+`npx tsx tools/crossing-classify.mts tests/corpus/*.tldsl.jsx`
+
+| file | crossings (T5) | crossings (T6) | crowded pairs (T5) | crowded pairs (T6) |
+|---|---|---|---|---|
+| deep-nesting | 9 | 9 | 4 | 4 |
+| hexagonal | 6 | 6 | 0 | 0 |
+| long-labels | 2 | 2 | 0 | 0 |
+| multi-region | 0 | 0 | 0 | 0 |
+| release-pipeline | 0 | 0 | 0 | 0 |
+| sequence | 0 | 0 | 0 | 0 |
+| sparse-graph | 0 | 0 | 0 | 0 |
+| wide-fanout | 10 | **0** | 2 | **0** |
+| **total** | **27** | **17** | **6** | **4** |
+
+The `fan` bucket is empty for the first time. `wide-fanout` went 10 -> 0
+crossings and 2 -> 0 crowded pairs; no other file moved on either metric, and
+only `docs/renders/wide-fanout.png` changed on disk.
+
+The mechanism is placement, not new routing. A container laid out by the
+doc-root auto-grid now collapses each fan - a source with >= 4 distinct targets
+whose only edge is back to that source - into one block, and the block is a
+single unwrapped **row** with the source at its head. Every fan edge therefore
+shares a y-range with its source, `deriveAxis` resolves to horizontal, and
+T3's bow, T4's side anchors and T5's lanes all fire on edges they previously
+declined. Not one line of `routing.ts` changed.
+
+The column form was tried first and measured **worse: 10 -> 32**. Source on the
+left, targets stacked in a column beside it, source vertically centred: the
+chord from the centred source to a target near either end of a 2000px column is
+steep, so it enters the column's x-band far from its target and travels inside
+it, slicing every rectangle on the way. "No target sits on the ray to another
+target" was true and irrelevant - it constrains the *endpoints*, not the band
+the chord passes through. Placement cannot make a diagonal chord safe; putting
+the endpoints on a shared axis and letting the existing bow handle it can.
+
+`wide-fanout`'s canvas is now **3722 x 204** (was 2453 x 1905), fill ratio
+0.335. One unwrapped row of 19 boxes is what buys the zero. The arcs are not in
+that box - the rendered PNG is far taller, and the 17 nested arcs converge into
+a solid wedge of ink for the first ~15% of their length near `Dispatcher`.
+`crowdedPairs` scores that 0 because the arcs diverge well before the
+one-third-of-length threshold, so the metric is not lying, but the eye still
+sees a blob. Both the aspect and the wedge are in Discovered work.

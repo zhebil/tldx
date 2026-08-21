@@ -8,6 +8,7 @@ import { astBuilders } from "../parser/ast.fixture.js";
 import { BOX_ASPECT_TARGET, estimatedBoxSize } from "./defaults.js";
 import {
   bestGridCols,
+  findFanGroups,
   formsChain,
   hasSkipEdge,
   hybridLayout,
@@ -432,6 +433,129 @@ describe("hybridLayout doc-root aspect wrap (B20)", () => {
     const a = boxById(result.children, "a");
     expect(a.x).toBe(hub.x);
     expect(a.y).toBeGreaterThan(hub.y);
+  });
+});
+
+describe("findFanGroups", () => {
+  it("groups a source with >= minOutDegree distinct leaf targets", () => {
+    const groups = findFanGroups(
+      ["hub", "a", "b", "c", "d"],
+      [
+        { from: "hub", to: "a" },
+        { from: "hub", to: "b" },
+        { from: "hub", to: "c" },
+        { from: "hub", to: "d" },
+      ],
+    );
+    expect(groups).toEqual([{ sourceId: "hub", targetIds: ["a", "b", "c", "d"] }]);
+  });
+
+  it("drops a candidate target that has an extra edge elsewhere (not a leaf)", () => {
+    const groups = findFanGroups(
+      ["hub", "a", "b", "c", "d", "e"],
+      [
+        { from: "hub", to: "a" },
+        { from: "hub", to: "b" },
+        { from: "hub", to: "c" },
+        { from: "hub", to: "d" },
+        { from: "d", to: "e" },
+      ],
+    );
+    expect(groups).toEqual([]);
+  });
+
+  it("dedupes parallel edges between the same pair, so they don't count toward the threshold", () => {
+    const edges = Array.from({ length: 7 }, () => ({ from: "core", to: "driven-ports" }));
+    expect(findFanGroups(["core", "driven-ports"], edges)).toEqual([]);
+  });
+
+  it("requires at least minOutDegree distinct leaf targets", () => {
+    const groups = findFanGroups(
+      ["hub", "a", "b", "c"],
+      [
+        { from: "hub", to: "a" },
+        { from: "hub", to: "b" },
+        { from: "hub", to: "c" },
+      ],
+    );
+    expect(groups).toEqual([]);
+  });
+
+  it("finds two disjoint fans in the same container", () => {
+    const groups = findFanGroups(
+      ["hub1", "a1", "a2", "a3", "a4", "hub2", "b1", "b2", "b3", "b4"],
+      [
+        { from: "hub1", to: "a1" },
+        { from: "hub1", to: "a2" },
+        { from: "hub1", to: "a3" },
+        { from: "hub1", to: "a4" },
+        { from: "hub2", to: "b1" },
+        { from: "hub2", to: "b2" },
+        { from: "hub2", to: "b3" },
+        { from: "hub2", to: "b4" },
+      ],
+    );
+    expect(groups).toEqual([
+      { sourceId: "hub1", targetIds: ["a1", "a2", "a3", "a4"] },
+      { sourceId: "hub2", targetIds: ["b1", "b2", "b3", "b4"] },
+    ]);
+  });
+});
+
+describe("hybridLayout fan-group placement (T6)", () => {
+  it("collapses a fan at/above the threshold into a source + target-column block", async () => {
+    const result = await layoutAst(
+      doc({}, [
+        box({ id: "hub", label: "hub" }),
+        box({ id: "a", label: "a" }),
+        box({ id: "b", label: "b" }),
+        box({ id: "c", label: "c" }),
+        box({ id: "d", label: "d" }),
+        edge({ id: "e1", from: "hub", to: "a" }),
+        edge({ id: "e2", from: "hub", to: "b" }),
+        edge({ id: "e3", from: "hub", to: "c" }),
+        edge({ id: "e4", from: "hub", to: "d" }),
+      ]),
+    );
+    expect(result.layout).toBe("grid");
+    const hub = boxById(result.children, "hub");
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    const c = boxById(result.children, "c");
+    const d = boxById(result.children, "d");
+
+    // targets share one y with the source, laid out left to right in a row
+    expect(a.y).toBe(hub.y);
+    expect(b.y).toBe(hub.y);
+    expect(c.y).toBe(hub.y);
+    expect(d.y).toBe(hub.y);
+    expect(a.x - hub.x).toBe(hub.w + 40);
+    expect(b.x - a.x).toBe(a.w + 40);
+    expect(c.x - b.x).toBe(b.w + 40);
+    expect(d.x - c.x).toBe(c.w + 40);
+  });
+
+  it("leaves an explicit layout unaffected even when a child fans out past the threshold", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row" }, [
+        box({ id: "hub", label: "hub" }),
+        box({ id: "a", label: "a" }),
+        box({ id: "b", label: "b" }),
+        box({ id: "c", label: "c" }),
+        box({ id: "d", label: "d" }),
+        edge({ id: "e1", from: "hub", to: "a" }),
+        edge({ id: "e2", from: "hub", to: "b" }),
+        edge({ id: "e3", from: "hub", to: "c" }),
+        edge({ id: "e4", from: "hub", to: "d" }),
+      ]),
+    );
+    expect(result.layout).toBe("row");
+    const hub = boxById(result.children, "hub");
+    const a = boxById(result.children, "a");
+    const d = boxById(result.children, "d");
+    expect(a.y).toBe(hub.y);
+    expect(a.x).toBeGreaterThan(hub.x);
+    expect(d.x).toBeGreaterThan(a.x);
   });
 });
 

@@ -48,6 +48,9 @@ const TARGET_ASPECT = 16 / 9;
 type Rect = { x: number; y: number; w: number; h: number };
 type FlowMode = "row" | "col" | "grid";
 type Pad = { left: number; top: number; right: number; bottom: number };
+type FlowEl = IRBoxPositioned | IRNotePositioned | IRFramePositioned;
+type FanGroup = { sourceId: string; targetIds: string[] };
+type FanBlock = { source: FlowEl; targets: FlowEl[]; w: number; h: number; rowH: number };
 
 export type AutoPlaceRequest = {
   nodes: readonly { id: string; w: number; h: number }[];
@@ -218,25 +221,31 @@ async function layoutContainer(
     const flowedIds = flowedEls.map((el) => el.id);
     let flowMode: FlowMode = mode as FlowMode;
     let flowCols = cols;
-    let autoEdges: { from: string; to: string }[] | undefined;
+    const edges = collectAutoEdges(children);
+
+    const fanGroups = mayAutoGrid ? findFanGroups(flowedIds, edges) : [];
+    const { collapsedEls, collapsedIds, blocks, targetOwner } = collapseFanGroups(
+      flowedEls,
+      fanGroups,
+      gap,
+    );
+
     if (mayAutoGrid && mode === "col") {
       const childIds = children
         .filter((c) => c.kind !== "edge" && c.kind !== "doc")
         .map((c) => c.id);
-      autoEdges = collectAutoEdges(children);
-      if (!formsChain(childIds, autoEdges)) {
+      if (!formsChain(childIds, edges)) {
         flowMode = "grid";
-        const preGap = hasSkipEdge(flowedIds, autoEdges) ? gap * SKIP_ROW_GAP_FACTOR : gap;
-        flowCols = bestGridCols(flowedEls, gap, TARGET_ASPECT, preGap);
+        const preGap = hasSkipEdge(collapsedIds, edges) ? gap * SKIP_ROW_GAP_FACTOR : gap;
+        flowCols = bestGridCols(collapsedEls, gap, TARGET_ASPECT, preGap);
       }
     }
-    const edges = autoEdges ?? collectAutoEdges(children);
     const rowGaps =
       flowMode === "grid"
-        ? skipRowGaps(flowedIds, edges, resolveCols(flowCols, flowedEls.length), gap)
+        ? skipRowGaps(collapsedIds, edges, resolveCols(flowCols, collapsedEls.length), gap)
         : [];
     const positions = computeFlowPositions(
-      flowedEls,
+      collapsedEls,
       flowMode,
       flowCols,
       gap,
@@ -245,9 +254,7 @@ async function layoutContainer(
       pad.top,
       align,
     );
-    flowedIndices.forEach((i, k) => {
-      sized[i] = { ...sized[i]!, x: positions[k]!.x, y: positions[k]!.y };
-    });
+    expandFanBlocks(sized, flowedIndices, positions, collapsedIds, blocks, targetOwner, gap);
     const bbox = boundingBox(children, sized);
     w = bbox.maxX + pad.right;
     h = bbox.maxY + pad.bottom;
@@ -383,6 +390,133 @@ export function hasSkipEdge(
     const from = pos.get(e.from);
     const to = pos.get(e.to);
     return from !== undefined && to !== undefined && Math.abs(from - to) > 1;
+  });
+}
+
+/**
+ * Groups a source with `>= minOutDegree` distinct leaf targets - targets
+ * whose only edge (in or out) connects back to the source - into one fan
+ * group per source. Walks `flowedIds` in order so earlier sources claim
+ * first; a candidate group touching an already-consumed source or target is
+ * dropped whole, not partially formed. Parallel edges between the same pair
+ * collapse into one neighbour (a fan is about distinct targets, not edge
+ * count).
+ */
+export function findFanGroups(
+  flowedIds: readonly string[],
+  edges: readonly { from: string; to: string }[],
+  minOutDegree = 4,
+): FanGroup[] {
+  const idSet = new Set(flowedIds);
+  const neighbors = new Map<string, Set<string>>();
+  for (const id of flowedIds) neighbors.set(id, new Set());
+  for (const e of edges) {
+    if (!idSet.has(e.from) || !idSet.has(e.to) || e.from === e.to) continue;
+    neighbors.get(e.from)!.add(e.to);
+    neighbors.get(e.to)!.add(e.from);
+  }
+
+  const consumed = new Set<string>();
+  const groups: FanGroup[] = [];
+  for (const s of flowedIds) {
+    if (consumed.has(s)) continue;
+    const sNeighbors = neighbors.get(s)!;
+    const targetIds = flowedIds.filter((t) => {
+      if (!sNeighbors.has(t)) return false;
+      const tNeighbors = neighbors.get(t)!;
+      return tNeighbors.size === 1 && tNeighbors.has(s);
+    });
+    if (targetIds.length < minOutDegree || targetIds.some((t) => consumed.has(t))) continue;
+    groups.push({ sourceId: s, targetIds });
+    consumed.add(s);
+    for (const t of targetIds) consumed.add(t);
+  }
+  return groups;
+}
+
+/**
+ * Replaces each fan group with one synthetic `Rect` at the source's index in
+ * flowed order - source and its targets laid out left to right in a single
+ * row (T6) - so every fan edge shares the source's axis and the parent flow
+ * lays the whole fan out as a single unit. Targets are dropped from the
+ * collapsed list; `expandFanBlocks` puts them back.
+ */
+function collapseFanGroups(
+  flowedEls: readonly FlowEl[],
+  groups: readonly FanGroup[],
+  gap: number,
+): {
+  collapsedEls: Rect[];
+  collapsedIds: string[];
+  blocks: Map<string, FanBlock>;
+  targetOwner: Map<string, { sourceId: string; index: number }>;
+} {
+  const byId = new Map(flowedEls.map((el) => [el.id, el]));
+  const consumedTargets = new Set(groups.flatMap((g) => g.targetIds));
+  const groupBySource = new Map(groups.map((g) => [g.sourceId, g]));
+  const blocks = new Map<string, FanBlock>();
+  const targetOwner = new Map<string, { sourceId: string; index: number }>();
+
+  const collapsedEls: Rect[] = [];
+  const collapsedIds: string[] = [];
+  for (const el of flowedEls) {
+    if (consumedTargets.has(el.id)) continue;
+    const group = groupBySource.get(el.id);
+    if (group === undefined) {
+      collapsedEls.push({ x: el.x, y: el.y, w: el.w, h: el.h });
+      collapsedIds.push(el.id);
+      continue;
+    }
+    const targets = group.targetIds.map((id) => byId.get(id)!);
+    const rowH = targets.reduce((m, t) => Math.max(m, t.h), el.h);
+    const targetsW = targets.reduce((s, t) => s + t.w, 0);
+    const w = el.w + targetsW + gap * targets.length;
+    blocks.set(el.id, { source: el, targets, w, h: rowH, rowH });
+    targets.forEach((t, index) => targetOwner.set(t.id, { sourceId: el.id, index }));
+    collapsedEls.push({ x: 0, y: 0, w, h: rowH });
+    collapsedIds.push(el.id);
+  }
+  return { collapsedEls, collapsedIds, blocks, targetOwner };
+}
+
+/**
+ * Writes final positions back into `sized` for every flowed index: plain
+ * elements take their collapsed position verbatim, a fan block's source and
+ * targets are laid out left to right in the block's row, each vertically
+ * centred against the row height.
+ */
+function expandFanBlocks(
+  sized: (FlowEl | null)[],
+  flowedIndices: readonly number[],
+  positions: readonly { x: number; y: number }[],
+  collapsedIds: readonly string[],
+  blocks: ReadonlyMap<string, FanBlock>,
+  targetOwner: ReadonlyMap<string, { sourceId: string; index: number }>,
+  gap: number,
+): void {
+  const posById = new Map(collapsedIds.map((id, k) => [id, positions[k]!]));
+  flowedIndices.forEach((i) => {
+    const el = sized[i]!;
+    const block = blocks.get(el.id);
+    if (block !== undefined) {
+      const p = posById.get(el.id)!;
+      sized[i] = { ...el, x: p.x, y: p.y + Math.round((block.rowH - block.source.h) / 2) };
+      return;
+    }
+    const owner = targetOwner.get(el.id);
+    if (owner !== undefined) {
+      const ownerBlock = blocks.get(owner.sourceId)!;
+      const p = posById.get(owner.sourceId)!;
+      const before = ownerBlock.targets.slice(0, owner.index).reduce((s, t) => s + t.w, 0);
+      sized[i] = {
+        ...el,
+        x: p.x + ownerBlock.source.w + gap * (owner.index + 1) + before,
+        y: p.y + Math.round((ownerBlock.rowH - el.h) / 2),
+      };
+      return;
+    }
+    const p = posById.get(el.id)!;
+    sized[i] = { ...el, x: p.x, y: p.y };
   });
 }
 
