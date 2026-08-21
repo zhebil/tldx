@@ -1,194 +1,81 @@
 /**
- * `tools/screenshot.mts <file.tldsl.jsx> <out.png> [options]` - export a
- * compiled diagram straight from tldraw's own export API (`editor.toImage`),
- * not a viewport screenshot. Exports build from shape records and are
- * cropped to content by construction, so there's no zoom-to-fit keystroke,
- * no UI-hiding CSS hack, and no dependency on the browser viewport size.
+ * `tools/screenshot.mts <file.tldsl.jsx> <out.png> [options]` - thin wrapper
+ * kept for this plan's other tasks that already shell out to this path. All
+ * the actual logic (arg parsing, serve-reuse, `editor.toImage` export) now
+ * lives in `tldsl render` (`src/cli/render.ts`); this file just builds the
+ * viewer bundle on demand and calls into the same pieces `tldsl render`
+ * uses, in-process (no more spawning a `tldsl serve` child).
  *
- * Options:
- *   --frame <id>     export that frame's contents (tldsl id). tldraw's export
- *                    semantics: the descendants are drawn, the frame's own
- *                    border and name label are not.
- *   --shapes <a,b>   comma-separated tldsl ids to export
- *   --padding <px>   default 32 (tldraw default)
- *   --scale <n>
- *   --format png|svg|jpeg|webp   default png, inferred from out extension
- *   --dark
- *   --no-background
- *
- * Starts `tldsl serve <file>` as a child process via the shared harness in
- * `serve-harness.mts`, drives headless chromium via playwright, and always
- * kills the child before exiting.
+ * CLI surface, stderr prefix (`tools/screenshot.mts: <message>`), and exit
+ * codes are unchanged from the old implementation.
  */
 
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
-import { extname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { chromium } from "playwright";
-import type { Editor, TLExportType, TLShapeId } from "tldraw";
+import { parseArgs } from "../src/cli/render.js";
+import { runServe, type ServeIo } from "../src/cli/serve.js";
+import { createSystemClock } from "../src/infra/clock/system-clock.js";
+import { createJsxExecute } from "../src/infra/execute-jsx/execute-jsx.js";
+import { createChokidarWatch } from "../src/infra/fs/chokidar-watch.js";
+import { createNodeFsRead } from "../src/infra/fs/node-fs-read.js";
+import { createNodeFsWrite } from "../src/infra/fs/node-fs-write.js";
+import { ElkLayoutAdapter } from "../src/infra/layout-elk/elk-layout.js";
+import { createStderrLog } from "../src/infra/log/stderr-log.js";
+import { exportImage } from "../src/infra/render/export-image.js";
+import { findServe } from "../src/infra/serve-registry/serve-registry.js";
 
-import { withServedDiagram } from "./serve-harness.mjs";
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-type ExportType = TLExportType;
-const EXPORT_TYPES: readonly ExportType[] = ["png", "svg", "jpeg", "webp"];
-
-type Options = {
-  frame?: string | undefined;
-  shapes?: string[] | undefined;
-  padding?: number | undefined;
-  scale?: number | undefined;
-  format?: ExportType | undefined;
-  dark: boolean;
-  background: boolean;
-};
-
-// tldraw defaults bitmap exports to pixelRatio 2; pinned explicitly so PNG
-// output dimensions don't silently change if that default ever moves,
-// since this repo diffs PNGs across revisions.
-const PIXEL_RATIO = 2;
-
-function parseArgs(argv: string[]): { file: string; out: string; opts: Options } {
-  const positional: string[] = [];
-  const opts: Options = { dark: false, background: true };
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    switch (arg) {
-      case "--frame":
-        opts.frame = argv[++i];
-        break;
-      case "--shapes":
-        opts.shapes = (argv[++i] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-        break;
-      case "--padding":
-        opts.padding = Number(argv[++i]);
-        break;
-      case "--scale":
-        opts.scale = Number(argv[++i]);
-        break;
-      case "--format": {
-        const fmt = argv[++i];
-        if (!EXPORT_TYPES.includes(fmt as ExportType)) {
-          throw new Error(`--format must be one of ${EXPORT_TYPES.join(", ")}, got ${fmt}`);
-        }
-        opts.format = fmt as ExportType;
-        break;
-      }
-      case "--dark":
-        opts.dark = true;
-        break;
-      case "--no-background":
-        opts.background = false;
-        break;
-      default:
-        if (arg !== undefined) positional.push(arg);
-    }
-  }
-
-  const [fileArg, outArg] = positional;
-  if (fileArg === undefined || outArg === undefined) {
-    throw new Error(
-      "usage: tools/screenshot.mts <file.tldsl.jsx> <out.png> [--frame <id>] [--shapes <a,b>] [--padding <px>] [--scale <n>] [--format png|svg|jpeg|webp] [--dark] [--no-background]",
-    );
-  }
-  if (opts.frame !== undefined && opts.shapes !== undefined) {
-    throw new Error("--frame and --shapes are mutually exclusive");
-  }
-
-  return { file: resolve(process.cwd(), fileArg), out: resolve(process.cwd(), outArg), opts };
+function ensureViewerBuilt(viewerBundleDir: string): Promise<void> {
+  if (existsSync(viewerBundleDir)) return Promise.resolve();
+  return new Promise((resolvePromise, reject) => {
+    const proc = spawn("npm", ["run", "build:viewer"], { cwd: REPO_ROOT, stdio: "inherit" });
+    proc.on("exit", (code) => {
+      if (code === 0) resolvePromise();
+      else reject(new Error(`npm run build:viewer exited with code ${code}`));
+    });
+    proc.on("error", reject);
+  });
 }
 
-function inferFormat(outPath: string, requested: ExportType | undefined): ExportType {
-  if (requested !== undefined) return requested;
-  const ext = extname(outPath).slice(1).toLowerCase();
-  if (EXPORT_TYPES.includes(ext as ExportType)) return ext as ExportType;
-  return "png";
-}
+const silentIo: ServeIo = { writeStdout: () => {}, writeStderr: (chunk) => process.stderr.write(chunk) };
 
 async function main(): Promise<void> {
   const { file, out, opts } = parseArgs(process.argv.slice(2));
   if (!existsSync(file)) {
     throw new Error(`no such file: ${file}`);
   }
-  const format = inferFormat(out, opts.format);
 
-  await withServedDiagram(file, (url) => captureExport(url, out, format, opts));
-}
+  const viewerBundleDir = resolve(REPO_ROOT, "dist", "viewer");
+  await ensureViewerBuilt(viewerBundleDir);
 
-async function captureExport(
-  url: string,
-  outPath: string,
-  format: ExportType,
-  opts: Options,
-): Promise<void> {
-  const browser = await chromium.launch();
+  const reused = findServe(file);
+  if (reused !== undefined) {
+    await exportImage(reused, out, opts);
+    return;
+  }
+
+  const handle = await runServe({
+    path: file,
+    deps: {
+      fs: createNodeFsRead(),
+      fsWrite: createNodeFsWrite(),
+      watch: createChokidarWatch(),
+      layout: new ElkLayoutAdapter(),
+      execute: createJsxExecute(),
+      log: createStderrLog(),
+      clock: createSystemClock(),
+      viewerBundleDir,
+    },
+    io: silentIo,
+  });
   try {
-    const page = await browser.newPage({ viewport: { width: 1600, height: 1200 } });
-    await page.goto(url, { waitUntil: "networkidle" });
-    // `state: "attached"` because a perfectly vertical arrow has a zero-width
-    // bounding box, which playwright's default visibility check never passes.
-    await page.waitForSelector("[data-shape-id]", { timeout: 15_000, state: "attached" });
-
-    const base64 = await page.evaluate(
-      async ({ frame, shapes, padding, scale, format, dark, background, pixelRatio }) => {
-        const editor = (window as unknown as { editor: Editor }).editor;
-
-        const allIds = [...editor.getCurrentPageShapeIds()];
-        const validIds = allIds.map((tlId) => tlId.replace(/^shape:/, "")).sort();
-
-        // toImage/getSvgJsx already expands each given id to itself plus its
-        // descendants internally, so a frame id alone is enough to pull in
-        // its children - confirmed by reading getSvgJsx.mjs, which calls
-        // editor.getShapeAndDescendantIds(ids) before rendering.
-        let targetIds: TLShapeId[];
-        if (frame !== undefined) {
-          const frameId = `shape:${frame}` as TLShapeId;
-          if (!editor.getShape(frameId)) {
-            throw new Error(`unknown --frame id "${frame}". Valid ids: ${validIds.join(", ")}`);
-          }
-          targetIds = [frameId];
-        } else if (shapes !== undefined) {
-          const missing = shapes.filter((id) => !editor.getShape(`shape:${id}` as TLShapeId));
-          if (missing.length > 0) {
-            throw new Error(
-              `unknown --shapes id(s): ${missing.join(", ")}. Valid ids: ${validIds.join(", ")}`,
-            );
-          }
-          targetIds = shapes.map((id) => `shape:${id}` as TLShapeId);
-        } else {
-          targetIds = allIds;
-        }
-
-        const { blob } = await editor.toImage(targetIds, {
-          format,
-          darkMode: dark,
-          background,
-          pixelRatio,
-          ...(padding === undefined ? {} : { padding }),
-          ...(scale === undefined ? {} : { scale }),
-        });
-        const buf = await blob.arrayBuffer();
-        let binary = "";
-        const bytes = new Uint8Array(buf);
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
-        return btoa(binary);
-      },
-      {
-        frame: opts.frame,
-        shapes: opts.shapes,
-        padding: opts.padding,
-        scale: opts.scale,
-        format,
-        dark: opts.dark,
-        background: opts.background,
-        pixelRatio: PIXEL_RATIO,
-      },
-    );
-
-    await writeFile(outPath, Buffer.from(base64, "base64"));
+    await exportImage(handle.url, out, opts);
   } finally {
-    await browser.close();
+    await handle.close();
   }
 }
 

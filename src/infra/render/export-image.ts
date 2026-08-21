@@ -1,0 +1,131 @@
+/**
+ * `editor.toImage` export adapter behind `tldsl render`. Drives headless
+ * chromium against a served diagram URL and writes the resulting image to
+ * disk. Per CONTEXT.md "boundaries that don't vary" there is no port here -
+ * one implementation, wired directly from `cli/render.ts`.
+ *
+ * playwright is a devDependency (it pulls browser binaries) but this file
+ * ships in `dist/cli`, so the import is dynamic and optional: a missing
+ * install fails with an actionable message instead of crashing every `tldsl`
+ * invocation that never calls `render`.
+ */
+
+import { writeFile } from "node:fs/promises";
+
+import type { Editor, TLShapeId } from "tldraw";
+
+export type RenderFormat = "png" | "svg" | "jpeg" | "webp";
+
+export type RenderOptions = {
+  frame?: string | undefined;
+  shapes?: string[] | undefined;
+  padding?: number | undefined;
+  scale?: number | undefined;
+  format: RenderFormat;
+  dark: boolean;
+  background: boolean;
+};
+
+// tldraw defaults bitmap exports to pixelRatio 2; pinned explicitly so PNG
+// output dimensions don't silently change if that default ever moves, since
+// this repo diffs PNGs across revisions.
+const PIXEL_RATIO = 2;
+
+async function loadChromium(): Promise<(typeof import("playwright"))["chromium"]> {
+  try {
+    const playwright = await import("playwright");
+    return playwright.chromium;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    const msg = err instanceof Error ? err.message : String(err);
+    if (code === "ERR_MODULE_NOT_FOUND" || msg.includes("Cannot find")) {
+      throw new Error("tldsl render needs playwright: npm i -D playwright && npx playwright install chromium");
+    }
+    throw err;
+  }
+}
+
+export async function exportImage(url: string, outPath: string, opts: RenderOptions): Promise<void> {
+  const chromium = await loadChromium();
+
+  let browser;
+  try {
+    browser = await chromium.launch();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Executable doesn't exist") || msg.includes("browserType.launch")) {
+      throw new Error(`${msg}\nRun: npx playwright install chromium`);
+    }
+    throw err;
+  }
+
+  try {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 1200 } });
+    // Not `networkidle`: the viewer holds an SSE connection open, so idle is
+    // never reliably reached - the selector wait below is the real gate.
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    // `state: "attached"` because a perfectly vertical arrow has a zero-width
+    // bounding box, which playwright's default visibility check never passes.
+    await page.waitForSelector("[data-shape-id]", { timeout: 15_000, state: "attached" });
+
+    const base64 = await page.evaluate(
+      async ({ frame, shapes, padding, scale, format, dark, background, pixelRatio }) => {
+        const editor = (window as unknown as { editor: Editor }).editor;
+
+        const allIds = [...editor.getCurrentPageShapeIds()];
+        const validIds = allIds.map((tlId) => tlId.replace(/^shape:/, "")).sort();
+
+        // toImage/getSvgJsx already expands each given id to itself plus its
+        // descendants internally, so a frame id alone is enough to pull in
+        // its children - confirmed by reading getSvgJsx.mjs, which calls
+        // editor.getShapeAndDescendantIds(ids) before rendering.
+        let targetIds: TLShapeId[];
+        if (frame !== undefined) {
+          const frameId = `shape:${frame}` as TLShapeId;
+          if (!editor.getShape(frameId)) {
+            throw new Error(`unknown --frame id "${frame}". Valid ids: ${validIds.join(", ")}`);
+          }
+          targetIds = [frameId];
+        } else if (shapes !== undefined) {
+          const missing = shapes.filter((id) => !editor.getShape(`shape:${id}` as TLShapeId));
+          if (missing.length > 0) {
+            throw new Error(
+              `unknown --shapes id(s): ${missing.join(", ")}. Valid ids: ${validIds.join(", ")}`,
+            );
+          }
+          targetIds = shapes.map((id) => `shape:${id}` as TLShapeId);
+        } else {
+          targetIds = allIds;
+        }
+
+        const { blob } = await editor.toImage(targetIds, {
+          format,
+          darkMode: dark,
+          background,
+          pixelRatio,
+          ...(padding === undefined ? {} : { padding }),
+          ...(scale === undefined ? {} : { scale }),
+        });
+        const buf = await blob.arrayBuffer();
+        let binary = "";
+        const bytes = new Uint8Array(buf);
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+        return btoa(binary);
+      },
+      {
+        frame: opts.frame,
+        shapes: opts.shapes,
+        padding: opts.padding,
+        scale: opts.scale,
+        format: opts.format,
+        dark: opts.dark,
+        background: opts.background,
+        pixelRatio: PIXEL_RATIO,
+      },
+    );
+
+    await writeFile(outPath, Buffer.from(base64, "base64"));
+  } finally {
+    await browser.close();
+  }
+}

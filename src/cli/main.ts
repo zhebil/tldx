@@ -13,6 +13,10 @@
  *   tldsl serve <file>   Watch the file, recompile on save, push the scene
  *                        to a local viewer over SSE. Stays alive until
  *                        SIGINT/SIGTERM.
+ *   tldsl render <file> <out.png>   Export the compiled diagram as an
+ *                        image, cropped to content. Reuses a running
+ *                        `tldsl serve` for the file if one is recorded,
+ *                        otherwise boots an ephemeral one.
  */
 
 import { realpathSync } from "node:fs";
@@ -28,9 +32,11 @@ import { gitStatus } from "../infra/git/git-status.js";
 import { ElkLayoutAdapter } from "../infra/layout-elk/elk-layout.js";
 import { createStderrLog } from "../infra/log/stderr-log.js";
 import { openBrowser } from "../infra/open-browser/open-browser.js";
+import { recordServe } from "../infra/serve-registry/serve-registry.js";
 
 import { runAbsorbCli } from "./absorb.js";
 import { runCheck, type CheckIo } from "./check.js";
+import { runRender } from "./render.js";
 import { runServe } from "./serve.js";
 
 type CliIo = CheckIo;
@@ -153,13 +159,37 @@ const commands: readonly Command[] = [
           },
           io,
         });
-        return await awaitShutdown(() => handle.close());
+        const forgetServe = recordServe(path, handle.url);
+        return await awaitShutdown(async () => {
+          await handle.close();
+          forgetServe();
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         io.writeStderr(`tldsl serve: ${msg}\n`);
         return 1;
       }
     },
+  },
+  {
+    name: "render",
+    args: "<file> <out.png> [options]",
+    description: "export the compiled diagram as an image, cropped to content",
+    run: (rest, io) =>
+      runRender({
+        argv: rest,
+        deps: {
+          fs: createNodeFsRead(),
+          fsWrite: createNodeFsWrite(),
+          watch: createChokidarWatch(),
+          layout: new ElkLayoutAdapter(),
+          execute: createJsxExecute(),
+          log: createStderrLog(),
+          clock: createSystemClock(),
+          viewerBundleDir: defaultViewerBundleDir(),
+        },
+        io,
+      }),
   },
 ];
 

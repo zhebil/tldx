@@ -1725,7 +1725,7 @@ computes something is a bug.
 |---|---|
 | `tldsl check <file>` | exists |
 | `tldsl serve <file>` | exists |
-| `tldsl render <file> <out.png>` | **missing** - lives in `tools/screenshot.mts` |
+| `tldsl render <file> <out.png>` | exists (T23) |
 | `tldsl overlay show <file>` | **missing** - Phase 7 |
 | `tldsl verify <file>` | **missing** - Phase 7, T21 |
 
@@ -1757,7 +1757,7 @@ the design:
 
 ### Tasks
 
-- [ ] **T23. `tldsl render` - a real CLI command, cropped to content.**
+- [x] **T23. `tldsl render` - a real CLI command, cropped to content.**
   `tools/screenshot.mts` becomes `tldsl render`, built and shipped like `check`
   and `serve`. But do not port it as-is: the current approach is wrong.
 
@@ -1820,6 +1820,49 @@ the design:
   old-style viewport screenshot on one fixture before trusting it. This plan
   says "when the report and the pixels disagree, the pixels are right", and that
   rule is only sound if the exported pixels are the screen's pixels.
+
+  Shipped as `tldsl render <file> <out.png> [options]`: `infra/render/export-image.ts`
+  (the `editor.toImage` adapter - no port, one impl, wired from cli/ like
+  `infra/devserver/`), `infra/serve-registry/serve-registry.ts` (the discovery
+  record) and `cli/render.ts` (argv, format inference, URL resolution, exit
+  code), registered in `cli/main.ts` with the same real adapters `serve` uses.
+  `tools/screenshot.mts` is now a 80-line wrapper over the same pieces - same
+  argv, same `tools/screenshot.mts:` stderr prefix, same exit codes, but it no
+  longer spawns a `serve` child; both paths call `runServe` in-process.
+  playwright is loaded with a dynamic `import()` and both failure modes (module
+  missing, browser binary missing) surface the `npx playwright install chromium`
+  hint, so `dist/cli` stays installable without it. `pixelRatio` stays pinned
+  at 2. **54 -> 56 test files, 627 -> 642 tests**; `npm run check` green.
+
+  The numbers, all on `deep-nesting` unless noted. Default crop: tldraw reports
+  page bounds `594 x 752`, the export is `658 x 816` CSS px = bounds + 32
+  padding a side, `1316 x 1632` at `pixelRatio` 2 - the content bounding box
+  exactly, no empty grid, no UI. Two consecutive runs are byte-identical
+  (`518dae87...`), and identical to the committed `docs/renders/deep-nesting.png`,
+  as are `sequence` and `wide-fanout` - so nothing about the geometry moved and
+  `docs/renders/`/`docs/baseline.md` are untouched. `--frame l2` exports Router,
+  Metrics and the nested `l3`/`l4` frames with their children and nothing else;
+  `Gateway` and `Config` are gone, as is `l2`'s own border and label (tldraw
+  draws a frame's contents, not the frame). A bad `--frame` id exits 1 and lists
+  the valid ids.
+
+  **Export vs screen, verified once** (the clause that makes "the pixels are
+  right" sound): I captured the same fixture both ways - `toImage`, and an
+  old-style 1600x1200 viewport screenshot with `Shift+1` zoom-to-fit and
+  `.tlui-layout` hidden - and looked at both. Same shapes, same labels, same
+  arrow paths, same frame titles, same relative positions. The only differences
+  are the ones the export is *for*: the viewport version carries bands of empty
+  grid on all four sides, a "made with tldraw" watermark, and frame-title text
+  scaled by the zoom level. The export path shows what the screen shows.
+
+  **One change beyond the port.** `page.goto` used `waitUntil: "networkidle"`,
+  inherited from the old tool. The viewer holds an SSE connection open, so idle
+  is never reliably reached: a render against a warm `serve` timed out at 30s on
+  its first attempt and took 4.3s on the next. Switched to `domcontentloaded`,
+  leaving the existing `waitForSelector("[data-shape-id]")` as the real
+  readiness gate - the same render now takes **0.61s**, three runs, all
+  byte-identical to the baseline. That is what makes T25's synchronous
+  in-hook render viable; at 30s it was not.
 
 - [ ] **T24. The skill.**
   Teaches the vocabulary: the Phase 5 primitives, the Phase 3 styling props, the
@@ -2213,6 +2256,27 @@ as-is.
   built, and nothing mechanical can build it.
 
 ## Discovered work
+
+- **T23: `docs/baseline.md`'s `png` column disagrees with the committed PNGs.**
+  The table says `deep-nesting` exports at `1316 x 1708`, computed from the
+  layout report's `594 x 790` canvas. tldraw's own page bounds for that file are
+  `594 x 752`, and the committed `docs/renders/deep-nesting.png` is `1316 x 1632`
+  - which `tldsl render` reproduces byte for byte. So the report's canvas height
+  over-reports by 38px on this file and the doc's `png` column was derived from
+  it rather than measured. Nothing in the render moved; the number in the table
+  is arithmetic on a stale input. Worth re-deriving that column from the actual
+  files next time the corpus is re-rendered.
+- **T23: `--frame` has no way to include the frame's own border and label.**
+  tldraw's export draws a frame's contents, not the frame, so a single-frame
+  export loses the box and the title that a reader needs for context. Passing
+  the frame id plus a synthetic bounds would do it, or exporting the parent with
+  `--shapes`. Nobody has needed it yet.
+- **T23: the serve record is keyed by file, not by port, and never validates the
+  URL.** `findServe` trusts a live pid. A `serve` that is alive but wedged, or a
+  pid reused by an unrelated process on the same machine, would send `render` at
+  a URL that answers nothing and it would fail with a playwright timeout rather
+  than falling back to booting its own. A single HEAD request before trusting
+  the record would close it.
 
 - **T11: `estimatedNoteSize` is still a char-count guess, now a scaled one.**
   Sticky height reservation divides label length by

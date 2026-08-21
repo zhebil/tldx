@@ -83,6 +83,14 @@ infra/      Adapters. One per port that exists.
                 the CLI here (the first platform-specific native binary in
                 the project), contained to this directory the way elkjs is
                 contained to layout-elk/.
+  render/       `editor.toImage` export behind `tldsl render`. Drives headless
+                chromium against a served diagram URL and writes the image.
+                No port - one impl, called directly from cli/render.ts.
+                playwright is loaded with a dynamic import so a missing
+                install only breaks `render`, not the whole CLI.
+  serve-registry/ Temp-dir record of a running `tldsl serve` (pid + url,
+                keyed by the diagram's realpath) so `render` can reuse it
+                instead of booting its own. Best-effort; never throws.
   log/          stdout/stderr logger. Implements LogPort.
 
 contracts/  Wire types shared across layers. Imports NOTHING.
