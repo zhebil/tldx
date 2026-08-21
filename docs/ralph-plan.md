@@ -14,8 +14,11 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 38
-  when **B32 was kept**. The champion is now the wake-38 **B32** revision (each
+- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 39
+  when **B34 added a seventh corpus file** (`release-pipeline`, a 6 x 3 grid -
+  the placement line of enquiry now has three voting files instead of two).
+  The layout code itself is unchanged since wake 38, when **B32 was kept**.
+  The champion is now the wake-38 **B32** revision (each
   grid row boundary gets a corridor scaled by how many skip edges cross it,
   `gap * min(4, 1 + crossings)`) on top of the wake-37 **B25** revision (which
   established that a grid carrying a skip edge is worth a wider row gap at all),
@@ -48,7 +51,9 @@ once A is done. The loop never terminates; the human stops it.
   Gate 5's instrument is `tools/arrow-truth.mts`, which reads the vertices
   tldraw actually drew (the old model-based tracer matched 0 of 84 corpus arrows
   and was deleted at wake 32); the champion baseline is the table at the top of
-  `docs/layout-champion.md`, at 10/5/1/0/0/**28** since wake 38.
+  `docs/layout-champion.md`, at 10/5/1/**10**/0/0/28 since wake 39 - seven files
+  now, in the alphabetical order the table uses (`release-pipeline` is the new
+  fourth column; no existing count moved).
 - **The judge may answer `WINNER: TIE`** since wake 33 (B29). Ties count as
   neither wins nor losses, and the ledger distinguishes a *judged tie* from a
   *structural tie* (a file never sent to a judge because nothing changed). The
@@ -66,7 +71,10 @@ once A is done. The loop never terminates; the human stops it.
   differs from its epoch - two audits in, drift is undetected, not
   demonstrated-absent. **Wake 40 will be the first audit that can fire**: B25
   moved `long-labels` and `wide-fanout` at wake 37, so the champion no longer
-  matches the wake-35 epoch on those two files.
+  matches the wake-35 epoch on those two files. **One wrinkle wake 39 added**:
+  the corpus is seven files now and `release-pipeline` has no wake-35 baseline,
+  so it is not comparable and takes no part in the audit. Compare the six that
+  have an epoch; save the fresh epoch over all seven.
 
 ---
 
@@ -994,6 +1002,19 @@ Ordered. Take from the top. Strike through when resolved.
   step-6 rule, and the loss produced **B33**. Ledger entry in
   `docs/layout-hypotheses.md`.
 
+- [x] ~~**B34** _(corpus, wake 39)_ Add a genuinely multi-row grid with mixed
+  short and long skips, so the placement line of enquiry stops being decided by
+  `long-labels` and `wide-fanout` alone. Raise it **before** B33 is judged.~~
+  **DONE** _(wake 39)_ - `tests/corpus/release-pipeline.tldsl.jsx`, a 16-stage
+  CI/CD pipeline that resolves to a **6 x 3 grid**, the first corpus file with
+  more than one interior row boundary and the first with an uneven rhythm
+  (boundary 0 at gap x3, boundary 1 saturated at x4). Four skips stay inside a
+  row, three cross one boundary, one crosses both; two flow-*adjacent* edges
+  cross a row boundary, which is exactly B33's predicate hole. Champion
+  regenerated - the six existing sections came back byte-identical, diff is
+  additions only. Gate 5 baseline for the new file: **10** of 20 arrows. Ledger
+  entry in `docs/layout-hypotheses.md`.
+
 - [ ] **B33** _(from B32's loss, wake 38)_ Widen a grid row boundary for **every**
   edge that crosses it, not only for skip edges. B32's `long-labels` loss was
   caused by exactly this hole: `router → orders` is flow-*adjacent*
@@ -1820,3 +1841,29 @@ anything that outlives the loop.)_
   cheap (`cols` ranges over at most `n` values) and terminating in practice, but
   it is a second causal claim and belongs in its own wake. Worth filing as a
   hypothesis once B33 has settled whether the crossing predicate is even final.
+
+- **(wake 39, from B34)** **The audit epoch and the corpus can now disagree in
+  size.** `docs/baselines/wake-35/` holds six files; the corpus holds seven, and
+  every future corpus addition widens that gap for five wakes. The audit rule
+  says "all six files", which is now stale wording. It was left alone rather
+  than edited mid-wake - the rule's intent is unambiguous (compare what has a
+  baseline) and rewriting a protocol step is its own unit of work. If a corpus
+  addition ever lands in the same five-wake window as a *removal*, revisit
+  properly.
+
+- **(wake 39, from B34)** **`release-pipeline` renders `Rollback` as
+  `Rollbac`/`k`.** The estimator's `len * 9 + 48` gives the box 120px and tldraw
+  breaks the word inside it. Deliberately not fixed: widening the label to dodge
+  a renderer defect is corpus-doctoring, and the wrap is a structural constant
+  invisible to any A/B on this file. It gives **B11**/**B26** a second witness,
+  and a clearer one than `long-labels` - there the wrapping at least looks
+  intentional.
+
+- **(wake 39, from B34)** **The corpus has no file that is a grid *without*
+  skip edges.** Every multi-row grid it contains (`long-labels`, `wide-fanout`,
+  now `release-pipeline`) carries skips, so `hasSkipEdge` is true for all of
+  them and the un-widened branch of B25/B32/B33 is exercised only by files that
+  are not grids at all. A hypothesis that narrows the no-skip case would have no
+  voting file. Not urgent - nothing on the backlog does that - but it is the
+  mirror of the coverage hole B34 just closed, and it should be closed the same
+  way if a hypothesis ever needs it.
