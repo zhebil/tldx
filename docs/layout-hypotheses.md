@@ -1812,3 +1812,61 @@ tests (the 7 removed are B27's own). Both sides' artefacts regenerated from
 scratch this wake; the champion's arrow-truth numbers on the *unreverted* tree
 reproduced `docs/layout-champion.md`'s table exactly (10/9/1/0/0/36) before the
 revert, which is what makes the pre-B27 column trustworthy.
+
+---
+
+## Wake 35 - drift audit #2 (no drift; champion byte-identical to the epoch)
+
+_Not a hypothesis. A step-9 drift audit, which counts as the wake's unit of
+work. No candidate was built and no judge was spent._
+
+**Result: NO DRIFT.** All six corpus files came back a **structural tie** -
+identical PNG *and* identical report - so under protocol step 5 not one of them
+was sent to a judge, and under step 6 there are no voting files. The older
+baseline won zero files and lost zero files, so the ratchet does not engage.
+
+**What was compared.** `docs/baselines/wake-30/` (the wake-28 champion,
+B1 + B20 + B9) against six reports and six PNGs regenerated from scratch at
+this wake's HEAD.
+
+| file | PNG vs wake-30 | report vs wake-30 |
+| --- | --- | --- |
+| deep-nesting | byte-identical | identical |
+| hexagonal | byte-identical | identical |
+| long-labels | byte-identical | identical |
+| sequence | byte-identical | identical |
+| sparse-graph | byte-identical | identical |
+| wide-fanout | byte-identical | identical |
+
+The reports are identical *after dropping one line*: wake-30's copies still
+carry `arrow paths crossing a non-endpoint shape: N`, the model-based gate-5
+metric that B28 proved matched 0 of 84 real arrows and deleted from
+`layout-report.mts` at wake 32. Every other byte matches, including the ASCII
+render. That line is tooling output, not geometry, so its removal is not drift -
+but it is why a naive `diff` reports all six files as changed, and the next
+auditor should expect the same shift against the wake-30 epoch.
+
+**Why this is the expected answer, and why it is still worth having run.**
+Between wake 30 and wake 35 exactly one hypothesis was kept (B27, wake 31) and
+it was reverted at wake 34. The champion should therefore be back where it
+started - and the audit is the only thing that *checks* that, rather than
+assuming it from a clean `git revert`. It confirms the revert was complete down
+to the pixel: no stray half-reverted anchor, no report field left behind.
+
+Two things fall out of it for free:
+
+- **The screenshot pipeline is deterministic across five wakes**, six files,
+  two independent chromium runs, to the byte. Every gate and every blind A/B in
+  Phase B rests on that and it had never been measured over time.
+- **A structural tie on all six files is a real audit outcome**, distinct from
+  wake 30's vacuous one. Wake 30 had nothing to compare; this wake compared
+  everything and found it unchanged.
+
+**What it does not tell us.** The ratchet still has not been exercised against
+an actually-different champion. Two audits in, drift remains undetected rather
+than demonstrated-absent-under-load: the first had no baseline, the second had
+no delta. The first informative audit will be the first one that runs five
+wakes after a kept hypothesis that survives.
+
+**Epoch saved:** `docs/baselines/wake-35/` - six reports, six PNGs, write-once.
+**Verified:** `npm run check` green.
