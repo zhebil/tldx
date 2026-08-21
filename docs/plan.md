@@ -375,7 +375,10 @@ to come after Phase 1.
   a request lifecycle as a single flow with two branches;
   a state machine with a cycle in it (**nothing in the corpus has a cycle**, and
   a cycle is the case every routing rule in Phase 1 is least prepared for - a
-  back-edge is a same-axis skip that runs backwards).
+  back-edge is a same-axis skip that runs backwards). **Give the state machine
+  `layout="auto"`** - a cycle has no source order that means anything, so it is
+  the case ELK should win, and `auto` is currently exercised on exactly one
+  fixture out of eight, which is thin evidence for a whole layout path.
   These become the files to look at when asking "is this good". The stress
   fixtures stay the files to measure.
   **Acceptance:** all three compile with zero diagnostics, render, and are added
@@ -425,6 +428,10 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   `<Layers>` - stacked tiers, the block-schema shape, where each tier is a row
   and edges run tier-to-tier only.
   `<Swimlanes>` - a grid with labelled rows, where an element's row is its lane.
+  `<Graph>` - relationships with no natural order; this one selects `auto`.
+  **The primitive should pick the layout engine**, so the author declares what
+  the thing *is* rather than naming an algorithm. `layout="auto"` stays
+  available as the escape hatch, but nobody should have to know the string.
   **Acceptance:** a fixture per primitive; each produces zero same-axis skip
   edges by construction, verified with the T2 classifier.
 
@@ -573,12 +580,18 @@ tasks above by the human, not by the loop.
    container-aware sizing with an aspect target - see T0, which deletes the
    constant outright.
 
-2. **Should `layout="auto"` (ELK) come back for graph-shaped input?** ELK solves
-   same-axis skips by construction - it assigns layers and routes between them.
-   It was set aside because it scrambles source order, which matters for nested
-   containers. But `sparse-graph` and a state machine are genuinely
-   graph-shaped, and source order means little there. The cost is two layout
-   engines to maintain.
+2. ~~**Should `layout="auto"` (ELK) come back for graph-shaped input?**~~
+   **Answered, and the question was misframed.** ELK never left and is not an
+   alternative engine: `hybridLayout` already delegates per container, so a
+   container with `layout="auto"` goes to ELK while its parent and siblings stay
+   deterministic. It works - `sparse-graph` renders with zero crossings.
+   Decisions: **auto stays opt-in** (source order carries meaning in nested
+   containers, and ADR-13's spatial continuity argument still holds); **the
+   primitive should imply the engine** rather than the author naming an
+   algorithm - see T16; and **it needs testing on more than one fixture** - see
+   T13. Note that ELK computes edge routes and we discard them, because tldraw
+   arrows cannot take waypoints, so an `auto` container gets ELK placement and
+   our arrows. T3-T5 apply there identically.
 
 3. **Are stickies the right shape for notes at all?** 200px fixed width makes any
    real sentence a twenty-line column. A geo shape with a warm fill would look
