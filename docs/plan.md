@@ -262,7 +262,7 @@ Two traps, both paid for already:
 
 ### Phase 1 - stop arrows crossing shapes
 
-- [ ] **T1. Regenerate the baseline.**
+- [x] **T1. Regenerate the baseline.**
   Every crossing count in the repo predates commit `2484ffa` and describes
   geometry that no longer exists. Run `arrow-truth` and `screenshot` over all
   eight corpus files. Write `docs/baseline.md`: one table of per-file crossing
@@ -272,6 +272,19 @@ Two traps, both paid for already:
   **Acceptance:** `docs/baseline.md` exists, one PNG per file in
   `docs/renders/`, and a second run of `arrow-truth` reproduces the table
   exactly.
+
+  **Done at `148e306`.** `docs/baseline.md` now holds the per-file table
+  (canvas, shapes, frames, arrows, crossings, PNG size) and eight PNGs sit in
+  `docs/renders/`. Two consecutive `arrow-truth` runs over the whole corpus were
+  byte-identical, vertices included, so the table reproduces exactly.
+  The numbers: **60 crossings over 118 arrows and 154 shapes**, but they are not
+  spread evenly - `wide-fanout` alone contributes 29 (a dispatcher fanning out
+  to eighteen workers over four rows), `sequence` and `sparse-graph` are at
+  zero, and the other five sit between 5 and 9. Eyeballing the renders confirms
+  the T0 sizing held: no label wraps mid-word anywhere in the corpus, so every
+  remaining defect visible in the PNGs is an arrow or a note, not text.
+  `docs/layout-champion.md` got a HISTORICAL banner at the top pointing at
+  `docs/baseline.md`; it was not deleted.
 
 - [ ] **T2. Classify every crossing.**
   Do not build a fix before knowing what is being fixed. Extend `arrow-truth`
@@ -969,3 +982,21 @@ promoted into the task list by the human.
 - `multi-region` and `release-pipeline` both park their `<Note>` in a band of
   empty canvas far below the diagram - visible in the renders, untouched by
   T0, and squarely T7/T8.
+- **The corpus crossing total is dominated by one file.** `wide-fanout` is 29 of
+  60. A change that only helps fan-out edges would halve the headline number
+  while leaving seven of eight diagrams exactly as they are; conversely T3's
+  "no file gains a crossing" gate is nearly free to pass while barely moving the
+  total. Read the per-file column, not the total.
+- **`arrow-truth` counts (arrow, crossed shape) pairs, not arrows.** One chord
+  through four boxes scores 4. That is the right metric for T3-T5 but it is not
+  comparable to any "arrows that cross something" figure in the historical docs.
+- **Frames count as crossable shapes.** In `deep-nesting` the nested
+  `System`/`Service`/`Module`/`Unit` frames are geo shapes, so an edge leaving
+  its frame is charged once per frame boundary it passes through. Worth deciding
+  in T2 whether a frame the arrow's own endpoint lives inside should count.
+- `layout-report.mts` prints no shape-kind column, so frame-vs-leaf had to be
+  inferred from which ids appear in the `parent` column. A `kind` column would
+  make the baseline table trivially re-derivable.
+- The root container is absent from the geometry table (children of `sequence`
+  list `parent=sequence`, but there is no `sequence` row), so `shapes` in the
+  baseline excludes the document frame itself.
