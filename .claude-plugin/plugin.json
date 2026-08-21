@@ -1,0 +1,5 @@
+{
+  "name": "tldsl",
+  "description": "Write architecture diagrams as JSX and see them rendered.",
+  "version": "0.1.0"
+}

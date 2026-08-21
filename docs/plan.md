@@ -1864,7 +1864,7 @@ the design:
   byte-identical to the baseline. That is what makes T25's synchronous
   in-hook render viable; at 30s it was not.
 
-- [ ] **T24. The skill.**
+- [x] **T24. The skill.**
   Teaches the vocabulary: the Phase 5 primitives, the Phase 3 styling props, the
   `on` attachment from T7, and the workflow - `serve` while iterating, `check`
   before claiming done, `render` to actually look at it.
@@ -1874,6 +1874,31 @@ the design:
   **Acceptance:** an agent given only this skill and no other context writes a
   non-trivial diagram that compiles clean on the first attempt. Test that; do
   not review the prose and call it done.
+
+  Built `skills/tldsl/SKILL.md` (158 lines) plus a three-line
+  `.claude-plugin/plugin.json`, making the repo root the plugin root as the
+  Phase 8 layout notes describe. The skill is the file shape and its five
+  non-negotiables, a one-line-per-component table, the layout and style props
+  with their exact enums, edges, `on`-attachment, the `check`/`serve`/`render`
+  workflow, and the five diagnostics that actually bite. No logic in it.
+
+  **Acceptance met, 2 of 2.** Two fresh sonnet agents were given the path to
+  that one file, forbidden from reading anything else in the repo or running any
+  CLI, and allowed a single attempt. Agent A wrote an 18-box CI/CD release
+  pipeline across 7 containers with a styled rollback path; agent B wrote a
+  17-box SaaS analytics platform with containers nested two deep and a userland
+  component instantiated twice under `ns`. Both exit 0 from `tldsl check` on the
+  first try. Both renders were looked at: B reads well; A validates but reads
+  badly - a note lands squarely on top of "Revert to previous build" and three
+  arrow labels collide near the approval diamond. That is a layout defect the
+  skill exposed, not a skill defect, and both halves are in Discovered work.
+
+  Two things the test changed in the prose: both agents independently guessed at
+  the same thing - whether `<Edge>` and `{flow(...)}` may sit as siblings among
+  top-level frames (they may) - so that is now stated; and A's collision earned
+  a line telling authors to keep note text to a sentence. One bug was caught in
+  my own draft before the test: the worked example used `geo="cylinder"`, which
+  is not a legal `geo`. Both examples in the file now compile and pass `check`.
 
 - [ ] **T25. The hooks.**
   Three behaviours, gated by the `if` glob on `*.tldsl.jsx`.
@@ -2931,3 +2956,25 @@ promoted into the task list by the human.
   harness's `describeDivergence`: a divergence in `schema` would fail the
   equality gate and be reported as an empty record list.
 - **`examples/` is *still* untracked**, unchanged since T16b. Not mine to commit.
+
+- **An attached note can be drawn on top of a sibling box.** T24's agent-A test
+  diagram parks a two-line `<Note on="rollback-trigger">` directly over the
+  "Revert to previous build" box inside the same frame. T7 places an attached
+  note 24px off its target "on whichever side is clearest", but clearest is
+  evidently scored against the target alone, not against the target's siblings.
+  The note is out of layout by design, so nothing pushes back, and long note
+  text makes it near-certain. The cheap fix is to score candidate sides by
+  overlap against every shape, not just the anchor.
+- **Arrow labels collide with each other and with box labels.** Same render:
+  "rejected", "regression detected" and "tests fail" pile up around the approval
+  diamond, and "Release manager approval" is overprinted by one of them. T12
+  puts an arrow label at the arrow midpoint with no collision awareness, so
+  three edges converging on one target put three labels in nearly one place.
+- **The plugin root is now the repo root** (`.claude-plugin/plugin.json`,
+  `skills/`). T25 and T26 add `hooks/hooks.json` and `commands/` beside them. If
+  that ever sits badly next to `src/` and `docs/`, moving the lot under
+  `plugin/` is a two-file change - but nothing forces it today.
+- **Nothing tests the skill's examples.** The two JSX snippets inside SKILL.md
+  were compiled by hand this wake, and they will rot silently. A small test that
+  extracts fenced `jsx` blocks from the skill and runs them through the corpus
+  compile path would pin them.
