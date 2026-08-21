@@ -2572,3 +2572,129 @@ regardless of how principled the derivation is. Two consequences:
 
 Reverted; `stack.ts` and `stack.test.ts` restored, `npm run check` green at 318
 tests and gate 5 back to 10/5/1/8/0/0/28.
+
+---
+
+## B35 — fan-out as a second corridor term _(wake 43)_ — **REVERTED**
+
+**Hypothesis.** Every row-gap rule so far (B25, B32, B33) scales a boundary's
+corridor by one number: how many edges cross it. Three independent judge pairs
+(B25, B32, drift audit #3) said `wide-fanout` wants vertical room because a
+12-way fan needs distinct arrow angles to stay traceable, while `long-labels`
+gains nothing from gap it does not need - and no predicate to date mentions
+fan-out at all. Add the concentration of a boundary's crossings on a single node
+as a **second, additive** term.
+
+### Measured before building
+
+Wake 42's lesson was to measure before deriving, so `skipRowGaps` was
+instrumented and the whole corpus run. Per boundary, `crossings` (the champion's
+term) against `fan` (the most crossing edges incident to any one node):
+
+| file | cols x rows | crossings | fan |
+| --- | --- | --- | --- |
+| long-labels | 2 x 6 | 2,1,2,1,0 | 1,1,2,1,0 |
+| release-pipeline | 6 x 3 | 3,5 | 2,2 |
+| wide-fanout | 6 x 5 | 14,8,2,2 | 14,8,2,2 |
+
+The other four corpus files have no auto-grid and never reach `skipRowGaps`.
+Two things fall out. **`fan` is genuinely not `crossings`**: `release-pipeline`
+spreads 5 crossings over nodes that carry at most 2 each, so any rule keyed on
+concentration leaves it alone where a rule keyed on the raw count would not.
+And on `wide-fanout` the two are *equal* on every boundary - its crossings are
+entirely one hub's fan, which is precisely the shape the hypothesis is about.
+
+### The change
+
+One expression in `src/domain/layout/stack.ts` (+16/-3) plus four unit tests:
+
+```
+gap * (min(SKIP_ROW_GAP_MAX, 1 + crossings) + floor(fan / SKIP_ROW_GAP_MAX))
+```
+
+`fan` counts **both** endpoints of each crossing edge, so it is incident degree
+through the boundary, not out-degree - measurement showed the two are identical
+on this corpus, and incident degree is the direction-agnostic definition. The
+new term is non-negative, so **no boundary can ever get less gap than the
+champion gives it**; it introduces no new constant, reusing `SKIP_ROW_GAP_MAX`
+as the number of edges on one node that buys one extra gap unit.
+
+Predicted and observed identically: `long-labels` and `release-pipeline`
+**unchanged** (fan below the threshold on every boundary - byte-identical
+reports, structural ties), `wide-fanout` 160,160,120,120 → **280,240,120,120**.
+
+Two pre-existing tests changed their expected numbers, both driven by the same
+fixture (`a` incident to 4 of 5 crossing edges, so the fan term adds a unit):
+`160` → `200`. They assert that the *total* factor is capped at
+`SKIP_ROW_GAP_MAX`, which is exactly what this hypothesis stops being true, so
+they were renamed to "caps the **crossing term**" and re-based rather than
+worked around by editing the fixture. The other five `skipRowGaps` tests passed
+unedited.
+
+### Gates
+
+| gate | result |
+| --- | --- |
+| `npm run check` | pass - 38 files, 322 tests |
+| new overlapping pairs | 0 on every file |
+| source-order violations | 0 on every file |
+| canvas area | `wide-fanout` 983x860 → 983x1060 (1.23x); six files identical |
+| arrow paths through a non-endpoint shape | **improves - `wide-fanout` 28 → 24**; all others unchanged (10/5/1/8/0/0) |
+
+All five pass. Gate 5 falling 4 on the only file that moved is the largest
+single-file gate-5 gain in the loop's history, ahead of B25's 36→31 spread over
+a bigger change and B32's 31→28.
+
+Champion baseline re-verified independently in a detached worktree at `HEAD`
+before any comparison: 10/5/1/8/0/0/28, matching the recorded table.
+
+### Judgement
+
+One voting file. `long-labels` and `release-pipeline` were byte-identical on
+both report and PNG, as were the four non-grid files - structural ties, not sent
+to a judge.
+
+| file | judge's call | reasoning |
+| --- | --- | --- |
+| wide-fanout | **champion** _(champion was A)_ | "Both diagrams are structurally identical with the same edge-clutter defects, but A packs the same legibility into a tighter canvas with shorter, easier-to-trace arrows, while B's extra row spacing adds only empty space." |
+
+0 wins, 1 loss. Losses exceed wins → **REVERTED**.
+
+### What this actually establishes
+
+**The fan-out premise is falsified on the file it was derived from, and that is
+the wake's real product.** Three separate judge pairs had said `wide-fanout`
+wants vertical room. Given vertical room *by a rule that does nothing else*, a
+fourth blind judge preferred the tighter champion and called the added space
+"dead vertical bands". The earlier reads are not thereby wrong, they are
+**mis-scaled**: B25 and B32 moved that file's gaps by 40-80px as part of changes
+that altered other boundaries too, while B35 added 120px and 80px to two
+boundaries and nothing else. Room helps until it becomes distance; the corridor
+on `wide-fanout` is already past the point where more of it pays.
+
+Second, and more uncomfortable: **gate 5 and the judge disagreed outright on
+this file.** The instrument says 28 → 24, a 14% improvement in arrows piercing
+boxes; the judge, looking at the render, reported the fan edges "graze row-2
+boxes about equally" in both and decided on canvas economy instead. Set against
+wake 42, where *narrowing* the same file's gaps took it 28 → 27 with a 21%
+shorter canvas, the picture is that **gate 5 on `wide-fanout` is non-monotonic
+in row gap and is not tracking what a reader notices there**. It remains a valid
+veto - it catches real regressions elsewhere, as B36 showed on
+`release-pipeline` - but a gate-5 gain on `wide-fanout` should not be read as
+evidence a change is good.
+
+Third, the line of enquiry: the corridor formula is not obviously
+under-parameterised after all. Wake 42 read `wide-fanout` and `release-pipeline`
+pulling opposite ways as evidence for a second term; this wake supplied a second
+term that leaves `release-pipeline` untouched by construction and still lost.
+What both wakes actually show is that **`wide-fanout`'s corridor is near a
+local optimum in both directions** - narrowing it improved gate 5 slightly,
+widening it improved gate 5 more, and neither improved the diagram. The next
+move on row gaps should be **B37** (floor the cap, widen only the busiest
+boundary) and it should be understood as the last one on this line: if a
+widening-only re-tuning also fails to convince a judge, row-gap scalars are
+exhausted and the corpus's remaining defects live somewhere else.
+
+Reverted; `stack.ts` and `stack.test.ts` restored from `HEAD`, `npm run check`
+green at 318 tests, `wide-fanout`'s report byte-identical to the champion's and
+gate 5 back to 10/5/1/8/0/0/28.
