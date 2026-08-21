@@ -64,8 +64,17 @@ once A is done. The loop never terminates; the human stops it.
   80px read as empty bands. So the corridor is *not* under-parameterised the way
   wake 42 inferred - `wide-fanout` sits near a local optimum in both directions
   (narrowing it improved gate 5 slightly, widening it improved gate 5 more,
-  neither improved the diagram). **Row-gap scalars have one hypothesis left,
-  B37; if that also fails to convince a judge, the line is exhausted.**
+  neither improved the diagram). Wake 44 went to open B37, the last hypothesis
+  on the line, and found it **VOID: the floored relative cap is the identity
+  function** on every input, because B36's relative factor is bounded above by
+  both of the champion's terms. Nothing was built. **Row-gap scalars are now a
+  closed line of enquiry** - narrowing fails gate 5 (B36), widening passes every
+  gate and loses on the render (B35), and every relative re-parameterisation
+  between them is bounded by the absolute rule it replaces, so it can only be a
+  no-op or a narrowing. The kept state is B33's `gap * min(4, 1 + crossings)`,
+  sitting between a gate-5 floor and a judged ceiling. **Do not file another
+  row-gap scalar hypothesis.** This is the second line closed, after arrow
+  attachment; the backlog's remaining entries all move something else.
   Gate 5's instrument is `tools/arrow-truth.mts`, which reads the vertices
   tldraw actually drew (the old model-based tracer matched 0 of 84 corpus arrows
   and was deleted at wake 32); the champion baseline is the table at the top of
@@ -1095,22 +1104,22 @@ Ordered. Take from the top. Strike through when resolved.
   until it becomes distance. Also the first outright disagreement between gate 5
   and a judge on the same file. Ledger entry in `docs/layout-hypotheses.md`.
 
-- [ ] **B37** _(from B36's gate-5 rejection, wake 42)_ Retry the relative cap in
+- [x] ~~**B37** _(from B36's gate-5 rejection, wake 42)_ Retry the relative cap in
   the **widening-only** direction: award each boundary
   `max(min(SKIP_ROW_GAP_MAX, 1 + crossings), relative_factor)` so no boundary
-  ever gets less than the champion gives it today. B36 established that the
-  narrowing direction is what breaks gate 5 - `release-pipeline`'s first
-  boundary cannot go below `gap * 4` without putting two arrows back through two
-  boxes - while saying nothing against scaling the busiest boundary up. Gate 5
-  cannot regress by construction (every corridor is ≥ the champion's), so the
-  gate to watch is **canvas area**, the mirror of B36. **Now at the top of the
-  backlog** - B35 ran at wake 43 and reverted without changing the corridor
-  formula, so the abandon condition did not fire. Read B35's ledger entry before
-  building: it establishes that a gate-5 gain on `wide-fanout` is not evidence a
-  change is good, and that widening that file's corridor loses to a judge. B37
-  should therefore be judged on whether it helps `release-pipeline`, and treated
-  as **the last hypothesis on row-gap scalars** - if a widening-only re-tuning
-  also fails, the line is exhausted and the remaining defects live elsewhere.
+  ever gets less than the champion gives it today.~~ **VOID** _(wake 44)_ - that
+  expression is the identity. B36's relative factor is bounded above by *both*
+  of the champion's terms (`≤ MAX` and `≤ 1 + crossings`, since its denominator
+  is `max(MAX-1, maxCount)`), so flooring it at the champion is a no-op on every
+  input, not merely on this corpus - verified on the three corpus vectors and by
+  random search over 500,000 vectors, 0 differences. Nothing was built.
+  **The abandon condition fires anyway, for a stronger reason**: a widening-only
+  rule must award some boundary more than one gap per crossing edge, which no
+  renormalisation of a crossing count can do - it needs a second additive term,
+  which is B35, which passed all five gates at wake 43 and still lost to a
+  judge. Narrowing fails gate 5 (B36), widening loses on the render (B35), and
+  everything between them is the identity. **Row-gap scalars are closed; do not
+  file another.** Ledger entry in `docs/layout-hypotheses.md`.
 
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
@@ -2067,3 +2076,23 @@ anything that outlives the loop.)_
   rename them to "caps the crossing term" - **not** to edit the fixture so it
   stops hitting the threshold. B35 did the former; if it is retried, expect the
   same two tests to move again.
+
+- **(wake 44, from B37)** **Evaluate a formula hypothesis against the formula it
+  replaces before delegating an implementation.** "Measure the premise before
+  building" (B8's lesson) has so far been read as *take a measurement*; B37 shows
+  it applies to *derivations* too. B37 was written from the shape of B36's
+  failure - narrowing broke gate 5, so forbid narrowing - without re-reading the
+  algebra in B36's own entry, which already said the relative factor is always
+  ≤ the champion's. Flooring a quantity at something it never exceeds is the
+  identity. Two wakes running (B35's fan-vs-crossing table, B37's bound) have
+  been decided by arithmetic costing minutes, before any subagent was spawned.
+  For a formula change, do the substitution by hand first; if it can be shown a
+  no-op or a strict inequality, that *is* the wake's result.
+
+- **(wake 44)** The backlog's remaining entries have never been re-ordered
+  against the two closed lines. B10 is now top, but it is an ELK option for
+  `layout="auto"` containers - **no corpus file opts into `auto`**, so it may be
+  unjudgeable in the B8 sense (a change no file can see). Measure that before
+  building it: if the corpus cannot exercise it, the honest move is to strike it
+  and take B22, which the plan already calls "the half the corpus can actually
+  see" and which touches all six files.
