@@ -251,6 +251,7 @@ async function layoutContainer(
     const flowedIds = flowedEls.map((el) => el.id);
     let flowMode: FlowMode = mode as FlowMode;
     let flowCols = cols;
+    let serpentine = false;
     const edges = collectAutoEdges(children);
 
     const fanGroups = mayAutoGrid ? findFanGroups(flowedIds, edges) : [];
@@ -266,8 +267,9 @@ async function layoutContainer(
         .map((c) => c.id);
       if (!formsChain(childIds, edges)) {
         flowMode = "grid";
+        serpentine = true;
         const preGap = hasSkipEdge(collapsedIds, edges) ? gap * SKIP_ROW_GAP_FACTOR : gap;
-        flowCols = bestGridCols(collapsedEls, gap, TARGET_ASPECT, preGap);
+        flowCols = bestGridCols(collapsedEls, gap, TARGET_ASPECT, preGap, serpentine);
       }
     }
     const clearanceEdges = resolveEdgeOwners(children, docLabeledEdges);
@@ -285,6 +287,7 @@ async function layoutContainer(
       pad.left,
       pad.top,
       align,
+      serpentine,
     );
     expandFanBlocks(sized, flowedIndices, positions, collapsedIds, blocks, targetOwner, effectiveGap);
     const bbox = boundingBox(children, sized);
@@ -705,6 +708,7 @@ function computeFlowPositions(
   padLeft: number,
   padTop: number,
   align: Align,
+  serpentine = false,
 ): { x: number; y: number }[] {
   if (mode === "row") {
     const maxH = els.reduce((m, el) => Math.max(m, el.h), 0);
@@ -718,7 +722,7 @@ function computeFlowPositions(
   }
   if (mode === "grid") {
     const n = resolveCols(cols, els.length);
-    return gridPositions(els, n, gap, rowGaps, padLeft, padTop);
+    return gridPositions(els, n, gap, rowGaps, padLeft, padTop, serpentine);
   }
   const maxW = els.reduce((m, el) => Math.max(m, el.w), 0);
   const out: { x: number; y: number }[] = [];
@@ -730,6 +734,11 @@ function computeFlowPositions(
   return out;
 }
 
+function serpentineCol(i: number, cols: number, serpentine: boolean): number {
+  const r = Math.floor(i / cols);
+  return serpentine && r % 2 === 1 ? cols - 1 - (i % cols) : i % cols;
+}
+
 function gridPositions(
   els: readonly Rect[],
   cols: number,
@@ -737,13 +746,14 @@ function gridPositions(
   rowGaps: readonly number[],
   padLeft: number,
   padTop: number,
+  serpentine = false,
 ): { x: number; y: number }[] {
   const rows = Math.ceil(els.length / cols);
   const colWidths = new Array<number>(cols).fill(0);
   const rowHeights = new Array<number>(rows).fill(0);
   els.forEach((el, i) => {
     const r = Math.floor(i / cols);
-    const c = i % cols;
+    const c = serpentineCol(i, cols, serpentine);
     colWidths[c] = Math.max(colWidths[c]!, el.w);
     rowHeights[r] = Math.max(rowHeights[r]!, el.h);
   });
@@ -759,7 +769,10 @@ function gridPositions(
     rowY.push(y);
     y += rowHeights[r]! + (rowGaps[r] ?? gap);
   }
-  return els.map((_, i) => ({ x: colX[i % cols]!, y: rowY[Math.floor(i / cols)]! }));
+  return els.map((_, i) => ({
+    x: colX[serpentineCol(i, cols, serpentine)]!,
+    y: rowY[Math.floor(i / cols)]!,
+  }));
 }
 
 /** Pure column-max / row-max extent of a row-major grid, no positions. */
@@ -768,13 +781,14 @@ function gridExtent(
   cols: number,
   gap: number,
   rowGap: number = gap,
+  serpentine = false,
 ): { w: number; h: number } {
   const rows = Math.ceil(els.length / cols);
   const colWidths = new Array<number>(cols).fill(0);
   const rowHeights = new Array<number>(rows).fill(0);
   els.forEach((el, i) => {
     const r = Math.floor(i / cols);
-    const c = i % cols;
+    const c = serpentineCol(i, cols, serpentine);
     colWidths[c] = Math.max(colWidths[c]!, el.w);
     rowHeights[r] = Math.max(rowHeights[r]!, el.h);
   });
@@ -793,12 +807,13 @@ export function bestGridCols(
   gap: number,
   target: number = TARGET_ASPECT,
   rowGap: number = gap,
+  serpentine = false,
 ): number {
   if (els.length === 0) return 1;
   let bestCols = 1;
   let bestScore = Infinity;
   for (let cols = 1; cols <= els.length; cols++) {
-    const { w, h } = gridExtent(els, cols, gap, rowGap);
+    const { w, h } = gridExtent(els, cols, gap, rowGap, serpentine);
     const score = Math.abs(Math.log(w / h / target));
     if (score < bestScore) {
       bestScore = score;

@@ -639,3 +639,51 @@ reserves for a horizontal arrow label is roughly one glyph narrower than what
 tldraw needs, and because the corridor is sized *from* the label, shortening
 the label does not escape the shortfall. Recorded under Discovered work; the
 final labels (`calls`, `reads`, `charges card`) all render on one line.
+
+## After T17 - serpentine rows in the auto-chosen grid
+
+`src/domain/layout/stack.ts` (+21/-6): in the grid the engine picks itself
+(`mayAutoGrid && mode === "col"`, the B20 auto-wrap), odd rows run
+right-to-left. An explicit `layout="grid"` stays row-major. This is the re-test
+of B21b, which was rejected in wake 24 on a crossing gate measured against
+boxes 40% too narrow.
+
+Whole-corpus diff of `canvas` and `total edge length`, before vs after, over all
+sixteen fixtures: **one line moved.**
+
+| file | canvas | total edge length | crossings |
+|---|---|---|---|
+| release-pipeline | 1350 x 888 (same) | 9558 -> **7762** (-19%) | 5 -> 5 |
+| long-labels | 1538 x 848 (same) | 4877 -> 4877 | 0 -> 0 |
+| every other fixture | unchanged | unchanged | unchanged |
+
+`crossing-classify` over the whole corpus is byte-identical before and after:
+`same-axis skip=3, cross-container=10, fan=0, other=0, total=13`. Overlapping
+shape pairs stay 0 everywhere. `npm run check` green, 44 files / 534 tests (two
+new unit tests in `stack.test.ts`).
+
+**Only two of five grid files can see the change, and only one of them moves a
+number.** `deep-nesting` and `hexagonal` have a single top-level child;
+`wide-fanout` is now one row of 3722 x 204 after T6's fan collapse, and a
+one-row grid has no odd row to mirror. `long-labels` does get mirrored rows -
+`router` moves from x=0 to x=1052 - but its columns are all 486 wide and its
+edges are symmetric about the row, so the length total lands on exactly the same
+number.
+
+**The gate number did not move: 13 crossings before, 13 after.** T17 asked to
+keep it only if crossings drop. They did not, and they could not: the three
+same-axis skips left in the corpus are inside `order-states`, which is
+`layout="auto"` (ELK, not the grid), and the ten cross-container crossings are
+in `deep-nesting` and `hexagonal`, neither of which reaches the auto-wrap. The
+crossing budget serpentine was aimed at was already spent by T3-T6b.
+
+**What moved is visible in the pixels, and it is a real improvement on
+`release-pipeline`.** Before, the two row-boundary edges (`Security scan ->
+Integration tests` and `Build image -> Push to registry`) ran the full width of
+the canvas as long diagonals, and `Manual approval -> Canary 5%` did the same
+into row 2. After, row 1 reads right-to-left, so those two become short hops
+between adjacent columns and `Manual approval -> Canary 5%` becomes a straight
+vertical drop. `long-labels` is a wash: `auth -> router` swaps a down-left
+diagonal for a down-right one of identical length, and its rows now read
+backwards, which for a diagram whose boxes are full sentences is arguably worse
+prose order even though no metric notices.

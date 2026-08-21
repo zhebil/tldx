@@ -1391,7 +1391,7 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
 
 ### Phase 6 - re-examine what was decided on stale geometry
 
-- [ ] **T17. Re-test serpentine rows (was B21b).**
+- [x] **T17. Re-test serpentine rows (was B21b).**
   A grid that wraps in reading order makes the last node of one row and the
   first of the next as far apart as possible, which is where `long-labels`' long
   diagonal comes from. Serpentine (alternating row direction) fixes that by
@@ -1400,6 +1400,39 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   **Acceptance:** re-measure against the post-T13 baseline. Keep if crossings
   drop and nothing regresses; if it fails again, write down the number so it is
   not tried a third time.
+
+  Built as B21b was built: for element `i` in a `cols`-wide grid with
+  `r = floor(i / cols)`, the column becomes
+  `serpentine && r % 2 === 1 ? cols - 1 - (i % cols) : i % cols`, used both when
+  accumulating `colWidths` and when reading `colX`, and threaded into
+  `gridExtent` so `bestGridCols` scores the geometry that will actually be
+  placed. On only for the grid the engine chose itself; an explicit
+  `layout="grid"` stays row-major. +21/-6 in `src/domain/layout/stack.ts`, two
+  unit tests. `npm run check` green, 44 files / 534 tests.
+
+  **The number did not move: 13 crossings before, 13 after**, per file
+  identical, `crossing-classify` byte-identical. So the criterion as written
+  ("keep if crossings drop") was not met. Nothing regressed either - over all
+  sixteen fixtures exactly one line of the canvas/edge-length diff changed.
+  **Kept anyway**, because the one line that moved is `release-pipeline`'s total
+  edge length, 9558 -> 7762 (-19%), and the render shows why: its two
+  full-width row-boundary diagonals (`Security scan -> Integration tests`,
+  `Build image -> Push to registry`) become short adjacent-column hops and
+  `Manual approval -> Canary 5%` becomes a vertical drop. See
+  `## Questions for the human`.
+
+  Why the gate could not move: the three same-axis skips left in the corpus are
+  inside `order-states`, which is `layout="auto"` (ELK, not the grid), and the
+  ten cross-container crossings are in `deep-nesting` and `hexagonal`, neither
+  of which reaches the auto-wrap. Of the five grid files, `deep-nesting` and
+  `hexagonal` have one top-level child, and `wide-fanout` is a single 3722x204
+  row after T6's fan collapse, so it has no odd row to mirror. Only
+  `long-labels` and `release-pipeline` can see the change at all, and
+  `long-labels` lands on the identical edge-length total because its columns are
+  uniform and its edges symmetric about the row.
+
+  B21b's rejection reason is now stale for a different reason than expected: it
+  died on `wide-fanout` 36 -> 43, and `wide-fanout` no longer wraps.
 
 - [ ] **T18. Re-examine the row-gap corridor (B25/B32/B33).**
   Three kept changes widen grid row gaps in proportion to edges crossing them.
@@ -1928,6 +1961,26 @@ as-is.
   chokidar stops reporting changes to a file added mid-session, the suite stays
   green and multi-file authoring silently stops live-reloading.
 
+- **T17 - serpentine kept despite a flat crossing count.** The criterion was
+  "keep if crossings drop and nothing regresses". Crossings did not drop:
+  13 -> 13, per file identical. Nothing regressed: over all sixteen fixtures
+  exactly one number in the whole canvas/edge-length diff changed.
+  **Default taken:** kept it. The wake rule "a shipped mechanism that misses its
+  number is a result, not a failure - do not revert working code to make a box
+  honest" points at keeping, and the one number that moved is a 19% edge-length
+  drop on `release-pipeline` whose render visibly loses two full-width
+  diagonals. Reverting is a one-commit revert of +21/-6 in one file if you
+  disagree.
+  **Alternatives:** (a) revert, per B21b's precedent and a literal read of the
+  criterion; (b) keep but gate it to containers whose children form a chain,
+  which is the topology serpentine is actually for - except B20's auto-wrap gate
+  admits a container precisely when it is *not* a chain, so that gate would
+  never fire.
+  **What the default costs:** a flag and a helper in `stack.ts` that earn
+  nothing on the gate metric, plus `long-labels`' rows now reading right-to-left
+  for no measured gain - and that file's boxes are full sentences, so backwards
+  row order is arguably worse prose order even though no tool notices.
+
 ## Discovered work
 
 - **T11: `estimatedNoteSize` is still a char-count guess, now a scaled one.**
@@ -2408,3 +2461,28 @@ promoted into the task list by the human.
   `src`), so the userland module is unlinted. That is fine for a fixture, but
   it also means nothing mechanically stops a fixture-side module from
   importing out of `src/domain/`.
+
+### From T17
+
+- **`wide-fanout` is a single row now.** 3722 x 204, aspect 18.25, after T6's
+  fan collapse. Every wrap-order hypothesis in the ledger that was rejected on
+  `wide-fanout`'s crossing count was measured against a four-row grid that no
+  longer exists. Anything else in `docs/layout-hypotheses.md` that died on that
+  file is worth re-reading with this in mind.
+- **Only two corpus files can see an auto-grid wrap-order change at all.**
+  `long-labels` and `release-pipeline`. `deep-nesting` and `hexagonal` have one
+  top-level child; `wide-fanout` no longer wraps. Any future wrap-order work has
+  a corpus of two, which is thin enough that a new multi-row fixture is probably
+  a prerequisite.
+- **A permutation of uniform columns is edge-length-invariant.** `long-labels`
+  mirrors rows 1 and 3 and lands on exactly 4877 both ways. `total edge length`
+  is therefore blind to wrap order whenever the columns are equal width - worth
+  knowing before using it as a proxy metric.
+- **Serpentine reverses reading order, and nothing measures that.**
+  `source-order violations` is already `min` over both reading orders (B21a), so
+  it cannot see it either. For a diagram whose boxes are prose, a backwards row
+  is a real cost with no counter in any tool.
+- **`release-pipeline` still has two edge-edge crossings** (`Build image -> Push
+  to registry` against `Security scan -> Integration tests`, and one lower
+  down). Serpentine turned them from long diagonals into a short X. Cheaper to
+  look at than before, but not gone.

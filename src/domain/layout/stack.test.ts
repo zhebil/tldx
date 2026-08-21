@@ -146,6 +146,21 @@ describe("hybridLayout", () => {
     expect(d.x).toBeGreaterThan(c.x);
   });
 
+  it("keeps an explicit grid row-major, not serpentine", async () => {
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 3 }, [
+        box({ id: "a", label: "A" }),
+        box({ id: "b", label: "B" }),
+        box({ id: "c", label: "C" }),
+        box({ id: "d", label: "D" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const d = boxById(result.children, "d");
+    // row 1's first child (d) stays under column 0, same x as row 0's a
+    expect(d.x).toBe(a.x);
+  });
+
   it("sizes a nested frame to its content bounding box", async () => {
     const result = await layoutAst(
       doc({ layout: "col" }, [
@@ -543,6 +558,24 @@ describe("hybridLayout doc-root aspect wrap (B20)", () => {
     );
     expect(result.layout).toBe("grid");
     expect(result.cols).toBe(expectedCols);
+  });
+
+  it("mirrors odd rows of an auto-wrapped grid (serpentine)", async () => {
+    const labels = ["a", "b", "c", "d", "e"];
+    const result = await layoutAst(
+      doc(
+        {},
+        labels.map((l) => box({ id: l, label: l.toUpperCase() })),
+      ),
+    );
+    expect(result.layout).toBe("grid");
+    expect(result.cols).toBe(3);
+    const a = boxById(result.children, "a");
+    const d = boxById(result.children, "d");
+    const e = boxById(result.children, "e");
+    // row 1 (d, e) is reversed: d lands under column 2, not column 0
+    expect(d.x).not.toBe(a.x);
+    expect(d.x).toBeGreaterThan(e.x);
   });
 
   it("leaves an explicit layout=\"col\" doc unaffected even when its children fan out", async () => {
