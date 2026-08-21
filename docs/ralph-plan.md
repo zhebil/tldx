@@ -14,13 +14,14 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, gate-5 table updated at
-  wake 34 when **B27 was reverted**. The champion is now the wake-28 **B9**
-  revision (a note reserves the space tldraw actually draws) on top of the
-  wake-22 **B20** revision (topology-gated doc-root aspect wrap) and the
-  wake-12 **B1** revision (cross-axis `align`, default `center`). Those three
-  are the only hypotheses still standing - B2, B3, B4a, B13, B14, B15, B6 and
-  now B27 and B31 all reverted after judging, and B7 and B24 were rejected at an
+- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 37
+  when **B25 was kept**. The champion is now the wake-37 **B25** revision (a
+  grid whose children carry a skip edge lays its rows out at double the gap) on
+  top of the wake-28 **B9** revision (a note reserves the space tldraw actually
+  draws), the wake-22 **B20** revision (topology-gated doc-root aspect wrap) and
+  the wake-12 **B1** revision (cross-axis `align`, default `center`). Those four
+  are the only hypotheses still standing - B2, B3, B4a, B13, B14, B15, B6, B27
+  and B31 all reverted after judging, and B7 and B24 were rejected at an
   objective gate before judging. Judged results live in
   `docs/layout-hypotheses.md` - read it before proposing a hypothesis.
 - **Arrows are `arc` with centre anchors, and arrow *attachment* is now a
@@ -32,13 +33,15 @@ once A is done. The loop never terminates; the human stops it.
   on where they buy nothing (crossings unmoved on all six files) and off where a
   crossing needs fixing. The residual effect is pure cost - collapsed nubs on
   short hops, doglegs on already-straight lines - which is what the judge saw.
-  **Do not file another attachment hypothesis.** The next arrow work is **B25**
-  (routing lanes in *placement*), now top of the backlog; if that fails, the
-  honest next step is an obstacle-aware router, not another terminal rule.
+  **Do not file another attachment hypothesis.** Wake 37 confirmed the
+  redirection was right: **B25** moved the corridor into *placement* and became
+  the first hypothesis in the loop's history to lower gate 5, taking
+  `wide-fanout` from 36 crossings to 31 with two blind wins and no losses. The
+  live line of enquiry is now placement, not terminals - see **B32**.
   Gate 5's instrument is `tools/arrow-truth.mts`, which reads the vertices
   tldraw actually drew (the old model-based tracer matched 0 of 84 corpus arrows
   and was deleted at wake 32); the champion baseline is the table at the top of
-  `docs/layout-champion.md`, unchanged since wake 34 at 10/5/1/0/0/36.
+  `docs/layout-champion.md`, at 10/5/1/0/0/**31** since wake 37.
 - **The judge may answer `WINNER: TIE`** since wake 33 (B29). Ties count as
   neither wins nor losses, and the ledger distinguishes a *judged tie* from a
   *structural tie* (a file never sent to a judge because nothing changed). The
@@ -54,7 +57,9 @@ once A is done. The loop never terminates; the human stops it.
   An audit is that wake's whole unit of work; it does not also run a hypothesis.
   The ratchet still has not been exercised against a champion that actually
   differs from its epoch - two audits in, drift is undetected, not
-  demonstrated-absent.
+  demonstrated-absent. **Wake 40 will be the first audit that can fire**: B25
+  moved `long-labels` and `wide-fanout` at wake 37, so the champion no longer
+  matches the wake-35 epoch on those two files.
 
 ---
 
@@ -953,7 +958,7 @@ Ordered. Take from the top. Strike through when resolved.
   with a judge and the Status block required this to land first. Ledger entry in
   `docs/layout-hypotheses.md`.
 
-- [ ] **B25** _(new, wake 26)_ Routing lanes in **placement**. Every arrow
+- [x] ~~**B25** _(new, wake 26)_ Routing lanes in **placement**. Every arrow
   hypothesis so far (B3, B4a, B13, B14, B15) changed how arrows *attach*; none
   changed where boxes *sit*. Layout still packs children at a flat 40px gap, so
   an orthogonal arrow has no corridor and must cross a box - the champion
@@ -962,7 +967,27 @@ Ordered. Take from the top. Strike through when resolved.
   arrow is two endpoints plus one scalar; see `docs/jsx-pivot.md`), so placement
   is the only lever left. When a container's children carry an edge that skips a
   neighbour, widen the gap on the axis that edge must traverse. Gate 5 measures
-  the result directly. **EPIC.**
+  the result directly. **EPIC.**~~ **KEPT** _(wake 37)_ - landed as the row axis
+  only, in grid containers only: `hasSkipEdge` on flow-position distance gates
+  `rowGap = gap * 2`. A measured sweep decided the axis - row ×2 costs 1.35×
+  canvas and passes gate 4, uniform ×2 costs 1.62× and fails it - and the
+  column axis was left alone because a skip chord in a `row`/`col` runs through
+  the intervening centres however wide the gap. First hypothesis ever to lower
+  gate 5: `wide-fanout` 36 → 31, two blind wins, no losses. Ledger entry in
+  `docs/layout-hypotheses.md`.
+
+- [ ] **B32** _(successor to B25, wake 37)_ Scale the skip widening with the
+  *size* of the skip instead of a flat ×2. B25 established that a corridor
+  between grid rows is worth real canvas, but its factor is a constant chosen
+  by one measurement on one file: `wide-fanout`'s hub reaches 18 flow positions
+  away and `long-labels`' furthest skip reaches 6, and both get the same
+  doubling. Derive the factor from the maximum skip distance (or from the count
+  of skip edges crossing each row boundary), so a dense fan gets more corridor
+  and a single long-range edge gets less. **Gate 4 is the whole difficulty**:
+  uniform ×3 already fails it on `wide-fanout` at 1.70×, so any per-file
+  scaling must spend the budget on the axis the file is not already long in.
+  Measure the premise first - if the corpus's skip distances are bimodal
+  (a hub or nothing) there is no gradient to exploit and this strikes like B8.
 
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
@@ -1722,3 +1747,27 @@ anything that outlives the loop.)_
   re-rolled mid-wake (re-rolling a draw you dislike is its own bias). A balanced
   assignment (shuffle three of six to each label) would remove the failure mode
   outright and costs nothing. Protocol edit, not a hypothesis.
+
+- **(wake 37, from B25)** **Gate 4 is now the binding constraint on placement
+  work, and it is measured wrong for tall files.** The area cap (1.5× the
+  champion on any file) is what forced B25 down from uniform ×2 (1.62×, fails)
+  to row-only ×2 (1.35×, passes) - a good outcome, but by accident. The cap is
+  blind to *shape*: `wide-fanout` at 983 x 460 is a 2.14 aspect and growing its
+  height moves it toward 16:9, while `sparse-graph` at 282 x 1360 is already
+  0.21 and the same absolute growth would make it worse. A cap on the
+  *aspect-ratio distance from 16:9*, or an area cap that is looser on the axis a
+  file is short in, would let placement hypotheses spend their budget where it
+  helps. Not filed as a hypothesis - it is a change to the objective gates, and
+  loosening a gate is the kind of edit that needs its own wake and its own
+  argument.
+
+- **(wake 37, from B25)** **Four of six corpus files cannot see a grid row-gap
+  change at all**, because `deep-nesting`, `hexagonal`, `sequence` and
+  `sparse-graph` resolve to a single grid row or to a `col` chain. B25 got two
+  voting files; a future placement hypothesis on the same axis will get the same
+  two. That is not yet a corpus defect - the four are pulling their weight on
+  frames, notes and chains - but it means the placement line of enquiry is
+  effectively being judged by `long-labels` and `wide-fanout` alone. Worth a
+  corpus hypothesis (its own kind of entry, per the honesty rules) adding a
+  genuinely multi-row grid with mixed short and long skips, if placement work
+  continues past B32.
