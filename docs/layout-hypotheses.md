@@ -2277,3 +2277,79 @@ looks intentional. Here it is unmistakably wrong.
 reserves the space tldraw actually draws - but it means row 2 is visually
 anchored by the note rather than by the boxes. Worth knowing before reading any
 judge's remark about row 2.
+
+---
+
+## Wake 40 - drift audit #3 (no drift; 1-1, and the first audit with a real delta)
+
+_Not a hypothesis. A step-9 drift audit, which counts as the wake's unit of
+work. No candidate was built._
+
+**Result: NO DRIFT.** The older epoch won 1 file and lost 1 file. Step 9 fires
+only when the older baseline wins *more* files than it loses, so the ratchet
+does not engage and nothing is bisected. Next wake takes B33 off the backlog as
+planned.
+
+**What was compared.** `docs/baselines/wake-35/` (the wake-28 champion,
+B1 + B20 + B9) against reports and PNGs regenerated from scratch at this wake's
+HEAD (B1 + B20 + B9 + B25 + B32). `release-pipeline` joined the corpus at wake
+34 and has no wake-35 baseline, so it is not comparable and took no part in the
+audit; it is in the fresh epoch.
+
+| file | PNG vs wake-35 | report | judged | winner |
+| --- | --- | --- | --- | --- |
+| deep-nesting | byte-identical | identical | no - structural tie | - |
+| hexagonal | byte-identical | identical | no - structural tie | - |
+| long-labels | differs | differs | yes | **epoch (wake-35)** |
+| release-pipeline | no baseline | no baseline | no - not comparable | - |
+| sequence | byte-identical | identical | no - structural tie | - |
+| sparse-graph | byte-identical | identical | no - structural tie | - |
+| wide-fanout | differs | differs | yes | **champion (wake-40)** |
+
+Exactly the two files the plan predicted would move, and only those two: B25 and
+B32 change row gaps inside grid containers carrying skip edges, and four of the
+six corpus files resolve to a single grid row or a `col` chain where there is no
+row boundary to widen. Four structural ties, byte-for-byte, across five wakes and
+an independent chromium run - the screenshot pipeline stays deterministic.
+
+**The two verdicts, and why the split is the finding.**
+
+- `long-labels` - **epoch wins.** "B packs the same rows at even, tight vertical
+  spacing, so arrows are shorter and the flow reads as one continuous chain,
+  while A stretches the identical layout with uneven gaps that add dead space
+  without improving legibility." Canvas 1362 vs 1162 tall, fill ratio 0.307 vs
+  0.360, mean edge 601 vs 556.
+- `wide-fanout` - **champion wins.** "The extra vertical spacing in A keeps the
+  Dispatcher's 12-arrow fan-out at distinct, followable angles, while B's
+  compressed rows flatten those arrows into a near-horizontal bundle that
+  strikes through several Worker boxes' labels and makes the edge targets
+  ambiguous." Canvas 860 vs 460 tall.
+
+This is the third time the same two files have split 1-1 on a row-gap change:
+B25 (wake 37, kept), B32 (wake 38, kept weak), and now an audit run by two fresh
+judges that were never told a champion existed. Three independent judge pairs
+reproducing the same split is no longer noise. The two files disagree because
+they are asking the row gap for different things: `wide-fanout` needs vertical
+room so a 12-way fan-out separates into distinguishable angles; `long-labels` is
+a two-column chain whose rows are already tall because of notes, so extra gap
+buys nothing and costs edge length. **The predicate is wrong, not the effect.**
+B25 gates on "this grid carries a skip edge" and B32 scales by crossings; neither
+mentions fan-out, which is what the winning file actually needed. Filed as
+discovered work in the plan.
+
+**What this audit does tell us that the first two could not.** Audits #1 and #2
+were vacuous and delta-free respectively; drift was undetected, not
+demonstrated-absent. This one had a genuine two-file delta and the ratchet was
+live. It came back on the exact edge - one win each - which is the weakest
+possible "no drift", and it is worth saying plainly: had `wide-fanout` gone the
+other way the loop would have been bisecting B32 this wake. The keep-by-default
+policy currently rests on one file.
+
+**Honesty note on the blinding.** The per-file randomisation independently drew
+champion = A for both files. That is a legitimate 1-in-4 outcome and it was not
+rerolled - rerolling an assignment because it looks unlucky is the same class of
+error as editing the corpus. The two judges were separate subagents sharing no
+context, and they split anyway, so the tally is not an assignment artefact.
+
+**Epoch saved:** `docs/baselines/wake-40/` - seven reports, seven PNGs,
+write-once. **Verified:** `npm run check` green, 38 files / 316 tests.
