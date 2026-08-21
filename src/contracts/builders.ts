@@ -215,12 +215,12 @@ export function frameShape(
   } satisfies TLRecord;
 }
 
-export function arrowShape(input: ShapeBase & { kind?: "arc" | "elbow" }): TLRecord {
+export function arrowShape(input: ShapeBase): TLRecord {
   return {
     ...baseShapeFields(input),
     type: "arrow",
     props: {
-      kind: input.kind ?? "arc",
+      kind: "arc",
       start: { x: 0, y: 0 },
       end: { x: 0, y: 0 },
       bend: 0,

@@ -135,7 +135,6 @@ describe("record factories", () => {
       typeName: "shape",
       type: "arrow",
       props: {
-        kind: "arc",
         start: { x: 0, y: 0 },
         end: { x: 0, y: 0 },
         arrowheadEnd: "arrow",
