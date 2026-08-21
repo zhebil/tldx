@@ -52,8 +52,12 @@ once A is done. The loop never terminates; the human stops it.
   change that file has ever won, closing the 1-1 split B25, B32 and drift audit
   #3 all produced. `release-pipeline` gate 5 fell 10 → 8. But B33's own gate-4
   warning fired: `release-pipeline` went 120,160 → 160,160, so the per-boundary
-  gradient now survives on `long-labels` alone. **The next thing to derive on
-  this line is the `SKIP_ROW_GAP_MAX` cap, not the predicate** - see B36.
+  gradient now survives on `long-labels` alone. Wake 42 tried to derive that cap
+  (**B36**) and it was **rejected at gate 5**: making it relative to the busiest
+  boundary can only narrow, and `release-pipeline`'s flat ×4 turns out to be
+  load-bearing - 48px off its first boundary puts gate 5 straight back to 10.
+  **The single scalar is at its floor on that file; the next move on this line
+  is a second term (B35), not a re-tuning of the first.**
   Gate 5's instrument is `tools/arrow-truth.mts`, which reads the vertices
   tldraw actually drew (the old model-based tracer matched 0 of 84 corpus arrows
   and was deleted at wake 32); the champion baseline is the table at the top of
@@ -1039,22 +1043,24 @@ Ordered. Take from the top. Strike through when resolved.
   survives only on `long-labels`. The cap, not the predicate, is the next thing
   to derive. Ledger entry in `docs/layout-hypotheses.md`.
 
-- [ ] **B36** _(from B33's gate-4 warning, wake 41)_ Derive `SKIP_ROW_GAP_MAX`
-  instead of hard-coding 4. B32 chose the cap by hand ("4 and not 3, so the
-  gradient stays visible on both files"), which was honest tuning against a
-  two-file corpus. B33 then widened the predicate and `release-pipeline`
-  immediately saturated both its boundaries, going 120,160 → 160,160: a flat ×4,
-  which is the degenerate case B32 picked the cap to avoid. The gradient now
-  exists on `long-labels` alone. Candidate derivation: make the cap relative
-  rather than absolute - scale each boundary by its share of the *maximum*
-  crossing count on that container (`1 + (rows - 1) * crossings / maxCrossings`,
-  or similar), so a grid whose boundaries are all equally busy gets a uniform
-  gap by construction instead of by saturation, and one with a hot boundary
-  still gets a gradient. **Measure before building** (B8's lesson): print the
-  per-boundary crossing counts for all three grid files under the B33 predicate
-  first, and abandon the derivation if the corpus turns out to be uniform rather
-  than graded. Watch gate 4 - a relative cap can raise the total as easily as
-  lower it.
+- [x] ~~**B36** _(from B33's gate-4 warning, wake 41)_ Derive `SKIP_ROW_GAP_MAX`
+  instead of hard-coding 4, by making the cap relative to the busiest boundary
+  in the container rather than an absolute clip.~~ **REJECTED at gate 5**
+  _(wake 42)_ - and it falsified its own premise. The required measurement came
+  first and the corpus is graded, not uniform (`long-labels` 2,1,2,1,0;
+  `release-pipeline` 3,5; `wide-fanout` 14,8,2,2 - the other four files have no
+  auto-grid at all), so the derivation was built:
+  `1 + (MAX-1) * count / max(MAX-1, maxCount)`, the closed form of
+  `min(1 + count, relative)`, which can only ever *narrow* a boundary. Four
+  gates passed - `wide-fanout` got 21% shorter and one arrow better - but
+  `release-pipeline` went **8 → 10** arrow paths through a non-endpoint shape,
+  the exact value B33 had improved it *from* by widening that same boundary.
+  **Its flat ×4 is load-bearing, not degenerate saturation**: 48px off that one
+  boundary drops two long descending diagonals into shallower angles and back
+  through two boxes. A cap derivation has to be *floored* at the current award,
+  not merely scaled - filed as **B37**. Also the first evidence that the two
+  grid files want opposite things from the same scalar, which is direct support
+  for **B35**. Ledger entry in `docs/layout-hypotheses.md`.
 
 - [ ] **B35** _(deferred by drift audit #3 at wake 40, now due)_ Scale the row
   corridor by **fan-out**, not only by crossings. Wake 40 wrote this up and
@@ -1070,6 +1076,19 @@ Ordered. Take from the top. Strike through when resolved.
   a boundary as a second term in that boundary's corridor. **Sequence this after
   B36** - stacking a new term on an unexamined cap is how B32's hand-tuned 4
   became load-bearing in the first place.
+
+- [ ] **B37** _(from B36's gate-5 rejection, wake 42)_ Retry the relative cap in
+  the **widening-only** direction: award each boundary
+  `max(min(SKIP_ROW_GAP_MAX, 1 + crossings), relative_factor)` so no boundary
+  ever gets less than the champion gives it today. B36 established that the
+  narrowing direction is what breaks gate 5 - `release-pipeline`'s first
+  boundary cannot go below `gap * 4` without putting two arrows back through two
+  boxes - while saying nothing against scaling the busiest boundary up. Gate 5
+  cannot regress by construction (every corridor is ≥ the champion's), so the
+  gate to watch is **canvas area**, the mirror of B36. Sequence after B35: B35
+  proposes a genuinely new term and B36 showed the single-scalar rule is already
+  at its floor on one file, so re-tuning the same scalar is the weaker of the
+  two and should not go first. Abandon if B35 changes the corridor formula.
 
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
@@ -1976,3 +1995,21 @@ anything that outlives the loop.)_
   fan-out evidence behind B35 - is blind to the current predicate. Worth
   remembering when a future wake reads a `wide-fanout` structural tie as "no
   effect": on row-gap work it increasingly means "no *reachable* effect".
+
+- **(wake 42, from B36)** **The two grid files want opposite things from the
+  same parameter.** Under one rule that narrows every row corridor,
+  `release-pipeline` regressed gate 5 (8 → 10) while `wide-fanout` got 21%
+  shorter *and* improved it (28 → 27). A single scalar per boundary cannot
+  satisfy both, which is the strongest evidence yet that the corridor formula is
+  under-parameterised rather than mis-tuned. Feeds B35 directly.
+
+- **(wake 42, from B36)** **The per-boundary crossing counts are now measured
+  and worth reusing**, so the next wake on this line need not re-instrument:
+  `long-labels` 12 children / 2 cols / 6 rows → 2,1,2,1,0; `release-pipeline`
+  17 / 6 / 3 → 3,5; `wide-fanout` 26 / 6 / 5 → 14,8,2,2. The other four corpus
+  files have no auto-grid container and never reach `skipRowGaps` at all - **the
+  effective corpus for every row-gap hypothesis is three files, not seven**, and
+  one of those three (`long-labels`, max 2) is below the cap and therefore blind
+  to any change to the cap itself. Re-measure with the same instrumentation
+  (a temporary `console.error` in `skipRowGaps` behind an env var) if the
+  predicate changes again.

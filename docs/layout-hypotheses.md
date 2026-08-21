@@ -2469,3 +2469,106 @@ PNG equality to decide which files are structural ties: a file that changes
 bytes without changing layout will be sent to a judge for no reason. Filed in
 discovered work; not chased here, because an audit is not this wake's unit of
 work.
+
+---
+
+## B36 — derive `SKIP_ROW_GAP_MAX` instead of clipping at it _(wake 42)_ — **REJECTED at gate 5**
+
+B32 picked the cap of 4 by hand against a two-file corpus. B33 then widened the
+crossing predicate and `release-pipeline` immediately saturated both boundaries
+to a flat ×4, which is the degenerate case the cap was chosen to avoid. B36's
+premise: the clip is the problem, so replace the absolute clip with a relative
+one and the gradient comes back.
+
+### Measurement first
+
+B36's own backlog entry required measuring before building (B8's lesson).
+`skipRowGaps` was instrumented temporarily and `layout-report.mts` run over the
+whole corpus. Per-boundary crossing counts under the live B33 predicate:
+
+| file | n | cols | rows | crossings per boundary | gaps at `gap * min(4, 1 + c)` |
+| --- | --- | --- | --- | --- | --- |
+| long-labels | 12 | 2 | 6 | 2, 1, 2, 1, 0 | 120, 80, 120, 80, 40 |
+| release-pipeline | 17 | 6 | 3 | 3, 5 | 160, 160 |
+| wide-fanout | 26 | 6 | 5 | 14, 8, 2, 2 | 160, 160, 120, 120 |
+
+The other four corpus files never reach `skipRowGaps` at all - they have no
+auto-grid container. **The corpus is graded, not uniform**, so the abandon
+condition in the backlog entry did not fire, and the derivation was worth
+building. The table also shows the saturation is worse than the B33 entry
+recorded: `wide-fanout`'s top two boundaries are identical at 160 despite one
+carrying 1.75× the traffic of the other.
+
+### The diff
+
+One expression in `skipRowGaps`, plus its doc comment and two unit tests
+(+10/-4 in `stack.ts`, +18 in `stack.test.ts`). All seven pre-existing
+`skipRowGaps` tests passed unedited.
+
+```
+- return crossings.map((count) => gap * Math.min(SKIP_ROW_GAP_MAX, 1 + count));
++ const denom = Math.max(SKIP_ROW_GAP_MAX - 1, Math.max(...crossings));
++ return crossings.map((count) =>
++   Math.round(gap * (1 + (SKIP_ROW_GAP_MAX - 1) * (count / denom))),
++ );
+```
+
+That is the closed form of `min(1 + count, 1 + (MAX-1) * count / maxCount)`:
+normalise by the busiest boundary in the container, but never award more than
+the old absolute rule did. The resulting factor is therefore **always ≤ the
+champion's**, so the change can only narrow a boundary, never widen one - which
+makes the canvas-area gate safe by construction. `SKIP_ROW_GAP_MAX` keeps its
+name and its value; its meaning shifts from "clip" to "the multiplier the
+busiest boundary gets".
+
+Predicted and observed identically: `long-labels` unchanged (its max of 2 is
+below `MAX - 1 = 3`, so relative and absolute coincide), `release-pipeline`
+160,160 → **112,160**, `wide-fanout` 160,160,120,120 → **160,109,57,57**.
+
+### Gates
+
+| gate | result |
+| --- | --- |
+| `npm run check` | pass - 38 files, 320 tests |
+| new overlapping pairs | 0 on every file |
+| source-order violations | 0 on every file |
+| canvas area | **shrinks**: `release-pipeline` 1324x832 → 1324x784 (0.94×), `wide-fanout` 983x860 → 983x683 (0.79×); five files identical |
+| arrow paths through a non-endpoint shape | **FAIL - `release-pipeline` 8 → 10** (`wide-fanout` improved 28 → 27; all others unchanged) |
+
+**Rejected without a judge.** Four gates passed, including a 21% height cut on
+`wide-fanout` for one fewer pierced arrow - a real gain that gate 5 correctly
+refused to let ride along with a regression on another file.
+
+### What this actually establishes
+
+**B36's premise is falsified for `release-pipeline`: its flat ×4 is not
+degenerate saturation, it is load-bearing.** Narrowing that one boundary from
+160 to 112 shifts rows 2 and 3 up by 48px, and the two long diagonals that
+descend out of row 0 (`e-integration-publish` at `(1123,49.6)→(205.3,228.7)`,
+`e-scan-publish` at `(883,50.9)→(205.1,222.4)`) plus the row-1 descents drop
+into shallower angles and clip two more non-endpoint shapes. Gate 5 goes
+straight back to 10 - **exactly the value B33 improved it from at wake 41**, by
+widening the very same boundary. B33 bought those two arrows with 48px, and B36
+sold them back.
+
+So the cap is not "unexamined hand-tuning" that happens to hold. On this corpus
+`gap * 4` on `release-pipeline`'s first boundary is the minimum that keeps two
+arrows out of two boxes, and any rule that assigns it less fails gate 5
+regardless of how principled the derivation is. Two consequences:
+
+1. **A future cap derivation must be floored, not just scaled.** The failure is
+   entirely in the *narrowing* direction; nothing here argues against making the
+   busiest boundary's award relative. A rule of the form
+   `max(champion_factor_for_this_boundary, relative_factor)` cannot regress gate
+   5 by construction, but it can only widen, so it would need the area gate
+   watched instead of gate 5. That is a different hypothesis and is filed as
+   **B37**.
+2. **`wide-fanout` wants the opposite of what `release-pipeline` wants.** It got
+   21% shorter *and* one arrow better under the same rule. The two grid files
+   pull in opposite directions on the same parameter, which is the first
+   concrete evidence that a single scalar per boundary is under-parameterised -
+   and it is direct support for **B35**'s claim that fan-out is a second term,
+   not a re-tuning of the first.
+
+Reverted; `stack.ts` and `stack.test.ts` restored, `npm run check` green at 318
+tests and gate 5 back to 10/5/1/8/0/0/28.
