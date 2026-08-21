@@ -846,7 +846,7 @@ pass-through, rejected at `lower.ts` if unknown.** No CSS, no theme layer.
 Split by whether the prop moves geometry, because the layout-affecting ones have
 to come after Phase 1.
 
-- [ ] **T9. Pass-through style props that do not affect layout.**
+- [x] **T9. Pass-through style props that do not affect layout.**
   On boxes and frames: `color`, `fill` (`none|semi|solid|pattern`), `dash`
   (`draw|solid|dashed|dotted`). On edges: `color`, `dash`, `arrowheadStart`,
   `arrowheadEnd` (`none|arrow|triangle|square|dot|pipe|diamond|inverted|bar`).
@@ -862,6 +862,47 @@ to come after Phase 1.
   renders; a bad value produces a spanned diagnostic; crossing counts and canvas
   dimensions are byte-identical to T8 across the whole corpus (these props must
   not move anything).
+
+  **Built.** `src/domain/ir/styles.ts` (new) holds the four enum tuples copied
+  from `@tldraw/tlschema`'s `values` arrays, so `domain/` still imports no
+  tldraw. `lower.ts` gained one generic `readEnum<T>()` in the shape of the
+  existing `readDirection`/`readAlign`, wired into all four `lower*` functions;
+  an unknown value pushes `ir/invalid-style-value` at the attribute's own span
+  and drops the field. `builders.ts` turned four hardcoded arrow props and the
+  geo `dash` into defaulted inputs, and `emit.ts` spreads the IR fields through.
+  Layout needed no change: `stack.ts`, `attach.ts` and the ELK adapter all
+  spread `...el`. New fixture `tests/e2e/fixtures/styles.tldsl.jsx` exercises
+  all 13 colours, 5 fills, 4 dashes and 9 arrowheads plus frame/note/sticky
+  colour, and compiles with zero diagnostics.
+
+  **The numbers.** The whole scene JSON is **byte-identical** across all eight
+  corpus files (compared against `HEAD` via a compile-and-dump script, not just
+  `layout-report`), which is stronger than the acceptance asked for - no
+  crossing count or canvas dimension can have moved, so `docs/renders/` and
+  `docs/baseline.md` needed no re-render. `npm run check` green, 41 files /
+  ~400 tests. Bad values produce spanned diagnostics:
+  `bad.tldsl.jsx:6:7: error[ir/invalid-style-value]: 'color' must be one of
+  black, grey, ... (got 'puce')`.
+
+  **Three places the task's text did not match tldraw, resolved as follows.**
+  (a) `frameShapeProps` is exactly `{ w, h, name, color }` - a tldraw frame
+  shape has **no `fill` and no `dash`**. Frames therefore accept `color` only;
+  `fill`/`dash` on a `<Frame>` stay `ir/unknown-prop`. (b) The "frames get a
+  very light fill" default needed **no code**: `FrameShapeUtil.toSvg` already
+  fills every frame with `theme.black.frame.fill` unconditionally. (c) `fill`
+  has **five** tldraw values, not the four the task lists - the fifth is a
+  literal `"fill"`. All five are accepted, because decision 9 says *raw tldraw
+  enums* and rejecting a value tldraw accepts would be a bug the first author
+  to try it hits.
+
+  **Frame `color` compiles and validates but does not yet render.**
+  `FrameShapeUtil.options.showColors` is `false` by default, so tldraw draws
+  every frame in `theme.black` regardless of `props.color`; turning it on needs
+  `FrameShapeUtil.configure({ showColors: true })` in `src/viewer/app.tsx`,
+  which also changes the frame heading's fill and x-offset on every existing
+  render. Not done here - it is a viewer change, not a lowering change, and it
+  risks the byte-identical requirement this task is built around. Logged under
+  `## Questions for the human`.
 
 - [ ] **T10. Text alignment and label colour.**
   `textAlign` (`start|middle|end`), `verticalAlign`, `labelColor`.
@@ -1411,6 +1452,37 @@ as-is.
   fallback. Built and measured - an exact no-op on all eight files, byte-identical
   route maps and PNGs. Tried three times now.
 
+- **T9 - frame `color` compiles but does not render.** T9 asked for `color` on
+  frames. It lowers, validates and emits correctly, but tldraw's
+  `FrameShapeUtil.options.showColors` defaults to `false`, so every frame is
+  drawn in `theme.black` no matter what `props.color` says.
+  **Default taken:** shipped the pass-through and left the viewer alone. It
+  changes least: enabling it is `FrameShapeUtil.configure({ showColors: true })`
+  in `src/viewer/app.tsx`, a one-line, trivially reversible change - but it also
+  swaps every frame heading's fill from `theme.background` to the colour's
+  `headingFill` and shifts the heading x-offset from -6 to -1, i.e. it changes
+  how all three frame-bearing corpus renders look, for a feature no corpus file
+  uses. T9's acceptance is "byte-identical", so putting it in the same wake
+  would have made the acceptance unmeasurable.
+  **Alternatives:** (2) flip `showColors` in the viewer and re-baseline the
+  three frame renders in the same change; (3) drop `color` from `<Frame>`
+  entirely and let containment be conveyed by nesting alone.
+  **What the default costs:** an author can write `<Frame color="blue">`, get no
+  diagnostic, and see no colour - the one failure mode decision 9 was written to
+  prevent. Whoever picks this up should also note that frames are the *only*
+  place tldraw hides a valid prop behind an editor option; boxes, notes and
+  arrows all honour `color` immediately.
+
+- **T9 - `fill` has five values, not four.** The task lists
+  `none|semi|solid|pattern`; tldraw's `DefaultFillStyle.values` is
+  `["none","semi","solid","pattern","fill"]`.
+  **Default taken:** accepted all five. Decision 9 is "raw tldraw enums,
+  pass-through, rejected if unknown", and `"fill"` is not unknown to tldraw.
+  **Alternatives:** (2) reject `"fill"` to match the task text literally.
+  **What the default costs:** nothing found - it is a superset, the fixture
+  exercises all five, and geometry is unaffected. Recorded only so the
+  discrepancy between the plan text and the schema is not re-derived.
+
 - **T8 - only three files could shrink.** T8's acceptance asks for a canvas
   area drop on at least four files; the shipped change reached three
   (deep-nesting -4.8%, hexagonal -5.2%, multi-region -7.9%).
@@ -1478,6 +1550,26 @@ promoted into the task list by the human.
   it needs to be a deliberate task rather than a drive-by.
 - `docs/layout-champion.md` is still in the tree and still describes
   pre-`2484ffa` geometry. T1 marks it historical.
+
+- **`fill` is not overridable on a geo `<Note>`.** T9 gave notes `color` only
+  (that is what the task asked for), so `emitNote`'s geo path still hardcodes
+  `fill: "semi"`. A `<Note fill="none">` is an `ir/unknown-prop`. One line in
+  `ALLOWED_PROPS` + `lowerNote` + `emitNote` if anyone wants it.
+- **`size`, `font`, `labelColor`, `align`, `verticalAlign` are still hardcoded
+  in `builders.ts`.** T10 and T11 own four of the five; nothing owns `size` on
+  an *arrow* (its stroke weight), which is the cheapest remaining legibility
+  win in Phase 3 and is not layout-affecting.
+- **The style enums are copied into `domain/ir/styles.ts`, not derived.** They
+  cannot be imported - `domain/` may not import tldraw - so a tldraw point
+  release that adds a colour silently leaves tldsl rejecting it. The pattern
+  used elsewhere for exactly this (`DEFAULT_SCHEMA` in `builders.ts`) is pinned
+  by an e2e test that reads the live schema; the enum tuples have no such test.
+  `tests/e2e/scene-roundtrip.test.ts` is the natural home.
+- **`arrow` shapes carry a `fill` prop** (`arrowShapeProps.fill`) that T9 did
+  not expose. It only matters for filled arrowheads (`triangle`, `diamond`,
+  `square`, `dot`), where it is the difference between hollow and solid - which
+  is visible in `tests/e2e/fixtures/styles.tldsl.jsx`, where every arrowhead
+  renders hollow.
 - **`estimatedNoteSize` still uses a flat `NOTE_CHAR_PX = 15`**, the same class
   of bug T0 just removed from box sizing. Notes now have measured glyph metrics
   available (`textWidth` in `domain/layout/glyph-metrics.ts`) but do not use

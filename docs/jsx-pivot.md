@@ -196,6 +196,12 @@ of domain components. `<Service name="api"/>` is no more native to an LLM than
 from JSX mechanics, not element names. `roadmap.md` already rejected
 `<service>`/`<decision>` bundles on this reasoning and that call still holds.
 
+**Update (T9/T16b):** the `variant` prop clause above is superseded - presets
+are userland JSX components (plan T16b: a function returning `<Box color="..."
+fill="..." />`), not a built-in prop. There is no `variant` prop on any element
+today; only the raw enums (`color`, `fill`, `dash`, `arrowheadStart`,
+`arrowheadEnd`) landed as pass-through props (T9).
+
 ### 10. Comments-as-stickies (ADR-11) is dead
 
 `{/* … */}` is a JavaScript comment. esbuild strips it during transform — it never

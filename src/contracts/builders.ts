@@ -155,6 +155,7 @@ export function boxShape(
     geo?: string;
     color?: string;
     fill?: string;
+    dash?: string;
   },
 ): TLRecord {
   return {
@@ -167,7 +168,7 @@ export function boxShape(
       color: input.color ?? "black",
       labelColor: "black",
       fill: input.fill ?? "none",
-      dash: "draw",
+      dash: input.dash ?? "draw",
       size: "m",
       font: "draw",
       align: "middle",
@@ -222,7 +223,15 @@ export function frameShape(
   } satisfies TLRecord;
 }
 
-export function arrowShape(input: ShapeBase & { bend?: number }): TLRecord {
+export function arrowShape(
+  input: ShapeBase & {
+    bend?: number;
+    color?: string;
+    dash?: string;
+    arrowheadStart?: string;
+    arrowheadEnd?: string;
+  },
+): TLRecord {
   return {
     ...baseShapeFields(input),
     type: "arrow",
@@ -231,14 +240,14 @@ export function arrowShape(input: ShapeBase & { bend?: number }): TLRecord {
       start: { x: 0, y: 0 },
       end: { x: 0, y: 0 },
       bend: input.bend ?? 0,
-      color: "black",
+      color: input.color ?? "black",
       labelColor: "black",
       size: "m",
-      dash: "draw",
+      dash: input.dash ?? "draw",
       fill: "none",
       font: "draw",
-      arrowheadStart: "none",
-      arrowheadEnd: "arrow",
+      arrowheadStart: input.arrowheadStart ?? "none",
+      arrowheadEnd: input.arrowheadEnd ?? "arrow",
       text: "",
       labelPosition: 0.5,
       scale: 1,

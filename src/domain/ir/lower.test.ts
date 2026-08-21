@@ -263,7 +263,7 @@ describe("lower: ir/unknown-prop", () => {
     const [d] = diagnostics;
     expect(d!.code).toBe("ir/unknown-prop");
     expect(d!.message).toBe(
-      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW)",
+      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash)",
     );
     // column 3: fixture's synthetic per-attribute column for `lable`, the
     // second attribute after `id`.
@@ -373,5 +373,92 @@ describe("lower: note 'on' target", () => {
     const ast = doc({}, [box({ id: "a" }), note({ on: "a" }, "hi")]);
     const { codes } = lowerAst(ast);
     expect(codes).not.toContain("ir/unknown-prop");
+  });
+});
+
+describe("lower: style props (T9)", () => {
+  it("captures color/fill/dash on <box>", () => {
+    const ast = doc({}, [box({ id: "a", color: "blue", fill: "solid", dash: "dashed" })]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const boxIr = ir!.children[0]!;
+    if (boxIr.kind !== "box") throw new Error("expected box");
+    expect(boxIr.color).toBe("blue");
+    expect(boxIr.fill).toBe("solid");
+    expect(boxIr.dash).toBe("dashed");
+  });
+
+  it("captures color on <frame>", () => {
+    const ast = doc({}, [frame({ id: "f", color: "green" })]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const frameIr = ir!.children[0]!;
+    if (frameIr.kind !== "frame") throw new Error("expected frame");
+    expect(frameIr.color).toBe("green");
+  });
+
+  it("captures color on <note>", () => {
+    const ast = doc({}, [note({ id: "n", color: "yellow" }, "hi")]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const noteIr = ir!.children[0]!;
+    if (noteIr.kind !== "note") throw new Error("expected note");
+    expect(noteIr.color).toBe("yellow");
+  });
+
+  it("captures color/dash/arrowheadStart/arrowheadEnd on <edge>", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      edge({
+        id: "e",
+        from: "a",
+        to: "a",
+        color: "red",
+        dash: "dotted",
+        arrowheadStart: "square",
+        arrowheadEnd: "diamond",
+      }),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const edgeIr = ir!.children[1]!;
+    if (edgeIr.kind !== "edge") throw new Error("expected edge");
+    expect(edgeIr.color).toBe("red");
+    expect(edgeIr.dash).toBe("dotted");
+    expect(edgeIr.arrowheadStart).toBe("square");
+    expect(edgeIr.arrowheadEnd).toBe("diamond");
+  });
+
+  it("ir/invalid-style-value for an unknown color, with a non-zero span, and omits the field", () => {
+    const ast = doc({}, [box({ id: "a", color: "puce" })]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics).toHaveLength(1);
+    const [d] = diagnostics;
+    expect(d!.code).toBe("ir/invalid-style-value");
+    expect(d!.message).toContain("'color' must be one of");
+    expect(d!.message).toContain("(got 'puce')");
+    expect(d!.span).not.toEqual({ file: "", line: 0, column: 0 });
+    expect(d!.span?.line).toBeGreaterThan(0);
+
+    const { ir } = lower(ast);
+    const boxIr = ir!.children[0]!;
+    if (boxIr.kind !== "box") throw new Error("expected box");
+    expect(boxIr.color).toBeUndefined();
+  });
+
+  it("ir/invalid-style-value for an unknown fill on <box>", () => {
+    const { codes } = lowerAst(doc({}, [box({ id: "a", fill: "gradient" })]));
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+
+  it("ir/invalid-style-value for an unknown dash on <box>", () => {
+    const { codes } = lowerAst(doc({}, [box({ id: "a", dash: "squiggly" })]));
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+
+  it("ir/invalid-style-value for an unknown arrowheadStart on <edge>", () => {
+    const ast = doc({}, [box({ id: "a" }), edge({ from: "a", to: "a", arrowheadStart: "star" })]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-style-value"]);
   });
 });

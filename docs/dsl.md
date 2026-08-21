@@ -63,10 +63,10 @@ line number and the allowed list.
 | element | allowed props |
 |---|---|
 | `<Doc>` | `id`, `direction`, `layout`, `gap`, `pad`, `cols` |
-| `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h` |
-| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW` |
-| `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h` |
-| `<Edge>` | `id`, `from`, `to` |
+| `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h`, `color` |
+| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash` |
+| `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `color` |
+| `<Edge>` | `id`, `from`, `to`, `color`, `dash`, `arrowheadStart`, `arrowheadEnd` |
 
 `x`/`y`/`w`/`h`/`gap`/`pad`/`cols`/`maxW` are numbers written as strings
 (`w="200"`), like any other JSX attribute value. A non-numeric value is
@@ -79,8 +79,19 @@ address them by id. `<Doc>`, `<Note>`, and `<Edge>` get a synthesized id when
 omitted. Duplicate explicit ids are `ir/duplicate-id`, reported at the
 *second* occurrence, naming the first definition's line.
 
-There is no `color`, `fill`, `variant`, or any other styling prop today -
-`className` or `style` are `ir/unknown-prop` just like a typo would be.
+`color`/`fill`/`dash`/`arrowheadStart`/`arrowheadEnd` are raw tldraw style
+enums, pass-through only - they never affect layout geometry. `color` is one
+of tldraw's 13-value palette (`black`, `grey`, `light-violet`, `violet`,
+`blue`, `light-blue`, `yellow`, `orange`, `green`, `light-green`,
+`light-red`, `red`, `white`); `fill` is `none | semi | solid | pattern |
+fill`; `dash` is `draw | solid | dashed | dotted`; `arrowheadStart` /
+`arrowheadEnd` (on `<Edge>` only) are one of `arrow | triangle | square | dot
+| pipe | diamond | inverted | bar | none`. An unrecognized value is
+`ir/invalid-style-value`, naming the allowed list. `<Frame>` has no `fill` or
+`dash` - tldraw's frame shape doesn't support them, so they're
+`ir/unknown-prop` there. There is no `variant`, or any other CSS-style
+prop today - `className` or `style` are `ir/unknown-prop` just like a typo
+would be.
 
 ## Layout
 
@@ -277,8 +288,9 @@ rejected or unavailable at lowering:
   parsed, rejected with `ir/anchor-not-supported`.
 - Free endpoints (`"x:100,y:200"`) - parsed, rejected with
   `ir/free-endpoint-not-supported`.
-- Any visual/style prop (`color`, `fill`, `variant`, `className`, `style`) -
-  `ir/unknown-prop`.
+- Any CSS-style prop (`variant`, `className`, `style`) - `ir/unknown-prop`.
+  (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd` - raw tldraw
+  enums - are implemented; see the Props table above.)
 - Edge decoration (`type`, `route`, `head-start`, `head-end`) - not a
   recognized `<Edge>` prop at all.
 - Comments-as-stickies - dead; use `<Note>`.

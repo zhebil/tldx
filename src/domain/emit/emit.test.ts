@@ -273,6 +273,95 @@ describe("domain/emit", () => {
   });
 });
 
+describe("domain/emit: style pass-through (T9)", () => {
+  it("passes box color/fill/dash through to props, defaulting when absent", () => {
+    const scene = emit(
+      doc([
+        box({ id: "styled", x: 0, y: 0, w: 100, h: 50, color: "blue", fill: "solid", dash: "dashed" }),
+        box({ id: "plain", x: 0, y: 0, w: 100, h: 50 }),
+      ]),
+    );
+    const styled = scene.store["shape:styled"]?.props as Record<string, unknown>;
+    expect(styled.color).toBe("blue");
+    expect(styled.fill).toBe("solid");
+    expect(styled.dash).toBe("dashed");
+
+    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    expect(plain.color).toBe("black");
+    expect(plain.fill).toBe("none");
+    expect(plain.dash).toBe("draw");
+  });
+
+  it("passes frame color through, defaulting to black when absent", () => {
+    const scene = emit(
+      doc([frame({ id: "f", x: 0, y: 0, w: 100, h: 50, color: "green", children: [] })]),
+    );
+    expect((scene.store["shape:f"]?.props as Record<string, unknown>).color).toBe("green");
+
+    const defaulted = emit(doc([frame({ id: "g", x: 0, y: 0, w: 100, h: 50, children: [] })]));
+    expect((defaulted.store["shape:g"]?.props as Record<string, unknown>).color).toBe("black");
+  });
+
+  it("passes geo-note color through, overriding the warm-fill default", () => {
+    const scene = emit(
+      doc([note({ id: "n", text: "hi", x: 0, y: 0, w: 100, h: 50, color: "violet" })]),
+    );
+    const props = scene.store["shape:n"]?.props as Record<string, unknown>;
+    expect(props.color).toBe("violet");
+    expect(props.fill).toBe("semi");
+  });
+
+  it("defaults geo-note color to yellow when absent (unchanged behavior)", () => {
+    const scene = emit(doc([note({ id: "n", text: "hi", x: 0, y: 0, w: 100, h: 50 })]));
+    const props = scene.store["shape:n"]?.props as Record<string, unknown>;
+    expect(props.color).toBe("yellow");
+    expect(props.fill).toBe("semi");
+  });
+
+  it("passes sticky color through", () => {
+    const scene = emit(
+      doc([note({ id: "s", text: "hi", x: 0, y: 0, w: 200, h: 200, sticky: true, color: "orange" })]),
+    );
+    expect((scene.store["shape:s"]?.props as Record<string, unknown>).color).toBe("orange");
+  });
+
+  it("passes edge color/dash/arrowheadStart/arrowheadEnd through, defaulting when absent", () => {
+    const scene = emit(
+      doc([
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 200, y: 0, w: 100, h: 50 }),
+        edge({
+          id: "e",
+          from: "a",
+          to: "b",
+          color: "red",
+          dash: "dotted",
+          arrowheadStart: "square",
+          arrowheadEnd: "diamond",
+        }),
+      ]),
+    );
+    const props = scene.store["shape:e"]?.props as Record<string, unknown>;
+    expect(props.color).toBe("red");
+    expect(props.dash).toBe("dotted");
+    expect(props.arrowheadStart).toBe("square");
+    expect(props.arrowheadEnd).toBe("diamond");
+
+    const defaulted = emit(
+      doc([
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 200, y: 0, w: 100, h: 50 }),
+        edge({ id: "e2", from: "a", to: "b" }),
+      ]),
+    );
+    const defaultProps = defaulted.store["shape:e2"]?.props as Record<string, unknown>;
+    expect(defaultProps.color).toBe("black");
+    expect(defaultProps.dash).toBe("draw");
+    expect(defaultProps.arrowheadStart).toBe("none");
+    expect(defaultProps.arrowheadEnd).toBe("arrow");
+  });
+});
+
 // -- helpers ------------------------------------------------------------------
 
 const SPAN = { file: "test.tldsl", line: 1, column: 1 };
@@ -294,6 +383,9 @@ function box(input: {
   w: number;
   h: number;
   label?: string;
+  color?: string;
+  fill?: string;
+  dash?: string;
 }): IRBoxPositioned {
   const { label, ...rest } = input;
   return {
@@ -302,7 +394,7 @@ function box(input: {
     span: SPAN,
     ...rest,
     ...(label === undefined ? {} : { label }),
-  };
+  } as IRBoxPositioned;
 }
 
 function note(input: {
@@ -313,13 +405,14 @@ function note(input: {
   w: number;
   h: number;
   sticky?: boolean;
+  color?: string;
 }): IRNotePositioned {
   return {
     kind: "note",
     idExplicit: false,
     span: SPAN,
     ...input,
-  };
+  } as IRNotePositioned;
 }
 
 function frame(input: {
@@ -330,6 +423,7 @@ function frame(input: {
   h: number;
   name?: string;
   children: IRElementPositioned[];
+  color?: string;
 }): IRFramePositioned {
   const { name, ...rest } = input;
   return {
@@ -338,14 +432,22 @@ function frame(input: {
     span: SPAN,
     ...rest,
     ...(name === undefined ? {} : { name }),
-  };
+  } as IRFramePositioned;
 }
 
-function edge(input: { id: string; from: string; to: string }): IREdge {
+function edge(input: {
+  id: string;
+  from: string;
+  to: string;
+  color?: string;
+  dash?: string;
+  arrowheadStart?: string;
+  arrowheadEnd?: string;
+}): IREdge {
   return {
     kind: "edge",
     idExplicit: true,
     span: SPAN,
     ...input,
-  };
+  } as IREdge;
 }

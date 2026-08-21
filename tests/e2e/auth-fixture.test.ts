@@ -24,7 +24,10 @@ import {
   sceneJson,
 } from "../../src/contracts/builders.js";
 import type { SceneJSON, TLRecord } from "../../src/contracts/scene-json.js";
+import { compileFile } from "../../src/app/compile-file.js";
+import { StubLayout } from "../../src/domain/ports/layout.fake.js";
 import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
+import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(HERE, "fixtures");
@@ -219,5 +222,18 @@ describe("e2e fixture: auth scene spec", () => {
     );
     expect(docs).toHaveLength(1);
     expect(pages).toHaveLength(1);
+  });
+});
+
+describe("e2e fixture: styles.tldsl.jsx (T9)", () => {
+  it("compiles with zero diagnostics, exercising every tldraw style enum value", async () => {
+    const path = join(FIXTURES, "styles.tldsl.jsx");
+    const result = await compileFile(path, {
+      fs: createNodeFsRead(),
+      layout: new StubLayout(),
+      execute: createJsxExecute(),
+    });
+    expect(result.diagnostics).toEqual([]);
+    expect(result.sceneJson).not.toBeNull();
   });
 });

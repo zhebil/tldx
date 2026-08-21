@@ -1,5 +1,6 @@
 import type { Align, Direction, LayoutMode } from "../layout/defaults.js";
 import type { SourceSpan } from "../diagnostics/index.js";
+import type { StyleArrowhead, StyleColor, StyleDash, StyleFill } from "./styles.js";
 
 /**
  * Normalized intermediate representation. Produced by `lower(ast)` from
@@ -46,6 +47,8 @@ export type IRFrame = IRBase & {
   w?: number;
   h?: number;
   children: IRElement[];
+  /** Pass-through tldraw frame style; frames have no `fill`/`dash` in tldraw's schema. */
+  color?: StyleColor;
 };
 
 export type IRBox = IRBase & {
@@ -56,6 +59,10 @@ export type IRBox = IRBase & {
   w?: number;
   h?: number;
   maxW?: number;
+  /** Pass-through tldraw geo-shape style; does not affect layout. */
+  color?: StyleColor;
+  fill?: StyleFill;
+  dash?: StyleDash;
 };
 
 export type IRNote = IRBase & {
@@ -69,6 +76,8 @@ export type IRNote = IRBase & {
   y?: number;
   w?: number;
   h?: number;
+  /** Pass-through tldraw style; does not affect layout. */
+  color?: StyleColor;
 };
 
 export type IREdge = IRBase & {
@@ -77,6 +86,11 @@ export type IREdge = IRBase & {
   from: string;
   /** Id of the destination addressable element. Resolved at lower time. */
   to: string;
+  /** Pass-through tldraw arrow style; does not affect layout. */
+  color?: StyleColor;
+  dash?: StyleDash;
+  arrowheadStart?: StyleArrowhead;
+  arrowheadEnd?: StyleArrowhead;
 };
 
 export type IRElement = IRDoc | IRFrame | IRBox | IRNote | IREdge;

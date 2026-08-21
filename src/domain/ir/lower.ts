@@ -13,6 +13,10 @@
  * - `x | y | w | h` parse as finite numbers when present.
  * - attributes outside the fixed allowed set per element kind are rejected
  *   with `ir/unknown-prop` (replaces the type checker the MVP doesn't have).
+ * - style props (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd`)
+ *   must be one of tldraw's fixed enum values (`ir/styles.ts`), or
+ *   `ir/invalid-style-value`. These are pure pass-through - they never
+ *   affect layout.
  *
  * Errors do not abort lowering; the IR is produced best-effort and the
  * caller decides what to do based on `hasErrors(diagnostics)`. Edges that
@@ -35,6 +39,7 @@ import {
   type Direction,
   type LayoutMode,
 } from "../layout/defaults.js";
+import { ARROWHEADS, COLORS, DASHES, FILLS } from "./styles.js";
 import type {
   AstBox,
   AstEdge,
@@ -70,10 +75,11 @@ const ALLOWED_PROPS = {
     "y",
     "w",
     "h",
+    "color",
   ],
-  box: ["id", "label", "x", "y", "w", "h", "maxW"],
-  note: ["id", "on", "x", "y", "w", "h"],
-  edge: ["id", "from", "to"],
+  box: ["id", "label", "x", "y", "w", "h", "maxW", "color", "fill", "dash"],
+  note: ["id", "on", "x", "y", "w", "h", "color"],
+  edge: ["id", "from", "to", "color", "dash", "arrowheadStart", "arrowheadEnd"],
 } as const;
 
 /**
@@ -199,6 +205,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
   const direction = readDirection(node.attrs, ctx);
   const layout = readLayoutMode(node.attrs, ctx);
   const align = readAlign(node.attrs, ctx);
+  const color = readEnum(node.attrs, "color", COLORS, ctx);
   const frame: IRFrame = {
     kind: "frame",
     ...assignId(node.attrs, node.span, ctx, {
@@ -214,6 +221,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
     ...(align === undefined ? {} : { align }),
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
     ...numericAttrs(node.attrs, ctx, ["gap", "pad", "cols"] as const),
+    ...(color === undefined ? {} : { color }),
   };
   for (const child of node.children) {
     const lowered = lowerNode(child, ctx);
@@ -224,6 +232,9 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
 
 function lowerBox(node: AstBox, ctx: Ctx): IRBox {
   checkUnknownProps("box", node.attrs, ctx);
+  const color = readEnum(node.attrs, "color", COLORS, ctx);
+  const fill = readEnum(node.attrs, "fill", FILLS, ctx);
+  const dash = readEnum(node.attrs, "dash", DASHES, ctx);
   return {
     kind: "box",
     ...assignId(node.attrs, node.span, ctx, {
@@ -234,11 +245,15 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
     span: node.span,
     ...optionalString(node.attrs, "label"),
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h", "maxW"] as const),
+    ...(color === undefined ? {} : { color }),
+    ...(fill === undefined ? {} : { fill }),
+    ...(dash === undefined ? {} : { dash }),
   };
 }
 
 function lowerNote(node: AstNote, ctx: Ctx): IRNote {
   checkUnknownProps("note", node.attrs, ctx);
+  const color = readEnum(node.attrs, "color", COLORS, ctx);
   return {
     kind: "note",
     ...assignId(node.attrs, node.span, ctx, {
@@ -251,6 +266,7 @@ function lowerNote(node: AstNote, ctx: Ctx): IRNote {
     ...(node.sticky ? { sticky: true as const } : {}),
     ...optionalString(node.attrs, "on"),
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
+    ...(color === undefined ? {} : { color }),
   };
 }
 
@@ -273,6 +289,11 @@ function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
   const to = validateEndpoint(toAttr, "to", ctx);
   if (from === null || to === null) return null;
 
+  const color = readEnum(node.attrs, "color", COLORS, ctx);
+  const dash = readEnum(node.attrs, "dash", DASHES, ctx);
+  const arrowheadStart = readEnum(node.attrs, "arrowheadStart", ARROWHEADS, ctx);
+  const arrowheadEnd = readEnum(node.attrs, "arrowheadEnd", ARROWHEADS, ctx);
+
   return {
     kind: "edge",
     ...assignId(node.attrs, node.span, ctx, {
@@ -283,6 +304,10 @@ function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
     span: node.span,
     from,
     to,
+    ...(color === undefined ? {} : { color }),
+    ...(dash === undefined ? {} : { dash }),
+    ...(arrowheadStart === undefined ? {} : { arrowheadStart }),
+    ...(arrowheadEnd === undefined ? {} : { arrowheadEnd }),
   };
 }
 
@@ -517,6 +542,26 @@ function readAlign(attrs: Attrs, ctx: Ctx): Align | undefined {
     error(
       "ir/bad-align",
       `'align' must be one of ${ALIGNS.join(", ")} (got '${raw}')`,
+      attr.span,
+    ),
+  );
+  return undefined;
+}
+
+function readEnum<T extends string>(
+  attrs: Attrs,
+  name: string,
+  values: readonly T[],
+  ctx: Ctx,
+): T | undefined {
+  const attr = attrs[name];
+  if (attr === undefined) return undefined;
+  const raw = attr.value;
+  if ((values as readonly string[]).includes(raw)) return raw as T;
+  ctx.diagnostics.push(
+    error(
+      "ir/invalid-style-value",
+      `'${name}' must be one of ${values.join(", ")} (got '${raw}')`,
       attr.span,
     ),
   );

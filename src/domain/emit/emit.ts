@@ -14,10 +14,15 @@
  *   shape id. Shape `x | y` is whatever layout produced (frame-relative when
  *   nested), preserved verbatim.
  * - `<Note>` (non-sticky) emits as a `geo` rectangle sized like a box (IR
- *   `w`/`h` pass through verbatim), warm-filled (`color: "yellow", fill:
- *   "semi"`) to read as an annotation. `<Sticky>` (`note.sticky`) keeps the
- *   old path: drops IR `w` (tldraw stickies are always 200 wide) and keeps
- *   `h` as `growY` above tldraw's 200 base height.
+ *   `w`/`h` pass through verbatim), warm-filled by default (`color: "yellow",
+ *   fill: "semi"`, overridden by IR `note.color` when set) to read as an
+ *   annotation. `<Sticky>` (`note.sticky`) keeps the old path: drops IR `w`
+ *   (tldraw stickies are always 200 wide) and keeps `h` as `growY` above
+ *   tldraw's 200 base height; `note.color` passes through the same way.
+ * - `box`/`frame`/`note`/`edge` also pass through the raw tldraw style props
+ *   IR carries (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd` -
+ *   see `domain/ir/styles.ts`) verbatim onto the shape when present; these
+ *   never affect geometry.
  * - Edges become an `arrow` shape (`x: 0, y: 0`, parented to the page) plus
  *   two `binding` records anchoring start/end to the referenced shapes with
  *   default-center attach. The 13-anchor scheme is phase 1. A same-axis skip
@@ -103,6 +108,9 @@ function emitBox(box: IRBoxPositioned, parentId: string): TLRecord {
     w: box.w,
     h: box.h,
     ...(box.label === undefined ? {} : { text: box.label }),
+    ...(box.color === undefined ? {} : { color: box.color }),
+    ...(box.fill === undefined ? {} : { fill: box.fill }),
+    ...(box.dash === undefined ? {} : { dash: box.dash }),
   });
 }
 
@@ -115,6 +123,7 @@ function emitNote(note: IRNotePositioned, parentId: string): TLRecord {
       y: note.y,
       text: note.text,
       growY: Math.max(0, note.h - NOTE_SIZE),
+      ...(note.color === undefined ? {} : { color: note.color }),
     });
   }
   return boxShape({
@@ -125,7 +134,7 @@ function emitNote(note: IRNotePositioned, parentId: string): TLRecord {
     w: note.w,
     h: note.h,
     text: note.text,
-    color: "yellow",
+    color: note.color ?? "yellow",
     fill: "semi",
   });
 }
@@ -139,6 +148,7 @@ function emitFrame(frame: IRFramePositioned, parentId: string): TLRecord {
     w: frame.w,
     h: frame.h,
     ...(frame.name === undefined ? {} : { name: frame.name }),
+    ...(frame.color === undefined ? {} : { color: frame.color }),
   });
 }
 
@@ -146,7 +156,19 @@ function emitFrame(frame: IRFramePositioned, parentId: string): TLRecord {
 // anchor already sits on the outline and can trim a bowed arrow to a 10px stub.
 function emitEdge(edge: IREdge, out: TLRecord[], route: EdgeRoute | undefined): void {
   const arrowId = shapeId(edge.id);
-  out.push(arrowShape({ id: arrowId, parentId: PAGE_ID, x: 0, y: 0, bend: route?.bend ?? 0 }));
+  out.push(
+    arrowShape({
+      id: arrowId,
+      parentId: PAGE_ID,
+      x: 0,
+      y: 0,
+      bend: route?.bend ?? 0,
+      ...(edge.color === undefined ? {} : { color: edge.color }),
+      ...(edge.dash === undefined ? {} : { dash: edge.dash }),
+      ...(edge.arrowheadStart === undefined ? {} : { arrowheadStart: edge.arrowheadStart }),
+      ...(edge.arrowheadEnd === undefined ? {} : { arrowheadEnd: edge.arrowheadEnd }),
+    }),
+  );
   out.push(
     arrowBinding({
       id: `binding:${edge.id}-start`,
