@@ -457,3 +457,52 @@ blocker.
 - **Repro:** `examples/repro/d19-literal-newline-in-label.tldsl.jsx` (both forms
   side by side; both pass `check`, only one is a label)
 - **Status:** open
+
+### D20. `maxW` holds on a rectangle and is ignored on a diamond
+
+- **Diagram:** `examples/cicd-pipeline.tldsl.jsx`
+- **Severity:** ugly
+- **Attempted:** The two decision points in a pipeline are diamonds, and like
+  every other box in the file they were given `maxW="200"` so the row would not
+  stretch into one long line (the lever T32 found).
+- **Happened:** The rectangles obeyed - 159 to 195px wide. The two diamonds did
+  not: `quality-gate` came out 369px and `health-gate` **492px**, 2.5x its own
+  cap, with `error rate < 1% for 10 min` on a single unwrapped line. Isolated in
+  the repro: the identical label with the identical `maxW="200"` renders 188x152
+  as a rectangle and **492x320** as a diamond. It is not the inscribed-rectangle
+  factor - a diamond alone in a `<Doc layout="col">` with the same label and cap
+  renders 200 wide, so the width survives until the box is a row child. The
+  knock-on is the row height: the oversized diamond drags every sibling in its
+  row from 152 to 320px tall, which is why `Commit` is a 310px-tall rectangle
+  holding four words.
+- **Repro:** `examples/repro/d20-maxw-ignored-on-diamond.tldsl.jsx`
+- **Status:** open
+
+### D21. A cross-container edge is a straight chord, and a backwards one is the worst case
+
+- **Diagram:** `examples/cicd-pipeline.tldsl.jsx`
+- **Severity:** wrong
+- **Attempted:** The two paths that make a pipeline a pipeline rather than a
+  list: `notify -> commit` ("fix and re-push") returning from the off-ramp row
+  to the first stage, and `rollback -> deploy-prod` re-entering the delivery row
+  from below. Also the three converging failure edges into `notify`.
+- **Happened:** Every edge whose endpoints sit in different containers is drawn
+  as a straight line between the two shapes and nothing else is consulted.
+  `notify -> commit` is a 1,100px chord from (476,1449) to (227,354): it enters
+  the `cd` frame through its bottom border, passes through `Staging smoke
+  tests`, leaves through the top border and enters the `ci` frame the same way.
+  `quality-gate -> notify` and `approval -> notify` cut the same frame
+  diagonally, and `approval -> notify` parks the word `rejected` on top of
+  `Deploy to production` - `layout-report` counts 3 edges crossing a frame
+  boundary they do not belong to and `arrow-truth` 6 paths crossing a
+  non-endpoint shape. There is no routing prop, no waypoint syntax and no
+  orthogonal option in the skill, so an author has exactly one lever: move the
+  boxes.
+  **The prediction in the task did not hold, and the correction matters for the
+  fix.** The short backwards edge was expected to be the disaster and is fine -
+  `rollback -> deploy-prod` is 159px, goes up and in cleanly, and the render is
+  the better for it. What breaks is *length*, not direction: a chord is
+  survivable while it runs with the layout axis over a short span, and a
+  backwards edge is simply the reliable way to produce a long one.
+- **Repro:** `examples/repro/d21-backward-edge-is-a-chord.tldsl.jsx`
+- **Status:** open

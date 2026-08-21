@@ -2328,7 +2328,7 @@ only test it gets against material T24 did not choose.
   `Mobile App`. `npm run check` green (59 files, 657 tests); no `src/` touched,
   so `docs/renders/` and `docs/baseline.md` are unchanged.
 
-- [ ] **T33. A CI/CD pipeline with branches and a gate.**
+- [x] **T33. A CI/CD pipeline with branches and a gate.**
   Commit through build, unit tests, integration tests, a manual approval gate,
   staging, smoke tests, production, plus a rollback path returning to a previous
   stage. **The rollback edge is the point**: an arrow that flows backwards
@@ -2337,6 +2337,47 @@ only test it gets against material T24 did not choose.
   corpus.
   **Acceptance:** `examples/cicd-pipeline.tldsl.jsx`, check clean, PNG reviewed,
   gaps logged.
+
+  `examples/cicd-pipeline.tldsl.jsx` exists and `tldsl check` is clean on the
+  first run: a `Continuous integration` row (commit, build, unit tests,
+  integration tests, a quality-gate diamond), a manual-approval diamond, a
+  `Continuous delivery` row (staging deploy, staging smoke, production deploy,
+  production smoke, a health-gate diamond) and an `Off-ramps` row (notify,
+  rollback, released). Both branches are there - the quality gate forks
+  pass/fail and the health gate forks healthy/unhealthy - and so are both
+  return paths: `notify -> commit` and the rollback edge `rollback ->
+  deploy-prod`.
+
+  **The numbers.** `layout-report`: canvas 1540x1747, aspect 0.88, fill 0.347,
+  1 overlapping shape pair, 6 edge-edge crossings, 3 edges crossing a frame
+  boundary they don't belong to. `arrow-truth`: 6 arrow paths crossing a
+  non-endpoint shape, 1 crowded pair, 1 label on a non-endpoint shape
+  (`rejected` stamped on `Deploy to production`). The PNG was rendered and
+  read; it is legible - the stages read left to right in both rows and the
+  colour coding survives - but three long diagonals slice the delivery row.
+
+  **The task's own prediction did not hold, and that is the result worth
+  keeping.** The rollback edge was expected to be the disaster. It is 159px,
+  goes up and into `deploy-prod` cleanly, and costs the render nothing. What
+  broke is `notify -> commit`: a 1,100px straight chord through two frame
+  borders and through `Staging smoke tests`. The variable is *length*, not
+  direction - a backwards edge is just the reliable way to make a long one.
+
+  **Two new entries, D20-D21, plus recurrences on D3 and D11.** D20 (ugly) -
+  `maxW` holds on a rectangle and is ignored on a diamond: the same label with
+  the same `maxW="200"` renders 188x152 as a rectangle and 492x320 as a
+  diamond, and only when it is a row child (alone in a column it obeys). The
+  oversized diamond then drags its whole row from 152 to 320px tall, which is
+  why `Commit` is a 310px box holding four words. D21 (wrong) - a
+  cross-container edge is a straight chord with no routing prop, no waypoint
+  syntax and no orthogonal option; the author's only lever is to move boxes.
+  D3 recurs (the note overlaps the off-ramps border, the one overlapping pair)
+  and D11 recurs (`rejected` at the geometric midpoint, which happens to be
+  `Deploy to production`).
+
+  Nothing was worked around and nothing was reshaped. `npm run check` green
+  (59 files, 657 tests); no `src/` touched, so `docs/renders/` and
+  `docs/baseline.md` are unchanged.
 
 - [ ] **T34. Triage the ledger.**
   Read every entry. Group duplicates - several diagrams will hit the same
@@ -3615,3 +3656,21 @@ promoted into the task list by the human.
   description in a `<Note>` or leaves them out. If the skill gains one example
   from this phase, it should be a three-line box label - it is the single
   highest-value thing found in T32 and D19 only logs that it is undocumented.
+
+- **T33: a leaf box's height is not related to its label.** In the D20 repro's
+  clean case, four one-line boxes with the same `maxW` all came out 352px tall
+  in a `<Doc layout="col">`, and the same two-line labels came out 790px tall.
+  In a row they collapse to 152. Nothing in the file changes between those
+  runs except the container, so the intrinsic height a leaf reports outside a
+  row is roughly 5x what it needs. Not logged as a defect - it never showed up
+  in a rendered diagram, because every real diagram puts leaves in rows - but
+  if a fix task touches box sizing this is the number to look at first.
+- **The three tools disagree about what "crossing" means and none counts the
+  worst case.** `layout-report` counts edge-edge crossings and frame-boundary
+  crossings; `arrow-truth` counts paths crossing a non-endpoint shape and
+  labels overlapping one; neither counts an edge crossing a *box* it does not
+  connect as distinct from crossing a frame, and neither weights by length. In
+  T33 the single most damaging edge (a 1,100px chord) contributes exactly the
+  same 1 to every counter as a 50px arrow between adjacent boxes. A
+  length-weighted crossing count would have ranked this diagram's defects
+  correctly without anyone opening the PNG.
