@@ -32,8 +32,8 @@ Three things you may do to the plan, and nothing else:
 
 A task marked *blocked on a human decision* is a hard stop, not a puzzle. Write
 `BLOCKED ON HUMAN` at the top of `docs/plan.md` with the task number, commit
-that, and stop. Do not skip past it to the next task and do not make the
-decision yourself.
+that, print `LOOP BLOCKED` on a line by itself, and stop. Do not skip past it to
+the next task and do not make the decision yourself.
 
 If the top task's criterion cannot be measured, or the task contradicts what you
 find in the code, **do not improvise a substitute**. Write the problem under the
@@ -41,7 +41,12 @@ task, leave the box unchecked, commit that, and stop. A wake that reports a
 broken task is worth more than a wake that quietly does something else.
 
 If every task is ticked, write `ALL TASKS COMPLETE` at the top of `docs/plan.md`,
-commit, and stop. Do not invent more work.
+commit, print `LOOP COMPLETE` on a line by itself, and stop. Do not invent more
+work.
+
+`LOOP COMPLETE` and `LOOP BLOCKED` are the runner's stop signals. Print one only
+in the situation above that calls for it, on its own line, and never in passing -
+mentioning either mid-sentence kills the loop.
 
 ## Delegation
 
