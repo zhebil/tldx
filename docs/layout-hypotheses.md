@@ -1964,3 +1964,97 @@ next step is an obstacle-aware router, not another terminal rule.
 Reverted with `git stash push` + `git stash drop` over the five touched files
 (`git checkout --` is blocked by a guardrail hook in this environment);
 `npm run check` green on the restored tree, 38 files / 301 tests.
+
+---
+
+## B25 — skip-aware row gap in grid containers _(wake 37)_ — **KEPT**
+
+The first hypothesis in the loop's history to move the crossing metric, and the
+first one to change where boxes *sit* rather than how arrows attach. Wake 36
+closed arrow attachment after eight failures; B25 is what the Status block
+named as the only lever left.
+
+**Premise measured before building** (B8's lesson). A sweep of `DEFAULT_GAP`
+over `wide-fanout`, the file that carries 36 of the corpus's 52 crossings,
+showed the mechanism is real and monotone: gap 40 → 36 crossings, 60 → 33,
+80 → 30, 120 → 25. Splitting the grid's single gap per axis showed the row axis
+is the better lever, and by a wide margin per unit of canvas: row gap ×3 alone
+gave 30, column gap ×3 alone gave 32, row gap ×2 alone gave 31. A uniform gap
+of 80 also gives 30 but costs 1.62× the canvas area, which **fails objective
+gate 4**. Row gap ×2 costs 1.35× and passes. So the axis-split is not a
+refinement of the hypothesis, it is what makes it admissible at all.
+
+**Why the row axis and not both.** In a `row` or `col` container a skip chord
+runs *along* the flow axis and passes through the intervening children's
+centres no matter how wide the gap - widening cannot open a corridor there, it
+only grows the canvas. In a grid the skip chord is diagonal, and widening the
+axis it spans opens real corridor space between the rows. The change is
+therefore confined to the grid path; `row`, `col`, `free` and `auto` are
+byte-identical.
+
+**The diff.** `src/domain/layout/stack.ts`, +43/-8, plus tests.
+`SKIP_ROW_GAP_FACTOR = 2` and an exported predicate
+`hasSkipEdge(childIds, edges)` - true iff some edge connects two direct
+children whose flow positions differ by more than one. `layoutContainer`
+computes `rowGap = flowMode === "grid" && hasSkipEdge(...) ? gap * 2 : gap` and
+threads it through `computeFlowPositions` → `gridPositions`, where only the row
+cursor uses it; the column cursor keeps `gap`. `gridExtent` and `bestGridCols`
+take `rowGap` as a fourth parameter defaulting to `gap`, so the column count is
+chosen against the spacing the grid will actually get.
+
+**The predicate deliberately does not depend on `cols`.** The obvious
+formulation - "widen the row gap when an edge spans two rows" - is circular:
+which row a child lands in depends on `cols`, `cols` is chosen from the extent,
+and the extent depends on the row gap. Flow-position distance breaks the cycle
+and is a strictly weaker test, which is the safe direction: it can only fire
+where a genuine skip exists.
+
+`npm run check` green, 38 files / 308 tests (7 new). One pre-existing test moved:
+the B20 fan-out test derives its expectation by calling `bestGridCols` itself,
+and a fan is necessarily also a skip case (the hub sits more than one flow
+position from most of its spokes), so it now passes the same `rowGap`
+production computes. No corpus fixture was touched.
+
+**All five objective gates pass, and gate 5 improves for the first time.**
+
+| corpus file | champion | B25 | canvas champion | canvas B25 | area |
+| --- | --- | --- | --- | --- | --- |
+| deep-nesting | 10 | 10 | 560 x 776 | 560 x 776 | 1.00× |
+| hexagonal | 5 | 5 | 1198 x 636 | 1198 x 636 | 1.00× |
+| long-labels | 1 | 1 | 1927 x 1162 | 1927 x 1362 | 1.17× |
+| sequence | 0 | 0 | 282 x 1360 | 282 x 1360 | 1.00× |
+| sparse-graph | 0 | 0 | 680 x 460 | 680 x 460 | 1.00× |
+| wide-fanout | **36** | **31** | 983 x 460 | 983 x 620 | 1.35× |
+
+Overlapping shape pairs stayed at 0 and source-order violations at 0 on both
+changed files; edge-edge crossings were unmoved (1 and 0). `deep-nesting` and
+`hexagonal` are unchanged because their root grids are a single row, so there
+is no row gap to widen - a structural tie on four of six files, and only two
+went to a judge.
+
+| file | A | B | verdict | for the candidate |
+| --- | --- | --- | --- | --- |
+| long-labels | champion | candidate | B | **win** |
+| wide-fanout | champion | candidate | B | **win** |
+
+2 wins, 0 losses. KEPT. The randomiser put the candidate at B on both files;
+that is a real roll, recorded here because the run is small enough for it to
+matter to anyone re-reading the entry.
+
+**Both judges independently named the same mechanism, and it is the one the
+metric measures.** `wide-fanout`: *"the extra vertical spacing separates the
+Dispatcher's fan-out arrows so they enter boxes at steeper angles with less
+label occlusion, while in A the compressed rows make the arrows slice
+horizontally through the Worker 8-10 boxes and strike through their labels"*.
+`long-labels`: *"B's larger vertical gaps make the arrows actually traceable -
+the auth-to-router arrow is clearly visible in B but nearly swallowed by the
+tight 40px gap in A"*. Note that `long-labels` won on a file where gate 5 did
+*not* move (1 crossing either way): the corridor buys legibility even where it
+does not remove a crossing, which the metric cannot see.
+
+**What this does not settle.** ×2 is a constant, picked because ×3 fails gate 4
+on `wide-fanout` and ×1.5 leaves crossings on the table; nothing here argues it
+is the right shape of function. The obvious successor is to scale the widening
+with the *magnitude* of the skip (a hub reaching 18 flow positions away needs
+more corridor than one reaching 2) and to spend the budget where gate 4 has
+room, which is the axis the file is not already long in. Filed as **B32**.
