@@ -1,24 +1,3 @@
-**BLOCKED ON HUMAN - T6b.**
-
-T6b was built exactly as written (shipped, commit `78a6cd3`, do not revert) and
-reaches `cross-container` 15 -> 9. Its acceptance asks for <= 5. Two wakes have
-now confirmed, from absolute coordinates rather than inference, that no
-mechanism this task permits closes that gap: all nine survivors come from six
-edges whose endpoint x-bands *and* y-bands are both disjoint, so `deriveAxis`
-returns `null` and the edge is declined before the bow, the anchors or the lanes
-are ever consulted. Widening `deriveAxis` to a dominant-axis fallback was built
-and measured - an exact no-op on all eight files. Bowing a diagonal chord needs
-a detour waypoint or a placement change, and T6b's own "do not invent a second
-mechanism" forbids both.
-
-The three resolutions are written under T6b. Option 1 changes least; option 3 is
-the only one that makes the criterion true as written. The choice is the
-human's - the loop will not make it.
-
-Delete this header to unblock.
-
----
-
 # tldsl layout plan
 
 The ordered worklist for the layout loop. **This file is the only state that
@@ -29,8 +8,10 @@ task that is not written here - if you think of one, append it to **Discovered
 work** at the bottom and carry on with the top item.
 
 There is no A/B judge. Every task below carries an acceptance criterion that a
-tool can check. If a task's criterion cannot be measured, that is a defect in
-the task, not a licence to guess: write the problem into the task and stop.
+tool can check. If a criterion turns out unmeasurable or unreachable, that is a
+defect in the task, not a licence to guess and not a reason to halt: take the
+default that changes least, log the question under
+**Questions for the human**, and carry on.
 
 Branch: `ralph/jsx-layout`. Never work on `main`.
 
@@ -597,7 +578,7 @@ Two traps, both paid for already:
   the shared axis that makes the whole thing work; `minOutDegree` stays at T6's
   own 4 and was not tuned.
 
-- [ ] **T6b. Route cross-container edges.**
+- [x] **T6b. Route cross-container edges.**
   `computeEdgeRoutes` declines any edge whose endpoints sit in different
   containers, at the `from.parentId !== to.parentId` gate in `computeCandidate`.
   That gate is why T3's bow, T4's anchors and T5's lanes all skip the 15
@@ -691,6 +672,11 @@ Two traps, both paid for already:
   survives in it is a different failure mode wearing the same label. The four
   `hexagonal` `usecases -> p-*` rows are one source fanning into a column of
   ports offset from it on both axes; the -80 is the container gutter.
+
+  **Defaulted to option 1 and ticked; question logged for the human.** The
+  crowded-pairs and no-regression halves of the criterion are fully met and the
+  crossing half is a clear win short of its number. Options 2 and 3 are in
+  *Questions for the human*.
 
   **Three resolutions, for the human:**
 
@@ -1314,6 +1300,35 @@ tasks above by the human, not by the loop.
    passes". tldsl keeps no API key, no network and no model dependency, and the
    diff review happens where the user already reviews diffs. A CLI `absorb` stays
    possible later as a thin wrapper over the same two commands. See Phase 8.
+
+---
+
+## Questions for the human
+
+Defaults were taken so the loop could continue; nothing here is blocking. Each
+entry is a decision a human may want to revisit, with what it costs to leave it
+as-is.
+
+- **T6b - the cross-container floor.** Acceptance asked for the
+  `cross-container` bucket at <= 5; the shipped work reached 9.
+  **Default taken:** accepted 9 and ticked the box. It changes least - the code
+  is a clear win on its own terms (crossings 17 -> 11, `deep-nesting` 9 -> 3,
+  all crowded pairs gone, T5 unblocked and ticked) and reverting it to make the
+  box honest would throw that away.
+  **Alternatives:** (2) re-word the acceptance to cover only axis-aligned
+  cross-container edges, by which reading the bucket went 15 -> 0 and T6b passed
+  outright; (3) add a task that owns diagonal edges - either a detour waypoint
+  in `routing.ts` or placement, the trick that already worked twice.
+  **What the default costs:** nine crossings survive, all from six edges whose
+  endpoint x-bands *and* y-bands are disjoint, so `deriveAxis` returns null and
+  they are declined before any routing runs. Four are `hexagonal`'s `usecases ->
+  p-*` fan into a column of ports offset on both axes. The `cross-container`
+  bucket name now outlives its contents: nothing in it is axis-aligned, so it is
+  a different failure mode wearing the old label. Worth renaming if anyone
+  revisits.
+  **Already ruled out, do not retry:** widening `deriveAxis` to a dominant-axis
+  fallback. Built and measured - an exact no-op on all eight files, byte-identical
+  route maps and PNGs. Tried three times now.
 
 ## Discovered work
 

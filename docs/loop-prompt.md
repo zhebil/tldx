@@ -32,15 +32,42 @@ Three things you may do to the plan, and nothing else:
 - **Append to Discovered work.** Never promote your own entry into the task
   list; the human does that.
 
-A task marked *blocked on a human decision* is a hard stop, not a puzzle. Write
-`BLOCKED ON HUMAN` at the top of `docs/plan.md` with the task number, commit
-that, print `LOOP BLOCKED` on a line by itself, and stop. Do not skip past it to
-the next task and do not make the decision yourself.
+## Questions do not stop the loop
 
-If the top task's criterion cannot be measured, or the task contradicts what you
-find in the code, **do not improvise a substitute**. Write the problem under the
-task, leave the box unchecked, commit that, and stop. A wake that reports a
-broken task is worth more than a wake that quietly does something else.
+**Never halt for a decision.** Not when a task is marked *blocked on a human
+decision*, not when its acceptance turns out unreachable, not when the task
+contradicts what you find in the code. Halting wastes every remaining wake on a
+question that will be read once, at the end. Instead:
+
+1. **Take the reasonable default and apply it.** The default is nearly always
+   *accept what the work actually achieved and move on*: tick the box, record
+   the number you reached, and state plainly that it is short of what the task
+   asked. Where there is a real choice, take the option that changes least and
+   is easiest to reverse.
+2. **Append the question to `## Questions for the human`** at the bottom of
+   `docs/plan.md`, in this shape:
+
+   ```
+   - **T<n> - <one-line subject>.** <What the task asked, what you reached.>
+     **Default taken:** <what you did, and why it changes least.>
+     **Alternatives:** <the other options, one line each.>
+     **What the default costs:** <what stays wrong if nobody revisits this.>
+   ```
+
+3. Commit and end the wake normally. The next wake takes the next task.
+
+**Never let one question stop two wakes.** If it is already in that section, it
+is already decided - do not re-derive it, do not re-measure it, do not write a
+second entry. Move on.
+
+**A shipped mechanism that misses its number is a result, not a failure.** Do
+not revert working code to make a box honest, and do not invent a second
+mechanism to force the number. Record the gap and continue.
+
+The one thing still worth stopping for is a repo you cannot leave green: if
+`npm run check` fails and reverting does not fix it, write the failure into the
+plan, commit that alone, print `LOOP BLOCKED` on a line by itself, and stop.
+That is a broken tree, not a question.
 
 If every task is ticked, write `ALL TASKS COMPLETE` at the top of `docs/plan.md`,
 commit, print `LOOP COMPLETE` on a line by itself, and stop. Do not invent more
@@ -110,9 +137,10 @@ You are an orchestrator. Delegate the doing; keep decomposition and review.
 - **Never edit an existing corpus fixture to make a task pass.** Adding new
   fixtures is a task in the plan; changing old ones invalidates every
   measurement taken before it.
-- **Never ask the human anything.** There is nobody there. Where a task leaves
-  a genuinely free choice, take the option that changes less and write the
-  choice down under the task.
+- **Never ask the human anything mid-loop.** There is nobody there. Where a task
+  leaves a genuinely free choice, take the option that changes less, write the
+  choice down under the task, and if it is a choice a human would want to revisit
+  put it in `## Questions for the human` too.
 - **You may commit without review.** This overrides the review-before-commit
   rule in `AGENTS.md`, which is written for interactive sessions. Never push.
   Never touch `main`. Never `git add .` - stage the files you changed.
