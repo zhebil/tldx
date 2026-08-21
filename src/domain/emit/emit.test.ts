@@ -167,6 +167,17 @@ describe("domain/emit", () => {
     );
     const props = scene.store["shape:ad"]?.props as { bend: number };
     expect(props.bend).not.toBe(0);
+
+    const start = scene.store["binding:ad-start"];
+    const end = scene.store["binding:ad-end"];
+    expect((start?.props as { isPrecise: boolean }).isPrecise).toBe(true);
+    expect((end?.props as { isPrecise: boolean }).isPrecise).toBe(true);
+    expect((start?.props as { isExact: boolean }).isExact).toBe(true);
+    expect((end?.props as { isExact: boolean }).isExact).toBe(true);
+    const startAnchor = (start?.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor;
+    const endAnchor = (end?.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor;
+    expect(startAnchor).not.toEqual({ x: 0.5, y: 0.5 });
+    expect(endAnchor).not.toEqual({ x: 0.5, y: 0.5 });
   });
 
   it("parents an edge to the page even when the IR nests it inside a frame", () => {

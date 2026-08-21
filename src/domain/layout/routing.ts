@@ -1,14 +1,18 @@
 /**
- * IR-with-positions -> per-edge tldraw `bend`.
+ * IR-with-positions -> per-edge tldraw arrow route (bend + terminal anchors).
  *
- * `arrowShape` draws a straight chord by default (`bend: 0`), which passes
- * straight through any box/note sitting between an edge's endpoints on the
- * same layout axis (a "same-axis skip" edge - see `docs/plan.md` T3). This
- * module computes the bend needed to bow such an edge around the shapes it
- * would otherwise cross, choosing whichever perpendicular side has enough
- * clear room. Cross-container edges and edges with no intervening shapes
- * stay straight (`bend: 0`), which callers signal by simply not having an
- * entry in the returned map.
+ * `arrowShape` draws a straight chord by default (`bend: 0`) between shape
+ * centres, which passes straight through any box/note sitting between an
+ * edge's endpoints on the same layout axis (a "same-axis skip" edge - see
+ * `docs/plan.md` T3/T4). This module computes, for each such edge, a route:
+ * a non-zero `bend` that bows the arrow around the shapes it would otherwise
+ * cross, plus a `normalizedAnchor` on each terminal that moves the exit/entry
+ * point to the side of the shape perpendicular to the layout axis (top/bottom
+ * for a row, left/right for a column) so the arrow doesn't cut back through
+ * the neighbouring box before it starts bowing. Edges with no intervening
+ * shapes (or where no side has room to bow) stay straight with centre
+ * anchors, which callers signal by simply not having an entry in the
+ * returned map.
  */
 
 import type { IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
@@ -33,16 +37,18 @@ type Axis = "horizontal" | "vertical";
 type Side = "neg" | "pos";
 type Point = { x: number; y: number };
 
-export function computeEdgeBends(ir: IRDocPositioned): Map<string, number> {
+export type EdgeRoute = { bend: number; startAnchor: Point; endAnchor: Point };
+
+export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
   const { shapes, edges } = collect(ir);
   const byId = new Map(shapes.map((s) => [s.id, s]));
 
-  const bends = new Map<string, number>();
+  const routes = new Map<string, EdgeRoute>();
   for (const edge of edges) {
-    const bend = computeBend(edge, byId, shapes);
-    if (bend !== 0) bends.set(edge.id, bend);
+    const route = computeRoute(edge, byId, shapes);
+    if (route !== null) routes.set(edge.id, route);
   }
-  return bends;
+  return routes;
 }
 
 function collect(ir: IRDocPositioned): { shapes: AbsShape[]; edges: IREdge[] } {
@@ -69,14 +75,14 @@ function collect(ir: IRDocPositioned): { shapes: AbsShape[]; edges: IREdge[] } {
   return { shapes, edges };
 }
 
-function computeBend(edge: IREdge, byId: Map<string, AbsShape>, allShapes: AbsShape[]): number {
+function computeRoute(edge: IREdge, byId: Map<string, AbsShape>, allShapes: AbsShape[]): EdgeRoute | null {
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
-  if (!from || !to) return 0;
-  if (from.parentId !== to.parentId) return 0;
+  if (!from || !to) return null;
+  if (from.parentId !== to.parentId) return null;
 
   const axis = deriveAxis(from, to);
-  if (axis === null) return 0;
+  if (axis === null) return null;
 
   const crossed = allShapes.filter(
     (s) =>
@@ -86,23 +92,25 @@ function computeBend(edge: IREdge, byId: Map<string, AbsShape>, allShapes: AbsSh
       (s.kind === "box" || s.kind === "note") &&
       isCrossing(axis, from, to, s),
   );
-  if (crossed.length === 0) return 0;
+  if (crossed.length === 0) return null;
 
   const axisFrom = axisCentre(axis, from);
   const axisTo = axisCentre(axis, to);
-  const perpFrom = perpCentre(axis, from);
-  const perpTo = perpCentre(axis, to);
 
   const requiredSag = (side: Side): number => {
+    const perpFrom = anchorPerp(axis, side, from);
+    const perpTo = anchorPerp(axis, side, to);
     let maxSag = 0;
     for (const c of crossed) {
       const rawT = (axisCentre(axis, c) - axisFrom) / (axisTo - axisFrom);
       const t = Math.min(1 - 1e-6, Math.max(1e-6, rawT));
       const f = 4 * t * (1 - t);
       const chordPerp = perpFrom + t * (perpTo - perpFrom);
-      const farEdge = side === "neg" ? perpMin(axis, c) : perpMax(axis, c);
-      const clearance = Math.abs(chordPerp - farEdge) + CLEAR_MARGIN;
-      maxSag = Math.max(maxSag, clearance / f);
+      const need =
+        side === "pos"
+          ? perpMax(axis, c) + CLEAR_MARGIN - chordPerp
+          : chordPerp - (perpMin(axis, c) - CLEAR_MARGIN);
+      maxSag = Math.max(maxSag, Math.max(0, need) / f);
     }
     return maxSag;
   };
@@ -128,12 +136,18 @@ function computeBend(edge: IREdge, byId: Map<string, AbsShape>, allShapes: AbsSh
     return best;
   };
 
+  const midPerp = (side: Side): number => (anchorPerp(axis, side, from) + anchorPerp(axis, side, to)) / 2;
+
   const negSag = requiredSag("neg");
   const posSag = requiredSag("pos");
   const negGap = gap("neg");
   const posGap = gap("pos");
-  const negViable = negGap >= negSag;
-  const posViable = posGap >= posSag;
+  // The arc's peak reaches roughly midPerp +/- sag; only the part of that
+  // which pokes past the swept band actually needs clear room.
+  const negOvershoot = Math.max(0, negSag - (midPerp("neg") - bandMin));
+  const posOvershoot = Math.max(0, posSag - (bandMax - midPerp("pos")));
+  const negViable = negGap >= negOvershoot;
+  const posViable = posGap >= posOvershoot;
 
   let chosen: Side | null = null;
   if (negViable && posViable) {
@@ -143,16 +157,21 @@ function computeBend(edge: IREdge, byId: Map<string, AbsShape>, allShapes: AbsSh
   } else if (posViable) {
     chosen = "pos";
   }
-  if (chosen === null) return 0;
+  if (chosen === null) return null;
 
   const sag = chosen === "neg" ? negSag : posSag;
-  const u = unit(center(from), center(to));
+  const startPoint = anchorPoint(axis, chosen, from);
+  const endPoint = anchorPoint(axis, chosen, to);
+  const u = unit(startPoint, endPoint);
   const p: Point = { x: -u.y, y: u.x };
   const sideDir = sideDirection(axis, chosen);
   const sign = p.x * sideDir.x + p.y * sideDir.y >= 0 ? 1 : -1;
 
   const bend = round1(sag * sign);
-  return Math.abs(bend) < MIN_BEND ? 0 : bend;
+  if (Math.abs(bend) < MIN_BEND) return null;
+
+  const anchor = normalizedAnchor(axis, chosen);
+  return { bend, startAnchor: anchor, endAnchor: { ...anchor } };
 }
 
 function deriveAxis(from: AbsShape, to: AbsShape): Axis | null {
@@ -182,10 +201,6 @@ function axisCentre(axis: Axis, s: AbsShape): number {
   return axis === "horizontal" ? s.x + s.w / 2 : s.y + s.h / 2;
 }
 
-function perpCentre(axis: Axis, s: AbsShape): number {
-  return axis === "horizontal" ? s.y + s.h / 2 : s.x + s.w / 2;
-}
-
 function perpMin(axis: Axis, s: AbsShape): number {
   return axis === "horizontal" ? s.y : s.x;
 }
@@ -194,16 +209,27 @@ function perpMax(axis: Axis, s: AbsShape): number {
   return axis === "horizontal" ? s.y + s.h : s.x + s.w;
 }
 
+function anchorPerp(axis: Axis, side: Side, s: AbsShape): number {
+  return side === "neg" ? perpMin(axis, s) : perpMax(axis, s);
+}
+
+function anchorPoint(axis: Axis, side: Side, s: AbsShape): Point {
+  const axisCoord = axisCentre(axis, s);
+  const perpCoord = anchorPerp(axis, side, s);
+  return axis === "horizontal" ? { x: axisCoord, y: perpCoord } : { x: perpCoord, y: axisCoord };
+}
+
+function normalizedAnchor(axis: Axis, side: Side): Point {
+  if (axis === "horizontal") return side === "neg" ? { x: 0.5, y: 0 } : { x: 0.5, y: 1 };
+  return side === "neg" ? { x: 0, y: 0.5 } : { x: 1, y: 0.5 };
+}
+
 function axisMin(axis: Axis, s: AbsShape): number {
   return axis === "horizontal" ? s.x : s.y;
 }
 
 function axisMax(axis: Axis, s: AbsShape): number {
   return axis === "horizontal" ? s.x + s.w : s.y + s.h;
-}
-
-function center(s: AbsShape): Point {
-  return { x: s.x + s.w / 2, y: s.y + s.h / 2 };
 }
 
 function unit(a: Point, b: Point): Point {

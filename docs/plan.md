@@ -360,7 +360,7 @@ Two traps, both paid for already:
   Free choice recorded: frames are excluded from the "crossed" set (only boxes
   and notes), matching what `arrow-truth` actually counts as a crossing.
 
-- [ ] **T4. Side anchors together with bend.**
+- [x] **T4. Side anchors together with bend.**
   T3 bows the arrow but it still leaves and enters at shape centres, so the
   first and last stretch of the path still runs through the neighbouring box.
   Set `normalizedAnchor` on both terminals of a same-axis skip so the arrow
@@ -372,6 +372,39 @@ Two traps, both paid for already:
   straight line crosses just as much as a centre-anchored one.
   **Acceptance:** crossings lower than T3. Ship anchors and bend as one change;
   they are known to fail separately.
+
+  **Done.** `computeEdgeBends` became `computeEdgeRoutes`, returning
+  `{ bend, startAnchor, endAnchor }` per routed edge; `emitEdge` threads the
+  anchors onto both `arrowBinding`s. Only edges that already qualified for a
+  bend get anchors - fan edges and cross-container edges keep centre binding,
+  which is what separates this from B4a/B13/B14, where side anchors were applied
+  to *every* terminal and coarsened tldraw's continuous perimeter clipping.
+  Three pieces of geometry moved with the anchors: the chord (and so `u` and
+  the sag) is now measured between the anchor points rather than the centres;
+  the clearance test became signed, because with an edge anchor a crossed shape
+  can sit entirely on the far side of the chord and `Math.abs` demanded a bow it
+  did not need; and the viability test now compares the free gap against how far
+  the arc actually pokes past the swept band (`sag - (bandEdge - midPerp)`)
+  rather than against the raw sag.
+  **The numbers: 38 crossings -> 27, and no file gained one.**
+  wide-fanout 16->10, long-labels 5->2, multi-region 2->0; deep-nesting 9 and
+  hexagonal 6 unchanged. By bucket, **same-axis skip 11 -> 0** with
+  cross-container (15), fan (10) and other (2) untouched. Phase 1's target
+  bucket is empty.
+  **The render caught a fake win.** The first pass also measured 27, but four of
+  `multi-region`'s six skip edges were not drawn: with `isPrecise: true` and an
+  anchor sitting exactly on the outline, tldraw's arc-vs-outline clipping is
+  degenerate for one of the two bend signs, and `MIN_ARROW_LENGTH` left a 10px
+  stub (`arrow-truth` showed `euw1-api-to-cache` as `(340,325) -> (337.1,334.6)`).
+  Zero crossings bought by deleting the arrow. `isExact: true` on both terminals
+  of a routed edge skips that clipping entirely; the terminal stays on the
+  anchor, which is already on the outline, so nothing is lost. Total stayed at
+  27 and two more collapsed arrows in `wide-fanout` came back. A path-length
+  sweep over the corpus now finds no arrow under 15px.
+  Free choice recorded: the viability test was made geometrically correct
+  (compare the gap against the overshoot past the band, not the whole sag)
+  rather than left as-is, because the anchored chord changes what the old test
+  was approximating.
 
 - [ ] **T5. Lanes for parallel skips.**
   Once skips bow, two skips over overlapping spans bow into each other and
@@ -1090,3 +1123,24 @@ promoted into the task list by the human.
   `release-pipeline` and `wide-fanout` all grew by 20-70px because the export
   crops to content and bows reach past the boxes. Any future test that pins an
   exported image size will be sensitive to routing changes.
+- **`isExact` is load-bearing for any anchored terminal, and the metric cannot
+  see it.** An anchor on the outline plus tldraw's arc clipping can trim a
+  bowed arrow to a 10px stub, and a deleted arrow scores as zero crossings.
+  Every future change that moves a terminal needs the path-length sweep
+  (`awk` over `arrow-truth` output: flag any path whose endpoints are under
+  ~15px apart) run alongside the crossing count. Worth promoting into
+  `arrow-truth` itself as a permanent "degenerate arrow" line.
+- **T5's premise is now visible in two files.** `wide-fanout`'s four
+  `Dispatcher -> Worker 2..5` arcs and `release-pipeline`'s row-1 skips share a
+  span and bow to nearly the same magnitude, so they render as one thick stroke
+  with four arrowheads. Legible but ugly - exactly the lane problem T5 names.
+- **`multi-region`'s viability gate no longer bites.** The 2 crossings T3 left
+  there were blamed on the 40px inter-frame gap. With anchored chords the
+  required sag dropped below the gap and both bend fine, so the "widen
+  inter-container gaps" note from T3 is weaker evidence than it looked.
+- **The remaining 27 split cleanly by owner.** 15 cross-container (deep-nesting
+  9, hexagonal 6) and 10 fan (all wide-fanout, out of `Dispatcher`) and 2 other
+  (long-labels). Nothing left in the corpus is a same-axis skip, so any further
+  routing work has to widen its trigger past "both endpoints share a
+  container" - the 6 deep-nesting crossings that are geometrically skip-shaped
+  are the cheapest target.

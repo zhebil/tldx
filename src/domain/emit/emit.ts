@@ -37,7 +37,8 @@ import {
 } from "../../contracts/builders.js";
 import type { SceneJSON, TLRecord } from "../../contracts/scene-json.js";
 import { NOTE_SIZE } from "../layout/defaults.js";
-import { computeEdgeBends } from "../layout/routing.js";
+import { computeEdgeRoutes } from "../layout/routing.js";
+import type { EdgeRoute } from "../layout/routing.js";
 import type {
   IRBoxPositioned,
   IRDocPositioned,
@@ -54,10 +55,10 @@ export function emit(ir: IRDocPositioned): SceneJSON {
     documentRecord(),
     pageRecord({ id: PAGE_ID }),
   ];
-  const bends = computeEdgeBends(ir);
+  const routes = computeEdgeRoutes(ir);
 
   for (const child of ir.children) {
-    emitElement(child, PAGE_ID, records, bends);
+    emitElement(child, PAGE_ID, records, routes);
   }
 
   return sceneJson(records);
@@ -67,7 +68,7 @@ function emitElement(
   el: IRElementPositioned,
   parentId: string,
   out: TLRecord[],
-  bends: Map<string, number>,
+  routes: Map<string, EdgeRoute>,
 ): void {
   switch (el.kind) {
     case "box":
@@ -79,11 +80,11 @@ function emitElement(
     case "frame":
       out.push(emitFrame(el, parentId));
       for (const child of el.children) {
-        emitElement(child, shapeId(el.id), out, bends);
+        emitElement(child, shapeId(el.id), out, routes);
       }
       return;
     case "edge":
-      emitEdge(el, out, bends.get(el.id) ?? 0);
+      emitEdge(el, out, routes.get(el.id));
       return;
     case "doc":
       // Nested <doc> is rejected at IR-lowering; defend in depth.
@@ -126,15 +127,18 @@ function emitFrame(frame: IRFramePositioned, parentId: string): TLRecord {
   });
 }
 
-function emitEdge(edge: IREdge, out: TLRecord[], bend: number): void {
+// `isExact` skips tldraw's arc-vs-outline clipping, which is unstable when the
+// anchor already sits on the outline and can trim a bowed arrow to a 10px stub.
+function emitEdge(edge: IREdge, out: TLRecord[], route: EdgeRoute | undefined): void {
   const arrowId = shapeId(edge.id);
-  out.push(arrowShape({ id: arrowId, parentId: PAGE_ID, x: 0, y: 0, bend }));
+  out.push(arrowShape({ id: arrowId, parentId: PAGE_ID, x: 0, y: 0, bend: route?.bend ?? 0 }));
   out.push(
     arrowBinding({
       id: `binding:${edge.id}-start`,
       arrowId,
       shapeId: shapeId(edge.from),
       terminal: "start",
+      ...(route === undefined ? {} : { normalizedAnchor: route.startAnchor, isPrecise: true, isExact: true }),
     }),
   );
   out.push(
@@ -143,6 +147,7 @@ function emitEdge(edge: IREdge, out: TLRecord[], bend: number): void {
       arrowId,
       shapeId: shapeId(edge.to),
       terminal: "end",
+      ...(route === undefined ? {} : { normalizedAnchor: route.endAnchor, isPrecise: true, isExact: true }),
     }),
   );
 }

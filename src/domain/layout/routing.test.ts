@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { IRBoxPositioned, IRDocPositioned, IREdge, IRElementPositioned, IRFramePositioned } from "../ir/index.js";
 
-import { computeEdgeBends } from "./routing.js";
+import { computeEdgeRoutes } from "./routing.js";
 
 const SPAN = { file: "test.tldsl", line: 1, column: 1 };
 
@@ -29,7 +29,7 @@ function edge(input: { id: string; from: string; to: string }): IREdge {
   return { kind: "edge", idExplicit: true, span: SPAN, ...input };
 }
 
-describe("computeEdgeBends", () => {
+describe("computeEdgeRoutes", () => {
   it("leaves an adjacent hop in a row straight (no shape crossed)", () => {
     const ir = doc("root", [
       box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
@@ -37,11 +37,11 @@ describe("computeEdgeBends", () => {
       box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
       edge({ id: "ab", from: "a", to: "b" }),
     ]);
-    const bends = computeEdgeBends(ir);
-    expect(bends.get("ab")).toBeUndefined();
+    const routes = computeEdgeRoutes(ir);
+    expect(routes.get("ab")).toBeUndefined();
   });
 
-  it("bows a chord over two boxes in a row upward, with the exact deterministic sag", () => {
+  it("bows a chord over two boxes in a row upward, exiting the top edge of both terminals", () => {
     // a -> d skips b and c; nothing else on the page, so both sides are
     // symmetric (boxes centred on the chord) and tie-breaks to "up".
     const ir = doc("root", [
@@ -51,28 +51,34 @@ describe("computeEdgeBends", () => {
       box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
       edge({ id: "ad", from: "a", to: "d" }),
     ]);
-    const bends = computeEdgeBends(ir);
-    const bend = bends.get("ad");
-    expect(bend).toBeDefined();
-    expect(bend!).toBeLessThan(0); // negative bend = bows up in page space
-    // t at b and c is 1/3 and 2/3 -> f = 8/9 both; clearance = 25 (half box
-    // height) + 12 margin = 37; sag = 37 / (8/9) = 41.625 -> rounds to 41.6.
-    expect(bend).toBeCloseTo(-41.6, 5);
+    const routes = computeEdgeRoutes(ir);
+    const route = routes.get("ad");
+    expect(route).toBeDefined();
+    expect(route!.bend).toBeLessThan(0); // negative bend = bows up in page space
+    // Anchors sit on the top edge (y=0), same for a and d, so the chord runs
+    // flat along y=0; t at b and c is 1/3 and 2/3 -> f = 8/9 both; clearance
+    // is just the margin (12) -> sag = 12 / (8/9) = 13.5.
+    expect(route!.bend).toBeCloseTo(-13.5, 5);
+    expect(route!.startAnchor).toEqual({ x: 0.5, y: 0 });
+    expect(route!.endAnchor).toEqual({ x: 0.5, y: 0 });
   });
 
-  it("bows a chord in a column, with a computed sag", () => {
+  it("bows a chord in a column, exiting the left edge of both terminals", () => {
     const ir = doc("root", [
       box({ id: "a", x: 0, y: 0, w: 50, h: 100 }),
       box({ id: "b", x: 0, y: 150, w: 50, h: 100 }),
       box({ id: "c", x: 0, y: 300, w: 50, h: 100 }),
       edge({ id: "ac", from: "a", to: "c" }),
     ]);
-    const bends = computeEdgeBends(ir);
-    const bend = bends.get("ac");
-    expect(bend).toBeDefined();
-    // t at b is 0.5 -> f = 1; clearance = 25 (half box width) + 12 = 37 -> sag 37,
-    // nothing else on the page so both sides tie and break to "left" (negative x).
-    expect(bend).toBeCloseTo(37, 5);
+    const routes = computeEdgeRoutes(ir);
+    const route = routes.get("ac");
+    expect(route).toBeDefined();
+    // Anchors sit on the left edge (x=0); t at b is 0.5 -> f = 1; clearance
+    // is just the margin (12) -> sag = 12; nothing else on the page so both
+    // sides tie and break to "neg" (left).
+    expect(route!.bend).toBeCloseTo(12, 5);
+    expect(route!.startAnchor).toEqual({ x: 0, y: 0.5 });
+    expect(route!.endAnchor).toEqual({ x: 0, y: 0.5 });
   });
 
   it("leaves edges whose endpoints sit in different containers straight", () => {
@@ -95,8 +101,8 @@ describe("computeEdgeBends", () => {
       }),
       edge({ id: "ab", from: "a", to: "b" }),
     ]);
-    const bends = computeEdgeBends(ir);
-    expect(bends.get("ab")).toBeUndefined();
+    const routes = computeEdgeRoutes(ir);
+    expect(routes.get("ab")).toBeUndefined();
   });
 
   it("stays straight when boxed in on both sides (no viable side)", () => {
@@ -106,12 +112,34 @@ describe("computeEdgeBends", () => {
       box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
       box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
       // Squeezed in just above and below the row - not enough clearance
-      // for the ~41.6 sag the chord over b/c would otherwise need.
+      // for the 13.5 sag the chord over b/c would otherwise need.
       box({ id: "top", x: 200, y: -30, w: 50, h: 20 }),
       box({ id: "bottom", x: 200, y: 60, w: 50, h: 20 }),
       edge({ id: "ad", from: "a", to: "d" }),
     ]);
-    const bends = computeEdgeBends(ir);
-    expect(bends.get("ad")).toBeUndefined();
+    const routes = computeEdgeRoutes(ir);
+    expect(routes.get("ad")).toBeUndefined();
+  });
+
+  it("signed clearance ignores a crossed shape sitting entirely on the far side of the anchored chord", () => {
+    // a -> d skips both bNear (pokes above the top-anchored chord, y -10..10)
+    // and bFar (sits well below it, y 70..80). The old abs()-based clearance
+    // would have demanded sag for bFar too (abs(0-70)+12=82); the signed
+    // fix recognises bFar's far edge is already clear and contributes 0, so
+    // the bow is driven by bNear alone.
+    const ir = doc("root", [
+      box({ id: "a", x: 0, y: 0, w: 100, h: 100 }),
+      box({ id: "bNear", x: 200, y: -10, w: 100, h: 20 }),
+      box({ id: "bFar", x: 300, y: 70, w: 100, h: 10 }),
+      box({ id: "d", x: 450, y: 0, w: 100, h: 100 }),
+      edge({ id: "ad", from: "a", to: "d" }),
+    ]);
+    const routes = computeEdgeRoutes(ir);
+    const route = routes.get("ad");
+    expect(route).toBeDefined();
+    expect(route!.bend).toBeLessThan(0);
+    // t at bNear = 200/450 = 4/9 -> f = 80/81; need = 0 - (-10-12) = 22;
+    // sag = 22 * 81/80 = 22.275 -> rounds to -22.3.
+    expect(route!.bend).toBeCloseTo(-22.3, 5);
   });
 });

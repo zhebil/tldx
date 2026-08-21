@@ -172,3 +172,49 @@ Two files are unchanged by construction rather than by failure:
 not touch. `multi-region`'s remaining 2 are the middle region, where the
 required bow (~135px) exceeds the 40px gap to the neighbouring region frame on
 both sides, so the edge stays straight rather than plough into a neighbour.
+
+---
+
+## After T4 (side anchors together with bend)
+
+Same corpus, same layout - only the arrows moved again. Shape geometry is still
+byte-identical to the T1 table; `crossings` and the exported `png` size are the
+only columns that changed.
+
+| file | crossings (T1) | crossings (T3) | crossings (T4) | png |
+|---|---|---|---|---|
+| deep-nesting | 9 | 9 | 9 | 1316 x 1708 |
+| hexagonal | 6 | 6 | 6 | 2836 x 1428 |
+| long-labels | 5 | 5 | **2** | 4256 x 2283 |
+| multi-region | 6 | 2 | **0** | 1928 x 2572 |
+| release-pipeline | 5 | 0 | 0 | 2851 x 2108 |
+| sequence | 0 | 0 | 0 | 850 x 2904 |
+| sparse-graph | 0 | 0 | 0 | 1542 x 1072 |
+| wide-fanout | 29 | 16 | **10** | 2453 x 1905 |
+| **total** | **60** | **38** | **27** | |
+
+Bucket split at T4, from `tools/crossing-classify.mts`:
+**same-axis skip 0 (was 11), cross-container 15 (was 15), fan 10 (was 10),
+other 2 (was 2).** The bucket Phase 1 was written to eliminate is now empty.
+Everything that remains is a bucket T3/T4 never claimed to touch.
+
+### The `isExact` trap, found by looking at the render
+
+The first pass of T4 measured 27 as well, but four of `multi-region`'s six skip
+edges were **not drawn at all**. With `isPrecise: true` and an anchor that sits
+exactly on the shape outline, tldraw's arc-vs-outline clipping in
+`curved-arrow.ts` is degenerate: for one of the two bend signs it trimmed the
+whole arc away and `MIN_ARROW_LENGTH` left a 10px stub. `arrow-truth` reported
+`euw1-api-to-cache` as `(340,325) -> (337.1,334.6)` - a crossing count of zero
+bought by deleting the arrow. Setting `isExact: true` on both terminals of a
+routed edge skips that clipping entirely (`straight-arrow.ts:209-223`,
+`curved-arrow.ts:107,185`); the terminal stays exactly on the anchor, which is
+already on the outline, so nothing is lost visually. Total crossings were
+unchanged at 27 after the fix, and two more arrows in `wide-fanout`
+(`Dispatcher -> Worker 12`, `Dispatcher -> Worker 18`) came back from the same
+collapse. A path-length sweep over the whole corpus now finds no arrow shorter
+than 15px.
+
+The remaining 27 are two groups: `deep-nesting` (9) and `hexagonal` (6) are
+100% cross-container, and `wide-fanout`'s 10 are all fan edges out of
+`Dispatcher`, which is T6's placement problem, not a routing one.
