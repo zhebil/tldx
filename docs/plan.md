@@ -1523,7 +1523,7 @@ trick: the lossless part is mechanical, the lossy part is supervised.
 
 #### Tasks
 
-- [ ] **T19. Design spike. Write the doc, do not write code.**
+- [x] **T19. Design spike. Write the doc, do not write code.**
   The architecture above is settled. Produce `docs/round-trip.md` settling the
   details it leaves open, each with a decision and a reason:
   - **Overlay shape: final-state map, not an event log.** Event logs replay
@@ -1547,6 +1547,23 @@ trick: the lossless part is mechanical, the lossy part is supervised.
   prior art in the repo.
   **Acceptance:** the doc exists, every bullet above has a decision, and the
   out-of-scope list is explicit. **No code.**
+
+  `docs/round-trip.md` exists, 281 lines, five decisions D1-D5 covering the five
+  bullets plus an explicit out-of-scope list. No code: the only changed files are
+  this plan and that doc, and `npm run check` is green. The schema keys entries on
+  the tldraw record id (`shape:checkout`) because `emit/` prefixes rather than
+  renames, so `apply` needs no lookup table; `restyled` is expressed in the
+  existing `domain/ir/styles.ts` vocabulary, which makes it simultaneously a valid
+  tldraw props patch and a valid set of JSX props, so absorb's restyle case is a
+  rename rather than a translation. Staleness is confirmed as proposed, with one
+  wrinkle the task did not name written down: ADR-12's synthetic ids are content
+  hashes, so editing an anonymous `<Note>`'s text orphans its entry correctly but
+  surprisingly. Three decisions were taken that the task left implicit and that
+  T20 will inherit: `apply` never re-runs layout (it is a post-layout patch, and
+  the fixed point of layout-under-overlay is not guaranteed to exist), the viewer
+  writes over a plain `PUT /overlay` rather than the websocket CONTEXT.md
+  reserved, and `serve` deliberately does not watch the overlay file - watching it
+  would let the viewer's own write stomp the canvas being edited.
 
 - [ ] **T20. Overlay apply - the deterministic half.**
   Schema plus a pure `apply(overlay, scene)` in `domain/`, the viewer writing
@@ -1998,6 +2015,35 @@ as-is.
   nothing on the gate metric, plus `long-labels`' rows now reading right-to-left
   for no measured gain - and that file's boxes are full sentences, so backwards
   row order is arguably worse prose order even though no tool notices.
+
+- **T19 - `apply` never re-runs layout.** T19 asked for a decision on overlay
+  precedence; the doc takes it further and fixes an invariant T20 will be built
+  on: `apply` is a patch over the finished scene and never feeds back into the
+  layout engine.
+  **Default taken:** no re-layout. It changes least - it keeps `apply` a pure
+  function of two arguments, which is the whole reason the round-trip is
+  lossless by construction, and layout-under-overlay has no guaranteed fixed
+  point (a nudged box changes a container's extent, which moves the box).
+  **Alternatives:** (2) re-run layout with overlay entries as hard pins, which is
+  the `free`-container behaviour generalised; (3) re-run layout only when a
+  `restyled` changes `font`/`size`, the two props that change text metrics.
+  **What the default costs:** a canvas font or size change leaves the box sized
+  by the old metrics until the user drags it or absorbs. Visible, not wrong, and
+  fixable by the user with one drag.
+
+- **T19 - a `PUT` route rather than the reserved websocket.** CONTEXT.md's
+  transport section says "Websocket is reserved for phase 2 if round-trip needs
+  bidirectional". The doc concludes it does not.
+  **Default taken:** the viewer writes the overlay over `PUT /overlay` on the
+  existing dev server; SSE stays one-way and `TransportPort` is unchanged. It
+  changes least - one route on a server that already 405s non-GET, versus a
+  second transport with its own reconnect and message contract.
+  **Alternatives:** (2) upgrade the transport to a websocket as CONTEXT.md
+  anticipated; (3) have the viewer write nothing and make every nudge an
+  explicit "save" gesture.
+  **What the default costs:** if round-trip later needs the server to push
+  something the viewer must acknowledge, the `PUT` route will not carry it and
+  the websocket question reopens. Nothing in the current design needs that.
 
 ## Discovered work
 
@@ -2522,3 +2568,30 @@ promoted into the task list by the human.
   to registry` against `Security scan -> Integration tests`, and one lower
   down). Serpentine turned them from long diagonals into a short X. Cheaper to
   look at than before, but not gone.
+
+### From T19
+
+- **The viewer is already fully editable and silently discards edits.**
+  `<Tldraw onMount={handleMount} />` (`src/viewer/app.tsx:43`) sets no
+  `readonly` prop, and nothing listens to the store. A user can drag a box
+  today; the next `loadSnapshot` from a recompile, or a browser reload, throws
+  it away with no trace. That is the exact gap T20 closes, but until it lands
+  the honest options are a readonly viewer or a note in the README. Left alone
+  because changing it is T20's call, not T19's.
+- **CONTEXT.md will need three edits when T20 lands.** "Round-trip from canvas
+  back to DSL" is listed under both "Phase 2 (later)" and "Out of scope"; the
+  transport section says "Websocket is reserved for phase 2 if round-trip needs
+  bidirectional", which D4 overrules in favour of a `PUT` route on the existing
+  dev server. None touched here - the doc says "no code", and CONTEXT.md
+  describes code that does not exist yet.
+- **ADR-14 is unwritten on purpose.** `docs/round-trip.md` names itself as the
+  proposal; the `docs/decisions.md` entry should land with the implementation in
+  T20 so it records what was built, not what was planned.
+- **`docs/patches/` is dead weight.** Two git-format patches
+  (`b13-elbow-side-anchors.patch`, `b24-elbow-side-anchors.patch`) referenced
+  only from `docs/layout-hypotheses.md`, which is itself marked historical and
+  describes geometry that no longer exists after `2484ffa`. Deletable whenever
+  someone wants the tree smaller.
+- **`examples/kernel.tldsl.jsx` is still untracked.** Written during T16b,
+  never staged. Either it is a corpus fixture and belongs in git, or it is
+  scratch and belongs deleted.
