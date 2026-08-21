@@ -2135,7 +2135,7 @@ only test it gets against material T24 did not choose.
   green; no `src/` touched, so `docs/renders/` and `docs/baseline.md` are
   unchanged.
 
-- [ ] **T29. TCP state machine.**
+- [x] **T29. TCP state machine.**
   The eleven-state diagram - `CLOSED`, `LISTEN`, `SYN_RCVD`, `SYN_SENT`,
   `ESTABLISHED`, `FIN_WAIT_1`, `FIN_WAIT_2`, `CLOSING`, `TIME_WAIT`,
   `CLOSE_WAIT`, `LAST_ACK` - with transitions labelled `event / action`.
@@ -2145,6 +2145,37 @@ only test it gets against material T24 did not choose.
   rejected, or renders as nothing, that is a blocker entry.
   **Acceptance:** `examples/tcp-states.tldsl.jsx`, check clean, PNG reviewed,
   gaps logged.
+
+  `examples/tcp-states.tldsl.jsx` exists and `tldsl check` is clean: eleven
+  states in a `<Graph>` with all twenty RFC 793 transitions labelled
+  `event / action`, opening transitions blue and closing ones red. The PNG was
+  rendered and read twice, and **it is illegible** - that is the finding.
+  Four entries, D5-D8, each with a repro under `examples/repro/`.
+
+  **D5 (blocker) is the one the task predicted:** `from === to` is accepted by
+  `check`, draws no loop at all, and stamps the transition's label over the
+  box's own label - in the full diagram `recv data / ACK` ends up floating on
+  the frame border with no arrow near it. **D7 (blocker) is the bigger one:**
+  `layout="auto"` does not lay the graph out. A straight chain `a->b->c->d`
+  packs into a 2x2 block, `gap="40"` and `gap="400"` render byte-identical PNGs
+  with the nodes 20px apart either way, and `direction` makes no difference -
+  confirmed through `tldsl render`, not just the screenshot tool. Eleven states
+  20px apart with twenty labelled arrows is why the render looks the way it
+  does. D6 (wrong) - an arrow label in the default `draw` font loses its spaces
+  (`recv FIN / send ACK` renders `recvFIN/sendACK`), which is arrow-specific and
+  font-specific: the same string on a `<Box>` in `draw` is fine. D8 (ugly) - an
+  auto container reserves no room for edge labels (a `<Row>` widens its gap
+  until the label fits; auto has no equivalent) and draws arrows as direct
+  chords across the states in between.
+
+  Two authoring choices. `font="sans"` on every edge is the only workaround
+  applied - it is a documented prop and D6 keeps the evidence - and **nothing
+  else was worked around**: the self-transition stays in the source with its
+  label sitting on `ESTABLISHED`, the `<Graph>` keeps its stray "Frame" caption
+  (D2, which has no chrome-free alternative for `<Graph>` the way `<Row>` has
+  `<Group>` - noted under D2), and the note still covers part of the drawing
+  (D3). `npm run check` green; no `src/` touched, so `docs/renders/` and
+  `docs/baseline.md` are unchanged.
 
 - [ ] **T30. A layered web application architecture.**
   Browser, CDN, load balancer, a horizontally scaled app tier, cache, primary
@@ -3371,3 +3402,30 @@ promoted into the task list by the human.
 - **Nothing keeps `commands/sync.md` honest about the CLI.** Same gap as the
   SKILL.md examples: the command names five subcommands and quotes their
   behaviour, and a rename or an output-string change breaks it silently.
+- **`layout="auto"` looks unwired, not just badly tuned.** The ELK adapter
+  builds the right graph and passes `elk.spacing.nodeNode: String(req.gap)`, and
+  the CLI wires `ElkLayoutAdapter` on every command - yet gap, direction and
+  topology are all no-ops at render time (T29/D7), and the 20px spacing is
+  exactly ELK's default, i.e. what you get from `String(undefined)`. Worth
+  checking whether the frame's props reach `AutoPlaceRequest` at all before
+  anyone tunes ELK options. `src/infra/layout-elk/elk-layout.test.ts` presumably
+  passes a `req` built by hand, so a break in the plumbing between `stack.ts`
+  and the adapter would not show up there.
+- **The auto placer's output looks like the grid flow layout.** Four unconnected
+  or chained nodes land in a 2x2 block at the same aspect target the row/col/
+  grid path uses. If auto is silently falling through to `bestGridCols`, then
+  every `<Graph>` in the corpus has been a grid all along and no measurement
+  ever noticed, because no fixture has a topology a grid gets wrong.
+- **No diagnostic fires for an edge that draws nothing.** `from === to` (D5)
+  joins D1 and D3 on the list of things `check` is silent about. Three separate
+  authoring wakes have now shipped a diagram that validates clean and omits
+  information; a "this edge cannot be rendered" class of diagnostic would have
+  caught all three at author time.
+- **The phantom overlay T28 could not reproduce, reproduces.** Rendering
+  `examples/repro/d8-auto-edges-cross-nodes.tldsl.jsx` wrote
+  `...tldsl.overlay.json` containing one `moved: { parentId: "shape:g", index }`
+  entry per arrow - tldraw reparents an arrow into the frame that holds both its
+  endpoints, and the absorb path records that as a user edit. It needs a frame
+  and arrows whose endpoints are both inside it, which is why T28's two-lane
+  diagram only sometimes triggered it. Deleted by hand this wake so it would not
+  be committed.

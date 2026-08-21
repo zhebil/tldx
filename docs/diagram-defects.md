@@ -78,6 +78,9 @@ blocker.
   container whose author declined to name it.
 - **Repro:** `examples/repro/d2-unnamed-frame-caption.tldsl.jsx`
 - **Status:** open
+- **Also seen:** T29 - `<Graph>` does it too, and `<Graph>` has no chrome-free
+  alternative the way `<Row>`/`<Col>` have `<Group>`, so
+  `examples/tcp-states.tldsl.jsx` ships with a stray "Frame" caption.
 
 ### D3. An attached `<Note>` covers the shapes and arrows to its right
 
@@ -113,4 +116,80 @@ blocker.
   it means the grid primitive is unusable for any grid whose two axes want
   different spacing.
 - **Repro:** `examples/repro/d4-single-axis-gap.tldsl.jsx`
+- **Status:** open
+
+### D5. An edge from a shape to itself draws no loop
+
+- **Diagram:** `examples/tcp-states.tldsl.jsx`
+- **Severity:** blocker
+- **Attempted:** `<Edge from="established" to="established" label="recv data / ACK" />`
+  - the self-transition every state machine has, and the one thing the corpus
+  has never asked for.
+- **Happened:** `check` is clean and nothing is rejected, but no loop is drawn.
+  The arrow is zero-length, and its label is stamped across the box's own label
+  (`recv data / ACK` printed straight over `ESTABLISHED`); in the full diagram
+  the label ends up detached at the top-left corner of the frame, sitting on the
+  frame border with no arrow anywhere near it. A reader sees a caption floating
+  over the drawing, not a transition. There is no `bend`, `loop` or anchor prop
+  in the skill that would let an author draw one by hand either.
+- **Repro:** `examples/repro/d5-self-transition.tldsl.jsx`
+- **Status:** open
+
+### D6. Arrow labels lose their spaces in the default `draw` font
+
+- **Diagram:** `examples/tcp-states.tldsl.jsx`
+- **Severity:** wrong
+- **Attempted:** Transitions labelled in the standard `event / action` notation:
+  `<Edge from="a" to="b" label="recv FIN / send ACK" />`.
+- **Happened:** The label renders as `recvFIN/sendACK`. The spaces are drawn at
+  roughly zero width, so the words run together and in `one two three` the
+  letters of adjacent words actually collide. It is specific to arrows and to
+  the default font: the identical string on a `<Box>` in the same `draw` font is
+  spaced correctly, and `font="sans"` on the arrow renders `recv FIN / send ACK`
+  properly. So the two-part `event / action` convention - the entire notation of
+  a state diagram - is unreadable at default settings, and what the reader sees
+  is not the string the author wrote. The shipped diagram passes `font="sans"`
+  on every edge, which is a documented prop, and keeps the evidence here.
+- **Repro:** `examples/repro/d6-arrow-label-spaces.tldsl.jsx`
+- **Status:** open
+
+### D7. `layout="auto"` does not lay the graph out
+
+- **Diagram:** `examples/tcp-states.tldsl.jsx`
+- **Severity:** blocker
+- **Attempted:** `<Graph id="machine" direction="DOWN" gap="120">` around the
+  eleven TCP states, with the twenty transitions as edges - exactly what the
+  skill says `<Graph>` is for ("graph-shaped things with no natural reading
+  order").
+- **Happened:** None of the three inputs reaches the placement. A straight chain
+  `a -> b -> c -> d` comes out as a 2x2 block rather than a line, so the edge
+  topology is not used; rendering the same file with `gap="40"` and `gap="400"`
+  produces byte-identical PNGs, and the boxes sit 20px apart either way (ELK's
+  own default, which is what you get when the requested spacing never arrives);
+  `direction="RIGHT"` and `direction="DOWN"` are likewise indistinguishable. The
+  result looks like aspect-fitted grid packing, not a layered graph. Confirmed
+  through `tldsl render`, not just the screenshot tool, so it is the product and
+  not the harness. Consequence for the diagram: eleven states packed 20px apart
+  with twenty labelled arrows between them, which is the illegible render this
+  example ships.
+- **Repro:** `examples/repro/d7-auto-ignores-graph.tldsl.jsx`
+- **Status:** open
+
+### D8. An auto container reserves no room for edge labels and routes arrows over its nodes
+
+- **Diagram:** `examples/tcp-states.tldsl.jsx`
+- **Severity:** ugly
+- **Attempted:** Twenty labelled transitions inside the `<Graph>`.
+- **Happened:** Arrows are drawn as direct lines between the two shapes - the
+  adapter discards the routed geometry it asks ELK for - so a transition between
+  non-adjacent states crosses whatever is in between, and its label lands at the
+  midpoint on top of a box. Nothing reserves space for the label either: the
+  same edge inside a `<Row>` widens the row's gap until the label fits
+  (`labelClearanceGap`), and an auto container has no equivalent, so labels wrap
+  into 2-3 character stacks and overprint each other and the states. In the
+  shipped render `SYN / SYN+ACK` is broken across three fragments sitting on top
+  of `SYN_RCVD`.
+  Distinct from D7: fixing the node placement would shorten the chords but would
+  still leave labels unaccounted for.
+- **Repro:** `examples/repro/d8-auto-edges-cross-nodes.tldsl.jsx`
 - **Status:** open
