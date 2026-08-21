@@ -58,6 +58,12 @@ blocker.
   state into one row per message - ten rows, twenty-two boxes - purely so each
   arrow gets a row of its own to sit in.
 - **Repro:** `examples/repro/d1-repeated-edges.tldsl.jsx`
+- **Also seen in:** `examples/event-driven.tldsl.jsx` (T31). The collapse is not
+  limited to a stack of same-direction arrows: `t-orders -> payments` and
+  `payments -> t-orders` are antiparallel and adjacent, and `arrow-truth` puts
+  them `97% within 8px` of each other. See D14 - the separation mechanism that
+  should have caught this fires far too hard on distant pairs and not at all on
+  near ones.
 - **Status:** open
 
 ### D2. An unnamed `<Row>` / `<Col>` / `<Grid>` draws a border and captions itself "Frame"
@@ -97,6 +103,18 @@ blocker.
   way to cap its width, and `check` reports nothing. The failure mode is not
   cosmetic: the diagram silently omits a state.
 - **Repro:** `examples/repro/d3-note-covers-shape.tldsl.jsx`
+- **Also seen in:** `examples/event-driven.tldsl.jsx` (T31), worse. The note is
+  attached to the leftmost of four topic boxes in a row and its text is one
+  sentence, but it renders 549px wide - it covers `t-payments` and
+  `t-inventory` entirely and clips `t-shipments`. Three of the diagram's four
+  topics are gone from the PNG, and `layout-report` counts this as three of its
+  four `overlapping shape pairs` while `check` says nothing (D15). One
+  correction to the entry above: there **is** a width cap - `w` is in `<note>`'s
+  allowed prop set and `w="200"` does narrow it. It is not a fix. It is a
+  hand-tuned coordinate, the thing the skill says you never write, and it only
+  rotates the problem: the same sentence at `w="200"` becomes 242px tall and
+  covers its neighbour vertically instead of horizontally, still 3 overlapping
+  pairs. The documented cap, `maxW`, is rejected outright - see D16.
 - **Status:** open
 
 ### D4. `layout="grid"` has one `gap` for both axes
@@ -266,4 +284,93 @@ blocker.
   reported location is the only way to tell which element it means.
 - **Repro:** `examples/repro/d12-group-requires-id.tldsl.jsx` (compiles, as every
   repro here does; the comment in it says which line to delete to get the error)
+- **Status:** open
+
+### D13. Parallel edge labels are stamped at their own midpoints and overprint each other
+
+- **Diagram:** `examples/event-driven.tldsl.jsx`
+- **Severity:** wrong
+- **Attempted:** The ordinary event-bus idiom: a row of four services above a
+  row of four topics, with eight edges between them carrying the event names -
+  `publish OrderPlaced`, `subscribe`, `PaymentRefunded`, and so on.
+- **Happened:** Every label goes at its own edge's midpoint, and because all
+  eight edges span the same gap between the two rows, all eight labels land in
+  one 33px-tall band at y 143-155. `arrow-truth` gives their boxes: `publish
+  OrderPlaced` at x 79.5-256.5, `PaymentRefunded` at 224.7-386, `subscribe` at
+  252.7-341.6, `publish PaymentCaptured` at 291.3-514.3, `subscribe` at
+  346-434.9, `subscribe` at 394.5-483.4, `ShipmentFailed` at 504.6-642.6,
+  `publish StockReserved` at 561.1-758.5, `subscribe` at 639.6-728.5. Seven of
+  the nine overlap a neighbour. The render is a single run of glyphs -
+  `publishOrderPlacPaymenpublishPaymentCaptured` and `subscsubscribe` - so the
+  reader reads strings that are not any of the labels. This is not D11: nothing
+  is behind these labels, they collide with **each other**, and no tool counts
+  that. `layout-report`'s `overlapping shape pairs` ignores label boxes and
+  `arrow-truth` only checks label-versus-shape, so the diagram measures clean
+  on both while being unreadable.
+- **Repro:** `examples/repro/d13-fan-labels-collide.tldsl.jsx`
+- **Status:** open
+
+### D14. Antiparallel edges are separated by a bow that is huge when it should be small and absent when it should be there
+
+- **Diagram:** `examples/event-driven.tldsl.jsx`
+- **Severity:** ugly
+- **Attempted:** Two antiparallel pairs, both natural in an event topology.
+  `t-payments -> dlq` ("3 failed retries") with `dlq -> t-payments` ("redrive")
+  is the dead-letter loop; `t-orders -> payments` ("subscribe") with
+  `payments -> t-orders` ("PaymentRefunded") is a service reading a topic and
+  compensating back onto it.
+- **Happened:** The same mechanism mis-fires in both directions. The
+  dead-letter pair is 413px apart and nearly vertical, and both arcs bow ~165px
+  **left** of the straight line - out of the bus frame, across the `Derived
+  consumers` frame, and back - so their two labels land at (105.3,447.6) and
+  (116.4,445.9), overlapping each other and sitting on top of `Notification
+  service` (`arrow-truth`: `arrow labels overlapping a non-endpoint shape: 2`).
+  The adjacent pair gets the opposite treatment: `arrow-truth` reports
+  `ca51e353-0 / f256ec69-0 (97% within 8px)` - no separation at all, the two
+  arrows are one line for 97% of their length, which is D1's collapse on a pair
+  that is 130px apart. So separation exists but scales with nothing useful:
+  distant pairs are flung into a neighbour's frame, adjacent pairs get nothing.
+- **Repro:** `examples/repro/d14-antiparallel-bow.tldsl.jsx` (both cases in one
+  file)
+- **Status:** open
+
+### D15. `check` is clean on a diagram that has lost three of its shapes
+
+- **Diagram:** `examples/event-driven.tldsl.jsx`
+- **Severity:** papercut
+- **Attempted:** `tldsl check`, then claiming the diagram was done - the skill
+  says "`check` before you claim it is done", and the only other instruction is
+  to look at the PNG.
+- **Happened:** `check` printed nothing at all on a diagram where a `<Note>`
+  549px wide covers `t-payments` and `t-inventory` completely and clips
+  `t-shipments`, eight arrow labels overprint each other, 11 of 17 arrow paths
+  cross a shape they do not connect, and there are 14 edge-edge crossings. The
+  information exists - `layout-report` says `overlapping shape pairs: 4` and
+  `arrow-truth` says `arrow paths crossing a non-endpoint shape: 11` - but
+  neither is `check`, neither runs in the workflow the skill documents, and
+  neither is mentioned in the skill. Every other defect in this ledger was found
+  by rendering a PNG and reading it with human eyes; `check` has never once
+  been the thing that caught one. It validates the IR, not the diagram.
+- **Repro:** `examples/repro/d15-check-silent-on-occlusion.tldsl.jsx`
+- **Status:** open
+
+### D16. `maxW` is documented on `<Note>` and `<Sticky>` and rejected by `check`
+
+- **Diagram:** `examples/event-driven.tldsl.jsx`
+- **Severity:** papercut
+- **Attempted:** `<Note on="t-orders" maxW="160">` to stop the saga note
+  spreading across the whole bus (D3). The skill's Style section heads its list
+  "On `<Box>` / `<Note>` / `<Sticky>`" and `maxW - caps how wide a label may run
+  before wrapping` is the last item in it, so this is the documented lever and
+  the obviously right one.
+- **Happened:** `error[ir/unknown-prop]: 'maxW' is not supported on '<note>'
+  (allowed: id, on, x, y, w, h, color, textAlign, verticalAlign, labelColor,
+  font, size)`. Identical for `<Sticky>`, which also reports itself as
+  `<note>` - the same "the diagnostic names an element that is not in the file"
+  confusion as D12. The allowed set does contain `w`, so the capability exists
+  under a different name; the skill documents the one prop that does not work
+  and does not mention the one that does. Either the prop or the sentence is
+  wrong, and an author cannot tell which without running `check`.
+- **Repro:** `examples/repro/d16-note-maxw-rejected.tldsl.jsx` (compiles, with
+  the comment naming the prop to add back)
 - **Status:** open

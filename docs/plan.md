@@ -2230,13 +2230,47 @@ only test it gets against material T24 did not choose.
   `npm run check` green. No `src/` touched, so `docs/renders/` and
   `docs/baseline.md` are unchanged.
 
-- [ ] **T31. An event-driven microservice topology.**
+- [x] **T31. An event-driven microservice topology.**
   Six or seven services around a message bus, with both publish and subscribe
   edges, a dead-letter path, and a saga spanning three services. Stresses
   many-to-one and one-to-many through a single hub - the shape T6's fan
   placement was built for, on a graph it has never seen.
   **Acceptance:** `examples/event-driven.tldsl.jsx`, check clean, PNG reviewed,
   gaps logged.
+
+  Built `examples/event-driven.tldsl.jsx`: four core services that both publish
+  and subscribe, a `Kafka` frame of four topic boxes as the hub, three derived
+  consumers fed by two frame-targeted edges (`bus -> analytics`), and a
+  dead-letter topic with a redrive edge back onto the bus. The checkout saga
+  runs orders -> payments -> shipping and compensates backwards onto
+  `orders.v1`. `check` clean on the first run; 17 edges over 14 shapes.
+
+  **The numbers.** `layout-report`: 14 edge-edge crossings, 4 overlapping shape
+  pairs, canvas 1102x744, fill ratio 0.25. `arrow-truth`: 11 of 17 arrow paths
+  cross a shape they do not connect, 2 arrow labels sit on a non-endpoint shape,
+  1 crowded arrow pair at `97% within 8px`. The PNG was rendered and read, and
+  it is the worst-reading diagram of Phase 9 so far: three of the four topics
+  are hidden under the saga note and the eight publish/subscribe labels merge
+  into one run of glyphs.
+
+  **Four new entries, D13-D16, plus recurrences on D1 and D3.** D13 (wrong) -
+  eight labels land in one 33px band because each goes at its own edge's
+  midpoint, and seven of nine label boxes overlap a neighbour; they collide with
+  each other, not with shapes, and no tool counts that. D14 (ugly) - the
+  antiparallel separation is mis-scaled in both directions: the 413px
+  dead-letter pair bows ~165px sideways out of the bus frame and parks both
+  labels on `Notification service`, while the adjacent `t-orders`/`payments`
+  pair gets no separation at all. D15 (papercut) - `check` printed nothing on
+  all of the above; it validates the IR, not the diagram, and it has never once
+  been the thing that caught a defect in this ledger. D16 (papercut) - `maxW`
+  is documented on `<Note>` and `<Sticky>` and rejected by `check` on both,
+  which also corrects D3: `w` **is** allowed and does cap the note, it is just
+  a hand-tuned coordinate and it turns a horizontal occlusion into a vertical
+  one.
+
+  Nothing was worked around and nothing was reshaped: the note still hides three
+  topics, the labels still smear. `npm run check` green, no `src/` touched, so
+  `docs/renders/` and `docs/baseline.md` are unchanged.
 
 - [ ] **T32. A C4 container diagram.**
   Follow the C4 convention properly: a system boundary, containers inside it
@@ -3491,3 +3525,24 @@ promoted into the task list by the human.
   layered diagram is a full-width band. D10 is the symptom; the underlying
   question is whether those two components should stretch their children by
   definition rather than needing an `align` value that does not exist.
+
+- **T31: a hub topology is 17 hand-written edges.** Seven services and four
+  topics needed one `<Edge>` per publish and one per subscribe, and the edge
+  list is longer than the shape list for the third diagram running. An edge form
+  that takes a list on one side - "these four ids publish to this one" - would
+  collapse the whole pub/sub block and would also give the layout something to
+  fan deliberately instead of eight independent midpoints. Not a defect; the
+  diagram is expressible.
+- **T31: two measurement tools, neither in the documented workflow.**
+  `layout-report`'s `overlapping shape pairs` ignores label boxes;
+  `arrow-truth`'s label check only compares labels against shapes, never against
+  other labels. Between them they saw 4 of the 5 things wrong with
+  `event-driven` and reported none of them to the author, because the skill's
+  workflow section names only `check`, `serve` and `render`. D15 logs the
+  `check` half; the other half is that the tools that do know are dev tools in
+  `tools/`.
+- **T31: `<Sticky>` reports itself as `<note>` in diagnostics.** Same shape as
+  D12 - the error names an element that does not appear in the source file.
+  Folded into D16 rather than given a number of its own, but if D12 gets a fix
+  that maps IR node kinds back to the authored component name, this is the
+  second case it should cover.
