@@ -1,3 +1,10 @@
+BLOCKED ON HUMAN - T5.
+
+T5 is built and shipped; its acceptance criterion is not reachable by the
+mechanism T5 names, and two wakes have now independently confirmed that. The
+loop cannot advance past it without a human choosing one of the three
+resolutions written under T5. Do not start T6 until that choice is made.
+
 # tldsl layout plan
 
 The ordered worklist for the layout loop. **This file is the only state that
@@ -457,6 +464,45 @@ Two traps, both paid for already:
   register as crossings in the `fan` and `cross-container` buckets. T6 removes
   the `wide-fanout` two as a side effect of placement. Nothing in the current
   task list owns `deep-nesting`'s four.
+
+  **Second wake, independent verification.** The claim above was re-checked
+  from the coordinates rather than taken on trust, and it holds - but the
+  reason is sharper than "there is no bend to lane".
+
+  `deep-nesting`'s four are cross-container *and* invisible to the crossed-shape
+  filter. `e-validator-config` runs (297.5,538) -> (297.5,209.5) and fully
+  contains both `e-metrics-config` (297.1,340 -> 297.4,209.5) and
+  `e-router-handler` (297.1,326 -> 297.4,450.5), so they are exactly the
+  overlapping-span case T5 describes. They are declined twice over: once at
+  `from.parentId !== to.parentId` in `computeCandidate`, and again at the
+  `s.parentId === from.parentId` filter that builds `crossed`, which would
+  return empty even if the first gate were removed. Reaching them means routing
+  cross-container edges at all - widening T3's trigger, already sitting in
+  Discovered work - not assigning lanes. That is a T3-scale change to the
+  routing module with a crossings-based acceptance, and inventing it here would
+  be exactly the improvised substitute the plan forbids.
+
+  `wide-fanout`'s two are a placement coincidence. `hub -> leaf-7`
+  (106.6,62 -> 240.4,211.9) and `hub -> leaf-14` (106.6,62 -> 438.4,433.9)
+  share an origin and have slopes 1.120 and 1.121; the short arrow is a strict
+  geometric prefix of the long one, so they are 100% crowded by construction.
+  No bend mechanism applies (diagonal, so `deriveAxis` returns null) and no lane
+  separates two segments of the same ray. Only moving the leaves helps, which is
+  T6.
+
+  So no in-scope work ticks this box, and the next wake would produce this same
+  paragraph again. Three ways out, for a human to pick:
+
+  1. Accept 6 as the floor, tick T5, and let T6 take the `wide-fanout` two.
+  2. Re-word the acceptance to exclude straight, unrouted arrows - i.e. measure
+     crowding only over pairs that `computeEdgeRoutes` actually routed - and
+     re-check.
+  3. Promote the cross-container-routing entry from Discovered work into a task
+     ahead of T5, then re-check T5 after it and T6 have landed.
+
+  Option 3 is the only one that makes the criterion true as written; option 1
+  changes least. This wake declined to choose because the plan reserves that
+  for the human.
 
   Free choice recorded: `LANE_STEP = 20`. It is the smallest round step that
   cleared every routed pair in the corpus on the first try; not tuned further,
