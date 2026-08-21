@@ -1900,7 +1900,7 @@ the design:
   my own draft before the test: the worked example used `geo="cylinder"`, which
   is not a legal `geo`. Both examples in the file now compile and pass `check`.
 
-- [ ] **T25. The hooks.**
+- [x] **T25. The hooks.**
   Three behaviours, gated by the `if` glob on `*.tldsl.jsx`.
 
   **Validate on edit.** `PostToolUse` on `Edit|Write` runs `tldsl check` and
@@ -1929,6 +1929,56 @@ the design:
   output; a broken diagram surfaces its diagnostic without the agent asking; no
   hook stalls the session longer than `tldsl check` takes; and with `serve` cold,
   editing a diagram produces a hint rather than a ten-second pause.
+
+  Shipped `hooks/hooks.json` plus two POSIX `sh` scripts, and one small CLI
+  addition that keeps them honest. `hooks/on-edit.sh` (PostToolUse, `matcher`
+  `Edit|Write`) reads `tool_input.file_path` with `jq`, returns silently unless
+  it ends in `.tldsl.jsx`, runs `tldsl check`, and on a clean file runs
+  `tldsl render --reuse-only`; it emits one `hookSpecificOutput.additionalContext`
+  string either way. `hooks/on-prompt.sh` (UserPromptSubmit) is a `find` for
+  `*.tldsl.overlay.json` plus `jq '.entries | length'`, printing to plain stdout.
+  Neither script decides anything the CLI could decide - the one thing the CLI
+  could not previously answer was *"render only if it is free"*, so `tldsl render`
+  gained **`--reuse-only`**: when `findServe` comes back empty it errors instead
+  of booting chromium. That is four lines in `src/cli/render.ts` and it is what
+  keeps the hook a shell-out instead of a serve-registry parser.
+
+  **All four acceptance clauses measured, against the built `dist/cli`**, not
+  tsx. A non-`.tldsl.jsx` path: empty stdout, exit 0, **0.01s**. A clean diagram
+  with `serve` **cold**: the hint, no render, **0.26s** - not a ten-second pause.
+  A broken diagram: the diagnostic (`error[runtime/threw]`) arrives in
+  `additionalContext` with `hookEventName: "PostToolUse"`, **0.14s**, without
+  anyone asking for it. And with `serve` **warm** on `deep-nesting`, the same
+  hook rendered in **1.48s** and the PNG it wrote is byte-identical
+  (`518dae87...`) to the committed `docs/renders/deep-nesting.png` - so the
+  render path is real, and geometry did not move. `npm run check` green,
+  **56 -> 57 test files, 642 -> 651 tests**; the new `tests/e2e/hooks-fixture.test.ts`
+  spawns both scripts for real over stdin rather than reimplementing them.
+
+  **Two deviations, both written down rather than worked around.**
+
+  *The gate is the script, not the `if` field.* The plan's mechanics block says
+  to gate with `if` plus a glob. Re-read against the docs, `if` takes **a single
+  string**, not an array ("To match multiple tool names, use separate handlers
+  each with its own `if` value"), and path rules for `Write` are documented as
+  accepted but never consulted - only `Edit(...)` path rules are. Covering Edit
+  and Write would therefore need two handler entries whose behaviour I could not
+  test from inside the loop. The `case` guard on `$f` is one line, is covered by
+  two of the new tests, and produces the same silence; it costs one process spawn
+  per non-diagram edit, measured at 0.01s.
+
+  *The overlay hook over-reports, and I shipped it that way.* Immediately after
+  the warm render above, `on-prompt.sh` announced "8 unabsorbed canvas changes in
+  deep-nesting.tldsl.jsx" - with nobody having touched the canvas. The cause is
+  already in Discovered work from T23: booting the viewer makes it PUT back an
+  index-only overlay. Filtering those entries out inside the hook would put
+  overlay semantics in a hook, which is the one thing Phase 8's own rule forbids;
+  the count belongs in the `tldsl overlay show` this phase already lists as
+  missing. So the hook ships as specified and the false alarm is recorded, in
+  Discovered work and in Questions for the human.
+
+  Also fixed while testing: `${TMPDIR}` ends in `/` on macOS, so the injected
+  render path read `T//tldsl-render/...`. One line.
 
 - [ ] **T26. `/tldsl:sync`.** *Blocked on T19 and T21.*
   Reads `tldsl overlay show`, rewrites the JSX, runs `tldsl verify` until it
@@ -2029,6 +2079,23 @@ tasks above by the human, not by the loop.
 Defaults were taken so the loop could continue; nothing here is blocking. Each
 entry is a decision a human may want to revisit, with what it costs to leave it
 as-is.
+
+- **T25 - the overlay hook reports canvas changes nobody made.** The task asks
+  `UserPromptSubmit` to flag a non-empty `*.tldsl.overlay.json` as "source and
+  canvas disagree". Shipped exactly that, and it reported 8 changes on a file
+  nobody had edited, because rendering it once makes the viewer write an
+  index-only overlay.
+  **Default taken:** shipped the hook as the task specifies and wrote the false
+  positive down. It changes least: the hook is three lines of `find` + `jq`, and
+  the alternative fixes are both outside T25.
+  **Alternatives:** (2) filter index-only entries inside the hook - rejected,
+  Phase 8's rule is that a hook which computes something is a bug; (3) stop the
+  viewer PUTting an index-only overlay, a core round-trip change; (4) ship
+  `tldsl overlay show` and have the hook read its count, which is the shape the
+  phase's own missing-commands table already implies.
+  **What the default costs:** anyone who renders a diagram once then gets nagged
+  to run `/tldsl:sync` on every subsequent turn, for nothing. That is bad enough
+  that the hook may be worth disabling until (3) or (4) lands.
 
 - **T12 - the last arrow-label overlap, and squished diagonal labels.** T12's
   acceptance is *no* arrow label's bounding box overlapping a shape the arrow
@@ -2978,3 +3045,36 @@ promoted into the task list by the human.
   were compiled by hand this wake, and they will rot silently. A small test that
   extracts fenced `jsx` blocks from the skill and runs them through the corpus
   compile path would pin them.
+
+### From T25
+
+- **The overlay hook cries wolf after every render.** `hooks/on-prompt.sh`
+  counts `.entries` in `*.tldsl.overlay.json`; one `tldsl render` against a warm
+  serve was enough to make it report 8 unabsorbed changes on an untouched
+  `deep-nesting`. This is the T23 index-only-PUT defect surfacing where a user
+  will actually see it, every turn, and it makes the third hook worse than
+  silence until it is fixed. Two ways out: stop the viewer PUTting an
+  index-only overlay, or give the CLI a `tldsl overlay show` that reports only
+  entries a human would call a change. The second is on Phase 8's own
+  missing-commands table already.
+- **Rendering still litters the working tree.** Same cause: the warm-serve test
+  in this wake left `tests/corpus/deep-nesting.tldsl.overlay.json` behind and I
+  deleted it before committing, exactly as T23 did. Every wake that renders pays
+  this tax by hand.
+- **`async: true` may be able to inject context after all.** The Phase 8
+  mechanics block states that async hooks fire and forget and cannot inject, and
+  that is what forced the synchronous-render design. A docs re-read this wake
+  said the opposite - that async hooks use the same output JSON, including
+  `additionalContext`. I did not act on it: the synchronous render measures
+  0.26s cold and 1.48s warm, so there is nothing to buy. But the claim in the
+  plan should not be trusted as settled.
+- **Nothing in `npm run check` covers the warm-serve branch of `on-edit.sh`.**
+  The new e2e tests pin silence, diagnostics and the cold hint; the render
+  branch needs a live `serve` and chromium, so it was verified by hand this wake
+  (byte-identical PNG) and is unpinned thereafter.
+- **`hooks/on-prompt.sh` word-splits `find` output**, so an overlay under a path
+  containing a space is skipped, and its `find` is unbounded below `cwd`. It ran
+  in 0.25s over this repo; a monorepo could be slower, against a 15s timeout.
+- **The plugin is now three of the four pieces** - `skills/`, `hooks/`,
+  `.claude-plugin/`. Only `commands/` (T26) is missing, and T26 is the one task
+  that needs core commands that do not exist yet (`overlay show`, `verify`).

@@ -8,6 +8,9 @@
  * URL resolution: reuse a running `tldsl serve` for the file if one is
  * recorded and alive (`infra/serve-registry`); otherwise boot an in-process,
  * ephemeral `runServe` and close it in a `finally`.
+ *
+ * `--reuse-only` skips the ephemeral-boot fallback and errors instead, so a
+ * hook can render only when a warm `tldsl serve` is already free to use.
  */
 
 import { existsSync } from "node:fs";
@@ -24,16 +27,21 @@ export type ParsedRenderArgs = {
   file: string;
   out: string;
   opts: RenderOptions;
+  reuseOnly: boolean;
 };
 
 export function parseArgs(argv: readonly string[]): ParsedRenderArgs {
   const positional: string[] = [];
   let requestedFormat: RenderFormat | undefined;
+  let reuseOnly = false;
   const opts: RenderOptions = { dark: false, background: true, format: "png" };
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     switch (arg) {
+      case "--reuse-only":
+        reuseOnly = true;
+        break;
       case "--frame":
         opts.frame = argv[++i];
         break;
@@ -68,7 +76,7 @@ export function parseArgs(argv: readonly string[]): ParsedRenderArgs {
   const [fileArg, outArg] = positional;
   if (fileArg === undefined || outArg === undefined) {
     throw new Error(
-      "usage: tldsl render <file.tldsl.jsx> <out.png> [--frame <id>] [--shapes <a,b>] [--padding <px>] [--scale <n>] [--format png|svg|jpeg|webp] [--dark] [--no-background]",
+      "usage: tldsl render <file.tldsl.jsx> <out.png> [--frame <id>] [--shapes <a,b>] [--padding <px>] [--scale <n>] [--format png|svg|jpeg|webp] [--dark] [--no-background] [--reuse-only]",
     );
   }
   if (opts.frame !== undefined && opts.shapes !== undefined) {
@@ -78,7 +86,7 @@ export function parseArgs(argv: readonly string[]): ParsedRenderArgs {
   const out = resolve(process.cwd(), outArg);
   opts.format = requestedFormat ?? inferFormat(out);
 
-  return { file: resolve(process.cwd(), fileArg), out, opts };
+  return { file: resolve(process.cwd(), fileArg), out, opts, reuseOnly };
 }
 
 function inferFormat(outPath: string): RenderFormat {
@@ -95,7 +103,7 @@ export type RunRenderArgs = {
 export async function runRender(args: RunRenderArgs): Promise<number> {
   const { deps, io } = args;
   try {
-    const { file, out, opts } = parseArgs(args.argv);
+    const { file, out, opts, reuseOnly } = parseArgs(args.argv);
     if (!existsSync(file)) {
       throw new Error(`no such file: ${file}`);
     }
@@ -105,6 +113,9 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
       io.writeStdout(`tldsl render: reusing serve on ${reused}\n`);
       await exportImage(reused, out, opts);
     } else {
+      if (reuseOnly) {
+        throw new Error(`no running \`tldsl serve\` for ${file}; start one, or drop --reuse-only to boot a browser`);
+      }
       const handle = await runServe({ path: file, deps, io });
       try {
         await exportImage(handle.url, out, opts);

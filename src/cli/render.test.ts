@@ -59,6 +59,16 @@ describe("parseArgs", () => {
     ).toThrow(/mutually exclusive/);
   });
 
+  it("parses --reuse-only", () => {
+    const { reuseOnly } = parseArgs(["a.tldsl.jsx", "out.png", "--reuse-only"]);
+    expect(reuseOnly).toBe(true);
+  });
+
+  it("defaults --reuse-only to false", () => {
+    const { reuseOnly } = parseArgs(["a.tldsl.jsx", "out.png"]);
+    expect(reuseOnly).toBe(false);
+  });
+
   it("throws when the file positional is missing", () => {
     expect(() => parseArgs([])).toThrow(/usage: tldsl render/);
   });
