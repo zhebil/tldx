@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SceneJSON, TLRecord } from "../contracts/scene-json.js";
 import { error } from "../domain/diagnostics/index.js";
 import type { IRDoc, IRDocPositioned } from "../domain/ir/index.js";
+import { GEOS } from "../domain/ir/styles.js";
 import type { AstDoc } from "../domain/parser/ast.js";
 import { astBuilders } from "../domain/parser/ast.fixture.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
@@ -248,5 +249,24 @@ describe("compileFile", () => {
       const result = await compileFile(path, deps({ [path]: source }, new StubLayout(), execute));
       expect(result.inputs).toEqual(["foo/bar.tldsl.jsx", "foo/parts.tldsl.jsx"]);
     });
+  });
+});
+
+describe("compileFile: geo (T15)", () => {
+  it.each(GEOS)("round-trips geo=%s to scene JSON without a diagnostic", async (geo) => {
+    const path = "geo.tldsl.jsx";
+    const { doc, box } = astBuilders(path);
+    const execute = new FakeExecute();
+    execute.setResult(SRC, {
+      ast: doc({ id: "d" }, [box({ id: "b", label: "L", geo })]),
+      inputs: [path],
+    });
+
+    const result = await compileFile(path, deps({ [path]: SRC }, new StubLayout(), execute));
+
+    expect(result.diagnostics).toEqual([]);
+    const scene = result.sceneJson!;
+    const [shape] = recordsByType(scene, "shape");
+    expect((shape!.props as { geo?: string }).geo).toBe(geo);
   });
 });

@@ -37,6 +37,7 @@ import {
   estimatedBoxSize,
   estimatedNoteSize,
   fitBoxWidth,
+  geoScale,
   FRAME_PAD_INNER,
   FRAME_TITLE_PX,
   type Align,
@@ -328,13 +329,16 @@ function applyContainerBoxSizing(
     for (const i of boxIdx) {
       const box = children[i] as IRBox;
       if (box.w !== undefined) continue;
-      sharedW = Math.max(sharedW, fitBoxWidth(box.label, box.maxW, box));
+      const k = geoScale(box.label, box.maxW, box);
+      sharedW = Math.max(sharedW, Math.ceil(fitBoxWidth(box.label, box.maxW, box) * k));
     }
     for (const i of boxIdx) {
       const box = children[i] as IRBox;
       if (box.w !== undefined) continue;
       const w = box.maxW === undefined ? sharedW : Math.min(sharedW, box.maxW);
-      sized[i] = { ...sized[i]!, w, h: boxHeightForWidth(box.label, w, box) };
+      const k = geoScale(box.label, box.maxW, box);
+      const h = Math.ceil(boxHeightForWidth(box.label, w / k, box) * k);
+      sized[i] = { ...sized[i]!, w, h };
     }
     if (sharedW === 0) {
       for (const i of boxIdx) sharedW = Math.max(sharedW, sized[i]!.w);

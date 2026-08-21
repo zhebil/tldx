@@ -17,6 +17,7 @@
  */
 
 import { fontScale, lineHeightPx, textWidth, type TextStyle } from "./glyph-metrics.js";
+import type { StyleGeo } from "../ir/styles.js";
 
 const BOX_PAD_Y = 16;
 const BOX_MIN_W = 120;
@@ -138,16 +139,104 @@ export function fitBoxWidth(label: string | undefined, maxW?: number, ts?: TextS
   return lastW;
 }
 
+/** Rendered extent of `label` after greedy-wrapping it into a box `w` wide. */
+export function labelExtent(label: string, w: number, ts?: TextStyle): { wl: number; hl: number } {
+  const lines = wrapLineWidths(label, w - BOX_LABEL_PAD_X, ts);
+  return { wl: Math.max(...lines), hl: lines.length * lineHeightPx(ts) };
+}
+
+export type BoxStyle = TextStyle & { geo?: StyleGeo };
+
+type GeoModel = "rect" | "ellipse" | "diamond" | "triangle" | "arrow";
+
+/**
+ * Maps each of tldraw's 20 `geo` values to the outline model closest to its
+ * label-containment shape. `hexagon`/`octagon`/`pentagon`/`heart` are
+ * roomier than an ellipse and `star` is tighter than a diamond - both are
+ * approximations, not exact fits.
+ */
+const GEO_MODEL: Record<StyleGeo, GeoModel> = {
+  rectangle: "rect",
+  "check-box": "rect",
+  "x-box": "rect",
+  cloud: "rect",
+  ellipse: "ellipse",
+  oval: "ellipse",
+  hexagon: "ellipse",
+  octagon: "ellipse",
+  pentagon: "ellipse",
+  heart: "ellipse",
+  diamond: "diamond",
+  rhombus: "diamond",
+  "rhombus-2": "diamond",
+  star: "diamond",
+  trapezoid: "diamond",
+  "arrow-up": "arrow",
+  "arrow-down": "arrow",
+  "arrow-left": "arrow",
+  "arrow-right": "arrow",
+  triangle: "triangle",
+};
+
+/**
+ * How far the label overflows the outline, as a multiplier on the box: `1`
+ * means it exactly fits. `a`/`b` are the label's width and height as
+ * fractions of the box's.
+ *
+ * `arrow` uses tldraw's own shaft geometry from `getGeoShapePath.ts`: the
+ * shaft is 0.68 of the cross-axis, and the head eats 0.38 of the long axis,
+ * leaving the centred label 0.24 of the box height before it hits the head.
+ */
+const GEO_FIT: Record<Exclude<GeoModel, "rect">, (a: number, b: number) => number> = {
+  ellipse: (a, b) => Math.hypot(a, b),
+  diamond: (a, b) => a + b,
+  triangle: (a, b) => 2 * a + b,
+  arrow: (a, b) => Math.max(a / 0.68, b / 0.24),
+};
+
+/**
+ * Per-box scale `k >= 1` applied to both width and height so a label still
+ * fits inside a non-rectangular outline, centred - tldraw's own label
+ * measurement is geo-independent (`getUnscaledLabelSize` wraps at
+ * `w - LABEL_PADDING * 2` for every geo and `getGeometry` centres the label
+ * rect in the full bounding box), so without this a diamond or triangle
+ * would draw its label spilling past the drawn shape.
+ *
+ * Solved as a fixed point rather than in closed form: the box scales but the
+ * label does not, so growing the box re-wraps the label onto fewer lines and
+ * changes the very fractions the scale was derived from. Each pass multiplies
+ * `k` by the residual overflow, which converges in two or three steps.
+ */
+export function geoScale(label: string | undefined, maxW: number | undefined, style?: BoxStyle): number {
+  if (label === undefined || label.length === 0) return 1;
+  const model = GEO_MODEL[style?.geo ?? "rectangle"];
+  if (model === "rect") return 1;
+
+  const rw = fitBoxWidth(label, maxW, style);
+  const rh = boxHeightForWidth(label, rw, style);
+  const fit = GEO_FIT[model];
+
+  let k = 1;
+  for (let pass = 0; pass < 8; pass++) {
+    const { wl, hl } = labelExtent(label, rw * k, style);
+    const overflow = fit(wl / (rw * k), hl / (rh * k));
+    if (overflow <= 1.001) break;
+    k *= overflow;
+  }
+  return k;
+}
+
 export function estimatedBoxSize(
   label: string | undefined,
   maxW?: number,
-  ts?: TextStyle,
+  style?: BoxStyle,
 ): {
   w: number;
   h: number;
 } {
-  const w = fitBoxWidth(label, maxW, ts);
-  return { w, h: boxHeightForWidth(label, w, ts) };
+  const k = geoScale(label, maxW, style);
+  const w = fitBoxWidth(label, maxW, style);
+  return { w: Math.ceil(w * k), h: Math.ceil(boxHeightForWidth(label, w, style) * k) };
 }
 
 /**

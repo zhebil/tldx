@@ -87,7 +87,7 @@ line number and the allowed list.
 |---|---|
 | `<Doc>` | `id`, `direction`, `layout`, `gap`, `pad`, `cols` |
 | `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h`, `color` |
-| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
+| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash`, `geo`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
 | `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `color`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
 | `<Edge>` | `id`, `from`, `to`, `color`, `dash`, `arrowheadStart`, `arrowheadEnd`, `label`, `labelColor`, `font`, `size` |
 
@@ -141,6 +141,23 @@ stroke weight, same as `<Box>`/`<Note>` size sets border weight). An
 unrecognized value is `ir/invalid-style-value`, same as the other style
 props. Default is `draw`/`m`. `<Frame>` has neither - a frame title doesn't
 wrap through this path.
+
+`geo` (T15) is tldraw's shape-kind style on `<Box>` only, one of `arrow-down
+| arrow-left | arrow-right | arrow-up | check-box | cloud | diamond |
+ellipse | heart | hexagon | octagon | oval | pentagon | rectangle |
+rhombus-2 | rhombus | star | trapezoid | triangle | x-box` - the exact 20
+values tldraw's own `geo` shape supports. There is no `cylinder`; tldraw
+doesn't have one. Default is `rectangle`. An unrecognized value is
+`ir/invalid-style-value`, same as the other style props. Unlike
+`color`/`fill`/`dash`, `geo` *does* affect box sizing: tldraw measures and
+wraps a box's label the same way regardless of `geo`, so on a non-rectangle
+outline the label would otherwise overflow the drawn shape. To compensate,
+a non-rectangle box is grown (both `w` and `h`, by the same factor) enough
+that the label rectangle still fits inside the outline - a diamond, for
+instance, ends up visibly larger than a rectangle box with the same label,
+and a triangle larger still. `x-box` and `check-box` are sized as plain
+rectangles: tldraw draws their mark *through* the box, so no amount of
+growing keeps the label clear of it.
 
 ## Layout
 

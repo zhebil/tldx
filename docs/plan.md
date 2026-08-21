@@ -1213,7 +1213,7 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   the corpus every new offset is `+ 0` and the `hasFrameChild` predicate is
   unchanged, so `docs/renders/` and `docs/baseline.md` stand as they were.
 
-- [ ] **T15. `geo` as a prop. No named shape aliases in the library.**
+- [x] **T15. `geo` as a prop. No named shape aliases in the library.**
   tldraw's geo shape already supports `rectangle`, `ellipse`, `diamond`,
   `hexagon`, `cloud`, `oval`, `triangle`, `star`, `x-box`, `check-box` and more,
   all free. Expose it as `<Box geo="diamond">`.
@@ -1227,6 +1227,49 @@ defect Phase 1 exists to route around. Semantics beat heuristics.
   geometry. It currently will not: a diamond's usable inner width is roughly
   half its bounding box, so a diamond sized like a rectangle clips its label.
   Measure per geo with `text-metrics.mts` and feed the result into T0's sizing.
+
+  **Done.** All 20 values of tldraw's `GeoShapeGeoStyle` are exposed as
+  `<Box geo="...">` through the existing `readEnum` style-prop path (`GEOS` in
+  `ir/styles.ts`, `IRBox.geo`, `ALLOWED_PROPS.box`, `emitBox`); `boxShape`
+  already accepted `geo` and already defaulted it to `rectangle`, so emit
+  needed one line. No aliases were added. There is no cylinder and none was
+  faked.
+
+  **The task's premise about *why* sizing breaks is wrong, and the fix it
+  prescribes cannot work.** tldraw's own label measurement is geo-independent:
+  `getUnscaledLabelSize` (`GeoShapeUtil.tsx`) wraps at `w - LABEL_PADDING * 2`
+  for every geo and `getGeometry` centres the label rect in the full bounding
+  box. So a diamond does not clip or re-wrap its label - the text simply
+  overflows the drawn outline, and `text-metrics.mts` reports byte-identical
+  numbers for all 20 geos. There was nothing to measure. The correction is
+  therefore geometric: a per-box scale `k >= 1` on both `w` and `h`, from a
+  containment model per outline (`rect` -> 1, `ellipse` -> `hypot(a, b)`,
+  `diamond` -> `a + b`, `triangle` -> `2a + b`, `arrow` -> `max(a/0.68,
+  b/0.24)` from tldraw's own shaft geometry in `getGeoShapePath.ts`), where
+  `a`/`b` are the label's width and height as fractions of the box's.
+
+  **Solved as a fixed point, not in closed form.** The first cut computed `k`
+  once on the rectangle basis and the render still showed `triangle` and both
+  vertical arrows spilling their labels: the box scales but the label does not,
+  so growing the box re-wraps the label onto fewer lines and invalidates the
+  very fractions `k` came from. Iterating `k *= overflow` converges in two or
+  three passes. Numbers for `"triangle shape with a longer label"`: rectangle
+  256x92; triangle 615x221 (still overflowing, `2a+b = 1.43`) under the closed
+  form, 880x317 (`2a+b = 1.000`) under the fixed point. Diamond 502x181,
+  arrow-up 696x250.
+
+  **A 20-shape gallery was rendered twice and read by eye.** After the fix
+  every one of the 20 outlines contains its label at both a one-word and a
+  wrapping label. `x-box` and `check-box` are the two that still look wrong,
+  and no sizing fixes them: tldraw draws the cross and the tick *through* the
+  box, so the label crosses a stroke at any size. They are modelled as plain
+  rectangles and the limitation is written into `docs/dsl.md`.
+
+  **No geometry moved.** No corpus fixture carries a `geo`, so `k` is exactly 1
+  everywhere and all eleven canvases match the recorded baseline to the pixel
+  (`checkout-services` 869x640, `long-labels` 1538x848, `wide-fanout`
+  3722x204, ...). `docs/renders/` and `docs/baseline.md` stand unchanged.
+  `npm run check` green: 43 test files, 514 tests (was 43/468 at T14).
 
 - [ ] **T16. Composite primitives that carry layout semantics.**
   The ones worth having are the ones that constrain structure:
@@ -2154,3 +2197,33 @@ promoted into the task list by the human.
   only by unit tests. Until a fixture uses one, no render has ever contained a
   group, and the `+ offsetX` path in `emit.ts` is dead in every measured
   diagram.
+
+### From T15
+
+- **The containment models for `star`, `trapezoid`, `hexagon`, `octagon`,
+  `pentagon` and `heart` are approximations, not solved geometry.** `star` is
+  tighter than a diamond and is under-sized by the diamond model; the other
+  five are roomier than an ellipse and are over-sized by the ellipse model.
+  They all look right in the gallery, but nothing pins them the way the exact
+  four (rect / ellipse / diamond / triangle) are pinned.
+- **`x-box` and `check-box` cannot hold a label cleanly at any size.** tldraw
+  draws the mark through the box. The only real fixes are outside sizing:
+  offset the label (`verticalAlign="start"`), or don't ship those two geos.
+- **`geo` fights container box sizing.** `applyContainerBoxSizing` gives a
+  `col`/`grid` container one shared width, so a single `triangle` or `star`
+  child inflates every sibling. In the gallery a 5-wide grid with one triangle
+  is more than twice as wide as the same grid of rectangles. Nobody has decided
+  whether shared sizing should exclude, or normalise across, mixed geos.
+- **`geoScale` ignores `maxW`.** An author who caps a box with `maxW` still
+  gets a box wider than the cap once `k` is applied, because the label has to
+  fit the outline. `maxW` is documented as a wrap hint, so this is arguably
+  right, but it is undocumented and untested.
+- **The arrow model uses one constant pair (0.68 / 0.24) for all four arrow
+  geos.** It is exact for `arrow-up`/`arrow-down`, where the label sits in the
+  shaft. For `arrow-left`/`arrow-right` tldraw's head inset is
+  `min(w, h) * 0.38`, so the usable width depends on the box's own aspect - the
+  fixed point still converges, but the model is not the real constraint.
+- **Nothing exercises `geo` in the corpus or in `docs/renders/`.** All 20
+  values are pinned by unit tests and by a scratch gallery in `/tmp`, which is
+  not committed. Until a fixture carries a `geo`, no measured diagram has ever
+  contained a non-rectangle box.

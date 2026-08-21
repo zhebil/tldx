@@ -384,6 +384,20 @@ describe("domain/emit: style pass-through (T9)", () => {
     expect(plain.dash).toBe("draw");
   });
 
+  it("passes box geo through to props, defaulting to rectangle when absent (T15)", () => {
+    const scene = emit(
+      doc([
+        box({ id: "hex", x: 0, y: 0, w: 100, h: 50, geo: "hexagon" }),
+        box({ id: "plain", x: 0, y: 0, w: 100, h: 50 }),
+      ]),
+    );
+    const hex = scene.store["shape:hex"]?.props as Record<string, unknown>;
+    expect(hex.geo).toBe("hexagon");
+
+    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    expect(plain.geo).toBe("rectangle");
+  });
+
   it("passes frame color through, defaulting to black when absent", () => {
     const scene = emit(
       doc([frame({ id: "f", x: 0, y: 0, w: 100, h: 50, color: "green", children: [] })]),
@@ -649,6 +663,7 @@ function box(input: {
   color?: string;
   fill?: string;
   dash?: string;
+  geo?: string;
   textAlign?: string;
   verticalAlign?: string;
   labelColor?: string;

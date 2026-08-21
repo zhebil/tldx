@@ -13,7 +13,7 @@
  * - `x | y | w | h` parse as finite numbers when present.
  * - attributes outside the fixed allowed set per element kind are rejected
  *   with `ir/unknown-prop` (replaces the type checker the MVP doesn't have).
- * - style props (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd`,
+ * - style props (`color`, `fill`, `dash`, `geo`, `arrowheadStart`, `arrowheadEnd`,
  *   `textAlign`, `verticalAlign`, `labelColor`, `font`, `size`) must be one
  *   of tldraw's fixed enum values (`ir/styles.ts`), or
  *   `ir/invalid-style-value`. `font`/`size` affect box/note sizing
@@ -48,6 +48,7 @@ import {
   FILLS,
   FONT_SIZES,
   FONTS,
+  GEOS,
   TEXT_ALIGNS,
   VERTICAL_ALIGNS,
 } from "./styles.js";
@@ -99,6 +100,7 @@ const ALLOWED_PROPS = {
     "color",
     "fill",
     "dash",
+    "geo",
     "textAlign",
     "verticalAlign",
     "labelColor",
@@ -288,6 +290,7 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
   const color = readEnum(node.attrs, "color", COLORS, ctx);
   const fill = readEnum(node.attrs, "fill", FILLS, ctx);
   const dash = readEnum(node.attrs, "dash", DASHES, ctx);
+  const geo = readEnum(node.attrs, "geo", GEOS, ctx);
   const textAlign = readEnum(node.attrs, "textAlign", TEXT_ALIGNS, ctx);
   const verticalAlign = readEnum(node.attrs, "verticalAlign", VERTICAL_ALIGNS, ctx);
   const labelColor = readEnum(node.attrs, "labelColor", COLORS, ctx);
@@ -306,6 +309,7 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
     ...(color === undefined ? {} : { color }),
     ...(fill === undefined ? {} : { fill }),
     ...(dash === undefined ? {} : { dash }),
+    ...(geo === undefined ? {} : { geo }),
     ...(textAlign === undefined ? {} : { textAlign }),
     ...(verticalAlign === undefined ? {} : { verticalAlign }),
     ...(labelColor === undefined ? {} : { labelColor }),

@@ -59,3 +59,27 @@ export type StyleFont = (typeof FONTS)[number];
 
 export const FONT_SIZES = ["s", "m", "l", "xl"] as const;
 export type StyleFontSize = (typeof FONT_SIZES)[number];
+
+export const GEOS = [
+  "arrow-down",
+  "arrow-left",
+  "arrow-right",
+  "arrow-up",
+  "check-box",
+  "cloud",
+  "diamond",
+  "ellipse",
+  "heart",
+  "hexagon",
+  "octagon",
+  "oval",
+  "pentagon",
+  "rectangle",
+  "rhombus-2",
+  "rhombus",
+  "star",
+  "trapezoid",
+  "triangle",
+  "x-box",
+] as const;
+export type StyleGeo = (typeof GEOS)[number];

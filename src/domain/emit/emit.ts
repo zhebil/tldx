@@ -20,7 +20,7 @@
  *   (tldraw stickies are always 200 wide) and keeps `h` as `growY` above
  *   tldraw's 200 base height; `note.color` passes through the same way.
  * - `box`/`frame`/`note`/`edge` also pass through the raw tldraw style props
- *   IR carries (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd`,
+ *   IR carries (`color`, `fill`, `dash`, `geo` (`box` only), `arrowheadStart`, `arrowheadEnd`,
  *   and on `box`/`note`/`edge` also `labelColor`, `font`, `size`, and on
  *   `box`/`note` also `textAlign`, `verticalAlign` - see `domain/ir/styles.ts`)
  *   verbatim onto the shape when present; `font`/`size` already fed sizing at
@@ -129,6 +129,7 @@ function emitBox(box: IRBoxPositioned, parentId: string, offsetX: number, offset
     ...(box.color === undefined ? {} : { color: box.color }),
     ...(box.fill === undefined ? {} : { fill: box.fill }),
     ...(box.dash === undefined ? {} : { dash: box.dash }),
+    ...(box.geo === undefined ? {} : { geo: box.geo }),
     ...(box.textAlign === undefined ? {} : { textAlign: box.textAlign }),
     ...(box.verticalAlign === undefined ? {} : { verticalAlign: box.verticalAlign }),
     ...(box.labelColor === undefined ? {} : { labelColor: box.labelColor }),

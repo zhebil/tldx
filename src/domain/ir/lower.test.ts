@@ -263,7 +263,7 @@ describe("lower: ir/unknown-prop", () => {
     const [d] = diagnostics;
     expect(d!.code).toBe("ir/unknown-prop");
     expect(d!.message).toBe(
-      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash, textAlign, verticalAlign, labelColor, font, size)",
+      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash, geo, textAlign, verticalAlign, labelColor, font, size)",
     );
     // column 3: fixture's synthetic per-attribute column for `lable`, the
     // second attribute after `id`.
@@ -408,6 +408,15 @@ describe("lower: style props (T9)", () => {
     expect(boxIr.dash).toBe("dashed");
   });
 
+  it("captures geo on <box>", () => {
+    const ast = doc({}, [box({ id: "a", geo: "diamond" })]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const boxIr = ir!.children[0]!;
+    if (boxIr.kind !== "box") throw new Error("expected box");
+    expect(boxIr.geo).toBe("diamond");
+  });
+
   it("captures color on <frame>", () => {
     const ast = doc({}, [frame({ id: "f", color: "green" })]);
     const { ir, codes } = lowerAst(ast);
@@ -473,6 +482,11 @@ describe("lower: style props (T9)", () => {
 
   it("ir/invalid-style-value for an unknown dash on <box>", () => {
     const { codes } = lowerAst(doc({}, [box({ id: "a", dash: "squiggly" })]));
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+
+  it("ir/invalid-style-value for an unknown geo on <box>", () => {
+    const { codes } = lowerAst(doc({}, [box({ id: "a", geo: "cylinder" })]));
     expect(codes).toEqual(["ir/invalid-style-value"]);
   });
 

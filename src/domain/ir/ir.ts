@@ -6,6 +6,7 @@ import type {
   StyleDash,
   StyleFill,
   StyleFont,
+  StyleGeo,
   StyleFontSize,
   StyleTextAlign,
   StyleVerticalAlign,
@@ -74,6 +75,7 @@ export type IRBox = IRBase & {
   color?: StyleColor;
   fill?: StyleFill;
   dash?: StyleDash;
+  geo?: StyleGeo;
   /** Leaf text alignment; named `textAlign` (not `align`) since `align` is the container cross-axis prop (B1). */
   textAlign?: StyleTextAlign;
   verticalAlign?: StyleVerticalAlign;
