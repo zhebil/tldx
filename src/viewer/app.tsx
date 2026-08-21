@@ -32,6 +32,7 @@ export function ViewerApp(): JSX.Element {
 
   function handleMount(editor: Editor): void {
     editorRef.current = editor;
+    (window as unknown as { editor?: Editor }).editor = editor;
     if (state.scene !== null) {
       pushScene(editor, state.scene);
     }
