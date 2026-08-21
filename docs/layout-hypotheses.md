@@ -2698,3 +2698,108 @@ exhausted and the corpus's remaining defects live somewhere else.
 Reverted; `stack.ts` and `stack.test.ts` restored from `HEAD`, `npm run check`
 green at 318 tests, `wide-fanout`'s report byte-identical to the champion's and
 gate 5 back to 10/5/1/8/0/0/28.
+
+---
+
+## B37 — floor the relative cap so it can only widen _(wake 44)_ — **VOID: identically the champion**
+
+B36 replaced the absolute clip `min(4, 1 + crossings)` with a relative one and
+was rejected at gate 5, because relative scaling can only *narrow* a boundary
+and `release-pipeline`'s flat ×4 is load-bearing. B37's premise: keep the
+relative rule but floor it at what the champion already awards, so no boundary
+can ever get less -
+
+```
+factor = max( min(SKIP_ROW_GAP_MAX, 1 + crossings), relative_factor )
+```
+
+with B36's `relative_factor = 1 + (MAX-1) * count / max(MAX-1, maxCount)`. Gate
+5 then cannot regress by construction, and the gate to watch becomes canvas
+area.
+
+### Measurement first — and nothing was built
+
+Per the entry's own instruction (B8's lesson), the formula was evaluated before
+implementing it. **It is the identity.** Not "a no-op on this corpus" - a no-op
+on every possible input:
+
+- `relative ≤ MAX`, because `count / denom ≤ 1` whenever `denom ≥ maxCount`.
+- `relative ≤ 1 + count`, because `(MAX-1) / denom ≤ 1` whenever `denom ≥ MAX-1`.
+
+`denom = max(MAX-1, maxCount)` satisfies both bounds simultaneously, so
+`relative ≤ min(MAX, 1 + count)` always, and `max(champion, relative) =
+champion` always. B36's own ledger entry states the first half of this out loud
+- *"the resulting factor is therefore always ≤ the champion's, so the change can
+only narrow a boundary, never widen one"* - and flooring a quantity that is
+already a lower bound of the floor changes nothing. The error was writing the
+successor hypothesis from the *shape* of the failure (narrowing broke it, so
+forbid narrowing) without re-reading the algebra in the same entry.
+
+Confirmed numerically on the three corpus files that reach `skipRowGaps` (the
+other four have no auto-grid container), using the per-boundary crossing counts
+measured at wakes 42 and 43 under the live B33 predicate:
+
+| file | crossings | champion factor | relative factor | B37 factor |
+| --- | --- | --- | --- | --- |
+| long-labels | 2,1,2,1,0 | 3,2,3,2,1 | 3.00,2.00,3.00,2.00,1.00 | 3,2,3,2,1 |
+| release-pipeline | 3,5 | 4,4 | 2.80,4.00 | 4,4 |
+| wide-fanout | 14,8,2,2 | 4,4,3,3 | 4.00,2.71,1.43,1.43 | 4,4,3,3 |
+
+and by random search over 500,000 crossing vectors (1-8 boundaries, counts
+0-39): **0 boundaries out of ~2.25M differ from the champion, max |delta| 0.**
+
+### Gates
+
+Not run - there is no candidate. `npm run check` green at HEAD (38 files, 318
+tests), tree unchanged, no file in `src/` touched this wake.
+
+### Verdict
+
+**VOID.** Not REJECTED (no gate saw it) and not KEPT (protocol step 6's "no
+voting files at all → KEEP" clause exists for changes that are structurally tied
+on this corpus, not for a diff that is provably the identity function on all
+inputs; keeping it would add an unreachable branch and a false ledger entry
+claiming an effect). Struck from the backlog.
+
+### What this establishes: row-gap scalars are exhausted
+
+B37 was filed as the last hypothesis on this line, with the abandon condition
+"if a widening-only re-tuning also fails, the line is exhausted". It did not
+fail - it does not exist. The condition still fires, for a stronger reason.
+
+Ask what a *non-vacuous* widening-only rule would have to look like. To widen
+any boundary, some boundary must receive more than `1 + crossings` gaps - more
+than one gap-width per crossing edge. No renormalisation of the crossing count
+can produce that: every relative rule is bounded above by the absolute one it
+normalises. It requires a **second, additive term**, which is exactly what B35
+built at wake 43. B35 passed all five gates, took `wide-fanout` from 28 pierced
+arrows to 24 (the largest single-file gate-5 gain in the loop's history), and
+still lost its only blind A/B because the added 120px and 80px read as dead
+vertical bands. So the widening direction has been tested, in the only form it
+can take, and it lost on the render.
+
+The row-gap scalar therefore has both directions closed by evidence:
+
+| direction | hypothesis | outcome |
+| --- | --- | --- |
+| narrow | B36 _(wake 42)_ | gate 5 fails - `release-pipeline` 8 → 10 |
+| widen | B35 _(wake 43)_ | all gates pass, judge prefers the champion |
+| re-parameterise within those bounds | B37 _(this wake)_ | provably the identity |
+
+The kept state is B33's `gap * min(4, 1 + crossings)` per row boundary, and it
+sits between a gate-5 floor and a judged ceiling. **Do not file another row-gap
+scalar hypothesis.** This closes the second line of enquiry in the loop's
+history, after arrow attachment (eight failed hypotheses, closed at wake 36).
+Placement remains open, but the next hypotheses have to move something other
+than the vertical gap of an auto-grid: the backlog's B22/B23 (frame title
+band), B19 (cross-container alignment) and B26/B11 (text metrics) all do.
+
+### Process note
+
+Two wakes in a row now (B35, B37) have been decided by arithmetic done before
+any code was written - B35's fan-vs-crossing table showed which files could move
+at all, and B37's algebra showed it could not move any. Both were cheap. The
+"measure the premise before building" rule has paid for itself often enough that
+it should be read as applying to *derivations* as well as to measurements: when
+a hypothesis is a formula change, evaluate the formula against the one it
+replaces before delegating an implementation.
