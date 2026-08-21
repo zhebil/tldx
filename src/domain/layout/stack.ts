@@ -28,9 +28,11 @@ import type {
 } from "../ir/index.js";
 
 import {
+  boxHeightForWidth,
   DEFAULT_ALIGN,
   estimatedBoxSize,
   estimatedNoteSize,
+  fitBoxWidth,
   FRAME_PAD_INNER,
   FRAME_TITLE_PX,
   type Align,
@@ -99,7 +101,7 @@ async function sizeElement(
 ): Promise<IRBoxPositioned | IRNotePositioned | IRFramePositioned> {
   switch (el.kind) {
     case "box": {
-      const size = estimatedBoxSize(el.label);
+      const size = estimatedBoxSize(el.label, el.maxW);
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
     }
     case "note": {
@@ -172,6 +174,10 @@ async function layoutContainer(
       if (c.kind === "edge" || c.kind === "doc") return false;
       return !(c.x !== undefined && c.y !== undefined);
     });
+
+  if (mode === "row" || mode === "col" || mode === "grid") {
+    applyContainerBoxSizing(children, sized, flowedIndices, mode);
+  }
 
   let w: number;
   let h: number;
@@ -251,6 +257,48 @@ async function layoutContainer(
 
   const out: IRElementPositioned[] = children.map((c, i) => (c.kind === "edge" ? c : sized[i]!));
   return { children: out, w, h, mode: usedMode, cols: usedCols };
+}
+
+/**
+ * Container-aware box sizing: a `col`/`grid` gives every flowed `box` child
+ * (no explicit `w`) the same width - the widest natural (aspect-bounded)
+ * width in the container, capped per-box by `maxW` if set - then re-wraps
+ * each to its final width; a `row` leaves widths alone. Either way, every
+ * flowed box (no explicit `h`) then gets the same height, the tallest in the
+ * container. Frames keep their content-derived size and notes their fixed
+ * sticky width; stretching either would blow the aspect target or can't be
+ * emitted at all, so only `box` children participate.
+ */
+function applyContainerBoxSizing(
+  children: readonly IRElement[],
+  sized: (IRBoxPositioned | IRNotePositioned | IRFramePositioned | null)[],
+  flowedIndices: readonly number[],
+  mode: "row" | "col" | "grid",
+): void {
+  const boxIdx = flowedIndices.filter((i) => children[i]!.kind === "box");
+  if (boxIdx.length === 0) return;
+
+  if (mode === "col" || mode === "grid") {
+    let sharedW = 0;
+    for (const i of boxIdx) {
+      const box = children[i] as IRBox;
+      if (box.w !== undefined) continue;
+      sharedW = Math.max(sharedW, fitBoxWidth(box.label, box.maxW));
+    }
+    for (const i of boxIdx) {
+      const box = children[i] as IRBox;
+      if (box.w !== undefined) continue;
+      const w = box.maxW === undefined ? sharedW : Math.min(sharedW, box.maxW);
+      sized[i] = { ...sized[i]!, w, h: boxHeightForWidth(box.label, w) };
+    }
+  }
+
+  let sharedH = 0;
+  for (const i of boxIdx) sharedH = Math.max(sharedH, sized[i]!.h);
+  for (const i of boxIdx) {
+    const box = children[i] as IRBox;
+    if (box.h === undefined) sized[i] = { ...sized[i]!, h: sharedH };
+  }
 }
 
 function boundingBox(

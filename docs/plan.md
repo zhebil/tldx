@@ -173,7 +173,7 @@ Two traps, both paid for already:
 
 ### Phase 0 - sizing, before anything measures anything
 
-- [ ] **T0. Container-aware box sizing. Do this first.**
+- [x] **T0. Container-aware box sizing. Do this first.**
   `estimatedBoxSize(label)` is a pure function of one string. It cannot see a
   box's siblings, so it has to guess both dimensions from text alone, and
   `BOX_MAX_W` is the workaround: with no other information available, a constant
@@ -215,6 +215,50 @@ Two traps, both paid for already:
   verified against a real render with `text-metrics.mts`; no box exceeds the
   aspect target unless the author pinned `w`. Look at the PNGs - this changes
   every file, including the two the cap never touched.
+
+  **Done.** `BOX_MAX_W` and `BOX_MIN_H` are gone; `fitBoxWidth` picks each
+  label's aspect-bounded natural width and `applyContainerBoxSizing` in
+  `stack.ts` gives a `col`/`grid` one shared width and a `row` one shared
+  height. Verified over all eight fixtures: 17 flow containers, every one
+  uniform to the pixel, no box past the aspect target, and `text-metrics.mts`
+  confirms no label wraps more lines than the engine predicted (i.e. no
+  mid-word wrap). `hexagonal`'s Driven-ports column went from 172/158/200/228/
+  144/214/120 to a flush 228; `long-labels` went from ten 320px ribbons to a
+  uniform 4-wide grid and lost one of its two long diagonals.
+
+  Two things the task did not anticipate, both settled by measurement:
+
+  - **`BOX_CHAR_PX = 14` was documented as an upper bound on glyph advance and
+    is not one.** Measuring every printable ASCII glyph through
+    `tools/text-metrics.mts` gives `#` 21.40, `M` 21.25, `%` 21.14, `W` 21.14,
+    `w` 20.85. That is why `Gateway` rendered as `Gatewa`/`y` in
+    `deep-nesting` both before this task and after its first pass - a 7-char
+    label got exactly 7x14 = 98px of content width and needed more. The
+    acceptance criterion here is unmeetable with a flat per-char constant, so
+    pass 1 ("unwrapped text width *from the measured metrics*") is now
+    literally that: `src/domain/layout/glyph-metrics.ts` holds the measured
+    advance table and `textWidth()`, and wrapping happens in pixels rather
+    than a character budget. Summing advances predicts real `labelW` within
+    5px over 41 corpus labels (worst under-prediction 1.58px, covered by a 4px
+    slack). Most boxes got *narrower*, not wider: `PasswordHasher` 228 -> 201.
+  - **The aspect target is 6, not the 4 the task suggested starting at.**
+    Tuned from renders as instructed. Only `sequence` is sensitive to the
+    value at all - the other seven fixtures render identically at 4, 5 and 6.
+    At 4 every one of its fourteen step labels is forced onto two lines
+    (215x1808); at 6 they all fit on one and the diagram is 23% shorter
+    (361x1388). 5 is strictly worse than both (310x1808: wider boxes, same
+    line count).
+
+  Free choice taken, per "change less": the shared width/height applies to
+  `box` children only. Notes cannot carry a width at all (`emitNote` emits a
+  fixed-width sticky and only sets `growY`; notes are T7), and stretching
+  boxes to a sibling frame's width would blow the aspect target outright -
+  `deep-nesting`'s `l3` column would hand `Handler` the ~500px width of the
+  `l4` frame beside it, an 8:1 box. So "a `col`'s children share a width" is
+  verified as "a `col`'s *box* children share a width".
+
+  `docs/renders/` and `docs/baseline.md` were deliberately not written: they
+  do not exist yet and creating them is T1's entire job.
 
 ### Phase 1 - stop arrows crossing shapes
 
@@ -909,3 +953,19 @@ promoted into the task list by the human.
   it needs to be a deliberate task rather than a drive-by.
 - `docs/layout-champion.md` is still in the tree and still describes
   pre-`2484ffa` geometry. T1 marks it historical.
+- **`estimatedNoteSize` still uses a flat `NOTE_CHAR_PX = 15`**, the same class
+  of bug T0 just removed from box sizing. Notes now have measured glyph metrics
+  available (`textWidth` in `domain/layout/glyph-metrics.ts`) but do not use
+  them. Left alone because notes are T7's surface.
+- The measured glyph table covers printable ASCII only; anything else falls
+  back to the widest advance (21.4px), so a CJK or emoji label over-reserves
+  badly. Nothing in the corpus exercises it.
+- `wrapLineWidths` re-measures the whole candidate line per word and
+  `fitBoxWidth` binary-searches over it, so sizing one label is O(words^2 log
+  px). Irrelevant at corpus scale; would matter for a very long label.
+- Every fixture except `sequence` renders byte-identically at aspect target 4,
+  5 and 6, so the corpus barely constrains that knob. Worth re-tuning once T13
+  adds diagrams people actually draw.
+- `multi-region` and `release-pipeline` both park their `<Note>` in a band of
+  empty canvas far below the diagram - visible in the renders, untouched by
+  T0, and squarely T7/T8.

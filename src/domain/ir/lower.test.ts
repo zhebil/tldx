@@ -263,7 +263,7 @@ describe("lower: ir/unknown-prop", () => {
     const [d] = diagnostics;
     expect(d!.code).toBe("ir/unknown-prop");
     expect(d!.message).toBe(
-      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h)",
+      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW)",
     );
     // column 3: fixture's synthetic per-attribute column for `lable`, the
     // second attribute after `id`.

@@ -2,8 +2,9 @@
  * `tools/text-metrics.mts <file.tldsl.jsx>` - print the *rendered* text
  * metrics of every shape's label as measured by a real browser.
  *
- * The layout engine only has flat per-char estimates (`estimatedBoxSize` in
- * `src/domain/layout/defaults.ts`) and nothing in the repo can currently
+ * The layout engine only estimates against a measured per-glyph advance-width
+ * table (`estimatedBoxSize` in `src/domain/layout/defaults.ts`, table in
+ * `src/domain/layout/glyph-metrics.ts`) and nothing in the repo can currently
  * observe what tldraw actually draws. This starts `tldsl serve <file>` as a
  * child process, parses its ephemeral port out of stdout, drives headless
  * chromium via playwright, and always kills the child before exiting - an

@@ -5,7 +5,7 @@ import type { IRBoxPositioned, IRElementPositioned, IRFramePositioned } from "..
 import type { AstNode } from "../parser/ast.js";
 import { astBuilders } from "../parser/ast.fixture.js";
 
-import { estimatedBoxSize } from "./defaults.js";
+import { BOX_ASPECT_TARGET, estimatedBoxSize } from "./defaults.js";
 import {
   bestGridCols,
   formsChain,
@@ -588,5 +588,76 @@ describe("skipRowGaps (B33)", () => {
 
   it("returns an empty array with fewer than 2 rows", () => {
     expect(skipRowGaps(["a", "b"], [{ from: "a", to: "b" }], 2, 40)).toEqual([]);
+  });
+});
+
+describe("hybridLayout container-aware box sizing (T0)", () => {
+  it("gives every col box child the same width and height", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "a", label: "A" }),
+        box({ id: "b", label: "Redis cluster primary" }),
+        box({ id: "c", label: "X" }),
+      ]),
+    );
+    const [a, b, c] = ["a", "b", "c"].map((id) => boxById(result.children, id));
+    expect(b!.w).toBe(a!.w);
+    expect(c!.w).toBe(a!.w);
+    expect(a!.h).toBe(b!.h);
+    expect(a!.h).toBe(c!.h);
+  });
+
+  it("gives every row box child the same height", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row" }, [
+        box({ id: "a", label: "A" }),
+        box({
+          id: "b",
+          label: "Alpha Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliett Kilo",
+        }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    expect(a.h).toBe(b.h);
+  });
+
+  it("never grows a flowed box past the aspect target unless w is pinned", async () => {
+    const longLabel =
+      "Alpha Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliett Kilo Lima Mike " +
+      "November Oscar Papa Quebec Romeo Sierra Tango Uniform Victor Whiskey Xray Yankee Zulu";
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "a", label: longLabel }),
+        box({ id: "pinned", label: "whatever", w: 900 }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const pinned = boxById(result.children, "pinned");
+    expect(a.w).toBeLessThanOrEqual(BOX_ASPECT_TARGET * a.h);
+    expect(pinned.w).toBe(900);
+  });
+
+  it("keeps an author-pinned w and h instead of the shared container size", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "pinned", label: "small", w: 250, h: 80 }),
+        box({ id: "other", label: "A much longer sibling label to force a bigger shared width" }),
+      ]),
+    );
+    const pinned = boxById(result.children, "pinned");
+    expect(pinned.w).toBe(250);
+    expect(pinned.h).toBe(80);
+  });
+
+  it("caps a box's shared width at its own maxW", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "wide", label: "A fairly long label that sets a wide shared width" }),
+        box({ id: "capped", label: "Short", maxW: 100 }),
+      ]),
+    );
+    const capped = boxById(result.children, "capped");
+    expect(capped.w).toBe(100);
   });
 });

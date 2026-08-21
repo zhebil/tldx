@@ -55,6 +55,7 @@ export type IRBox = IRBase & {
   y?: number;
   w?: number;
   h?: number;
+  maxW?: number;
 };
 
 export type IRNote = IRBase & {

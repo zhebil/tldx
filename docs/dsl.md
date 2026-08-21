@@ -63,13 +63,15 @@ line number and the allowed list.
 |---|---|
 | `<Doc>` | `id`, `direction`, `layout`, `gap`, `pad`, `cols` |
 | `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h` |
-| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h` |
+| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW` |
 | `<Note>` | `id`, `x`, `y`, `w`, `h` |
 | `<Edge>` | `id`, `from`, `to` |
 
-`x`/`y`/`w`/`h`/`gap`/`pad`/`cols` are numbers written as strings
+`x`/`y`/`w`/`h`/`gap`/`pad`/`cols`/`maxW` are numbers written as strings
 (`w="200"`), like any other JSX attribute value. A non-numeric value is
-`ir/invalid-numeric-attr`.
+`ir/invalid-numeric-attr`. `maxW` on `<Box>` caps the char budget a label
+wraps against, without pinning `w` itself; explicit `w`/`h` still win over
+any computed size.
 
 `id` is required on `<Box>` and `<Frame>` (`ir/missing-id`) since edges
 address them by id. `<Doc>`, `<Note>`, and `<Edge>` get a synthesized id when

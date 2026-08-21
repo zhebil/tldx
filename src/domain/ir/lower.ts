@@ -71,7 +71,7 @@ const ALLOWED_PROPS = {
     "w",
     "h",
   ],
-  box: ["id", "label", "x", "y", "w", "h"],
+  box: ["id", "label", "x", "y", "w", "h", "maxW"],
   note: ["id", "x", "y", "w", "h"],
   edge: ["id", "from", "to"],
 } as const;
@@ -231,7 +231,7 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
     }),
     span: node.span,
     ...optionalString(node.attrs, "label"),
-    ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
+    ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h", "maxW"] as const),
   };
 }
 

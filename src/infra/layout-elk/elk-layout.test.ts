@@ -139,7 +139,10 @@ describe("ElkLayoutAdapter: pinning policy", () => {
 });
 
 describe("ElkLayoutAdapter: label-driven sizing", () => {
-  it("grows a box's default width to fit a long label", async () => {
+  it("grows a column's shared width to fit its longest label", async () => {
+    // The default layout is `col`, so siblings share one container-derived
+    // width (see T0 in docs/plan.md) - the long label drives both boxes
+    // wider than the 120px minimum, rather than only growing itself.
     const port = new ElkLayoutAdapter();
     const ir: IRDoc = {
       kind: "doc",
@@ -168,7 +171,8 @@ describe("ElkLayoutAdapter: label-driven sizing", () => {
     const short = out.children[0]!;
     const long = out.children[1]!;
     if (short.kind !== "box" || long.kind !== "box") throw new Error("box");
-    expect(long.w).toBeGreaterThan(short.w);
+    expect(long.w).toBe(short.w);
+    expect(long.w).toBeGreaterThan(120);
   });
 
   it("honors an explicit w even for a long label", async () => {
