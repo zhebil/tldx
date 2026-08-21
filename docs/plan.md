@@ -414,6 +414,54 @@ Two traps, both paid for already:
   other over more than a third of their length. Add that check to
   `arrow-truth`.
 
+  **Built and shipped, but the box stays unchecked: the criterion is not met,
+  and it is not reachable by the mechanism this task describes.** Do not
+  rebuild lanes - they exist and they work. Read this note before touching T5
+  again.
+
+  What was built: `computeEdgeRoutes` in `src/domain/layout/routing.ts` is now
+  two phases. Phase 1 (`computeCandidate`, the old `computeRoute` stopping one
+  step short) yields a candidate carrying the chosen side, base sag, and the
+  two numbers the viability test needs. Phase 2 groups candidates by
+  `(parentId, axis, side)`, sorts each group by chord span ascending, and gives
+  each a lane `rank` = 1 + the highest rank among already-assigned siblings
+  whose axis-span overlaps it. Final sag = `baseSag + rank * LANE_STEP`
+  (`LANE_STEP = 20`), stepped back down one rank at a time while the extra sag
+  would bow the arc into a neighbouring shape. Longest chord therefore ends up
+  outermost, and an edge with no overlapping sibling keeps rank 0 and a
+  byte-identical bend to T4. `arrow-truth` gained `crowdedPairs` /
+  `crowdedFraction` (1px sampling, `CROWD_PX = 8`, `CROWD_FRACTION = 1/3`), so
+  the check the task asks for now runs on every invocation and prints the
+  offending pairs by id.
+
+  The numbers: **crowded pairs 20 -> 6. Crossings unchanged at 27**, per file
+  and in total, confirmed by `crossing-classify` as well. Every crowded pair
+  that involved a routed edge is gone: `wide-fanout` 12 -> 2, `multi-region`
+  3 -> 0, `release-pipeline` 1 -> 0. Looked at all four changed PNGs - the four
+  `Dispatcher -> Worker 2..5` arcs are four separate lanes now instead of one
+  stroke with four arrowheads, and the same for `Scheduler -> Task 2..4` and
+  `long-labels` row 1. `npm run check` green (40 files, 351 tests).
+
+  Why it stops at 6, and why lanes cannot go further: **all six survivors are
+  pairs of straight, unrouted arrows that are collinear because of where the
+  boxes sit.** There is no bend on them to assign a lane to. Four are
+  `deep-nesting`'s vertical chain at x=297, every one of which is
+  cross-container and so is declined by `computeEdgeRoutes` at the
+  `from.parentId !== to.parentId` gate. Two are `wide-fanout`'s
+  `hub -> leaf-7` / `hub -> leaf-14` and `hub -> leaf-8` / `hub -> leaf-16`,
+  where the near leaf sits exactly on the ray to the far one, so one arrow is a
+  geometric prefix of the other; both are diagonal, so `deriveAxis` returns
+  null and no route is computed either. The task's acceptance was written
+  assuming all crowding comes from bowed skips over overlapping spans - it
+  does not, and the six that do not are exactly the six arrows that still
+  register as crossings in the `fan` and `cross-container` buckets. T6 removes
+  the `wide-fanout` two as a side effect of placement. Nothing in the current
+  task list owns `deep-nesting`'s four.
+
+  Free choice recorded: `LANE_STEP = 20`. It is the smallest round step that
+  cleared every routed pair in the corpus on the first try; not tuned further,
+  because the check is a threshold and the margin is already comfortable.
+
 ### Phase 2 - placement that does not create the problem
 
 - [ ] **T6. Fan-out placement.**
@@ -1144,3 +1192,32 @@ promoted into the task list by the human.
   routing work has to widen its trigger past "both endpoints share a
   container" - the 6 deep-nesting crossings that are geometrically skip-shaped
   are the cheapest target.
+- **`deep-nesting`'s four crowded pairs have no owner in this plan.** They are
+  the vertical chain at x=297: four cross-container arrows drawn as bare
+  collinear segments, two of them overlapping 100%. T6 is placement for fans
+  and does not reach them; nothing else in T6-T18 claims cross-container
+  routing. If the T5 crowding criterion is meant to be reachable, a task that
+  widens `computeEdgeRoutes` past the `from.parentId !== to.parentId` gate has
+  to exist. That same widening is the cheapest target for the 15 remaining
+  cross-container crossings, so it is one task, not two.
+- **Collinearity, not just overlap, is a crowding source.** `hub -> leaf-7` and
+  `hub -> leaf-14` are 100% crowded because `leaf-7` sits exactly on the ray to
+  `leaf-14` - one arrow is a prefix of the other. Grid placement of a fan makes
+  this common: any two targets in the same direction from the source at
+  proportional distances collide. Worth stating as an explicit constraint in
+  T6's placement rule, because a fan block that is a clean column or row
+  reproduces it exactly.
+- **The lane viability step-down is untested in the corpus.** No candidate in
+  any of the eight files had its rank reduced - every lane offset fit on the
+  first try. So the `while (rank > 0 && gap < ...)` loop in `finalizeRoute` is
+  covered only by construction, not by a fixture. A denser diagram (T13) would
+  be the natural place to exercise it.
+- **`multi-region`'s outer lane runs within a few px of its region frame's left
+  border.** Not a crossing (frames are excluded from the crossed set by design,
+  recorded under T3), and it reads fine, but the lane mechanism has no notion of
+  the parent frame's own bounds, so a third lane in that column would bow
+  straight out of the frame. The gap check only looks at sibling boxes and notes.
+- **`arrow-truth` now prints two metrics, and only one is in `docs/baseline.md`'s
+  main table.** Crowded pairs are tracked in the "After T5" section instead.
+  Whoever next revises the baseline should decide whether crowding earns a
+  column of its own alongside crossings, since it is now a standing check.

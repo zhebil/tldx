@@ -218,3 +218,49 @@ than 15px.
 The remaining 27 are two groups: `deep-nesting` (9) and `hexagonal` (6) are
 100% cross-container, and `wide-fanout`'s 10 are all fan edges out of
 `Dispatcher`, which is T6's placement problem, not a routing one.
+
+---
+
+## After T5 (lanes for parallel skips)
+
+New metric, new check in `arrow-truth`: a **crowded pair** is two arrow paths
+that come within 8px of each other over more than a third of either path's
+length - the number that catches two arcs rendering as one thick stroke with
+two arrowheads. Crossings are unchanged at 27 in every file; only the sag of
+already-bowed edges moved.
+
+| file | crossings | crowded pairs (T4) | crowded pairs (T5) |
+|---|---|---|---|
+| deep-nesting | 9 | 4 | 4 |
+| hexagonal | 6 | 0 | 0 |
+| long-labels | 2 | 0 | 0 |
+| multi-region | 0 | 3 | **0** |
+| release-pipeline | 0 | 1 | **0** |
+| sequence | 0 | 0 | 0 |
+| sparse-graph | 0 | 0 | 0 |
+| wide-fanout | 10 | 12 | **2** |
+| **total** | **27** | **20** | **6** |
+
+Every crowded pair that involved a *routed* edge is gone. `wide-fanout`'s four
+`Dispatcher -> Worker 2..5` arcs, which shared a source anchor and all sagged
+~12-13px, now sit in four visibly separate lanes; the same for
+`Scheduler -> Task 2..4`, `multi-region`'s stacked column skips, and
+`release-pipeline` row 1.
+
+The six that remain are **not lanes-shaped**. All six are pairs of *straight*
+arrows that are collinear because of where the boxes are, so there is no bend
+to lane in the first place:
+
+- `wide-fanout` 2: `hub -> leaf-7` / `hub -> leaf-14` and `hub -> leaf-8` /
+  `hub -> leaf-16`. `leaf-7` sits exactly on the ray from `hub` to `leaf-14`,
+  so one arrow is a prefix of the other. Both are fan edges out of
+  `Dispatcher` - T6's placement problem, and fixing the placement removes the
+  crowding and the crossing together.
+- `deep-nesting` 4: the vertical chain at x=297 (`l1-gateway -> l2-router`,
+  `l2-metrics -> l1-config`, `l3-validator -> l1-config`,
+  `l2-router -> l3-handler`). Every one of these is cross-container, so
+  `computeEdgeRoutes` declines it at the `from.parentId !== to.parentId` gate
+  and it renders as a bare vertical segment.
+
+Both groups are the same six arrows that still register as crossings, so
+whatever fixes those buckets fixes this residue too.

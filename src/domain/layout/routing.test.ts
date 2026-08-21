@@ -142,4 +142,59 @@ describe("computeEdgeRoutes", () => {
     // sag = 22 * 81/80 = 22.275 -> rounds to -22.3.
     expect(route!.bend).toBeCloseTo(-22.3, 5);
   });
+
+  it("lanes overlapping-span skips in the same row so the longer chord bows further", () => {
+    // ad (span 50..500, skips b and c) and ce (span 350..650, skips d)
+    // overlap on x in 350..500. Both tie-break to "neg" like the single-edge
+    // cases above, landing them in the same lane group. ce is shorter so it
+    // sorts first and keeps rank 0 (sag 12, matching a lone c->e skip); ad is
+    // longer, ranks above it (sag 13.5 + one 20px lane step = 33.5), so its
+    // bow reaches farther from the row than ce's.
+    const ir = doc("root", [
+      box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+      box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+      box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
+      box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
+      box({ id: "e", x: 600, y: 0, w: 100, h: 50 }),
+      edge({ id: "ad", from: "a", to: "d" }),
+      edge({ id: "ce", from: "c", to: "e" }),
+    ]);
+    const routes = computeEdgeRoutes(ir);
+    const ad = routes.get("ad");
+    const ce = routes.get("ce");
+    expect(ad).toBeDefined();
+    expect(ce).toBeDefined();
+    expect(ad!.bend).toBeLessThan(0);
+    expect(ce!.bend).toBeLessThan(0);
+    expect(ce!.bend).toBeCloseTo(-12, 5);
+    expect(ad!.bend).toBeCloseTo(-33.5, 5);
+    expect(Math.abs(ad!.bend)).toBeGreaterThan(Math.abs(ce!.bend));
+  });
+
+  it("keeps rank 0 for two non-overlapping skips in the same row", () => {
+    // Same a/b/c/d shape as the plain skip test above, duplicated 1000px to
+    // the right as e/f/g/h. Both edges tie-break to "neg" and land in the
+    // same lane group, but their spans (50..500 and 1050..1500) don't
+    // overlap, so both keep rank 0 and bend identically to the single-edge
+    // case (-13.5).
+    const ir = doc("root", [
+      box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+      box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+      box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
+      box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
+      box({ id: "e", x: 1000, y: 0, w: 100, h: 50 }),
+      box({ id: "f", x: 1150, y: 0, w: 100, h: 50 }),
+      box({ id: "g", x: 1300, y: 0, w: 100, h: 50 }),
+      box({ id: "h", x: 1450, y: 0, w: 100, h: 50 }),
+      edge({ id: "ad", from: "a", to: "d" }),
+      edge({ id: "eh", from: "e", to: "h" }),
+    ]);
+    const routes = computeEdgeRoutes(ir);
+    const ad = routes.get("ad");
+    const eh = routes.get("eh");
+    expect(ad).toBeDefined();
+    expect(eh).toBeDefined();
+    expect(ad!.bend).toBeCloseTo(-13.5, 5);
+    expect(eh!.bend).toBeCloseTo(-13.5, 5);
+  });
 });

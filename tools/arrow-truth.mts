@@ -34,6 +34,12 @@ export type PageTruth = { arrows: ArrowTruth[]; shapes: ShapeBounds[] };
 
 export type CrossingPair = { arrowId: string; from: string; to: string; crossedId: string };
 
+export type CrowdedPair = { a: string; b: string; fraction: number };
+
+/** Two paths this close, for this much of one of them, read as a single stroke. */
+export const CROWD_PX = 8;
+export const CROWD_FRACTION = 1 / 3;
+
 async function main(): Promise<void> {
   const files = process.argv.slice(2);
   if (files.length === 0) {
@@ -62,6 +68,12 @@ async function reportFile(file: string): Promise<void> {
   process.stdout.write(
     `\narrow paths crossing a non-endpoint shape: ${countCrossings(sortedArrows, shapes)}\n`,
   );
+
+  const crowded = crowdedPairs(sortedArrows);
+  for (const { a, b, fraction } of crowded) {
+    process.stdout.write(`  crowded: ${a} / ${b} (${Math.round(fraction * 100)}% within ${CROWD_PX}px)\n`);
+  }
+  process.stdout.write(`arrow pairs crowding each other: ${crowded.length}\n`);
 }
 
 function formatPath(points: Pt[]): string {
@@ -133,6 +145,62 @@ export function crossingPairs(arrows: ArrowTruth[], shapes: ShapeBounds[]): Cros
 
 function countCrossings(arrows: ArrowTruth[], shapes: ShapeBounds[]): number {
   return crossingPairs(arrows, shapes).length;
+}
+
+function pointToSegment(p: Pt, a: Pt, b: Pt): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function pointToPath(p: Pt, path: Pt[]): number {
+  let best = Infinity;
+  for (let i = 0; i < path.length - 1; i++) {
+    best = Math.min(best, pointToSegment(p, path[i]!, path[i + 1]!));
+  }
+  return best;
+}
+
+/** Fraction of `a`'s arc length that lies within `px` of polyline `b`, sampled at ~1px. */
+export function crowdedFraction(a: Pt[], b: Pt[], px: number): number {
+  let total = 0;
+  let near = 0;
+  for (let i = 0; i < a.length - 1; i++) {
+    const p = a[i]!;
+    const q = a[i + 1]!;
+    const len = Math.hypot(q.x - p.x, q.y - p.y);
+    if (len === 0) continue;
+    const steps = Math.max(1, Math.ceil(len));
+    const step = len / steps;
+    for (let s = 0; s < steps; s++) {
+      const t = (s + 0.5) / steps;
+      total += step;
+      if (pointToPath({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t }, b) < px) near += step;
+    }
+  }
+  return total === 0 ? 0 : near / total;
+}
+
+/**
+ * Pairs of arrows that render as one thick stroke: within `CROWD_PX` of each
+ * other over more than `CROWD_FRACTION` of either path's length.
+ */
+export function crowdedPairs(arrows: ArrowTruth[]): CrowdedPair[] {
+  const out: CrowdedPair[] = [];
+  for (let i = 0; i < arrows.length; i++) {
+    for (let j = i + 1; j < arrows.length; j++) {
+      const x = arrows[i]!;
+      const y = arrows[j]!;
+      const fraction = Math.max(
+        crowdedFraction(x.points, y.points, CROWD_PX),
+        crowdedFraction(y.points, x.points, CROWD_PX),
+      );
+      if (fraction > CROWD_FRACTION) out.push({ a: x.arrowId, b: y.arrowId, fraction });
+    }
+  }
+  return out;
 }
 
 export async function extractTruth(url: string): Promise<PageTruth> {
