@@ -29,7 +29,7 @@ npx tsx tools/arrow-truth.mts tests/corpus/*.tldsl.jsx
 | long-labels | 1 |
 | sequence | 0 |
 | sparse-graph | 0 |
-| wide-fanout | 36 |
+| wide-fanout | 31 |
 
 ---
 
@@ -245,25 +245,25 @@ layout-report: tests/corpus/long-labels.tldsl.jsx
 id              parent       x    y    w    h
 gateway         long-labels  0    0    903  60
 auth            long-labels  988  0    885  60
-rate-limiter    long-labels  0    100  903  60
-router          long-labels  988  100  912  60
-orders          long-labels  0    200  921  60
-inventory       long-labels  988  200  903  60
-payments        long-labels  0    300  894  60
-notifier        long-labels  988  300  912  60
-audit           long-labels  0    400  948  60
-reporting       long-labels  988  400  939  60
-note-reporting  long-labels  0    500  200  632
-note-payments   long-labels  988  500  200  662
+rate-limiter    long-labels  0    140  903  60
+router          long-labels  988  140  912  60
+orders          long-labels  0    280  921  60
+inventory       long-labels  988  280  903  60
+payments        long-labels  0    420  894  60
+notifier        long-labels  988  420  912  60
+audit           long-labels  0    560  948  60
+reporting       long-labels  988  560  939  60
+note-reporting  long-labels  0    700  200  632
+note-payments   long-labels  988  700  200  662
 
 == Metrics ==
-canvas: 1927 x 1162
-aspect ratio: 1.66
-fill ratio (leaf area / canvas area): 0.360
+canvas: 1927 x 1362
+aspect ratio: 1.41
+fill ratio (leaf area / canvas area): 0.307
 overlapping shape pairs: 0
 edge-edge crossings: 1
-total edge length: 4446
-mean edge length: 556
+total edge length: 4650
+mean edge length: 581
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
 source-order violations per container:
@@ -271,19 +271,24 @@ source-order violations per container:
 left-edge alignment groups per container:
   long-labels: 2 groups over 12 children
 
-== ASCII Render (100x30 cells; 1 cell = 19.3 x 38.7 px) ==
+== ASCII Render (100x35 cells; 1 cell = 19.3 x 38.9 px) ==
 The API gateway receives every inbound request     The authentication service checks the bearer t   
                        ...................................................                          
+                       .                                                 .                          
 |---------------------------------------------|    |----------------------------------------------| 
 |The rate limiter tracks request counts per cl|    |The router inspects the request path and dispa| 
-|---------------------------------------------|  ..|----------------------------------------------| 
-The order service validates the cart contents an.  The inventory service reserves stock for each l  
+|---------------------------------------------|    |----------------------------------------------| 
+                                           .............                                            
+The order service validates the cart contents an   The inventory service reserves stock for each l  
                         ...................................................                         
+                        .                                                                           
 |---------------------------------------------|    |----------------------------------------------| 
 |The payment service charges the customer's ca|....|The notification service sends a confirmation | 
 |---------------------------------------------|    |----------------------------------------------| 
+                        .                                                                           
 The audit log service records every state transiti The reporting service aggregates completed orders
                         .                                                                           
+                                                                                                    
 |---------|                                        |---------|                                      
 |         |                                        |         |                                      
 |         |                                        |         |                                      
@@ -507,35 +512,35 @@ leaf-2    wide-fanout  347  0    120  60
 leaf-3    wide-fanout  516  0    120  60
 leaf-4    wide-fanout  685  0    120  60
 leaf-5    wide-fanout  854  0    120  60
-leaf-6    wide-fanout  0    100  120  60
-leaf-7    wide-fanout  178  100  120  60
-leaf-8    wide-fanout  347  100  120  60
-leaf-9    wide-fanout  516  100  120  60
-leaf-10   wide-fanout  685  100  129  60
-leaf-11   wide-fanout  854  100  129  60
-leaf-12   wide-fanout  0    200  129  60
-leaf-13   wide-fanout  178  200  129  60
-leaf-14   wide-fanout  347  200  129  60
-leaf-15   wide-fanout  516  200  129  60
-leaf-16   wide-fanout  685  200  129  60
-leaf-17   wide-fanout  854  200  129  60
-leaf-18   wide-fanout  0    300  129  60
-mini-hub  wide-fanout  178  300  129  60
-mini-1    wide-fanout  347  300  120  60
-mini-2    wide-fanout  516  300  120  60
-mini-3    wide-fanout  685  300  120  60
-mini-4    wide-fanout  854  300  120  60
-mini-5    wide-fanout  0    400  120  60
-mini-6    wide-fanout  178  400  120  60
+leaf-6    wide-fanout  0    140  120  60
+leaf-7    wide-fanout  178  140  120  60
+leaf-8    wide-fanout  347  140  120  60
+leaf-9    wide-fanout  516  140  120  60
+leaf-10   wide-fanout  685  140  129  60
+leaf-11   wide-fanout  854  140  129  60
+leaf-12   wide-fanout  0    280  129  60
+leaf-13   wide-fanout  178  280  129  60
+leaf-14   wide-fanout  347  280  129  60
+leaf-15   wide-fanout  516  280  129  60
+leaf-16   wide-fanout  685  280  129  60
+leaf-17   wide-fanout  854  280  129  60
+leaf-18   wide-fanout  0    420  129  60
+mini-hub  wide-fanout  178  420  129  60
+mini-1    wide-fanout  347  420  120  60
+mini-2    wide-fanout  516  420  120  60
+mini-3    wide-fanout  685  420  120  60
+mini-4    wide-fanout  854  420  120  60
+mini-5    wide-fanout  0    560  120  60
+mini-6    wide-fanout  178  560  120  60
 
 == Metrics ==
-canvas: 983 x 460
-aspect ratio: 2.14
-fill ratio (leaf area / canvas area): 0.428
+canvas: 983 x 620
+aspect ratio: 1.59
+fill ratio (leaf area / canvas area): 0.318
 overlapping shape pairs: 0
 edge-edge crossings: 0
-total edge length: 10864
-mean edge length: 435
+total edge length: 11524
+mean edge length: 461
 edges skipped (unresolved endpoint): 0
 edges crossing a frame boundary they don't belong to: 0
 source-order violations per container:
@@ -543,28 +548,37 @@ source-order violations per container:
 left-edge alignment groups per container:
   wide-fanout: 6 groups over 26 children
 
-== ASCII Render (100x23 cells; 1 cell = 9.8 x 20.0 px) ==
+== ASCII Render (100x32 cells; 1 cell = 9.8 x 19.4 px) ==
 |-------------|   |-----------|    |-----------|    |-----------|    |-----------|    |-----------| 
-|Dispatcher...|...|Worker 1...|....|Worker 2...|....|Worker 3...|....|Worker 4...|....|Worker 5   | 
-|      .......|...|...........|..  |           |    |           |    |           |    |           | 
-|-------------|...|-----------|....|-----------|... |-----------|    |-----------|    |-----------| 
-      ..  . .   ... ................................................                                
-|-----------|..   |-----------|....|-----------|....|-----------|....|------------|.. |------------|
-|Worker 6   |. .. |Worker 7   |....|Worker 8. .|....|Worker 9   |    |Worker 10   |  .|Worker 11   |
-|     ..    | .  .|       ....|    |.....    ..|....|  ........ |    |            |   |            |
-|-----------|  .  |-----------|..  |-----------|    |-----------|....|------------|   |------------|
-      .         .   ..           ...          .....        ......       .........                   
-|------------|   .|------------|   |------------|  .|------------|...|------------|...|------------|
-|Worker 12   |    |Worker 13   |   |Worker 14   |   |Worker 15   |   |Worker 16   |   |Worker 17   |
+|Dispatcher   |   |Worker 1   |    |Worker 2   |    |Worker 3   |    |Worker 4   |    |Worker 5   | 
+|      .......|...|...........|....|...........|....|...........|....|...........|....|......     | 
+|-------------|...|-----------|    |-----------|    |-----------|    |-----------|    |-----------| 
+       . .............................                                                              
+       . . .  .. ..................................                                                 
+      ..  . .   ..  .... ...............  .....................                                     
+|-----------|.    |-----------|... |-----------|   .|-----------|....|------------|   |------------|
+|Worker 6   | .   |Worker 7 ..|   .|Worker 8...|....|Worker 9...|....|Worker 10...|...|Worker 11   |
+|     ..    |. .. |    ...    |....|   .....   |....|. ....     |    | .....      |   |.......     |
+|-----------|.   .|-----------|    |-----------|.   |-----------|    |------------|   |------------|
+      ..      .   .         ...       ....       .....      ......                                  
+      ..       .   .           ..         ....        .....       ......                            
+      .         .   .            ..           ...          ....         ......                      
+|------------|   .|------------|   |------------|...|------------|.. |------------|.  |------------|
+|Worker 12   |    |Worker 13   |   |Worker 14   |   |Worker 15   |  .|Worker 16   | ..|Worker 17   |
+|     .      |    |     .      |   |    ..      |   |    ..      |   |   ...      |   |   ....     |
 |------------|    |------------|   |------------|   |------------|   |------------|   |------------|
+      .             .                                                                               
       .              .                                                                              
+      .               .                                                                             
 |------------|    |------------|   |-----------|    |-----------|    |-----------|    |-----------| 
 |Worker 18   |    |Scheduler   |   |Task 1     |    |Task 2     |    |Task 3     |    |Task 4     | 
 |     .      |    |    ........|...|...........|....|...........|....|...........|....|......     | 
 |------------|    |------------|   |-----------|    |-----------|    |-----------|    |-----------| 
-               ....     .                                                                           
-|-----------|..   |-----------|                                                                     
-|Task 5 ....|     |Task 6     |                                                                     
+                  ...   .                                                                           
+               ...      .                                                                           
+             ..         .                                                                           
+|-----------|     |-----------|                                                                     
+|Task 5 ..  |     |Task 6     |                                                                     
 |     ..    |     |     .     |                                                                     
 |-----------|     |-----------|                                                                     
 ```
