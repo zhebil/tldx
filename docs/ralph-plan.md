@@ -20,21 +20,25 @@ once A is done. The loop never terminates; the human stops it.
   wake-22 **B20** revision (topology-gated doc-root aspect wrap) and the
   wake-12 **B1** revision (cross-axis `align`, default `center`). Those three
   are the only hypotheses still standing - B2, B3, B4a, B13, B14, B15, B6 and
-  now B27 all reverted after judging, and B7 and B24 were rejected at an
+  now B27 and B31 all reverted after judging, and B7 and B24 were rejected at an
   objective gate before judging. Judged results live in
   `docs/layout-hypotheses.md` - read it before proposing a hypothesis.
-- **Arrows are back to `arc` with centre anchors, and every arrow hypothesis
-  tried so far has now failed.** B27 was the last one standing; wake 34's B30
-  re-ran it against the corrected gate 5 and it takes `hexagonal` from 5
-  crossings to **9** while moving no other file. Gate 5's instrument is
-  `tools/arrow-truth.mts`, which reads the vertices tldraw actually drew (the
-  old model-based tracer matched 0 of 84 corpus arrows and was deleted at wake
-  32); the champion baseline is the table at the top of
-  `docs/layout-champion.md`. B30 is also the first wake where an objective gate
-  and the judge disagreed - the judge scored B27 2-1-2 - and it is settled in
-  the gate's favour, for the reasons in the B30 ledger entry. The successor,
-  **B31**, keeps the judge's finding (elbows do read better where there is room
-  for them) and replaces B27's degree predicate with a clearance one.
+- **Arrows are `arc` with centre anchors, and arrow *attachment* is now a
+  closed line of enquiry.** Eight hypotheses have changed how arrows attach -
+  B3, B4a, B13, B14, B15, B24, B27, B31 - and all eight are reverted or
+  rejected. Wake 36's B31 was the cleanest of them and the only one ever to
+  clear gate 5 outright, and that is exactly what killed it: a clearance
+  predicate fires only where the corridor is already empty, so it turns elbows
+  on where they buy nothing (crossings unmoved on all six files) and off where a
+  crossing needs fixing. The residual effect is pure cost - collapsed nubs on
+  short hops, doglegs on already-straight lines - which is what the judge saw.
+  **Do not file another attachment hypothesis.** The next arrow work is **B25**
+  (routing lanes in *placement*), now top of the backlog; if that fails, the
+  honest next step is an obstacle-aware router, not another terminal rule.
+  Gate 5's instrument is `tools/arrow-truth.mts`, which reads the vertices
+  tldraw actually drew (the old model-based tracer matched 0 of 84 corpus arrows
+  and was deleted at wake 32); the champion baseline is the table at the top of
+  `docs/layout-champion.md`, unchanged since wake 34 at 10/5/1/0/0/36.
 - **The judge may answer `WINNER: TIE`** since wake 33 (B29). Ties count as
   neither wins nor losses, and the ledger distinguishes a *judged tie* from a
   *structural tie* (a file never sent to a judge because nothing changed). The
@@ -912,24 +916,25 @@ Ordered. Take from the top. Strike through when resolved.
   are on files where the crossing count does not move. Successor **B31**.
   Ledger entry in `docs/layout-hypotheses.md`.
 
-- [ ] **B31** _(from B30, wake 34)_ **Gate elbow arrows on measured clearance,
-  not on degree.** B30 reverted B27 but confirmed its premise on two files:
-  blind judges preferred elbows on `deep-nesting` and `long-labels`, both times
-  because the diagonal chord slashed through a third box. What B27 got wrong is
-  the predicate. Deduped out-degree > 3 marks a container fan-shaped and drops
-  it to arc; that protected `wide-fanout` exactly as intended and did nothing
-  for `hexagonal`, whose port boxes each fan out at out-degree 1 and whose
-  corridors are still far too tight for an L to fit. Degree is a proxy for
-  space, and on the corpus's densest file the proxy is simply wrong. Try the
-  direct test instead: an edge gets elbow + side anchors only when there is
-  actual room - the axis-aligned band between the two endpoint rects contains
-  no third shape, measured on the layout rects. This is **not B15**, which
-  tested the centre-to-centre *chord* and failed because the router draws an L;
-  test the L's own corridor. Gate 5 measures it directly and the target is
-  concrete: `hexagonal` must not rise above 5 while `deep-nesting` and
-  `long-labels` keep the elbows the judge preferred. If no predicate can hold
-  both, the honest conclusion is that arrow *attachment* has been exhausted and
-  the remaining lever is placement (**B25**).
+- [x] ~~**B31** _(from B30, wake 34)_ **Gate elbow arrows on measured clearance,
+  not on degree.** An edge gets elbow + side anchors only when the axis-aligned
+  band between the two endpoint rects contains no third shape, measured on the
+  layout rects. Not B15, which tested the centre-to-centre chord; test the L's
+  own corridor. Target: `hexagonal` must not rise above 5 while `deep-nesting`
+  and `long-labels` keep the elbows the judge preferred.~~ **REVERTED**
+  _(wake 36)_ - 0 wins, 2 losses, 4 judged ties, and it **closes the arrow
+  attachment line for good**. The predicate worked exactly as specified: it is
+  the first arrow hypothesis ever to clear gate 5 outright, holding `hexagonal`
+  at 5 and moving no file's crossing count at all. That flatness is the finding.
+  Clearance-gating fires only where the corridor is already empty - and an edge
+  with an empty corridor was never crossing anything - so it switches elbow on
+  precisely where it buys nothing and off precisely where a crossing needs
+  fixing. What is left is pure cost, and the judge named it on the two files
+  B30 said elbows helped: `deep-nesting`'s short hops collapse to
+  *"tiny directionless nubs"*, and `long-labels` gets *"a needless dogleg kink"*
+  on lines that were already straight. Eight attachment hypotheses (B3, B4a,
+  B13, B14, B15, B24, B27, B31) are now reverted or rejected. **File no more.**
+  Ledger entry in `docs/layout-hypotheses.md`.
 
 - [x] ~~**B29** _(from B27, wake 31)_ **Let the judge return a tie.** Step 5 tells
   the judge not to hedge, so a visually indistinguishable pair is decided by
@@ -1680,3 +1685,40 @@ anything that outlives the loop.)_
   same note needs extending. A `--format-version` header on the report would
   make this self-describing, but that is a tool change for a problem that has
   cost one grep so far.
+
+- **(wake 36, from B31)** **The geometry report actively pushes the judge
+  toward TIE on any arrow-only change.** `layout-report.mts` carries no arrow
+  information at all - it was stripped of the gate-5 line at wake 32 - so for a
+  hypothesis that touches only `emit.ts`'s arrow path the two reports are
+  byte-identical by construction. Three of B31's four judged ties cited exactly
+  that in their reasoning (*"the geometry reports are byte-identical"*, *"the
+  PNGs differ only in non-visible encoding"*), and two of them went on to
+  dismiss a genuine elbow-vs-arc difference as "stroke jitter" or "encoding
+  noise". Protocol step 5 already says the render is the truth where the two
+  disagree, but handing the judge a document that says "nothing changed" invites
+  it to reason from the document. Options: withhold the report entirely when it
+  is identical on both sides, or have `layout-report.mts` carry the per-arrow
+  `kind` and anchor so the report can see what the candidate actually changed.
+  The first is a one-line change to the judge bundle and is the smaller fix.
+  Not filed as a hypothesis - it is a protocol/tooling edit.
+
+- **(wake 36, from B31)** **The short-edge arrowhead defect is a router
+  property, not an anchor property.** B18 was struck at wake 20 as vacuous
+  because nothing in production set precise anchors, so "keep centre anchors for
+  short edges" described the champion rather than changing it. B31 shows the
+  underlying defect is real and independent: on `deep-nesting`'s near-touching
+  boxes the *elbow router* collapsed two edges into what the judge called
+  *"tiny directionless nubs"*, losing the flow direction entirely. Any future
+  change that puts an orthogonal route on a short edge needs a minimum-run floor
+  regardless of how the terminals are anchored. Since attachment is closed, this
+  matters only if B25's placement lanes ever create short orthogonal hops -
+  noted here so it is not rediscovered a third time.
+
+- **(wake 36, from B31)** **Independent per-file coin flips give lopsided A/B
+  assignments often enough to matter.** This wake drew candidate-at-B on 5 of 6
+  files; wake 31 drew candidate-at-A on 4 of 5, which is part of what motivated
+  B29's tie rule. With ties allowed the damage is bounded - a position-biased
+  judge now has somewhere neutral to go - so this was left alone rather than
+  re-rolled mid-wake (re-rolling a draw you dislike is its own bias). A balanced
+  assignment (shuffle three of six to each label) would remove the failure mode
+  outright and costs nothing. Protocol edit, not a hypothesis.
