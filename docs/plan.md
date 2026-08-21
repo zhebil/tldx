@@ -1651,13 +1651,52 @@ trick: the lossless part is mechanical, the lossy part is supervised.
   five op kinds fire is now a harness stage, not a test assertion. T20's
   acceptance is still covered, by strictly more.
 
-- [ ] **T22. `tldsl absorb`.** *Blocked on the T19 decisions.*
+- [x] **T22. `tldsl absorb`.** *Blocked on the T19 decisions.*
   The model-driven step. Reads JSX plus overlay, rewrites the JSX, empties the
   overlay, leaves a reviewable diff.
   **Acceptance:** the canvas-first case works end to end - a stub `<Doc/>` plus
   an overlay of hand-added shapes absorbs into JSX that compiles, on its own
   and with an empty overlay, to the same scene the canvas showed. Verified by
   T21's harness, not by inspection.
+
+  Shipped as `tldsl absorb <file> [--force]`: `domain/absorb/codegen.ts` (pure -
+  records to JSX text, plus the splice into the root `<Doc>`), `app/absorb.ts`
+  (the use case), `cli/absorb.ts` (stdio and the exit code) and
+  `infra/git/git-status.ts` (D5's dirty-file guardrail; outside a repo it writes
+  a `.bak` first). Absorb **partitions** the overlay rather than demanding all of
+  it: bare `added` geo/note records become `<Box>`/`<Sticky>` elements hard-pinned
+  with `x`/`y`, so they are excluded from flow placement and disturb nothing
+  already in the file, and every other entry - `moved`, `restyled`, `relabelled`,
+  `deleted`, added arrows and bindings - stays in the overlay untouched. It then
+  **verifies itself**: recompile, re-apply the residual overlay, deep-compare
+  against the pre-absorb applied scene. Only on a match does it write the overlay
+  back (D5's "never empty the overlay unless the rewrite verifiably reproduces
+  the render"); on any divergence it restores the original source byte for byte
+  and names the diverging records.
+
+  The numbers: **54 test files / 627 tests**, up from 52/609 at T21;
+  `npm run check` green. `tests/e2e/absorb-fixture.test.ts` is the acceptance
+  criterion - a stub `<Doc/>` plus an overlay of four hand-added shapes absorbs,
+  the overlay file on disk ends with **zero entries**, the rewritten JSX compiled
+  *alone* deep-equals the scene the canvas showed, and `checkFidelity` over the
+  rewritten file returns `[]`, which is T21's harness rather than inspection. Two
+  further e2e cases pin the partition (an added arrow and a `moved` entry survive
+  in the overlay while the box lands in the source) and the refusal (a record with
+  a non-zero `rotation`, which no JSX prop can express, exits 1 with source and
+  overlay byte-identical). I also ran it by hand on a two-box `<Doc layout="col">`
+  and looked at the render: the absorbed sticky and box sit at exactly the canvas
+  coordinates (900,120 and 640,120) and the two flowed boxes did not move (0/0 and
+  0/102 before and after). No layout code was touched, so `docs/renders/` and
+  `docs/baseline.md` are unchanged.
+
+  Two deviations from the obvious mapping, both forced by the compiler rather
+  than chosen. A `type: "note"` record absorbs into `<Sticky>`, not `<Note>` -
+  `emit/` only produces a tldraw note record for `<Sticky>`, and a plain `<Note>`
+  compiles to a warm-filled `geo`, which would fail absorb's own verification
+  every time. And absorb extends the existing `import { ... } from "tldsl"` with
+  `Box`/`Sticky` when it introduces a component the file did not import; without
+  that the stub case dies with `ReferenceError: Box is not defined`. It errors
+  rather than guessing if there is no such import to extend.
 
 ---
 
@@ -2151,6 +2190,27 @@ as-is.
   a full `loadSnapshot` every time the first one nudges a shape. Single local
   user is the documented scope (round-trip.md "Out of scope"), so this costs
   nothing today.
+
+- **T22 - absorb shipped deterministic, not model-driven.** The task and
+  `docs/round-trip.md` D5 both describe absorb as "a model rewrites the JSX",
+  allowed to be imperfect because it is reviewed. What shipped is a mechanical
+  rewriter with a verification gate: it absorbs the entries it can express
+  exactly, leaves the rest in the overlay, and refuses outright if the result
+  does not reproduce the render.
+  **Default taken:** built the mechanical half only. It changes least and is the
+  reversible option - a model can be put in front of it later, or asked to
+  restructure its flat pinned output afterwards, without any of this code
+  changing. A CLI that shells out to a model would bake an agent dependency into
+  a tool CONTEXT.md says is agent-agnostic, and that is the harder thing to undo.
+  **Alternatives:** (2) `absorb` shells out to a model for the rewrite and uses
+  the same verification gate to accept or reject it; (3) `absorb` emits the
+  mechanical rewrite plus a prompt, and Phase 8's `/tldsl:sync` command drives
+  the model half.
+  **What the default costs:** the canvas-first case produces *correct* JSX, not
+  *good* JSX - a flat pile of hard-pinned `<Box>` elements with every style prop
+  spelled out, no frames, no components, no flow. The half of the Phase 7 pitch
+  that says absorb "turns a flat pile of shapes into componentised JSX" is not
+  built, and nothing mechanical can build it.
 
 ## Discovered work
 
@@ -2763,3 +2823,37 @@ promoted into the task list by the human.
   the apply leg green independently.
 - **`examples/` is *still* untracked**, unchanged since T16b. Not mine to
   commit.
+
+### From T22
+
+- **Z-order has no DSL prop, and that is the biggest gap between the test and a
+  real canvas.** `emit/` gives every shape `index: "a1"` (`contracts/builders.ts`
+  defaults it and nothing overrides), so hand-built overlay records built with
+  `boxShape`/`noteShape` verify cleanly. A shape actually drawn in tldraw carries
+  a distinct fractional index (`a2`, `a2V`, ...), which no JSX attribute can pin,
+  so absorb would refuse it. Either the DSL grows a z-order prop or absorb has to
+  be allowed to leave a residual `moved: { index }` entry behind.
+- **The record fields absorb cannot express**, each of which makes it refuse
+  rather than silently drop: `rotation`, `opacity`, `isLocked`, `meta`, `url`,
+  `scale`, `index`, and any `parentId` other than the page - there is no
+  frame-nesting absorption, so a shape the user dragged into a frame cannot be
+  absorbed at all.
+- **Absorb does not touch `moved`/`restyled`/`relabelled`/`deleted`.** That is
+  the "nudge, then absorb" use case from the Phase 7 pitch, and it is entirely
+  unbuilt: those entries just stay in the overlay forever. It needs attribute
+  splicing into *existing* elements, which the per-element and per-attribute
+  spans in `domain/parser/ast.ts` already make possible - the spans are carried
+  through the IR and nothing consumes them for this yet.
+- **`readOverlay` collapses "missing" and "malformed" into one `null`.** A
+  corrupt overlay is reported as `nothing to absorb: no overlay at <path>` and
+  exits 0, which is a confusing thing to read while staring at a file that
+  exists. Three lines to separate.
+- **Codegen emits every mapped prop, not only the non-default ones.** Correct
+  and free of a default table that could drift from `builders.ts`, but the
+  absorbed line is 200 characters of `dash="draw" size="m" font="draw"` that a
+  human has to read past. A default-elision pass would need the DSL defaults and
+  the tldraw defaults to be provably the same set.
+- **`diffIds` only walks `store`**, the same limitation already logged for the
+  harness's `describeDivergence`: a divergence in `schema` would fail the
+  equality gate and be reported as an empty record list.
+- **`examples/` is *still* untracked**, unchanged since T16b. Not mine to commit.

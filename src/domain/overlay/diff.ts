@@ -125,7 +125,7 @@ function diffPlacement(base: TLRecord, current: TLRecord): OverlayPlacement | un
  *  richer structure (marks, non-text nodes) still extracts *something* -
  *  callers verify round-trip fidelity by re-encoding and comparing rather
  *  than trusting this blindly. */
-function richTextToPlain(doc: unknown): string {
+export function richTextToPlain(doc: unknown): string {
   const content = isRecord(doc) && Array.isArray(doc.content) ? doc.content : [];
   return content
     .map((paragraph) => {
@@ -142,7 +142,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function deepEqual(a: unknown, b: unknown): boolean {
+export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
     return false;

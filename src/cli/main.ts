@@ -24,10 +24,12 @@ import { createJsxExecute } from "../infra/execute-jsx/execute-jsx.js";
 import { createChokidarWatch } from "../infra/fs/chokidar-watch.js";
 import { createNodeFsRead } from "../infra/fs/node-fs-read.js";
 import { createNodeFsWrite } from "../infra/fs/node-fs-write.js";
+import { gitStatus } from "../infra/git/git-status.js";
 import { ElkLayoutAdapter } from "../infra/layout-elk/elk-layout.js";
 import { createStderrLog } from "../infra/log/stderr-log.js";
 import { openBrowser } from "../infra/open-browser/open-browser.js";
 
+import { runAbsorbCli } from "./absorb.js";
 import { runCheck, type CheckIo } from "./check.js";
 import { runServe } from "./serve.js";
 
@@ -94,6 +96,31 @@ const commands: readonly Command[] = [
           fs: createNodeFsRead(),
           layout: new ElkLayoutAdapter(),
           execute: createJsxExecute(),
+        },
+        io,
+      });
+    },
+  },
+  {
+    name: "absorb",
+    args: "<file> [--force]",
+    description: "fold a diagram's overlay back into its JSX source",
+    run: (rest, io) => {
+      const force = rest.includes("--force");
+      const path = rest.find((arg) => !arg.startsWith("--"));
+      if (path === undefined) {
+        io.writeStderr("tldsl absorb: missing <file> argument\n");
+        return 1;
+      }
+      return runAbsorbCli({
+        path,
+        force,
+        deps: {
+          fs: createNodeFsRead(),
+          fsWrite: createNodeFsWrite(),
+          layout: new ElkLayoutAdapter(),
+          execute: createJsxExecute(),
+          gitStatus,
         },
         io,
       });

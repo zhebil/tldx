@@ -86,6 +86,7 @@ module.exports = {
   overrides: [
     // Adapters get to import the modules they wrap.
     { files: ["src/infra/fs/**"],          rules: { "no-restricted-imports": "off" } },
+    { files: ["src/infra/git/**"],         rules: { "no-restricted-imports": "off" } },
     { files: ["src/infra/layout-elk/**"],  rules: { "no-restricted-imports": "off" } },
     { files: ["src/infra/execute-jsx/**"], rules: { "no-restricted-imports": "off" } },
     { files: ["src/infra/transport/**"],   rules: { "no-restricted-imports": "off" } },

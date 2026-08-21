@@ -14,7 +14,7 @@ There are three concentric scopes. **Every section below is MVP-scoped.** Phase 
 
 - **MVP (now):** the smallest slice that proves the thesis (file → live canvas, errors land in agent context within one tool turn).
 - **Phase 1 (later):** remaining feature surface from the original design (`Group`, `<Shape>` kinds, `<Text>`, `<Line>`, full anchor scheme, edge styling). `<import>`/`<use>` and comments-as-stickies are not phase 1 - the former was superseded outright by ES `import`, the latter was rejected as incompatible with the JSX execution model. See `docs/decisions.md` ADR-10, ADR-11.
-- **Phase 2 (landing):** round-trip from canvas back to DSL. The lossless half is built - canvas edits live in `x.tldsl.overlay.json` and the render is `applyOverlay(overlay, compile(jsx))` (ADR-22, `docs/round-trip.md`). The model-driven `absorb` step that folds an overlay back into JSX is still outstanding.
+- **Phase 2 (landing):** round-trip from canvas back to DSL. The lossless half is built - canvas edits live in `x.tldsl.overlay.json` and the render is `applyOverlay(overlay, compile(jsx))` (ADR-22, `docs/round-trip.md`). `tldsl absorb` folds the half of an overlay that JSX can express back into the source, verifies the rewrite reproduces the render before emptying the overlay, and leaves everything else in the overlay.
 
 ### MVP scope
 
@@ -60,6 +60,9 @@ domain/     Pure compiler core. No imports outside domain/ + contracts/.
   overlay/    Canvas edits over a compiled scene. `applyOverlay` (overlay +
               scene → scene) and its inverse `diffScenes`. Pure; never
               re-runs layout. See ADR-22 and docs/round-trip.md.
+  absorb/     Overlay records → JSX source text, and the splice into the
+              root `<Doc>`. Pure; the writing, guardrails and verification
+              live in `app/absorb.ts`.
   diagnostics/ Error type + source-span model. NO formatting (cli/ owns that).
   ports/      Port interfaces the domain pipeline depends on (LayoutPort).
               Fakes colocated as <port>.fake.ts.
@@ -221,7 +224,7 @@ The `PostToolUse` hook fires on every `Write|Edit`. `tldsl check` exits 0 with n
 
 Tracked in `docs/roadmap.md`. Highlights:
 
-- `absorb`: folding an overlay back into the JSX source. The overlay half of round-trip is built (ADR-22); rewriting source from it is model-driven and human-invoked, and is not part of the compiler.
+- Componentised `absorb`: `tldsl absorb` exists and is human-invoked, but it only rewrites source for the overlay ops JSX can express exactly (added geo/note shapes, hard-pinned). Turning a flat pile of absorbed shapes into frames and components is a model's job, not the compiler's.
 - `Group`, `<Shape>` kinds, `<Text>`, `<Line>`. (`<import>`/`<use>` is not on this list - ES `import` replaced it outright, not deferred.)
 - Full 8-compass-point-plus-fractions anchor scheme; default-center is enough for MVP. (Named anchors and free endpoints are parsed and rejected today: `ir/anchor-not-supported`, `ir/free-endpoint-not-supported`.)
 - Edge styling, head decorators, waypoints, edge labels.
