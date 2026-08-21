@@ -6,7 +6,9 @@ prompt each time. `docs/plan.md` is the only state that carries between wakes.
 1. Read `docs/plan.md`, then `AGENTS.md` and `CONTEXT.md`.
 2. `git checkout ralph/jsx-layout` (create from `main` if it does not exist).
 3. Take **the topmost unchecked task**. Not a task you like better, not one that
-   looks easier, not one you thought of. The top one.
+   looks easier, not one you thought of. The top one. A box marked `[>]` is
+   deferred to a later task that names it - skip it, and do not re-derive why
+   it is deferred; the reason is already written under it.
 4. Build it. Check its acceptance criterion with the tool the task names.
 5. `npm run check` must be green.
 6. If geometry moved, re-render `docs/renders/` and update `docs/baseline.md`.

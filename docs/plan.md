@@ -1,10 +1,3 @@
-BLOCKED ON HUMAN - T5.
-
-T5 is built and shipped; its acceptance criterion is not reachable by the
-mechanism T5 names, and two wakes have now independently confirmed that. The
-loop cannot advance past it without a human choosing one of the three
-resolutions written under T5. Do not start T6 until that choice is made.
-
 # tldsl layout plan
 
 The ordered worklist for the layout loop. **This file is the only state that
@@ -413,7 +406,9 @@ Two traps, both paid for already:
   rather than left as-is, because the anchored chord changes what the old test
   was approximating.
 
-- [ ] **T5. Lanes for parallel skips.**
+- [>] **T5. Lanes for parallel skips.** *Deferred to T6b - skip it, do not take
+  it as the top task. Its mechanism shipped; its box is re-checked when T6b
+  lands.*
   Once skips bow, two skips over overlapping spans bow into each other and
   become one thick illegible stroke. Assign each a distinct bend magnitude,
   ordered by span length so the longest chord takes the outermost lane.
@@ -491,18 +486,26 @@ Two traps, both paid for already:
   T6.
 
   So no in-scope work ticks this box, and the next wake would produce this same
-  paragraph again. Three ways out, for a human to pick:
+  paragraph again. Three ways out were offered to the human.
 
-  1. Accept 6 as the floor, tick T5, and let T6 take the `wide-fanout` two.
-  2. Re-word the acceptance to exclude straight, unrouted arrows - i.e. measure
-     crowding only over pairs that `computeEdgeRoutes` actually routed - and
-     re-check.
-  3. Promote the cross-container-routing entry from Discovered work into a task
-     ahead of T5, then re-check T5 after it and T6 have landed.
+  **Decided: option 3, with the ordering changed.** Cross-container routing is
+  promoted into the task list as **T6b**, placed *after* T6 rather than ahead of
+  T5. Rationale, recorded so it is not relitigated:
 
-  Option 3 is the only one that makes the criterion true as written; option 1
-  changes least. This wake declined to choose because the plan reserves that
-  for the human.
+  - Lanes work and must not be rebuilt. Putting the new task ahead of T5 would
+    have meant re-doing a task that already shipped its mechanism correctly.
+  - T6 removes the two `wide-fanout` survivors as a side effect of placement,
+    so it has to land first for T5's re-check to be meaningful.
+  - The two rejected options were rejected on the pixels, not the numbers.
+    `deep-nesting`'s four crowded pairs are the single vertical stroke running
+    through Config, Router, Metrics, Handler and Validator - the worst-looking
+    file in the corpus, and the original complaint that started this plan.
+    Option 1 ticks the box and leaves that picture unchanged. Option 2 narrows
+    the metric until it agrees with the code, which moves the goalposts without
+    moving a single arrow.
+
+  **T5's box stays unchecked until T6b lands**, then is re-checked. It is not
+  blocked in the meantime: T6 is the next task and does not depend on it.
 
   Free choice recorded: `LANE_STEP = 20`. It is the smallest round step that
   cleared every routed pair in the corpus on the first try; not tuned further,
@@ -519,6 +522,37 @@ Two traps, both paid for already:
   order among unrelated nodes.
   **Acceptance:** `wide-fanout` crossings down by at least half against the
   post-T5 number, and no other file regresses.
+
+  Note from T5's evidence: **collinearity is its own crowding source.** A fan
+  block that is a clean column or row places targets at proportional distances
+  along the same ray from the source, which is exactly what makes
+  `hub -> leaf-7` a 100% crowded prefix of `hub -> leaf-14`. Placement that
+  fixes crossings and reintroduces collinear overlap has not fixed anything.
+
+- [ ] **T6b. Route cross-container edges.**
+  `computeEdgeRoutes` declines any edge whose endpoints sit in different
+  containers, at the `from.parentId !== to.parentId` gate in `computeCandidate`.
+  That gate is why T3's bow, T4's anchors and T5's lanes all skip the 15
+  cross-container crossings - `deep-nesting` 9 and `hexagonal` 6 - and why
+  `deep-nesting`'s vertical chain is four bare collinear segments piercing five
+  boxes.
+
+  **Widen the trigger; do not invent a second mechanism.** The bow, the anchor
+  choice and the lane assignment already do the right thing once an edge is
+  allowed through. There is a second gate to deal with: the `crossed` set is
+  built with an `s.parentId === from.parentId` filter, so it returns empty for
+  cross-container edges even if the first gate is removed. Both have to widen
+  together or the change is a no-op - two wakes have already confirmed that
+  removing only the first does nothing.
+
+  Sag viability against shapes in *other* containers is the real work: an arc
+  that clears its own container may bow into a sibling frame or its contents.
+  The existing step-down loop is the place for it.
+
+  **Acceptance:** the `cross-container` bucket in `crossing-classify` down from
+  15 to at most 5; `deep-nesting`'s four crowded pairs gone; no file regresses
+  on either crossings or crowded pairs. Then re-check T5's criterion and tick
+  its box if it now holds.
 
 - [ ] **T7. Notes: shape, and attachment.**
   Two changes, shipped together because the second is only worth having once
@@ -1238,7 +1272,7 @@ promoted into the task list by the human.
   routing work has to widen its trigger past "both endpoints share a
   container" - the 6 deep-nesting crossings that are geometrically skip-shaped
   are the cheapest target.
-- **`deep-nesting`'s four crowded pairs have no owner in this plan.** They are
+- **PROMOTED TO T6b.** `deep-nesting`'s four crowded pairs had no owner. They are
   the vertical chain at x=297: four cross-container arrows drawn as bare
   collinear segments, two of them overlapping 100%. T6 is placement for fans
   and does not reach them; nothing else in T6-T18 claims cross-container
