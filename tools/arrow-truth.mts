@@ -26,6 +26,8 @@ export type ArrowTruth = {
   from: string;
   to: string;
   points: Pt[];
+  text: string;
+  labelBox?: { x: number; y: number; w: number; h: number };
 };
 
 export type ShapeBounds = { id: string; x: number; y: number; w: number; h: number };
@@ -33,6 +35,8 @@ export type ShapeBounds = { id: string; x: number; y: number; w: number; h: numb
 export type PageTruth = { arrows: ArrowTruth[]; shapes: ShapeBounds[] };
 
 export type CrossingPair = { arrowId: string; from: string; to: string; crossedId: string };
+
+export type LabelOverlapPair = { arrowId: string; crossedId: string };
 
 export type CrowdedPair = { a: string; b: string; fraction: number };
 
@@ -63,6 +67,10 @@ async function reportFile(file: string): Promise<void> {
   for (const a of sortedArrows) {
     process.stdout.write(`${a.arrowId} kind=${a.kind} from=${a.from} to=${a.to}\n`);
     process.stdout.write(`  truth: ${formatPath(a.points)}\n`);
+    if (a.labelBox) {
+      const { x, y, w, h } = a.labelBox;
+      process.stdout.write(`  label: "${a.text}" @ (${x},${y},${w},${h})\n`);
+    }
   }
 
   process.stdout.write(
@@ -74,6 +82,12 @@ async function reportFile(file: string): Promise<void> {
     process.stdout.write(`  crowded: ${a} / ${b} (${Math.round(fraction * 100)}% within ${CROWD_PX}px)\n`);
   }
   process.stdout.write(`arrow pairs crowding each other: ${crowded.length}\n`);
+
+  const labelOverlaps = labelOverlapPairs(sortedArrows, shapes);
+  for (const { arrowId, crossedId } of labelOverlaps) {
+    process.stdout.write(`  label-overlap: ${arrowId} over ${crossedId}\n`);
+  }
+  process.stdout.write(`arrow labels overlapping a non-endpoint shape: ${labelOverlaps.length}\n`);
 }
 
 function formatPath(points: Pt[]): string {
@@ -145,6 +159,34 @@ export function crossingPairs(arrows: ArrowTruth[], shapes: ShapeBounds[]): Cros
 
 function countCrossings(arrows: ArrowTruth[], shapes: ShapeBounds[]): number {
   return crossingPairs(arrows, shapes).length;
+}
+
+function rectsOverlap(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+/**
+ * One row per (labeled arrow, overlapped shape) pair where the arrow's label
+ * bounding box (page space) intersects a shape that is neither the arrow's
+ * `from` nor `to`. T12's acceptance check.
+ */
+export function labelOverlapPairs(
+  arrows: ArrowTruth[],
+  shapes: ShapeBounds[],
+): LabelOverlapPair[] {
+  const pairs: LabelOverlapPair[] = [];
+  for (const { arrowId, from, to, labelBox } of arrows) {
+    if (!labelBox) continue;
+    for (const s of shapes) {
+      if (s.id === from || s.id === to) continue;
+      const rect = { x: s.x + 0.5, y: s.y + 0.5, w: s.w - 1, h: s.h - 1 };
+      if (rectsOverlap(labelBox, rect)) pairs.push({ arrowId, crossedId: s.id });
+    }
+  }
+  return pairs;
 }
 
 function pointToSegment(p: Pt, a: Pt, b: Pt): number {
@@ -238,7 +280,12 @@ export async function extractTruth(url: string): Promise<PageTruth> {
         if (!startBinding || !endBinding) continue;
 
         const geometry = editor.getShapeGeometry(arrow);
-        const body = (geometry as unknown as { children: { vertices: Vec[] }[] }).children[0];
+        const children = (
+          geometry as unknown as {
+            children: { vertices: Vec[]; bounds: { x: number; y: number; w: number; h: number } }[];
+          }
+        ).children;
+        const body = children[0];
         if (!body) continue;
         const transform = editor.getShapePageTransform(arrow);
         const points = body.vertices.map((v) => {
@@ -246,12 +293,39 @@ export async function extractTruth(url: string): Promise<PageTruth> {
           return { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 };
         });
 
+        const text = arrow.props.text.trim();
+        let labelBox: { x: number; y: number; w: number; h: number } | undefined;
+        if (text !== "") {
+          const label = children[1];
+          if (label) {
+            const { x, y, w, h } = label.bounds;
+            const corners = [
+              { x, y },
+              { x: x + w, y },
+              { x, y: y + h },
+              { x: x + w, y: y + h },
+            ].map((c) => transform.applyToPoint(c));
+            const xs = corners.map((c) => c.x);
+            const ys = corners.map((c) => c.y);
+            const minX = Math.min(...xs);
+            const minY = Math.min(...ys);
+            labelBox = {
+              x: Math.round(minX * 10) / 10,
+              y: Math.round(minY * 10) / 10,
+              w: Math.round((Math.max(...xs) - minX) * 10) / 10,
+              h: Math.round((Math.max(...ys) - minY) * 10) / 10,
+            };
+          }
+        }
+
         arrows.push({
           arrowId: arrow.id.replace(/^shape:/, ""),
           kind: arrow.props.kind,
           from: startBinding.toId.replace(/^shape:/, ""),
           to: endBinding.toId.replace(/^shape:/, ""),
           points,
+          text,
+          ...(labelBox === undefined ? {} : { labelBox }),
         });
       }
       return { arrows, shapes };

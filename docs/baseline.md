@@ -444,3 +444,91 @@ other three sides.
 `sparse-graph`, `wide-fanout`), so no frame-chrome change can move their
 geometry. T8's acceptance asked for four; three is the arithmetic ceiling and
 all three were taken. See `docs/plan.md` `## Questions for the human`.
+
+---
+
+## After T12 - arrow labels, and the clearance they need
+
+`<Edge label="publishes">` now reaches tldraw's arrow `text` prop, together
+with `labelColor`, `font` and `size` (T10 and T11 both skipped `<Edge>`
+explicitly *because* the label was dead). `tools/arrow-truth.mts` gained the
+acceptance metric, printed as a third summary line per file:
+
+```
+arrow labels overlapping a non-endpoint shape: N
+```
+
+It reads the label's rectangle off `editor.getShapeGeometry(arrow).children[1]`
+- `ArrowShapeUtil.getGeometry` folds the label rect into the shape's public
+`Group2d` - maps its corners through `getShapePageTransform`, and counts one
+row per (labeled arrow, overlapped shape) pair where the shape is neither
+endpoint. `getArrowLabelPosition` itself is **not exported** from the `tldraw`
+package, so the geometry group is the only public route to that box.
+
+| file | crossings | crowded pairs | label overlaps |
+|---|---|---|---|
+| deep-nesting | 3 | 0 | 0 |
+| hexagonal | 6 | 0 | 0 |
+| long-labels | 0 | 0 | 0 |
+| multi-region | 0 | 0 | 0 |
+| release-pipeline | 0 | 0 | 0 |
+| sequence | 0 | 0 | 0 |
+| sparse-graph | 0 | 0 | 0 |
+| wide-fanout | 0 | 0 | 0 |
+| **total** | **9** | **0** | **0** |
+
+**All eight corpus files compile to byte-identical scene JSON**, verified twice
+(before/after via `git stash`, each dump asserted non-empty first - sizes ranged
+24,988 to 66,254 bytes - then `diff -rq`). No corpus fixture carries an edge
+label, so `docs/renders/` and the tables above are untouched; crossings are
+unchanged at 9.
+
+### The clearance mechanism, and the number that drove it
+
+The first render of the new fixture `tests/e2e/fixtures/edge-labels.tldsl.jsx`
+was unreadable: every label was force-wrapped into two or three narrow lines
+sitting on top of the boxes. The cause is exact, in
+`node_modules/tldraw/src/lib/shapes/arrow/arrowLabel.ts` (~82-95): for a
+non-elbow arrow whose body is wider than tall, tldraw sets
+
+```
+width = max(min(w, margin), min(bodyBounds.width - margin, w))   // margin = 64
+```
+
+so a label renders at its natural width `w` only when the arrow body is at
+least `w + 64` long. Between two adjacent boxes the body length *is* the
+container's gap, and the gap was 24px against a ~130px label.
+
+`labelClearanceGap` in `domain/layout/stack.ts` therefore raises a container's
+gap to the widest clearance any qualifying labeled edge needs - one uniform gap
+per container, the same shape as T0's one-box-size-per-container rule:
+
+- horizontal main axis (`row`, and `grid` within a row): `arrowLabelWidth(label) + 64`
+- vertical main axis (`col`): `arrowLabelLineHeight() + 2 * 4.25`
+
+Only edges between two **consecutive** flowed siblings qualify. `auto` (ELK owns
+its own spacing) and `free` (hard-pinned) are exempt.
+
+**Arrow labels use a third font-size table.** `ARROW_LABEL_FONT_SIZES`
+(`s:18 m:20 l:24 xl:28`) is not T11's `LABEL_FONT_SIZES` (`s:18 m:22 l:26 xl:32`)
+and not `FONT_SIZES`. `arrowLabelWidth` reuses T11's measured per-glyph `ADVANCE`
+tables with the arrow scale factor, which is exact given T11's linearity result.
+`glyph-metrics.test.ts` pins that the two widths differ at size `m` so the
+tables cannot be silently merged.
+
+**Edges are declared at `<Doc>` level, and that broke the first attempt.** Every
+fixture in this repo writes `<Edge>` as a sibling of the frames it connects, not
+inside them. Scoping clearance to edges found in a container's own subtree made
+the mechanism a 6px no-op. It now collects the document's labeled edges once at
+the layout entry point and resolves each one to the pair of *direct children* of
+each container that contain its endpoints.
+
+**The number.** On the new fixture, label overlaps went **2 -> 1** and the render
+went from three stacked label fragments per edge to legible one- and two-line
+labels with their own clearance; canvas 757 x 234. The one survivor is
+`e-ingest-publish over validate`: a bent skip edge whose label rides the arc's
+apex and clips the top few pixels of the box it skips. Cross-container diagonal
+edges (`on failure`, `writes`, `retries`) are still squished - their bodies are
+wider than tall, so the 64px rule applies to them too, but the gap that would
+clear them is horizontal space a `col` container's gap cannot provide. See
+`docs/plan.md` `## Questions for the human`.

@@ -127,16 +127,36 @@ export function fontScale(ts?: TextStyle): number {
   return LABEL_FONT_PX[ts?.size ?? DEFAULT_FONT_SIZE] / BASE_FONT_PX;
 }
 
-export function textWidth(s: string, ts?: TextStyle): number {
-  if (s.length === 0) return 0;
-  const font = ts?.font ?? DEFAULT_FONT;
+function rawAdvance(s: string, font: StyleFont): number {
   const table = ADVANCE[font];
   let w = 0;
   for (const ch of s) w += table[ch] ?? MAX_ADVANCE[font];
-  return w * fontScale(ts) + TEXT_SLACK_PX;
+  return w;
+}
+
+export function textWidth(s: string, ts?: TextStyle): number {
+  if (s.length === 0) return 0;
+  const font = ts?.font ?? DEFAULT_FONT;
+  return rawAdvance(s, font) * fontScale(ts) + TEXT_SLACK_PX;
 }
 
 /** tldraw's `TEXT_PROPS.lineHeight` is 1.35x the font size; rounded up for integer geometry. */
 export function lineHeightPx(ts?: TextStyle): number {
   return Math.ceil(LABEL_FONT_PX[ts?.size ?? DEFAULT_FONT_SIZE] * 1.35);
+}
+
+/** tldraw's `ARROW_LABEL_FONT_SIZES` (`default-shape-constants.ts:37`) - distinct from `LABEL_FONT_PX`, which is box/note only. */
+export const ARROW_LABEL_FONT_PX: Record<StyleFontSize, number> = { s: 18, m: 20, l: 24, xl: 28 };
+
+/** Same measurement as `textWidth`, scaled by the arrow label's own font-size table instead of `LABEL_FONT_PX`. */
+export function arrowLabelWidth(s: string, ts?: TextStyle): number {
+  if (s.length === 0) return 0;
+  const font = ts?.font ?? DEFAULT_FONT;
+  const scale = ARROW_LABEL_FONT_PX[ts?.size ?? DEFAULT_FONT_SIZE] / BASE_FONT_PX;
+  return rawAdvance(s, font) * scale + TEXT_SLACK_PX;
+}
+
+/** tldraw's `TEXT_PROPS.lineHeight` (1.35x) applied to the arrow label's own font-size table. */
+export function arrowLabelLineHeight(ts?: TextStyle): number {
+  return ARROW_LABEL_FONT_PX[ts?.size ?? DEFAULT_FONT_SIZE] * 1.35;
 }

@@ -119,7 +119,19 @@ const ALLOWED_PROPS = {
     "font",
     "size",
   ],
-  edge: ["id", "from", "to", "color", "dash", "arrowheadStart", "arrowheadEnd"],
+  edge: [
+    "id",
+    "from",
+    "to",
+    "color",
+    "dash",
+    "arrowheadStart",
+    "arrowheadEnd",
+    "label",
+    "labelColor",
+    "font",
+    "size",
+  ],
 } as const;
 
 /**
@@ -353,6 +365,9 @@ function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
   const dash = readEnum(node.attrs, "dash", DASHES, ctx);
   const arrowheadStart = readEnum(node.attrs, "arrowheadStart", ARROWHEADS, ctx);
   const arrowheadEnd = readEnum(node.attrs, "arrowheadEnd", ARROWHEADS, ctx);
+  const labelColor = readEnum(node.attrs, "labelColor", COLORS, ctx);
+  const font = readEnum(node.attrs, "font", FONTS, ctx);
+  const size = readEnum(node.attrs, "size", FONT_SIZES, ctx);
 
   return {
     kind: "edge",
@@ -364,10 +379,14 @@ function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
     span: node.span,
     from,
     to,
+    ...optionalString(node.attrs, "label"),
     ...(color === undefined ? {} : { color }),
     ...(dash === undefined ? {} : { dash }),
     ...(arrowheadStart === undefined ? {} : { arrowheadStart }),
     ...(arrowheadEnd === undefined ? {} : { arrowheadEnd }),
+    ...(labelColor === undefined ? {} : { labelColor }),
+    ...(font === undefined ? {} : { font }),
+    ...(size === undefined ? {} : { size }),
   };
 }
 

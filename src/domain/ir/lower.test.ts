@@ -551,3 +551,58 @@ describe("lower: font / size (T11)", () => {
     expect(codes).toEqual(["ir/invalid-style-value"]);
   });
 });
+
+describe("lower: arrow labels (T12)", () => {
+  it("captures label on <edge>", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      edge({ id: "e", from: "a", to: "a", label: "publishes" }),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const edgeIr = ir!.children[1]!;
+    if (edgeIr.kind !== "edge") throw new Error("expected edge");
+    expect(edgeIr.label).toBe("publishes");
+  });
+
+  it("captures labelColor/font/size on <edge>", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      edge({ id: "e", from: "a", to: "a", labelColor: "red", font: "mono", size: "xl" }),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const edgeIr = ir!.children[1]!;
+    if (edgeIr.kind !== "edge") throw new Error("expected edge");
+    expect(edgeIr.labelColor).toBe("red");
+    expect(edgeIr.font).toBe("mono");
+    expect(edgeIr.size).toBe("xl");
+  });
+
+  it("leaves label undefined on an <edge> with no label", () => {
+    const ast = doc({}, [box({ id: "a" }), edge({ id: "e", from: "a", to: "a" })]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const edgeIr = ir!.children[1]!;
+    if (edgeIr.kind !== "edge") throw new Error("expected edge");
+    expect(edgeIr.label).toBeUndefined();
+  });
+
+  it("ir/invalid-style-value for an unknown labelColor on <edge>", () => {
+    const ast = doc({}, [box({ id: "a" }), edge({ from: "a", to: "a", labelColor: "puce" })]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+
+  it("ir/invalid-style-value for an unknown font on <edge>", () => {
+    const ast = doc({}, [box({ id: "a" }), edge({ from: "a", to: "a", font: "comic-sans" })]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+
+  it("ir/invalid-style-value for an unknown size on <edge>", () => {
+    const ast = doc({}, [box({ id: "a" }), edge({ from: "a", to: "a", size: "xxl" })]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+});

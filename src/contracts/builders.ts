@@ -244,6 +244,10 @@ export function arrowShape(
     dash?: string;
     arrowheadStart?: string;
     arrowheadEnd?: string;
+    text?: string;
+    labelColor?: string;
+    font?: string;
+    size?: string;
   },
 ): TLRecord {
   return {
@@ -255,14 +259,14 @@ export function arrowShape(
       end: { x: 0, y: 0 },
       bend: input.bend ?? 0,
       color: input.color ?? "black",
-      labelColor: "black",
-      size: "m",
+      labelColor: input.labelColor ?? "black",
+      size: input.size ?? "m",
       dash: input.dash ?? "draw",
       fill: "none",
-      font: "draw",
+      font: input.font ?? "draw",
       arrowheadStart: input.arrowheadStart ?? "none",
       arrowheadEnd: input.arrowheadEnd ?? "arrow",
-      text: "",
+      text: input.text ?? "",
       labelPosition: 0.5,
       scale: 1,
       elbowMidPoint: 0.5,

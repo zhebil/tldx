@@ -479,6 +479,60 @@ describe("domain/emit: font / size pass-through (T11)", () => {
   });
 });
 
+describe("domain/emit: arrow labels (T12)", () => {
+  it("forwards edge label as arrow text", () => {
+    const scene = emit(
+      doc([
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 200, y: 0, w: 100, h: 50 }),
+        edge({ id: "e", from: "a", to: "b", label: "publishes" }),
+      ]),
+    );
+    const props = scene.store["shape:e"]?.props as Record<string, unknown>;
+    expect(props.text).toBe("publishes");
+  });
+
+  it("emits an empty text when the edge has no label", () => {
+    const scene = emit(
+      doc([
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 200, y: 0, w: 100, h: 50 }),
+        edge({ id: "e", from: "a", to: "b" }),
+      ]),
+    );
+    const props = scene.store["shape:e"]?.props as Record<string, unknown>;
+    expect(props.text).toBe("");
+  });
+
+  it("passes edge labelColor/font/size through, defaulting to black/draw/m", () => {
+    const scene = emit(
+      doc([
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 200, y: 0, w: 100, h: 50 }),
+        edge({
+          id: "styled",
+          from: "a",
+          to: "b",
+          label: "retries",
+          labelColor: "red",
+          font: "mono",
+          size: "xl",
+        }),
+        edge({ id: "plain", from: "a", to: "b" }),
+      ]),
+    );
+    const styled = scene.store["shape:styled"]?.props as Record<string, unknown>;
+    expect(styled.labelColor).toBe("red");
+    expect(styled.font).toBe("mono");
+    expect(styled.size).toBe("xl");
+
+    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    expect(plain.labelColor).toBe("black");
+    expect(plain.font).toBe("draw");
+    expect(plain.size).toBe("m");
+  });
+});
+
 // -- helpers ------------------------------------------------------------------
 
 const SPAN = { file: "test.tldsl", line: 1, column: 1 };
@@ -570,6 +624,10 @@ function edge(input: {
   dash?: string;
   arrowheadStart?: string;
   arrowheadEnd?: string;
+  label?: string;
+  labelColor?: string;
+  font?: string;
+  size?: string;
 }): IREdge {
   return {
     kind: "edge",

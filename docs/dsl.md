@@ -66,7 +66,7 @@ line number and the allowed list.
 | `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h`, `color` |
 | `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
 | `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `color`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
-| `<Edge>` | `id`, `from`, `to`, `color`, `dash`, `arrowheadStart`, `arrowheadEnd` |
+| `<Edge>` | `id`, `from`, `to`, `color`, `dash`, `arrowheadStart`, `arrowheadEnd`, `label`, `labelColor`, `font`, `size` |
 
 `x`/`y`/`w`/`h`/`gap`/`pad`/`cols`/`maxW` are numbers written as strings
 (`w="200"`), like any other JSX attribute value. A non-numeric value is
@@ -101,20 +101,23 @@ unrecognized value is `ir/invalid-style-value`, same as the other style
 props. Named `textAlign`, not `align`: `align` is already the container
 cross-axis alignment prop on `<Doc>`/`<Frame>` (see B1) and reusing it here
 would make the same prop name mean two different things depending on which
-component reads it. `<Edge>` has no `labelColor` - `arrowShape` always
-emits an empty label today (arrow labels land in a later task), so it would
-be dead code. `<Frame>` has none of these three - tldraw's frame shape
-props are exactly `{ w, h, name, color }`.
+component reads it. `<Edge>` also accepts `labelColor` (T12, see Edges
+below) - it's a pass-through only there too. `<Frame>` has none of these
+three - tldraw's frame shape props are exactly `{ w, h, name, color }`.
+`<Edge>` has no `textAlign`/`verticalAlign` - an arrow label is always
+center-anchored on its own bounding box, so alignment doesn't apply.
 
-`font`/`size` (T11) are raw tldraw text-style enums on `<Box>` and
-`<Note>`/`<Sticky>` only. Unlike the other style props, they *do* affect
+`font`/`size` (T11) are raw tldraw text-style enums on `<Box>`,
+`<Note>`/`<Sticky>`, and `<Edge>` (T12). On `<Box>`/`<Note>` they *do* affect
 layout: label wrapping and box/note sizing key off tldraw's real per-glyph
 metrics for the chosen (font, size) pair (`domain/layout/glyph-metrics.ts`).
 `font` is `draw | sans | serif | mono`; `size` is `s | m | l | xl`, tldraw's
-`LABEL_FONT_SIZES` (18/22/26/32px). An unrecognized value is
-`ir/invalid-style-value`, same as the other style props. Default is
-`draw`/`m` (unchanged from before T11). `<Edge>` and `<Frame>` have neither
-- arrow labels and frame titles don't wrap through this path.
+`LABEL_FONT_SIZES` (18/22/26/32px) on `<Box>`/`<Note>`, or
+`ARROW_LABEL_FONT_SIZES` on `<Edge>` (`size` there also sets the arrow's
+stroke weight, same as `<Box>`/`<Note>` size sets border weight). An
+unrecognized value is `ir/invalid-style-value`, same as the other style
+props. Default is `draw`/`m`. `<Frame>` has neither - a frame title doesn't
+wrap through this path.
 
 ## Layout
 
@@ -156,6 +159,13 @@ just strings) but are rejected at lowering, not supported:
 
 `flow("a", "b", "c")` is sugar for consecutive edges - use it for a simple
 chain, use explicit `<Edge>`s for anything non-linear.
+
+`label` (T12) sets the arrow's text, matching `<Box label=...>`. Omitted or
+empty is an unlabeled arrow (tldraw's default empty text):
+
+```jsx
+<Edge id="e2" from="api" to="db" label="reads" />
+```
 
 ## Attaching a note
 

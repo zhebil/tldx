@@ -11,6 +11,7 @@ import type { AstNode } from "../parser/ast.js";
 import { astBuilders } from "../parser/ast.fixture.js";
 
 import { BOX_ASPECT_TARGET, boxHeightForWidth, estimatedBoxSize, fitBoxWidth } from "./defaults.js";
+import { arrowLabelLineHeight, arrowLabelWidth } from "./glyph-metrics.js";
 import {
   bestGridCols,
   findFanGroups,
@@ -307,6 +308,81 @@ describe("hybridLayout", () => {
     expect(a.y).toBe(0);
     expect(b.x).toBe(sizeA.w + 10);
     expect(b.y).toBe(0);
+  });
+});
+
+describe("hybridLayout: labeled-edge gap clearance (T12)", () => {
+  it("widens a row's gap to clear a labeled edge between adjacent siblings", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row", gap: 10 }, [
+        box({ id: "a", label: "A", w: 50, h: 50 }),
+        box({ id: "b", label: "B", w: 50, h: 50 }),
+        edge({ id: "e", from: "a", to: "b", label: "reads from cache" }),
+      ]),
+    );
+    expect(boxById(result.children, "b").x).toBe(50 + arrowLabelWidth("reads from cache") + 64);
+  });
+
+  it("does not widen the gap for a labeled edge between non-adjacent siblings", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row", gap: 10 }, [
+        box({ id: "a", label: "A", w: 50, h: 50 }),
+        box({ id: "b", label: "B", w: 50, h: 50 }),
+        box({ id: "c", label: "C", w: 50, h: 50 }),
+        edge({ id: "e", from: "a", to: "c", label: "reads from cache" }),
+      ]),
+    );
+    expect(boxById(result.children, "b").x).toBe(60);
+    expect(boxById(result.children, "c").x).toBe(120);
+  });
+
+  it("does not widen the gap for an unlabeled edge", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row", gap: 10 }, [
+        box({ id: "a", label: "A", w: 50, h: 50 }),
+        box({ id: "b", label: "B", w: 50, h: 50 }),
+        edge({ id: "e", from: "a", to: "b" }),
+      ]),
+    );
+    expect(boxById(result.children, "b").x).toBe(60);
+  });
+
+  it("keeps the declared gap when it already exceeds the label's clearance", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row", gap: 500 }, [
+        box({ id: "a", label: "A", w: 50, h: 50 }),
+        box({ id: "b", label: "B", w: 50, h: 50 }),
+        edge({ id: "e", from: "a", to: "b", label: "hi" }),
+      ]),
+    );
+    expect(boxById(result.children, "b").x).toBe(550);
+  });
+
+  it("widens a col's gap using the line-height formula for a labeled edge", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col", gap: 10 }, [
+        box({ id: "a", label: "A", w: 50, h: 50 }),
+        box({ id: "b", label: "B", w: 50, h: 50 }),
+        edge({ id: "e", from: "a", to: "b", label: "reads" }),
+      ]),
+    );
+    expect(boxById(result.children, "b").y).toBe(50 + arrowLabelLineHeight() + 2 * 4.25);
+  });
+
+  it("widens a frame's gap for a labeled edge declared as a doc-level sibling of the frame", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        frame({ id: "f", layout: "row", pad: 10, gap: 10 }, [
+          box({ id: "a", label: "A", w: 50, h: 50 }),
+          box({ id: "b", label: "B", w: 50, h: 50 }),
+        ]),
+        edge({ id: "e", from: "a", to: "b", label: "reads from cache" }),
+      ]),
+    );
+    const f = frameById(result.children, "f");
+    const a = boxById(f.children, "a");
+    const b = boxById(f.children, "b");
+    expect(b.x).toBe(a.x + a.w + arrowLabelWidth("reads from cache") + 64);
   });
 });
 

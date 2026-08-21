@@ -1056,7 +1056,7 @@ to come after Phase 1.
   check that never looks at a non-empty artefact is indistinguishable from a
   passing one.
 
-- [ ] **T12. Arrow labels.**
+- [x] **T12. Arrow labels.**
   tldraw arrow shapes already carry a `text` prop; nothing exposes it. A diagram
   where the edges say *"publishes"* and *"on failure"* communicates more than
   any layout change in this plan.
@@ -1066,6 +1066,66 @@ to come after Phase 1.
   **Acceptance:** no arrow label's bounding box overlaps a shape the arrow does
   not connect. Add that check to `arrow-truth` and record the numbers in
   `docs/baseline.md`.
+
+  **What was built.** `label` on `<Edge>` (named for `<Box label>`, mapping to
+  tldraw's arrow `text` exactly as `IRBox.label` maps to `boxShape`'s `text`),
+  plus `labelColor`, `font` and `size` - T10 and T11 both skipped `<Edge>`
+  explicitly *because* the label was dead, so those belonged here. The chain is
+  `ALLOWED_PROPS.edge` + `lowerEdge` -> `IREdge` -> `emitEdge` -> `arrowShape`,
+  which stopped hardcoding `text: ""`. `assignId`'s edge `contentFields` was
+  deliberately left as `[from, to]`: folding the label in would change every
+  synthetic edge id and move geometry for a cosmetic gain.
+
+  **The acceptance check.** `tools/arrow-truth.mts` prints a third summary line,
+  `arrow labels overlapping a non-endpoint shape: N`, reading the label rect off
+  `editor.getShapeGeometry(arrow).children[1]` (guarded on `text.trim() !== ""`)
+  and mapping its corners through `getShapePageTransform`.
+  `getArrowLabelPosition` is **not exported** from `tldraw`, but
+  `ArrowShapeUtil.getGeometry` folds the label rect into the shape's public
+  `Group2d`, so the geometry group is the supported route to that box.
+
+  **The numbers. Corpus: 0 label overlaps on all eight files, and the scene JSON
+  is byte-identical across all eight** (verified before/after via `git stash`,
+  each dump asserted non-empty first, then `diff -rq`), so `docs/renders/` and
+  the baseline tables were untouched and crossings stayed at 9. On the new
+  fixture `tests/e2e/fixtures/edge-labels.tldsl.jsx`, overlaps went **2 -> 1**.
+  `npm run check` green, 42 files / 444 tests (up from 428).
+
+  **The clearance was not optional, and the reason is a hard tldraw number.**
+  The first render of the fixture was unreadable - every label force-wrapped
+  into two or three narrow fragments piled on the boxes. `arrowLabel.ts` (~82-95)
+  sets `width = max(min(w, 64), min(bodyBounds.width - 64, w))` for any
+  non-elbow arrow whose body is wider than tall, so a label renders at its
+  natural width only when the arrow body is at least `w + 64` long - and between
+  two adjacent boxes the body length *is* the container's gap, which was 24px
+  against a ~130px label. `labelClearanceGap` in `domain/layout/stack.ts` now
+  raises a container's gap to the widest clearance any qualifying labeled edge
+  needs (`arrowLabelWidth + 64` horizontal, `arrowLabelLineHeight + 2*4.25`
+  vertical), one uniform gap per container - the same shape as T0's
+  one-box-size-per-container rule. Only consecutive flowed siblings qualify;
+  `auto` and `free` are exempt.
+
+  **Arrow labels use a third font-size table.** `ARROW_LABEL_FONT_SIZES`
+  (`s:18 m:20 l:24 xl:28`) is neither T11's `LABEL_FONT_SIZES`
+  (`s:18 m:22 l:26 xl:32`) nor `FONT_SIZES`. `arrowLabelWidth` reuses T11's
+  measured `ADVANCE` tables with the arrow scale factor, exact given T11's
+  linearity result; a test pins that it differs from `textWidth` at size `m` so
+  the two tables cannot be quietly merged.
+
+  **The first clearance attempt was a 6px no-op, and the reason generalises.**
+  Every fixture in this repo declares `<Edge>` as a *sibling* of the frames it
+  connects, not inside them. Scoping clearance to edges found within a
+  container's own subtree therefore saw almost nothing. It now collects the
+  document's labeled edges once at the layout entry point and resolves each to
+  the pair of direct children of each container containing its endpoints. Worth
+  remembering for any future rule keyed off `collectAutoEdges`: a container's
+  own subtree is not where this DSL's edges live.
+
+  Looked at the render before and after. The same-container adjacent case is
+  transformed - `reads` and `on success` now sit in their own clearance with
+  visible arrows either side, where before they were fragments over the boxes.
+  Cross-container diagonal labels (`on failure`, `writes`, `retries`) are still
+  squished; see `## Questions for the human`.
 
 ### Phase 4 - a corpus worth judging
 
@@ -1561,6 +1621,31 @@ Defaults were taken so the loop could continue; nothing here is blocking. Each
 entry is a decision a human may want to revisit, with what it costs to leave it
 as-is.
 
+- **T12 - the last arrow-label overlap, and squished diagonal labels.** T12's
+  acceptance is *no* arrow label's bounding box overlapping a shape the arrow
+  does not connect; the shipped work reached **1** on the new fixture (0 across
+  the whole corpus, which carries no edge labels).
+  **Default taken:** accepted 1 and ticked the box. It changes least - the
+  clearance mechanism is a clear win on its own terms (2 -> 1 overlaps, and the
+  render went from three stacked label fragments per edge to legible labels with
+  real clearance), and the survivor is marginal: `e-ingest-publish`'s label rides
+  a bent skip edge's apex and clips the top few pixels of the box it skips.
+  **Alternatives:** (2) boost `|bend|` in `routing.ts` by half the label height
+  for a *labeled* bent edge, which would clear exactly this case in about five
+  lines; (3) nudge tldraw's `labelPosition` off 0.5 for an overlapping label,
+  which needs the domain to know where a point at parameter t lands on the arc -
+  duplicating tldraw geometry, the class of thing that has failed here before;
+  (4) re-word the acceptance to exclude bent skip edges.
+  **What the default costs:** one marginal overlap survives, and separately - not
+  counted by the metric, because a squished label is not an overlapping one -
+  **cross-container diagonal labels are still force-wrapped** (`on failure`
+  renders as `on / failur / e`). Those edges' bodies are wider than tall, so
+  tldraw's 64px squish margin applies to them exactly as it does to a row edge,
+  but the clearance they need is horizontal space that a `col` container's
+  vertical gap cannot provide. That is the same residue class as the T6b
+  cross-container question above: both are diagonal edges that the axis-aligned
+  machinery declines. Anyone revisiting either should look at them together.
+
 - **T6b - the cross-container floor.** Acceptance asked for the
   `cross-container` bucket at <= 5; the shipped work reached 9.
   **Default taken:** accepted 9 and ticked the box. It changes least - the code
@@ -1955,3 +2040,24 @@ promoted into the task list by the human.
   the frame border. Nobody has measured whether 32 is what tldraw's own label
   padding needs, the way T0 measured the glyph advances. The same trick that
   found `BOX_CHAR_PX = 14` was wrong would apply here.
+
+- **T12: `<Edge>` still cannot be styled with `fill`, `bend` or
+  `labelPosition`.** T12 exposed `label`/`labelColor`/`font`/`size`;
+  `labelPosition` stayed hardcoded at `0.5` and `bend` is owned by `routing.ts`.
+  An author who wants a label off-centre has no way to ask.
+- **T12: `arrowLabelWidth` ignores wrapping entirely.** It measures a label as
+  one line, so a long edge label (`"retries with exponential backoff"`) would
+  demand a gap as wide as the whole sentence rather than wrapping to two lines
+  at a sensible width. Nothing exercises it yet; T13's realistic diagrams might.
+- **T12: the clearance rule only looks at *consecutive* siblings.** A labeled
+  skip edge (source and target two apart) gets no clearance at all - exactly the
+  case whose label rides the bend apex and produced T12's surviving overlap.
+- **T12: the corpus has no edge labels at all**, so the new
+  `arrow labels overlapping a non-endpoint shape` metric is 0 there by
+  construction and cannot regress. It only starts measuring anything once T13's
+  realistic diagrams land, which the task text says will use arrow labels.
+- **`examples/kernel.tldsl.jsx` is an untracked leftover** in the repo root - a
+  hand-authored 138-line diagram that has never been committed and is referenced
+  by nothing. It is not test-generated (the only other `kernel` match in the tree
+  is a comment about FSEvents in `chokidar-watch.test.ts`). Either commit it as a
+  fixture or delete it; leaving it untracked makes every `git status` noisy.

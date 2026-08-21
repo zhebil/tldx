@@ -111,6 +111,10 @@ export type IREdge = IRBase & {
   dash?: StyleDash;
   arrowheadStart?: StyleArrowhead;
   arrowheadEnd?: StyleArrowhead;
+  label?: string;
+  labelColor?: StyleColor;
+  font?: StyleFont;
+  size?: StyleFontSize;
 };
 
 export type IRElement = IRDoc | IRFrame | IRBox | IRNote | IREdge;

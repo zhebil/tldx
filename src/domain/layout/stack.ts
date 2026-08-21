@@ -29,6 +29,8 @@ import type {
   IRNotePositioned,
 } from "../ir/index.js";
 
+import type { StyleFont, StyleFontSize } from "../ir/styles.js";
+
 import {
   boxHeightForWidth,
   DEFAULT_ALIGN,
@@ -42,11 +44,16 @@ import {
   type LayoutMode,
 } from "./defaults.js";
 import { attachNotes } from "./attach.js";
+import { arrowLabelLineHeight, arrowLabelWidth } from "./glyph-metrics.js";
 
 const DEFAULT_GAP = 40;
 const SKIP_ROW_GAP_FACTOR = 2;
 const SKIP_ROW_GAP_MAX = 4;
 const TARGET_ASPECT = 16 / 9;
+/** tldraw `arrowLabel.ts`'s squish margin: a straight arrow's body must be at least `label width + 64` before its label renders unsquished. */
+const ARROW_LABEL_MARGIN = 64;
+/** tldraw `ARROW_LABEL_PADDING` (`default-shape-constants.ts:55`), added on every side of the label box. */
+const ARROW_LABEL_PADDING = 4.25;
 
 type Rect = { x: number; y: number; w: number; h: number };
 type FlowMode = "row" | "col" | "grid";
@@ -54,6 +61,7 @@ type Pad = { left: number; top: number; right: number; bottom: number };
 type FlowEl = IRBoxPositioned | IRNotePositioned | IRFramePositioned;
 type FanGroup = { sourceId: string; targetIds: string[] };
 type FanBlock = { source: FlowEl; targets: FlowEl[]; w: number; h: number; rowH: number };
+type AutoEdge = { from: string; to: string; label?: string; font?: StyleFont; size?: StyleFontSize };
 
 export type AutoPlaceRequest = {
   nodes: readonly { id: string; w: number; h: number }[];
@@ -78,6 +86,9 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
   const mode = resolveMode(ir.layout);
   const gap = ir.gap ?? DEFAULT_GAP;
   const mayAutoGrid = ir.layout === undefined && ir.cols === undefined;
+  const allEdges: AutoEdge[] = [];
+  collectEdgesDeep(ir.children, allEdges);
+  const docLabeledEdges = allEdges.filter((e) => e.label !== undefined);
   const { children, mode: usedMode, cols: usedCols } = await layoutContainer(
     ir.children,
     mode,
@@ -88,6 +99,7 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
     ir.align ?? DEFAULT_ALIGN,
     placeAuto,
     mayAutoGrid,
+    docLabeledEdges,
   );
   return attachNotes({
     ...ir,
@@ -104,6 +116,7 @@ function resolveMode(mode: LayoutMode | undefined): LayoutMode {
 async function sizeElement(
   el: IRBox | IRNote | IRFrame,
   placeAuto: AutoPlacer,
+  docLabeledEdges: readonly AutoEdge[],
 ): Promise<IRBoxPositioned | IRNotePositioned | IRFramePositioned> {
   switch (el.kind) {
     case "box": {
@@ -120,11 +133,15 @@ async function sizeElement(
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w, h };
     }
     case "frame":
-      return sizeFrame(el, placeAuto);
+      return sizeFrame(el, placeAuto, docLabeledEdges);
   }
 }
 
-async function sizeFrame(frame: IRFrame, placeAuto: AutoPlacer): Promise<IRFramePositioned> {
+async function sizeFrame(
+  frame: IRFrame,
+  placeAuto: AutoPlacer,
+  docLabeledEdges: readonly AutoEdge[],
+): Promise<IRFramePositioned> {
   const mode = resolveMode(frame.layout);
   const gap = frame.gap ?? DEFAULT_GAP;
   const pad = frame.pad ?? FRAME_PAD_INNER;
@@ -140,6 +157,7 @@ async function sizeFrame(frame: IRFrame, placeAuto: AutoPlacer): Promise<IRFrame
     frame.align ?? DEFAULT_ALIGN,
     placeAuto,
     false,
+    docLabeledEdges,
   );
   const w = frame.w ?? contentW;
   const h = frame.h ?? contentH;
@@ -164,6 +182,7 @@ async function layoutContainer(
   align: Align,
   placeAuto: AutoPlacer,
   mayAutoGrid: boolean,
+  docLabeledEdges: readonly AutoEdge[],
 ): Promise<{
   children: IRElementPositioned[];
   w: number;
@@ -175,7 +194,7 @@ async function layoutContainer(
     children.map(async (c) => {
       if (c.kind === "edge") return null;
       if (c.kind === "doc") throw new Error("layout: nested <doc> is not permitted");
-      return sizeElement(c, placeAuto);
+      return sizeElement(c, placeAuto, docLabeledEdges);
     }),
   );
 
@@ -250,21 +269,23 @@ async function layoutContainer(
         flowCols = bestGridCols(collapsedEls, gap, TARGET_ASPECT, preGap);
       }
     }
+    const clearanceEdges = resolveEdgeOwners(children, docLabeledEdges);
+    const effectiveGap = labelClearanceGap(flowMode, flowCols, collapsedIds, clearanceEdges, gap);
     const rowGaps =
       flowMode === "grid"
-        ? skipRowGaps(collapsedIds, edges, resolveCols(flowCols, collapsedEls.length), gap)
+        ? skipRowGaps(collapsedIds, edges, resolveCols(flowCols, collapsedEls.length), effectiveGap)
         : [];
     const positions = computeFlowPositions(
       collapsedEls,
       flowMode,
       flowCols,
-      gap,
+      effectiveGap,
       rowGaps,
       pad.left,
       pad.top,
       align,
     );
-    expandFanBlocks(sized, flowedIndices, positions, collapsedIds, blocks, targetOwner, gap);
+    expandFanBlocks(sized, flowedIndices, positions, collapsedIds, blocks, targetOwner, effectiveGap);
     const bbox = boundingBox(children, sized);
     w = bbox.maxX + pad.right;
     h = bbox.maxY + pad.bottom;
@@ -360,7 +381,23 @@ function boundingBox(
  * an `auto` container ELK-topology hints without requiring it to see past
  * its own direct children.
  */
-function collectAutoEdges(children: readonly IRElement[]): { from: string; to: string }[] {
+function collectAutoEdges(children: readonly IRElement[]): AutoEdge[] {
+  const rawEdges: AutoEdge[] = [];
+  collectEdgesDeep(children, rawEdges);
+  return resolveEdgeOwners(children, rawEdges);
+}
+
+/**
+ * Resolves each of `edges` to the pair of direct children of `children` that
+ * contain (or are) its endpoints - regardless of where in the whole document
+ * the edge itself was declared. Drops an edge whose endpoint isn't anywhere
+ * in `children`'s subtree, or whose two endpoints resolve to the same direct
+ * child (self-loop at this container's level).
+ */
+function resolveEdgeOwners(
+  children: readonly IRElement[],
+  edges: readonly AutoEdge[],
+): AutoEdge[] {
   const owner = new Map<string, string>();
   for (const c of children) {
     if (c.kind === "edge" || c.kind === "doc") continue;
@@ -368,16 +405,47 @@ function collectAutoEdges(children: readonly IRElement[]): { from: string; to: s
     if (c.kind === "frame") indexDescendants(c.children, c.id, owner);
   }
 
-  const rawEdges: { from: string; to: string }[] = [];
-  collectEdgesDeep(children, rawEdges);
-
-  const out: { from: string; to: string }[] = [];
-  for (const e of rawEdges) {
+  const out: AutoEdge[] = [];
+  for (const e of edges) {
     const from = owner.get(e.from);
     const to = owner.get(e.to);
-    if (from !== undefined && to !== undefined && from !== to) out.push({ from, to });
+    if (from !== undefined && to !== undefined && from !== to) out.push({ ...e, from, to });
   }
   return out;
+}
+
+/**
+ * A container's gap must clear any labeled edge between two consecutive
+ * flowed siblings along the main axis (`grid`: consecutive within the same
+ * row) - the space tldraw needs to render the label unsquished (T12). One
+ * uniform gap per container: the declared gap, or the widest clearance any
+ * qualifying edge needs, whichever is larger.
+ */
+function labelClearanceGap(
+  flowMode: FlowMode,
+  cols: number | undefined,
+  ids: readonly string[],
+  edges: readonly AutoEdge[],
+  gap: number,
+): number {
+  if (ids.length < 2) return gap;
+  const pos = new Map<string, number>();
+  ids.forEach((id, i) => pos.set(id, i));
+  const rowSize = flowMode === "grid" ? resolveCols(cols, ids.length) : ids.length;
+  let effective = gap;
+  for (const e of edges) {
+    if (e.label === undefined) continue;
+    const from = pos.get(e.from);
+    const to = pos.get(e.to);
+    if (from === undefined || to === undefined || Math.abs(from - to) !== 1) continue;
+    if (flowMode === "grid" && Math.floor(from / rowSize) !== Math.floor(to / rowSize)) continue;
+    const clearance =
+      flowMode === "col"
+        ? arrowLabelLineHeight(e) + 2 * ARROW_LABEL_PADDING
+        : arrowLabelWidth(e.label, e) + ARROW_LABEL_MARGIN;
+    effective = Math.max(effective, clearance);
+  }
+  return effective;
 }
 
 /**
@@ -597,13 +665,16 @@ function indexDescendants(
   }
 }
 
-function collectEdgesDeep(
-  children: readonly IRElement[],
-  out: { from: string; to: string }[],
-): void {
+function collectEdgesDeep(children: readonly IRElement[], out: AutoEdge[]): void {
   for (const c of children) {
     if (c.kind === "edge") {
-      out.push({ from: c.from, to: c.to });
+      out.push({
+        from: c.from,
+        to: c.to,
+        ...(c.label === undefined ? {} : { label: c.label }),
+        ...(c.font === undefined ? {} : { font: c.font }),
+        ...(c.size === undefined ? {} : { size: c.size }),
+      });
       continue;
     }
     if (c.kind === "frame") collectEdgesDeep(c.children, out);

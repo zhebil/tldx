@@ -21,15 +21,18 @@
  *   tldraw's 200 base height; `note.color` passes through the same way.
  * - `box`/`frame`/`note`/`edge` also pass through the raw tldraw style props
  *   IR carries (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd`,
- *   and on `box`/`note` also `textAlign`, `verticalAlign`, `labelColor`,
- *   `font`, `size` - see `domain/ir/styles.ts`) verbatim onto the shape when
- *   present; `font`/`size` already fed sizing at layout time (`glyph-metrics.ts`),
- *   this is just the wire-format echo.
+ *   and on `box`/`note`/`edge` also `labelColor`, `font`, `size`, and on
+ *   `box`/`note` also `textAlign`, `verticalAlign` - see `domain/ir/styles.ts`)
+ *   verbatim onto the shape when present; `font`/`size` already fed sizing at
+ *   layout time on `box`/`note` (`glyph-metrics.ts`), and on `edge` drive
+ *   tldraw's own arrow stroke/label sizing directly - this is just the
+ *   wire-format echo.
  * - Edges become an `arrow` shape (`x: 0, y: 0`, parented to the page) plus
  *   two `binding` records anchoring start/end to the referenced shapes with
  *   default-center attach. The 13-anchor scheme is phase 1. A same-axis skip
  *   edge (see `domain/layout/routing.ts`) gets a non-zero `bend` so it bows
  *   around the shapes between its endpoints instead of drawing through them.
+ *   `edge.label` becomes the arrow's `text` prop (empty string when absent).
  * - Synthetic-id elements (notes / edges that didn't author an `id`) inherit
  *   IR's content-hash ids (ADR-12), so emit is deterministic across reorder.
  */
@@ -184,6 +187,10 @@ function emitEdge(edge: IREdge, out: TLRecord[], route: EdgeRoute | undefined): 
       ...(edge.dash === undefined ? {} : { dash: edge.dash }),
       ...(edge.arrowheadStart === undefined ? {} : { arrowheadStart: edge.arrowheadStart }),
       ...(edge.arrowheadEnd === undefined ? {} : { arrowheadEnd: edge.arrowheadEnd }),
+      ...(edge.label === undefined ? {} : { text: edge.label }),
+      ...(edge.labelColor === undefined ? {} : { labelColor: edge.labelColor }),
+      ...(edge.font === undefined ? {} : { font: edge.font }),
+      ...(edge.size === undefined ? {} : { size: edge.size }),
     }),
   );
   out.push(
