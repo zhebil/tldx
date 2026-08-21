@@ -14,17 +14,16 @@ once A is done. The loop never terminates; the human stops it.
 ## Status
 
 - Phase: **B**
-- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 39
-  when **B34 added a seventh corpus file** (`release-pipeline`, a 6 x 3 grid -
-  the placement line of enquiry now has three voting files instead of two).
-  The layout code itself is unchanged since wake 38, when **B32 was kept**.
-  The champion is now the wake-38 **B32** revision (each
-  grid row boundary gets a corridor scaled by how many skip edges cross it,
+- Champion layout revision: `docs/layout-champion.md`, regenerated at wake 41
+  when **B33 was kept**. The champion is now the wake-41 **B33** revision (a row
+  boundary's corridor counts *every* edge whose endpoints land in different grid
+  rows, not only flow-order skip edges) on top of the wake-38 **B32** revision
+  (each grid row boundary gets a corridor scaled by how many edges cross it,
   `gap * min(4, 1 + crossings)`) on top of the wake-37 **B25** revision (which
   established that a grid carrying a skip edge is worth a wider row gap at all),
   the wake-28 **B9** revision (a note reserves the space tldraw actually
   draws), the wake-22 **B20** revision (topology-gated doc-root aspect wrap) and
-  the wake-12 **B1** revision (cross-axis `align`, default `center`). Those five
+  the wake-12 **B1** revision (cross-axis `align`, default `center`). Those six
   are the only hypotheses still standing - B2, B3, B4a, B13, B14, B15, B6, B27
   and B31 all reverted after judging, and B7 and B24 were rejected at an
   objective gate before judging. Judged results live in
@@ -45,15 +44,22 @@ once A is done. The loop never terminates; the human stops it.
   live line of enquiry is now placement, not terminals. Wake 38's **B32** took
   `wide-fanout` further, 31 to 28, by spending the corridor per row boundary
   instead of uniformly - but it was a **weak keep** (1 win, 1 loss) and its loss
-  named the next defect precisely: the widening predicate counts *skip* edges,
+  named the next defect precisely: the widening predicate counted *skip* edges,
   while the renderer draws a long diagonal for any pair that lands in different
-  grid rows, adjacent in flow order or not. See **B33**.
+  grid rows, adjacent in flow order or not. Wake 41's **B33** fixed exactly that
+  and was **KEPT** (1 win, 0 losses, 1 judged tie): `long-labels` widened the
+  `router → orders` boundary 40 → 80 and won its blind A/B, the first row-gap
+  change that file has ever won, closing the 1-1 split B25, B32 and drift audit
+  #3 all produced. `release-pipeline` gate 5 fell 10 → 8. But B33's own gate-4
+  warning fired: `release-pipeline` went 120,160 → 160,160, so the per-boundary
+  gradient now survives on `long-labels` alone. **The next thing to derive on
+  this line is the `SKIP_ROW_GAP_MAX` cap, not the predicate** - see B36.
   Gate 5's instrument is `tools/arrow-truth.mts`, which reads the vertices
   tldraw actually drew (the old model-based tracer matched 0 of 84 corpus arrows
   and was deleted at wake 32); the champion baseline is the table at the top of
-  `docs/layout-champion.md`, at 10/5/1/**10**/0/0/28 since wake 39 - seven files
-  now, in the alphabetical order the table uses (`release-pipeline` is the new
-  fourth column; no existing count moved).
+  `docs/layout-champion.md`, at 10/5/1/**8**/0/0/28 since wake 41 - seven files,
+  in the alphabetical order the table uses (`release-pipeline` is the fourth
+  column, and B33 is what moved it from 10 to 8).
 - **The judge may answer `WINNER: TIE`** since wake 33 (B29). Ties count as
   neither wins nor losses, and the ledger distinguishes a *judged tie* from a
   *structural tie* (a file never sent to a judge because nothing changed). The
@@ -1018,25 +1024,52 @@ Ordered. Take from the top. Strike through when resolved.
   additions only. Gate 5 baseline for the new file: **10** of 20 arrows. Ledger
   entry in `docs/layout-hypotheses.md`.
 
-- [ ] **B33** _(from B32's loss, wake 38)_ Widen a grid row boundary for **every**
-  edge that crosses it, not only for skip edges. B32's `long-labels` loss was
-  caused by exactly this hole: `router → orders` is flow-*adjacent*
-  (`|Δpos| = 1`) so it counts as no crossing, yet in a 2-column grid it lands in
-  different rows and the renderer draws it as a long diagonal - through the very
-  boundary B32 narrowed to 40px to pay for corridors elsewhere. The judge saw it:
-  *"forcing that same diagonal arrow through a cramped slot right against the box
-  edges"*. Note the asymmetry that makes this coherent rather than a reversal of
-  B25: `hasSkipEdge`'s flow-distance test is the right test for **whether** a
-  grid deserves widening at all (it breaks the `cols` circularity, see B25), and
-  the wrong test for **which boundary** gets it - by the time `skipRowGaps` runs,
-  `cols` is already resolved, so row membership is knowable and the weaker proxy
-  is no longer needed. Change only the crossing count, keep `hasSkipEdge` where
-  it is. **Watch gate 4**: counting every edge can only raise the counts, so on
-  `wide-fanout` more boundaries will saturate at the cap and the file may drift
-  back toward a flat ×4; if it does, the cap is what needs deriving, not the
-  predicate. Also watch for the second defect B32's judge named, which this does
-  not address: an unevenly rhythmed grid is itself a legibility cost, paid on
-  every boundary while the corridor benefit lands on only some.
+- [x] ~~**B33** _(from B32's loss, wake 38)_ Widen a grid row boundary for
+  **every** edge that crosses it, not only for skip edges.~~ **KEPT at wake 41.**
+  One condition deleted from `skipRowGaps`: crossing is now
+  `floor(from / cols) !== floor(to / cols)`, with `hasSkipEdge` and the
+  `preGap`/`bestGridCols` call site untouched. Exactly one boundary moved on each
+  changed file. `long-labels` widened the `router → orders` boundary 40 → 80 -
+  the exact edge B32 lost on - and **won** its blind A/B, the first time that
+  file has ever won a row-gap change. `release-pipeline` gate 5 **10 → 8**, but
+  judged a tie. `wide-fanout` was a structural tie: it has no flow-adjacent edge
+  that crosses a row boundary at all. 1 win, 0 losses, 1 judged tie.
+  **The gate-4 warning fired, on the wrong file** - `release-pipeline` went
+  120,160 → 160,160, i.e. flat ×4, so the per-boundary gradient B32 bought now
+  survives only on `long-labels`. The cap, not the predicate, is the next thing
+  to derive. Ledger entry in `docs/layout-hypotheses.md`.
+
+- [ ] **B36** _(from B33's gate-4 warning, wake 41)_ Derive `SKIP_ROW_GAP_MAX`
+  instead of hard-coding 4. B32 chose the cap by hand ("4 and not 3, so the
+  gradient stays visible on both files"), which was honest tuning against a
+  two-file corpus. B33 then widened the predicate and `release-pipeline`
+  immediately saturated both its boundaries, going 120,160 → 160,160: a flat ×4,
+  which is the degenerate case B32 picked the cap to avoid. The gradient now
+  exists on `long-labels` alone. Candidate derivation: make the cap relative
+  rather than absolute - scale each boundary by its share of the *maximum*
+  crossing count on that container (`1 + (rows - 1) * crossings / maxCrossings`,
+  or similar), so a grid whose boundaries are all equally busy gets a uniform
+  gap by construction instead of by saturation, and one with a hot boundary
+  still gets a gradient. **Measure before building** (B8's lesson): print the
+  per-boundary crossing counts for all three grid files under the B33 predicate
+  first, and abandon the derivation if the corpus turns out to be uniform rather
+  than graded. Watch gate 4 - a relative cap can raise the total as easily as
+  lower it.
+
+- [ ] **B35** _(deferred by drift audit #3 at wake 40, now due)_ Scale the row
+  corridor by **fan-out**, not only by crossings. Wake 40 wrote this up and
+  explicitly deferred filing it until B33 settled, on the grounds that B33 might
+  move the predicate first. B33 has settled, and it did move the predicate - but
+  only for `long-labels`; `wide-fanout` was a *structural tie* under B33 (it has
+  no flow-adjacent edge that crosses a row boundary at all), so the evidence
+  wake 40 collected is untouched by it. That evidence: three independent judge
+  pairs said `wide-fanout` wants vertical room because a 12-way fan needs
+  distinct arrow angles to stay traceable, while `long-labels` gains nothing
+  from gap it does not need. Neither B25's, B32's nor B33's predicate mentions
+  fan-out. Proposal: add the maximum out-degree of any node on the upper side of
+  a boundary as a second term in that boundary's corridor. **Sequence this after
+  B36** - stacking a new term on an unexamined cap is how B32's hand-tuned 4
+  became load-bearing in the first place.
 
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
@@ -1905,3 +1938,41 @@ anything that outlives the loop.)_
   audit over a completely different subset. Not a problem to fix - just the
   reason an audit result should never be quoted as "the champion is fine", only
   as "nothing that moved has regressed".
+
+- **(wake 41, from B33)** **The screenshot tool is deterministic within a run
+  but not across wakes, on one file.** Recording the champion for B33 found that
+  `release-pipeline`'s PNG regenerated at HEAD is byte-different from the one in
+  `docs/baselines/wake-40/pngs/` (173029 vs 173045 bytes, ~153k differing bytes)
+  while its geometry report is byte-identical to the wake-40 epoch. Three
+  consecutive regenerations in this wake all agreed with each other, and the
+  other six PNGs matched the epoch exactly, so this is not general flakiness -
+  it is one file, across runs. **This bites the drift audit specifically**,
+  because protocol step 5 uses PNG equality to decide which files are structural
+  ties: a file whose bytes move without its layout moving gets sent to a judge
+  for nothing, and worse, the judge is then comparing two renders of the *same*
+  layout and will decide on noise. Wake 45's audit should check whether
+  `release-pipeline` is a spurious voter before counting its verdict. Likely
+  cause is font or text-shaping state in chromium rather than layout, since the
+  file that differs is the one with the most wrapped labels; worth confirming
+  before trusting or fixing anything.
+
+- **(wake 41, from B33)** **Gate 5 and the judge disagreed, and gate 5 was
+  right.** `release-pipeline` lost two arrow-through-shape crossings (10 → 8)
+  and the judge returned a tie, citing "same 7 crossings" - which is the
+  *edge-edge* crossing count from the report, not gate 5's metric. Gate 5 has
+  not been printed in `layout-report.mts` since wake 28/32, so a judge reading
+  the report has no way to see it and the nearest-looking number in front of it
+  is a different metric entirely. This is a small, fixable mismatch: either put
+  the arrow-truth count back into the report the judge is handed, or accept that
+  a gate-5-only improvement will always read as a tie. Leaning toward the
+  former, but it is a protocol change and therefore its own wake.
+
+- **(wake 41, from B33)** **`wide-fanout` cannot see the flow-adjacent
+  predicate at all**, which narrows the placement corpus more than it looks.
+  Its only flow-adjacent edges are `hub → leaf-1` (positions 0→1) and
+  `mini-hub → mini-1` (19→20), and both pairs sit inside a single row of its
+  6-column grid, so B33's change was a structural tie there. The file that
+  drove the entire placement line of enquiry - and that supplies the wake-40
+  fan-out evidence behind B35 - is blind to the current predicate. Worth
+  remembering when a future wake reads a `wide-fanout` structural tie as "no
+  effect": on row-gap work it increasingly means "no *reachable* effect".

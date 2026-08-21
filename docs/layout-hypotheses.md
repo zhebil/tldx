@@ -2353,3 +2353,119 @@ context, and they split anyway, so the tally is not an assignment artefact.
 
 **Epoch saved:** `docs/baselines/wake-40/` - seven reports, seven PNGs,
 write-once. **Verified:** `npm run check` green, 38 files / 316 tests.
+
+---
+
+## B33 — every edge that crosses a row boundary widens it _(wake 41)_ — **KEPT**
+
+B32 spent the row corridor per boundary, scaled by how many *skip* edges cross
+it. Its `long-labels` loss named the hole precisely: `router → orders` is
+flow-*adjacent* (`|Δpos| = 1`) so it counted as no crossing, yet in a 2-column
+grid it lands in a different row and the renderer draws it as a long diagonal -
+through the very boundary B32 had narrowed to 40px to pay for corridors
+elsewhere. B33 drops the flow-distance test from the crossing count.
+
+**The diff.** `src/domain/layout/stack.ts`, +5/-4, and it is one condition:
+
+```diff
+-    if (from === undefined || to === undefined || Math.abs(from - to) <= 1) continue;
++    if (from === undefined || to === undefined) continue;
+```
+
+Crossing is now decided purely by `floor(from / cols) !== floor(to / cols)` -
+row membership, which is knowable here because `cols` is already resolved. The
+`gap * min(SKIP_ROW_GAP_MAX, 1 + crossings)` formula, `SKIP_ROW_GAP_MAX = 4`,
+and `hasSkipEdge` with its `preGap`/`bestGridCols` call site are all untouched.
+That asymmetry is the point and not an oversight: flow distance is the right
+proxy for **whether** a grid deserves widening (it breaks the `cols`
+circularity, see B25) and the wrong test for **which boundary** gets it. Tests:
+two new cases in `skipRowGaps`, one pinning that a flow-adjacent edge landing in
+a different row now widens, one pinning that a flow-adjacent edge staying inside
+a row still does not. All five pre-existing cases passed **unedited** - every
+edge in them already had `|Δpos| > 1`, so the two predicates agree on those
+inputs.
+
+**All five objective gates pass, and gate 5 improves again.**
+
+| corpus file | gate 5 champion | gate 5 B33 | canvas champion | canvas B33 | area |
+| --- | --- | --- | --- | --- | --- |
+| deep-nesting | 10 | 10 | 560 x 776 | 560 x 776 | 1.00× |
+| hexagonal | 5 | 5 | 1198 x 636 | 1198 x 636 | 1.00× |
+| long-labels | 1 | 1 | 1927 x 1362 | 1927 x 1402 | 1.03× |
+| release-pipeline | **10** | **8** | 1324 x 792 | 1324 x 832 | 1.05× |
+| sequence | 0 | 0 | 282 x 1360 | 282 x 1360 | 1.00× |
+| sparse-graph | 0 | 0 | 680 x 460 | 680 x 460 | 1.00× |
+| wide-fanout | 28 | 28 | 983 x 860 | 983 x 860 | 1.00× |
+
+Overlapping shape pairs 0 and source-order violations 0 on both changed files;
+edge-edge crossings unmoved (1 and 7). `npm run check` green, 38 files / 318
+tests. No corpus fixture was touched.
+
+**Exactly one boundary moved on each changed file**, and the two moves are not
+the same kind of move.
+
+| file | champion row gaps | B33 row gaps |
+| --- | --- | --- |
+| long-labels | 120, **40**, 120, 80, 40 | 120, **80**, 120, 80, 40 |
+| release-pipeline | **120**, 160 | **160**, 160 |
+
+`long-labels` boundary 1 is the `router → orders` boundary - the one the B32
+judge complained about, widened by exactly the edge B32 could not see. That is
+as direct a test of the hypothesis as the corpus can offer.
+
+**`wide-fanout` was a structural tie, and the reason is worth recording.** It has
+26 children over 6 columns, and its only flow-adjacent edges are `hub → leaf-1`
+(positions 0→1, both row 0) and `mini-hub → mini-1` (19→20, both row 3). Neither
+crosses a boundary, so widening the predicate found nothing new. The file that
+has driven the whole placement line of enquiry is blind to this change.
+
+| file | A | B | verdict | for the candidate |
+| --- | --- | --- | --- | --- |
+| long-labels | champion | candidate | B | **win** |
+| release-pipeline | candidate | champion | TIE | judged tie |
+
+1 win, 0 losses, 1 judged tie → **KEPT**. Five files were structural ties
+(report and PNG byte-identical) and never went to a judge.
+
+`long-labels` won on the mechanism: *"B leaves a full row gap between the
+rate-limiter/router row and the orders row, so the long diagonal
+router-to-orders arrow crosses open space instead of squeezing through the
+narrow 40px slot in A where it nearly grazes the rate-limiter box, making that
+edge easier to trace."* This is the first row-gap change in the loop's history
+that `long-labels` has *won*, and it breaks the 1-1 split that B25, B32 and
+drift audit #3 all produced. The wake-40 discovered-work entry read that split
+as "the effect is right, the predicate is wrong"; B33 changed the predicate and
+the split closed.
+
+**Three things this entry should not smooth over.**
+
+1. **`release-pipeline` degenerated to a flat ×4**, which is the exact failure
+   the B33 backlog entry told this wake to watch for - it predicted it on
+   `wide-fanout` and it happened here instead. Its two boundaries were 120, 160
+   and are now 160, 160, so on the corpus's only file with more than one
+   interior boundary the per-boundary gradient B32 bought has been spent back to
+   uniform. The gradient survives only on `long-labels`. As B33 said: if this
+   keeps happening, **the cap is what needs deriving, not the predicate**.
+2. **Gate 5 fell 10 → 8 on `release-pipeline` and the judge still called it a
+   tie.** The judge's sentence cites "same 7 crossings", which is the
+   *edge-edge* crossing count printed in the report - gate 5's arrow-through-
+   shape metric is not in the report at all (deleted at wake 28/32). So the
+   objective instrument and the eye disagreed on that file, and the tie is a
+   real "I cannot see it", not a confirmation. Two fewer arrows through a box is
+   a genuine improvement the judge had no way to attribute.
+3. **A judged tie is not a win.** The verdict rests on one file. It is a
+   stronger keep than B32's (which had a loss) but it is still a single voting
+   file carrying the decision, which is the standing weakness the wake-40 audit
+   flagged.
+
+**Screenshot non-determinism, found while recording the champion.** The
+`release-pipeline` PNG regenerated at HEAD is byte-different from the one saved
+in `docs/baselines/wake-40/pngs/` (173029 vs 173045 bytes, ~153k differing
+bytes) even though its geometry report is byte-identical to the wake-40 epoch.
+Three consecutive regenerations in this wake agreed with each other, so it is
+stable *within* a run but not *across* wakes, on this file only - the other six
+PNGs are byte-identical to the epoch. This matters because the drift audit uses
+PNG equality to decide which files are structural ties: a file that changes
+bytes without changing layout will be sent to a judge for no reason. Filed in
+discovered work; not chased here, because an audit is not this wake's unit of
+work.
