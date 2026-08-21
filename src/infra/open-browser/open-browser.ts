@@ -3,6 +3,9 @@
  * impl, no test variation worth a port abstraction. Tests pass a no-op into
  * `cli/serve`'s `openBrowser` dep instead of going through this module.
  *
+ * The tab opens unfocused where the platform allows it, so `tldsl serve` never
+ * steals the foreground from the terminal that started it.
+ *
  * Failures (binary missing, sandbox refusal, exit non-zero) are swallowed:
  * the CLI has already printed the URL on stdout, so the user can paste it
  * manually. We `unref()` the child so it never holds the parent process open
@@ -27,7 +30,8 @@ interface CommandShape {
 }
 
 function commandFor(url: string, platform: NodeJS.Platform): CommandShape {
-  if (platform === "darwin") return { cmd: "open", args: [url] };
+  // `-g` opens without raising the browser above the terminal you launched from.
+  if (platform === "darwin") return { cmd: "open", args: ["-g", url] };
   if (platform === "win32") return { cmd: "cmd", args: ["/c", "start", "", url] };
   return { cmd: "xdg-open", args: [url] };
 }

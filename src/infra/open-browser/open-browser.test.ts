@@ -49,10 +49,10 @@ function fakeSpawn(): {
 }
 
 describe("openBrowser", () => {
-  it("uses `open` on darwin", () => {
+  it("uses `open -g` on darwin so the browser does not steal focus", () => {
     const { spawn, calls } = fakeSpawn();
     openBrowser("http://example/", { spawn, platform: "darwin" });
-    expect(calls).toEqual([{ cmd: "open", args: ["http://example/"] }]);
+    expect(calls).toEqual([{ cmd: "open", args: ["-g", "http://example/"] }]);
   });
 
   it("uses `xdg-open` on linux", () => {
