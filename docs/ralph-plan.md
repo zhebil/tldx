@@ -766,14 +766,40 @@ Ordered. Take from the top. Strike through when resolved.
   (`long-labels`; the other five have no notes and are byte-identical), judge
   chose the candidate. Gate 4 passed on rendered extents and failed on reported
   ones - see the ledger entry, and the discovered-work item it filed.
-- [ ] **B24** _(restored from the revert pile, wake 26)_ Re-apply
+- [x] ~~**B24** _(restored from the revert pile, wake 26)_ Re-apply
   `docs/patches/b13-elbow-side-anchors.patch` - elbow arrows and automatic side
-  anchors, shipped together - and re-judge under the loosened verdict rule. B13
-  was reverted on 1 win / 1 loss / 4 ties where all four ties were files that
-  could not see the change; that outcome is now a KEEP. Its single loss
-  (`hexagonal`: elbow routing "cuts through the CLI box") is real, and is
-  exactly what B25 exists to fix - land B24 first so B25 has something to route
-  around. **EPIC.**
+  anchors, shipped together - and re-judge under the loosened verdict rule.~~
+  **REJECTED AT GATE 5** _(wake 29)_ - no judge spent. Gate 5 did not exist when
+  B13 was judged at wake 16; it was built at wake 19, and the restored patch
+  dies on it. `wide-fanout` goes 36 -> **45** `arrow paths crossing a
+  non-endpoint shape`, and the render corroborates the count: the orthogonal
+  router turns the hub's eighteen spokes into vertical trunks that run down the
+  inside of six `Worker` boxes, several of them sharing one trunk segment so the
+  individual edges stop being separable by eye. Gates 1-4 all passed and every
+  rect is byte-identical (this hypothesis does not touch layout). The finding is
+  that the effect is **topological and strong in both directions** - `hexagonal`
+  5 -> **0** and `deep-nesting` 10 -> 9, against `wide-fanout` 36 -> 45 - which
+  is the same container-level signal B20 used to gate the doc-root wrap, not the
+  per-edge geometric predicate B15 went looking for. Survives as **B27**.
+  Candidate patch refreshed against today's tree as
+  `docs/patches/b24-elbow-side-anchors.patch`. Ledger entry in
+  `docs/layout-hypotheses.md`.
+
+- [ ] **B27** _(successor to B24, wake 29)_ Gate elbow arrows and side anchors on
+  **container topology**, the way B20 gates the doc-root wrap. B24 measured a
+  clean split: the pair is a strict improvement where the container's children
+  form layers or a chain (`hexagonal` 5 -> 0, `deep-nesting` 10 -> 9) and a
+  strict regression where they form a fan (`wide-fanout` 36 -> 45). So emit
+  `kind: "elbow"` + a derived side anchor for an edge only when the container
+  holding both endpoints is not fan-shaped (no child whose out-degree exceeds a
+  small threshold), and leave `arc` + centre anchors everywhere else. **This is
+  not B15.** B15 gated per edge on whether the *chord* was clear, and failed
+  because the router draws an L, not a chord; B27 does not test geometry at all,
+  it tests the graph. `formsChain(childIds, edges)` and `collectAutoEdges` from
+  B20 already exist and are the obvious starting point - a fan predicate is
+  their mirror. Gate 5 measures the result directly; the target is `wide-fanout`
+  staying at 36 while `hexagonal` reaches 0. **EPIC** for the same reason B13
+  was: elbow and side anchors each lose alone.
 
 - [ ] **B25** _(new, wake 26)_ Routing lanes in **placement**. Every arrow
   hypothesis so far (B3, B4a, B13, B14, B15) changed how arrows *attach*; none
@@ -1411,3 +1437,18 @@ anything that outlives the loop.)_
   prints `labelW` next to `shapeW` for every box in a file, and the champion's
   `long-labels` numbers show boxes reserving a consistent 32px more than their
   label needs. Filed as **B26** in the backlog rather than done inline.
+
+- **(wake 29)** The step-9 drift audit has no baseline to audit against.
+  `docs/baselines/` does not exist and no epoch baseline has ever been saved, so
+  the first wake that runs an audit cannot compare anything - it can only
+  establish the epoch. Whichever wake that is: save
+  `docs/baselines/wake-NN/{reports,pngs}` for all six corpus files, record in
+  the ledger that the audit was vacuous this once, and note that the *next*
+  audit is the first real one. Do not skip it, and do not treat "nothing to
+  compare" as a passed audit.
+
+- **(wake 29)** Gate 5 excludes an arrow's own endpoint shapes by construction,
+  so a count of 0 does not mean the render is clean. `hexagonal`'s B24 candidate
+  scored 0 while still drawing arrows across box labels and into boxes from the
+  wrong side. If a future arrow hypothesis reaches 0 on a file, look at the PNG
+  before believing the file is solved.

@@ -1338,3 +1338,79 @@ the 168px text column are observed facts about tldraw, not heuristics, and
 (see B26).
 
 ---
+## B24 — B13 restored: elbow arrows + side anchors _(wake 29)_ — **REJECTED AT GATE 5**
+
+**Hypothesis.** `docs/patches/b13-elbow-side-anchors.patch` re-applied verbatim:
+`arrowShape()` emits `kind: "elbow"` instead of `"arc"`, and `emitEdge` derives
+each terminal's `normalizedAnchor` from a page-space rect map with
+`isPrecise: true`, picking the side the centre-to-centre ray exits. B13 was
+reverted at wake 16 on 1 win / 1 loss / 4 ties under the old verdict rule; under
+the loosened rule (wake 26) that same outcome is a KEEP, so the restoration was
+owed. **EPIC**, argued indivisible at wake 15.
+
+**It never reached a judge.** Gate 5 did not exist when B13 was judged - it was
+built at wake 19, three wakes after B13's verdict - and B24 dies on it.
+
+**Diff.** The saved patch applied with one trivial conflict (wake 28 added a
+note-`growY` test immediately above the edge test the patch renames; both kept).
+5 files, +216/-20, of which 119 lines are `emit.ts` and the rest are tests and
+the emit snapshot. Refreshed against today's tree and saved as
+`docs/patches/b24-elbow-side-anchors.patch` so the next attempt does not redo
+the merge.
+
+**Objective gates.**
+
+| gate | champion | candidate | |
+|---|---|---|---|
+| 1. `npm run check` | green | green | pass |
+| 2. overlapping shape pairs | 0 everywhere | 0 everywhere | pass |
+| 3. source-order violations | 0 | 0 | pass |
+| 4. canvas area | - | byte-identical on all six | pass |
+| 5. arrow paths crossing a non-endpoint shape | see below | see below | **FAIL** |
+
+| file | champion | candidate | |
+|---|---|---|---|
+| `deep-nesting` | 10 | 9 | better |
+| `hexagonal` | 5 | **0** | better |
+| `long-labels` | 1 | 1 | same |
+| `sequence` | 0 | 0 | same |
+| `sparse-graph` | 0 | 0 | same |
+| `wide-fanout` | 36 | **45** | **worse - rejects** |
+
+Layout is untouched by this hypothesis, so every rect is byte-identical on all
+six files; gate 5 is the only gate that can see the change at all, exactly as
+its own backlog entry predicted.
+
+**The render agrees with the metric, so the rejection stands.** This is an arrow
+hypothesis, so the count was checked against pixels before being trusted (B9's
+lesson, applied the other way round this time - the report could have been
+wrong in the candidate's favour). It is not. In `wide-fanout` the orthogonal
+router turns Dispatcher's eighteen spokes into vertical trunks that run *down
+the inside* of `Worker 1`, `Worker 2`, `Worker 7`, `Worker 8`, `Worker 13` and
+`Worker 14`, and horizontal legs that run through `Worker 6` and the `Task`
+row. Worse than the count suggests: several spokes share the same trunk
+segment, so the fan's individual edges stop being separable by eye at all. The
+champion's chords cross boxes too, but each one is a distinguishable line from
+hub to leaf.
+
+**What this establishes.** Two things.
+
+1. **The direction of the effect is topological, and it is strong in both
+   directions.** Elbow + side anchors is a *clear improvement* on layered
+   structure (`hexagonal` 5 → 0, `deep-nesting` 10 → 9) and a *clear
+   regression* on a fan (`wide-fanout` 36 → 45). Every previous arrow wake
+   (B3, B4a, B13, B14, B15) read this as noise or as an arrowhead artefact and
+   went looking for a per-edge geometric predicate. It is neither: it is the
+   same container-level topology signal B20 already used successfully to gate
+   the doc-root wrap. Survives as **B27**.
+2. **A restored hypothesis must re-clear today's gates, not the gates it was
+   judged under.** B24 was restored because the *verdict rule* had loosened; the
+   *gate set* had tightened in the same interval, and nobody checked. Restoring
+   anything from before wake 19 now costs a gate-5 measurement first.
+
+`hexagonal`'s candidate render is worth a look by whoever runs B27: its gate-5
+count is 0 and the picture is still not clean, because arrows to and from a
+box's *own* endpoints are excluded by construction and several of them are
+drawn over box labels. Gate 5 is a floor, not a certificate.
+
+---
