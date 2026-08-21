@@ -689,22 +689,69 @@ the design:
 
 ### Tasks
 
-- [ ] **T23. Promote `render` to a real CLI command.**
-  `tools/screenshot.mts` becomes `tldsl render <file> <out.png>`, built and
-  shipped like `check` and `serve`. Two constraints matter more than the move:
-  - **Reuse a running `serve` if there is one.** This is load-bearing, not an
-    optimisation - see T25. Cold-starting a server plus chromium is the whole
-    5-10 second cost; against a warm `serve` it is just a screenshot. Discovery
+- [ ] **T23. `tldsl render` - a real CLI command, cropped to content.**
+  `tools/screenshot.mts` becomes `tldsl render`, built and shipped like `check`
+  and `serve`. But do not port it as-is: the current approach is wrong.
+
+  **Stop screenshotting the viewport.** Today's tool sizes a 1600x1200 window,
+  presses `Shift+1` to zoom-to-fit, injects
+  `.tlui-layout { display: none }` to hide tldraw's own UI, then captures the
+  page. The output is viewport-shaped, so a diagram that is not 4:3 gets bands
+  of empty grid, and the whole thing depends on a zoom keystroke and a CSS hack
+  landing correctly.
+
+  tldraw exposes the right primitive directly:
+
+  ```ts
+  editor.toImage(shapes: TLShape[] | TLShapeId[], opts): Promise<{blob, width, height}>
+  ```
+
+  with `bounds`, `padding` (default 32), `scale`, `pixelRatio`, `background`,
+  `darkMode` and `format`. It crops to the requested shapes by construction - no
+  UI, no grid, no zoom-to-fit, no CSS injection, no viewport dependency.
+
+  **Surface:**
+  ```
+  tldsl render <file> <out.png> [options]
+    (default)        every shape on the page, tightly cropped
+    --frame <id>     one frame (confirm whether tldraw includes its children;
+                     if not, resolve descendants before calling)
+    --shapes <ids>   comma-separated shape ids
+    --padding <px>   default 32
+    --scale <n>
+    --format png|svg|jpeg|webp
+    --dark
+    --no-background
+  ```
+  **Pin `pixelRatio`.** It defaults to 2 for bitmap exports, and this plan
+  compares PNGs across revisions - an unpinned default makes output depend on a
+  library default that can change.
+
+  Getting the blob to Node: `toImage` returns a `Blob` in page context, so
+  transfer it out of `page.evaluate` as base64 or an array buffer and write it
+  from the CLI.
+
+  Two constraints that survive from the old approach:
+  - **Reuse a running `serve` if there is one.** Load-bearing, not an
+    optimisation - see T25. A browser still has to be running for tldraw to
+    render at all; against a warm `serve` this is one `evaluate` call. Discovery
     is part of the task: a pidfile or a well-known port record, not guessing.
-  - **playwright is a `devDependency`** and pulls browser binaries. Making it a
-    hard runtime dependency makes every install heavy for a feature not everyone
-    uses. Make it optional and fail with an actionable
-    `npx playwright install chromium` message.
+  - **playwright is a `devDependency`** and pulls browser binaries. Make it
+    optional and fail with an actionable `npx playwright install chromium`
+    message rather than making every install heavy.
+
   Keep `tools/screenshot.mts` working, or reduce it to a thin wrapper - this
   plan's own tasks depend on it.
-  **Acceptance:** `tldsl render` works from a built `dist/`, produces the same
-  PNG as the tools script, is measurably faster with a `serve` already running,
-  and errors usefully when playwright is absent.
+
+  **Acceptance:** the default crop is the content bounding box plus padding,
+  with zero empty grid and no tldraw UI in the image; `--frame` exports one
+  frame and its children and nothing else; output is byte-identical across two
+  runs of the same input. **And verify once that the export path agrees with
+  what the screen actually shows** - tldraw builds the export from shape records
+  rather than the mounted DOM, so compare a `toImage` result against an
+  old-style viewport screenshot on one fixture before trusting it. This plan
+  says "when the report and the pixels disagree, the pixels are right", and that
+  rule is only sound if the exported pixels are the screen's pixels.
 
 - [ ] **T24. The skill.**
   Teaches the vocabulary: the Phase 5 primitives, the Phase 3 styling props, the
