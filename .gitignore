@@ -14,3 +14,4 @@ build/
 *.db
 .beads-credential-key
 .claude
+.playwright-mcp/
