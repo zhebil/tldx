@@ -17,6 +17,28 @@ Branch: `ralph/jsx-layout`. Never work on `main`.
 
 ---
 
+## Standing decisions from the human
+
+These override any acceptance criterion below that contradicts them.
+
+- **A crossing is not automatically a defect.** Crossing counts are a proxy for
+  legibility, not the goal. Some crossings read perfectly well - a short chord
+  over a gap between boxes costs nothing, and forcing it to zero can cost more
+  in detours and stretched layout than it saves. Where a task's acceptance is a
+  crossing count, treat it as a direction of travel, not a contract: if the
+  render looks right and the number is short, tick the box, record the number,
+  and say the remaining crossings were judged acceptable. **Do not distort a
+  layout to reach a number.** The pixels decide.
+
+- **Frame title collisions are acceptable. Do not spend a task on them.** tldraw
+  draws frame titles itself, outside the geometry the layout controls, and their
+  size changes with zoom - so a title overlapping a neighbouring frame's edge is
+  not reliably fixable and not worth reserving space for. T8 already reserves
+  clearance where tldraw draws it; that is as far as this goes. Do not open
+  follow-up work on title overlap, and do not count it as a regression.
+
+---
+
 ## Why this file replaced the old one
 
 The previous regime ran 45 wakes of self-generated hypotheses, each judged by a
