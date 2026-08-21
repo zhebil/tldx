@@ -107,16 +107,16 @@ async function sizeElement(
 ): Promise<IRBoxPositioned | IRNotePositioned | IRFramePositioned> {
   switch (el.kind) {
     case "box": {
-      const size = estimatedBoxSize(el.label, el.maxW);
+      const size = estimatedBoxSize(el.label, el.maxW, el);
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
     }
     case "note": {
       if (el.sticky) {
-        const size = estimatedNoteSize(el.text);
+        const size = estimatedNoteSize(el.text, el);
         return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
       }
-      const w = el.w ?? fitBoxWidth(el.text);
-      const h = el.h ?? boxHeightForWidth(el.text, w);
+      const w = el.w ?? fitBoxWidth(el.text, undefined, el);
+      const h = el.h ?? boxHeightForWidth(el.text, w, el);
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w, h };
     }
     case "frame":
@@ -307,13 +307,13 @@ function applyContainerBoxSizing(
     for (const i of boxIdx) {
       const box = children[i] as IRBox;
       if (box.w !== undefined) continue;
-      sharedW = Math.max(sharedW, fitBoxWidth(box.label, box.maxW));
+      sharedW = Math.max(sharedW, fitBoxWidth(box.label, box.maxW, box));
     }
     for (const i of boxIdx) {
       const box = children[i] as IRBox;
       if (box.w !== undefined) continue;
       const w = box.maxW === undefined ? sharedW : Math.min(sharedW, box.maxW);
-      sized[i] = { ...sized[i]!, w, h: boxHeightForWidth(box.label, w) };
+      sized[i] = { ...sized[i]!, w, h: boxHeightForWidth(box.label, w, box) };
     }
     if (sharedW === 0) {
       for (const i of boxIdx) sharedW = Math.max(sharedW, sized[i]!.w);
@@ -326,7 +326,7 @@ function applyContainerBoxSizing(
     for (const i of geoNoteIdx) {
       const noteEl = children[i] as IRNote;
       if (noteEl.w !== undefined) continue;
-      sized[i] = { ...sized[i]!, w: sharedW, h: boxHeightForWidth(noteEl.text, sharedW) };
+      sized[i] = { ...sized[i]!, w: sharedW, h: boxHeightForWidth(noteEl.text, sharedW, noteEl) };
     }
   }
 

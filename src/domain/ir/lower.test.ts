@@ -263,7 +263,7 @@ describe("lower: ir/unknown-prop", () => {
     const [d] = diagnostics;
     expect(d!.code).toBe("ir/unknown-prop");
     expect(d!.message).toBe(
-      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash, textAlign, verticalAlign, labelColor)",
+      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash, textAlign, verticalAlign, labelColor, font, size)",
     );
     // column 3: fixture's synthetic per-attribute column for `lable`, the
     // second attribute after `id`.
@@ -513,6 +513,40 @@ describe("lower: text align / label color (T10)", () => {
 
   it("ir/invalid-style-value for an unknown labelColor on <box>", () => {
     const ast = doc({}, [box({ id: "a", labelColor: "puce" })]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+});
+
+describe("lower: font / size (T11)", () => {
+  it("captures font/size on <box>", () => {
+    const ast = doc({}, [box({ id: "a", font: "sans", size: "xl" })]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const boxIr = ir!.children[0]!;
+    if (boxIr.kind !== "box") throw new Error("expected box");
+    expect(boxIr.font).toBe("sans");
+    expect(boxIr.size).toBe("xl");
+  });
+
+  it("captures font/size on <note>", () => {
+    const ast = doc({}, [note({ id: "n", font: "mono", size: "s" }, "hi")]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const noteIr = ir!.children[0]!;
+    if (noteIr.kind !== "note") throw new Error("expected note");
+    expect(noteIr.font).toBe("mono");
+    expect(noteIr.size).toBe("s");
+  });
+
+  it("ir/invalid-style-value for an unknown font on <box>", () => {
+    const ast = doc({}, [box({ id: "a", font: "comic-sans" })]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+
+  it("ir/invalid-style-value for an unknown size on <note>", () => {
+    const ast = doc({}, [note({ id: "n", size: "xxl" }, "hi")]);
     const { codes } = lowerAst(ast);
     expect(codes).toEqual(["ir/invalid-style-value"]);
   });

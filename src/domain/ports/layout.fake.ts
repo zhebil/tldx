@@ -94,7 +94,7 @@ function placeBox(
   defaultX: number,
   defaultY: number,
 ): IRBoxPositioned {
-  const size = estimatedBoxSize(box.label);
+  const size = estimatedBoxSize(box.label, undefined, box);
   return {
     ...box,
     x: box.x ?? defaultX,
@@ -109,7 +109,7 @@ function placeNote(
   defaultX: number,
   defaultY: number,
 ): IRNotePositioned {
-  const size = estimatedNoteSize(note.text);
+  const size = estimatedNoteSize(note.text, note);
   return {
     ...note,
     x: note.x ?? defaultX,

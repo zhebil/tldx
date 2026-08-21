@@ -64,8 +64,8 @@ line number and the allowed list.
 |---|---|
 | `<Doc>` | `id`, `direction`, `layout`, `gap`, `pad`, `cols` |
 | `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h`, `color` |
-| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash`, `textAlign`, `verticalAlign`, `labelColor` |
-| `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `color`, `textAlign`, `verticalAlign`, `labelColor` |
+| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
+| `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `color`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
 | `<Edge>` | `id`, `from`, `to`, `color`, `dash`, `arrowheadStart`, `arrowheadEnd` |
 
 `x`/`y`/`w`/`h`/`gap`/`pad`/`cols`/`maxW` are numbers written as strings
@@ -105,6 +105,16 @@ component reads it. `<Edge>` has no `labelColor` - `arrowShape` always
 emits an empty label today (arrow labels land in a later task), so it would
 be dead code. `<Frame>` has none of these three - tldraw's frame shape
 props are exactly `{ w, h, name, color }`.
+
+`font`/`size` (T11) are raw tldraw text-style enums on `<Box>` and
+`<Note>`/`<Sticky>` only. Unlike the other style props, they *do* affect
+layout: label wrapping and box/note sizing key off tldraw's real per-glyph
+metrics for the chosen (font, size) pair (`domain/layout/glyph-metrics.ts`).
+`font` is `draw | sans | serif | mono`; `size` is `s | m | l | xl`, tldraw's
+`LABEL_FONT_SIZES` (18/22/26/32px). An unrecognized value is
+`ir/invalid-style-value`, same as the other style props. Default is
+`draw`/`m` (unchanged from before T11). `<Edge>` and `<Frame>` have neither
+- arrow labels and frame titles don't wrap through this path.
 
 ## Layout
 

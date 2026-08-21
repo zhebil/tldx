@@ -951,7 +951,7 @@ to come after Phase 1.
   label colours render correctly. The prop is right in the scene JSON; this is a
   tldraw export limitation, logged under Discovered work.
 
-- [ ] **T11. Font and size, with a per-(font, size) metric table.**
+- [x] **T11. Font and size, with a per-(font, size) metric table.**
   **This task invalidates the box-sizing fix if done naively.** `BOX_CHAR_PX =
   14` and `BOX_LINE_H = 30` in `src/domain/layout/defaults.ts` were measured for
   exactly one combination: `font: draw`, `size: m`. Exposing `font`
@@ -963,6 +963,76 @@ to come after Phase 1.
   **Acceptance:** for every (font, size), a label of known length renders on one
   line. Add a test that fails if a combination is missing from the table, so the
   next enum value cannot be added without measuring it.
+
+  **The table is four tables, not sixteen, and that is a measured result.**
+  All 16 combinations were measured in a real browser (`tools/font-metrics.mts`,
+  new - see below). Advance width scales *exactly* linearly with font size:
+  predicting any size from that font's size-`m` table times
+  `LABEL_FONT_PX[size] / 22` has a **max error of 0.001px** over every glyph of
+  every font. So `glyph-metrics.ts` stores one 95-glyph table per font at `m`
+  plus a scale factor, and `textWidth(s, ts)` applies it. Sixteen stored tables
+  would have been 1500 hand-maintained numbers for no accuracy.
+
+  **Two tldraw facts the task did not state, both verified in `node_modules`.**
+  (a) Box *and* note labels use `LABEL_FONT_SIZES` (`s:18 m:22 l:26 xl:32`), not
+  `FONT_SIZES` - checked in both `GeoShapeUtil.mjs` and `NoteShapeUtil.mjs`.
+  (b) Line height is exactly `fontSizePx * 1.35` (`TEXT_PROPS.lineHeight`);
+  measured 24.30 / 29.69 / 35.09 / 43.19. The old `BOX_LINE_H = 30` was
+  `ceil(22 * 1.35)` all along, so it became `lineHeightPx(ts)` and the constant
+  is gone. `BOX_PAD_Y` and `BOX_LABEL_PAD_X` stay constants - both are tldraw's
+  `LABEL_PADDING`, which does not scale with size.
+
+  **What was built.** `FONTS`/`FONT_SIZES` in `src/domain/ir/styles.ts`;
+  `DRAW`/`SANS`/`SERIF`/`MONO_ADVANCE` tables, `TextStyle`, `fontScale`,
+  `lineHeightPx` and a `(font, size)`-aware `textWidth` in `glyph-metrics.ts`;
+  an optional trailing `ts?: TextStyle` threaded through `wrapLineWidths`,
+  `boxHeightForWidth`, `fitBoxWidth`, `estimatedBoxSize` and `estimatedNoteSize`
+  in `defaults.ts`. `font`/`size` on `IRBox`/`IRNote`, read through T9's generic
+  `readEnum`, spread through `emitBox`/`emitNote`, and `boxShape`/`noteShape` in
+  `builders.ts` stopped hardcoding `size: "m"` / `font: "draw"`. The layout call
+  sites pass the element itself as the `TextStyle` - `IRBox` and `IRNote`
+  structurally *are* one - so `stack.ts` and `layout.fake.ts` changed by 9 lines
+  total. `<Edge>` was left alone; arrow labels are T12.
+
+  **The `draw` table was deliberately not re-measured into place.** The fresh
+  measurement agrees with it on **93 of 95 glyphs to 0.00px** and disagrees only
+  on `" "` (7.15 stored vs 7.62) and `"#"` (21.40 vs 21.63), both under-reserved
+  and both well inside `TEXT_SLACK_PX = 4`. Correcting them would move geometry
+  for a sub-pixel gain, so the table is pinned with a comment saying why.
+
+  **The numbers: scene JSON byte-identical across all eight corpus files**, so
+  `docs/renders/` and `docs/baseline.md` were untouched. That was verified
+  twice - the first check was worthless, see the tooling note. `npm run check`
+  green, 42 files / 428 tests (up from 403).
+
+  **Acceptance, checked.** `glyph-metrics.test.ts` iterates `FONTS x FONT_SIZES`
+  (imported, never hand-listed) and asserts `estimatedBoxSize("Gateway", …)` has
+  height exactly `lineHeightPx(ts) + 32` - one line - for all 16, plus a
+  coverage test asserting `Object.keys(ADVANCE)` equals `FONTS`. Deleting the
+  `mono` table was confirmed to fail 6 tests, so a fifth font cannot be added
+  without measuring it. Looked at the render of the new fixture
+  `tests/e2e/fixtures/fonts.tldsl.jsx`: all 16 boxes on one line each, all four
+  fonts visibly distinct, both notes correct.
+
+  **`tools/font-metrics.mts` is new and is the reason this is reproducible.**
+  `tools/text-metrics.mts` measures the labels a diagram happens to contain; it
+  cannot measure a font. The new tool prints the four tables as pasteable
+  TypeScript, and `--all` re-checks the linearity claim. It has to run inside
+  `tldsl serve`: tldraw's `--tl-font-*` variables are defined on
+  `.tl-container`, **not** on `document.body`. My first measurement appended its
+  probe to `document.body`, silently resolved all four fonts to Times, and
+  produced four identical, entirely plausible-looking tables. Nothing in the
+  output said so - the `resolved` font-family column was added afterwards
+  precisely so it cannot happen quietly again.
+
+  **A scratch verification tool passed while proving nothing.** The
+  before/after corpus dump I wrote called `compileFile(deps, path)` when the
+  real signature is `compileFile(path, deps)`. Every dump was `null` plus an
+  `fs/read-error`, so `diff -rq` compared eight identical files containing the
+  word `null` and reported success. Byte-identity was re-established properly
+  afterwards by stashing and re-dumping. Worth remembering: a byte-identity
+  check that never looks at a non-empty artefact is indistinguishable from a
+  passing one.
 
 - [ ] **T12. Arrow labels.**
   tldraw arrow shapes already carry a `text` prop; nothing exposes it. A diagram
@@ -1553,6 +1623,34 @@ as-is.
 
 ## Discovered work
 
+- **T11: `estimatedNoteSize` is still a char-count guess, now a scaled one.**
+  Sticky height reservation divides label length by
+  `(NOTE_SIZE - 2*NOTE_PAD) / (15 * fontScale)`. It is now size-aware but still
+  font-blind, so a `mono` sticky (13.20px/glyph) is over-reserved and a `serif`
+  one is closer to the edge. The machinery to do it properly - `textWidth` with
+  a `TextStyle` - now exists; only the willingness to move sticky geometry is
+  missing. Any wake that re-renders the corpus anyway could switch it for free.
+- **T11: `sans`, `serif` and `mono` share an identical 13.20px advance for
+  every digit and every math symbol.** Not a measurement bug - all three are
+  IBM Plex faces, whose digits and operators are 600/1000 units. `draw`
+  (Shantell Sans) has the same signature at 15.40px for `+ < = > _ ~` but real
+  per-digit widths. Anyone eyeballing the tables for "suspiciously uniform
+  numbers" will find these first; they are correct.
+- **T11: the `mono` table is 95 copies of `13.20`.** Kept in full so all four
+  fonts share one lookup path and one regeneration command. If a fifth
+  monospace font ever lands, a `uniform(13.2)` helper beats a second wall of
+  identical numbers.
+- **T11: nothing pins the glyph tables against tldraw's own fonts changing.**
+  A tldraw upgrade that reships `tldraw_sans` would silently invalidate all
+  four tables, and every test here is self-consistent - it would still pass.
+  `tools/font-metrics.mts` makes re-measuring cheap; wiring a check that
+  compares stored to measured (in a browser, so not in `npm run check`) is the
+  missing half.
+- **T11: `size` on a `<Box>` reads like a box dimension.** It is tldraw's name
+  for the label's font size, and per decision 9 the enum names pass through
+  raw - but `<Box size="xl" w="200">` is two different meanings of "size" one
+  attribute apart. Not changed, because renaming it would be the first place
+  the pipeline stops using tldraw's vocabulary.
 - **T10: `NoteShapeUtil.toSvg` drops `labelColor`.** Sticky label colour is
   correct in the scene JSON and honoured by the live viewer, but every PNG from
   `tools/screenshot.mts` derives sticky label colour from `props.color`. Any

@@ -430,6 +430,55 @@ describe("domain/emit: text align / label color pass-through (T10)", () => {
   });
 });
 
+describe("domain/emit: font / size pass-through (T11)", () => {
+  it("passes box font/size through, defaulting to draw/m", () => {
+    const scene = emit(
+      doc([
+        box({ id: "styled", x: 0, y: 0, w: 100, h: 50, font: "serif", size: "xl" }),
+        box({ id: "plain", x: 0, y: 0, w: 100, h: 50 }),
+      ]),
+    );
+    const styled = scene.store["shape:styled"]?.props as Record<string, unknown>;
+    expect(styled.font).toBe("serif");
+    expect(styled.size).toBe("xl");
+
+    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    expect(plain.font).toBe("draw");
+    expect(plain.size).toBe("m");
+  });
+
+  it("passes geo-note and sticky font/size through, defaulting to draw/m", () => {
+    const scene = emit(
+      doc([
+        note({ id: "n", text: "hi", x: 0, y: 0, w: 100, h: 50, font: "mono", size: "l" }),
+        note({
+          id: "s",
+          text: "hi",
+          x: 0,
+          y: 0,
+          w: 200,
+          h: 200,
+          sticky: true,
+          font: "sans",
+          size: "s",
+        }),
+        note({ id: "s2", text: "hi", x: 0, y: 0, w: 200, h: 200, sticky: true }),
+      ]),
+    );
+    const geoProps = scene.store["shape:n"]?.props as Record<string, unknown>;
+    expect(geoProps.font).toBe("mono");
+    expect(geoProps.size).toBe("l");
+
+    const stickyProps = scene.store["shape:s"]?.props as Record<string, unknown>;
+    expect(stickyProps.font).toBe("sans");
+    expect(stickyProps.size).toBe("s");
+
+    const plainSticky = scene.store["shape:s2"]?.props as Record<string, unknown>;
+    expect(plainSticky.font).toBe("draw");
+    expect(plainSticky.size).toBe("m");
+  });
+});
+
 // -- helpers ------------------------------------------------------------------
 
 const SPAN = { file: "test.tldsl", line: 1, column: 1 };
@@ -457,6 +506,8 @@ function box(input: {
   textAlign?: string;
   verticalAlign?: string;
   labelColor?: string;
+  font?: string;
+  size?: string;
 }): IRBoxPositioned {
   const { label, ...rest } = input;
   return {
@@ -480,6 +531,8 @@ function note(input: {
   textAlign?: string;
   verticalAlign?: string;
   labelColor?: string;
+  font?: string;
+  size?: string;
 }): IRNotePositioned {
   return {
     kind: "note",

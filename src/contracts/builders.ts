@@ -159,6 +159,8 @@ export function boxShape(
     textAlign?: string;
     verticalAlign?: string;
     labelColor?: string;
+    font?: string;
+    size?: string;
   },
 ): TLRecord {
   return {
@@ -172,8 +174,8 @@ export function boxShape(
       labelColor: input.labelColor ?? "black",
       fill: input.fill ?? "none",
       dash: input.dash ?? "draw",
-      size: "m",
-      font: "draw",
+      size: input.size ?? "m",
+      font: input.font ?? "draw",
       align: input.textAlign ?? "middle",
       verticalAlign: input.verticalAlign ?? "middle",
       url: "",
@@ -193,6 +195,7 @@ export function noteShape(
     textAlign?: string;
     verticalAlign?: string;
     labelColor?: string;
+    font?: string;
   },
 ): TLRecord {
   return {
@@ -202,7 +205,7 @@ export function noteShape(
       color: input.color ?? "yellow",
       labelColor: input.labelColor ?? "black",
       size: input.size ?? "m",
-      font: "draw",
+      font: input.font ?? "draw",
       fontSizeAdjustment: 0,
       align: input.textAlign ?? "middle",
       verticalAlign: input.verticalAlign ?? "middle",

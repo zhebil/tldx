@@ -5,6 +5,8 @@ import type {
   StyleColor,
   StyleDash,
   StyleFill,
+  StyleFont,
+  StyleFontSize,
   StyleTextAlign,
   StyleVerticalAlign,
 } from "./styles.js";
@@ -74,6 +76,8 @@ export type IRBox = IRBase & {
   textAlign?: StyleTextAlign;
   verticalAlign?: StyleVerticalAlign;
   labelColor?: StyleColor;
+  font?: StyleFont;
+  size?: StyleFontSize;
 };
 
 export type IRNote = IRBase & {
@@ -92,6 +96,8 @@ export type IRNote = IRBase & {
   textAlign?: StyleTextAlign;
   verticalAlign?: StyleVerticalAlign;
   labelColor?: StyleColor;
+  font?: StyleFont;
+  size?: StyleFontSize;
 };
 
 export type IREdge = IRBase & {

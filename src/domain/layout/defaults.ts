@@ -5,26 +5,24 @@
  * same input - the contract is "no DOM, deterministic, identical sizes".
  *
  * Box sizing is three passes against measured tldraw text metrics
- * (`glyph-metrics.ts`: per-glyph advance widths, 32px total label padding,
- * 29.69px line height): `fitBoxWidth` picks each label's natural, unwrapped
- * width, bounded by `BOX_ASPECT_TARGET` rather than a pixel cap so long
- * labels wrap onto more lines instead of growing arbitrarily wide;
- * `layoutContainer` (in `stack.ts`) then picks one shared width (`col`,
- * `grid`) or height (`row`) across a container's flowed boxes; and
- * `boxHeightForWidth` re-wraps each label to that shared width for its final
- * height. A real greedy wrap never splits a word mid-line. Browser-side
- * re-measurement is deferred (issue tldsl-6ek out-of-scope).
+ * (`glyph-metrics.ts`: per-(font, size) advance widths, `lineHeightPx`):
+ * `fitBoxWidth` picks each label's natural, unwrapped width, bounded by
+ * `BOX_ASPECT_TARGET` rather than a pixel cap so long labels wrap onto more
+ * lines instead of growing arbitrarily wide; `layoutContainer` (in
+ * `stack.ts`) then picks one shared width (`col`, `grid`) or height (`row`)
+ * across a container's flowed boxes; and `boxHeightForWidth` re-wraps each
+ * label to that shared width for its final height. A real greedy wrap never
+ * splits a word mid-line. Browser-side re-measurement is deferred (issue
+ * tldsl-6ek out-of-scope).
  */
 
-import { textWidth } from "./glyph-metrics.js";
+import { fontScale, lineHeightPx, textWidth, type TextStyle } from "./glyph-metrics.js";
 
 const BOX_PAD_Y = 16;
 const BOX_MIN_W = 120;
 
-/** tldraw's own box label padding, measured: every wrapped label reports labelW === shapeW - 32. */
+/** tldraw's `LABEL_PADDING` - size-independent, so this stays a constant. Measured: every wrapped label reports labelW === shapeW - 32. */
 const BOX_LABEL_PAD_X = 32;
-/** Measured line height (29.69px), rounded up for integer geometry. */
-const BOX_LINE_H = 30;
 /**
  * Max width:height ratio a box may take before wrapping onto another line
  * instead. Tuned from renders: 4 forced every label in `sequence` onto two
@@ -75,7 +73,7 @@ export function isAlign(s: string): s is Align {
 }
 
 /** Greedy word-wrap: rendered width of each resulting line, given a usable content width in px. */
-function wrapLineWidths(text: string, maxContentW: number): number[] {
+function wrapLineWidths(text: string, maxContentW: number, ts?: TextStyle): number[] {
   const words = text.split(/\s+/).filter((w) => w.length > 0);
   if (words.length === 0) return [0];
 
@@ -83,14 +81,14 @@ function wrapLineWidths(text: string, maxContentW: number): number[] {
   let curWords: string[] = [];
   for (const word of words) {
     const candidate = curWords.length === 0 ? word : `${curWords.join(" ")} ${word}`;
-    if (curWords.length > 0 && textWidth(candidate) > maxContentW) {
-      lineWidths.push(textWidth(curWords.join(" ")));
+    if (curWords.length > 0 && textWidth(candidate, ts) > maxContentW) {
+      lineWidths.push(textWidth(curWords.join(" "), ts));
       curWords = [word];
     } else {
       curWords.push(word);
     }
   }
-  lineWidths.push(textWidth(curWords.join(" ")));
+  lineWidths.push(textWidth(curWords.join(" "), ts));
   return lineWidths;
 }
 
@@ -98,9 +96,9 @@ export function boxWidthForContent(contentW: number): number {
   return Math.max(BOX_MIN_W, Math.ceil(contentW) + BOX_LABEL_PAD_X);
 }
 
-export function boxHeightForWidth(label: string | undefined, w: number): number {
-  const lines = wrapLineWidths(label ?? "", w - BOX_LABEL_PAD_X).length;
-  return lines * BOX_LINE_H + BOX_PAD_Y * 2;
+export function boxHeightForWidth(label: string | undefined, w: number, ts?: TextStyle): number {
+  const lines = wrapLineWidths(label ?? "", w - BOX_LABEL_PAD_X, ts).length;
+  return lines * lineHeightPx(ts) + BOX_PAD_Y * 2;
 }
 
 /**
@@ -110,17 +108,18 @@ export function boxHeightForWidth(label: string | undefined, w: number): number 
  * longest *resulting* line (never a raw search budget), so a label never
  * splits mid-word.
  */
-export function fitBoxWidth(label: string | undefined, maxW?: number): number {
+export function fitBoxWidth(label: string | undefined, maxW?: number, ts?: TextStyle): number {
   const text = label ?? "";
 
   if (maxW !== undefined) {
     const budget = Math.max(1, maxW - BOX_LABEL_PAD_X);
-    return boxWidthForContent(Math.max(...wrapLineWidths(text, budget)));
+    return boxWidthForContent(Math.max(...wrapLineWidths(text, budget, ts)));
   }
 
   const wordCount = text.split(/\s+/).filter((w) => w.length > 0).length;
   const maxLines = Math.max(1, wordCount);
-  const hiBudget = Math.max(1, Math.ceil(textWidth(text)));
+  const hiBudget = Math.max(1, Math.ceil(textWidth(text, ts)));
+  const lineH = lineHeightPx(ts);
 
   let lastW = boxWidthForContent(0);
   for (let n = 1; n <= maxLines; n++) {
@@ -128,11 +127,11 @@ export function fitBoxWidth(label: string | undefined, maxW?: number): number {
     let hi = hiBudget;
     while (lo < hi) {
       const mid = Math.floor((lo + hi) / 2);
-      if (wrapLineWidths(text, mid).length <= n) hi = mid;
+      if (wrapLineWidths(text, mid, ts).length <= n) hi = mid;
       else lo = mid + 1;
     }
-    const w = boxWidthForContent(Math.max(...wrapLineWidths(text, lo)));
-    const h = n * BOX_LINE_H + BOX_PAD_Y * 2;
+    const w = boxWidthForContent(Math.max(...wrapLineWidths(text, lo, ts)));
+    const h = n * lineH + BOX_PAD_Y * 2;
     lastW = w;
     if (w <= BOX_ASPECT_TARGET * h) return w;
   }
@@ -142,21 +141,28 @@ export function fitBoxWidth(label: string | undefined, maxW?: number): number {
 export function estimatedBoxSize(
   label: string | undefined,
   maxW?: number,
+  ts?: TextStyle,
 ): {
   w: number;
   h: number;
 } {
-  const w = fitBoxWidth(label, maxW);
-  return { w, h: boxHeightForWidth(label, w) };
+  const w = fitBoxWidth(label, maxW, ts);
+  return { w, h: boxHeightForWidth(label, w, ts) };
 }
 
 /**
  * A deliberately generous upper bound over a naive character wrap - real
  * tldraw text metrics wrap differently, but never past this reservation.
  * Emit turns the reserved height into `growY` so the drawn sticky matches.
+ * The bound scales with `size` (via `fontScale`) but stays font-independent
+ * - it's a crude char-count budget, not a real per-glyph measurement.
  */
-export function estimatedNoteSize(text: string | undefined): { w: number; h: number } {
-  const perLine = Math.max(1, Math.floor((NOTE_SIZE - NOTE_PAD * 2) / NOTE_CHAR_PX));
+export function estimatedNoteSize(
+  text: string | undefined,
+  ts?: TextStyle,
+): { w: number; h: number } {
+  const scale = fontScale(ts);
+  const perLine = Math.max(1, Math.floor((NOTE_SIZE - NOTE_PAD * 2) / (NOTE_CHAR_PX * scale)));
   const lines = Math.ceil((text ?? "").length / perLine);
-  return { w: NOTE_SIZE, h: Math.max(NOTE_SIZE, lines * NOTE_LINE_H + NOTE_PAD * 2) };
+  return { w: NOTE_SIZE, h: Math.max(NOTE_SIZE, lines * (NOTE_LINE_H * scale) + NOTE_PAD * 2) };
 }

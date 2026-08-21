@@ -53,3 +53,9 @@ export type StyleTextAlign = (typeof TEXT_ALIGNS)[number];
 
 export const VERTICAL_ALIGNS = ["start", "middle", "end"] as const;
 export type StyleVerticalAlign = (typeof VERTICAL_ALIGNS)[number];
+
+export const FONTS = ["draw", "sans", "serif", "mono"] as const;
+export type StyleFont = (typeof FONTS)[number];
+
+export const FONT_SIZES = ["s", "m", "l", "xl"] as const;
+export type StyleFontSize = (typeof FONT_SIZES)[number];
