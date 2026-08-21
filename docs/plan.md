@@ -2090,7 +2090,7 @@ only test it gets against material T24 did not choose.
   (59 files / 657 tests, unchanged); no geometry moved, so `docs/renders/` and
   `docs/baseline.md` are untouched.
 
-- [ ] **T28. TCP connection lifecycle.**
+- [x] **T28. TCP connection lifecycle.**
   The three-way handshake, data transfer, and the four-way teardown, as a
   sequence between two participants - SYN, SYN-ACK, ACK, then FIN, ACK, FIN, ACK,
   with the state names (`SYN_SENT`, `ESTABLISHED`, `TIME_WAIT`) on the
@@ -2103,6 +2103,37 @@ only test it gets against material T24 did not choose.
   what is missing.
   **Acceptance:** `examples/tcp-lifecycle.tldsl.jsx` exists, `tldsl check` is
   clean, the PNG has been looked at, and every gap is in the ledger.
+
+  `examples/tcp-lifecycle.tldsl.jsx` exists and `tldsl check` is clean: two
+  lanes, ten instants each, the eight segments as horizontal arrows, and the
+  lifelines drawn as headless dotted `<Edge>`s between consecutive states -
+  `arrowheadStart="none" arrowheadEnd="none"` turns out to be enough for a
+  lifeline, so no primitive was needed for that. The PNG was rendered three
+  times and read each time; the final one is a correct, legible sequence
+  diagram.
+
+  **Four entries, D1-D4, with repros under `examples/repro/`.** D1 is the
+  blocker and it is the archetype's whole problem: N arrows between the same
+  pair of shapes are routed identically, so eight TCP segments render as one
+  arrow with the labels overprinted into a smear (`SYN`/`SYN-ACK`/`ACK` came out
+  as `SYNKACK`), and `check` says nothing. The shipped diagram works around it
+  by giving every message its own row of duplicated state boxes - ten rows,
+  twenty-two boxes - which is why it is 2052px tall for a nine-message exchange.
+  D2 (unnamed `<Row>`/`<Col>`/`<Grid>` caption themselves "Frame" - three stray
+  captions in the first render), D3 (an attached `<Note>` covers the arrow, its
+  label and the server's `CLOSED` box outright, so the PNG omits a state), D4
+  (`layout="grid"` has one `gap` for both axes, `rowGap` is `ir/unknown-prop`;
+  the first render was 7193px tall from 160px of dead space per row).
+
+  Two authoring choices, both kept inside the "may not touch `src/`" rule. D2
+  and D4 were worked around *in the diagram* because each has a documented
+  alternative component - `<Group layout="col">` for the chrome, nested
+  `<Col>`s in a `<Row>` for the per-axis gap - so the ledger keeps the evidence
+  in the repro and the example ships the good diagram. D3 was **not** worked
+  around: the note stays where a reader wants it, covering `server-ack2`, so the
+  example carries the defect visibly until a fix task drains it. `npm run check`
+  green; no `src/` touched, so `docs/renders/` and `docs/baseline.md` are
+  unchanged.
 
 - [ ] **T29. TCP state machine.**
   The eleven-state diagram - `CLOSED`, `LISTEN`, `SYN_RCVD`, `SYN_SENT`,
@@ -2571,6 +2602,26 @@ as-is.
   would have been a program.
 
 ## Discovered work
+
+- **A render wrote an overlay file I never asked for, once.** The first
+  `tools/screenshot.mts` run over `examples/tcp-lifecycle.tldsl.jsx` left an
+  `examples/tcp-lifecycle.tldsl.overlay.json` behind containing eight `moved`
+  entries - tldraw reparenting the eight arrow shapes into `shape:ladder` -
+  which then produced `overlay/unresolved-id` warnings against the next edit of
+  the source. It did **not** reproduce: deleting it and re-rendering the same
+  file produced no overlay, and a from-scratch grid-plus-eight-arrows diagram
+  under `examples/repro/` produced none either. Not logged as a defect because
+  an unreproducible one is not a defect yet, but if `render` or `serve` can
+  persist tldraw's own automatic reparenting as author edits, that is a
+  correctness problem in the absorb path worth a deliberate hunt.
+- **`check` cannot see a diagram that lost information.** D1 and D3 both render
+  something false and both pass `check` silently. A post-layout diagnostic for
+  "two edges share a path" and "a shape is fully covered by a note" would catch
+  the two worst findings of this wake before anyone looks at a PNG.
+- **An arrow has no rank.** Even with D1 fixed, nothing in the vocabulary says
+  message 3 comes after message 2. Sequence diagrams number their messages; a
+  fix that only separates the paths will still leave the reader to infer order
+  from geometry.
 
 - **T23: rendering a diagram writes an overlay file into the repo.** Every
   `tldsl render` (and every `tools/screenshot.mts`) boots the viewer, and the
