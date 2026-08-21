@@ -164,6 +164,51 @@ Two traps, both paid for already:
 
 ## Tasks
 
+### Phase 0 - sizing, before anything measures anything
+
+- [ ] **T0. Container-aware box sizing. Do this first.**
+  `estimatedBoxSize(label)` is a pure function of one string. It cannot see a
+  box's siblings, so it has to guess both dimensions from text alone, and
+  `BOX_MAX_W` is the workaround: with no other information available, a constant
+  is the only thing that stops a 94-character label becoming a 1348x62 ribbon.
+
+  The cap is not a design decision, it is a symptom. The measured consequence is
+  ragged containers - `hexagonal`'s "Driven ports" column is seven boxes stacked
+  vertically with seven different widths: 172, 158, 200, 228, 144, 214, 120.
+  Every column in the corpus has uneven edges on both sides.
+
+  Replace the single-string estimate with three passes:
+  1. **Natural width** per label - unwrapped text width from the measured
+     metrics, no cap.
+  2. **The container picks one shared content width.** A `col` gives every child
+     the same width; a `row` gives every child the same height. The shared width
+     is the widest natural width in the container, bounded by an **aspect
+     target** rather than a pixel constant - if the widest child would exceed the
+     target ratio (start at 4:1 w:h and tune from renders), wrap it instead.
+  3. **Wrap each label to the shared width**, compute per-child height, take the
+     container maximum.
+
+  Delete `BOX_MAX_W`. The only constant left is a ratio, and a ratio is
+  scale-invariant - there is no 320-vs-480-vs-640 conversation to have again.
+
+  Fold in two loose ends while here:
+  - **`BOX_MIN_H` is dead.** It is 60, but the height formula is
+    `lines * 30 + 32`, which is 62 for a single line, so the minimum can never
+    bind. Delete it or set it to something deliberate.
+  - **Author intent must still win.** `w` and `h` are already in
+    `ALLOWED_PROPS` for `box` and have to override all of the above. Add `maxW`
+    for a per-box wrap point.
+
+  This has to be finished before T1, because T1 locks a baseline and every
+  number in it depends on box geometry. Changing sizing after the baseline is
+  exactly the mistake that wasted the previous 45 wakes.
+
+  **Acceptance:** in every corpus file, a `col`'s children share a width to the
+  pixel and a `row`'s children share a height; no label wraps mid-word,
+  verified against a real render with `text-metrics.mts`; no box exceeds the
+  aspect target unless the author pinned `w`. Look at the PNGs - this changes
+  every file, including the two the cap never touched.
+
 ### Phase 1 - stop arrows crossing shapes
 
 - [ ] **T1. Regenerate the baseline.**
@@ -523,10 +568,10 @@ trick: the lossless part is mechanical, the lossy part is supervised.
 Do not act on these. They are the discussion surface; they get resolved into
 tasks above by the human, not by the loop.
 
-1. **`BOX_MAX_W = 320` is arbitrary.** It is the cap that turns a
-   paragraph-length label into a block instead of a 1300px ribbon. At 320,
-   `long-labels`' sentences wrap to about five lines. Wider means fewer lines
-   and a wider canvas. Nobody has looked at 480 or 560.
+1. ~~**`BOX_MAX_W = 320` is arbitrary.**~~ **Answered:** the cap should not
+   exist. It is a workaround for sizing being context-free, and the fix is
+   container-aware sizing with an aspect target - see T0, which deletes the
+   constant outright.
 
 2. **Should `layout="auto"` (ELK) come back for graph-shaped input?** ELK solves
    same-axis skips by construction - it assigns layers and routes between them.
@@ -539,9 +584,8 @@ tasks above by the human, not by the loop.
    real sentence a twenty-line column. A geo shape with a warm fill would look
    like a note and size like a box. This changes what `<Note>` emits.
 
-4. **Should `BOX_MIN_H` exist?** It is 60, but the height formula is
-   `lines * 30 + 32`, which is 62 for a single line, so the minimum never binds.
-   Either it is dead and should go, or the intent was a taller minimum.
+4. ~~**Should `BOX_MIN_H` exist?**~~ **Answered:** it is dead code - the
+   height formula never goes below it. Folded into T0.
 
 5. **Which primitives are actually worth having (T15, T16)?** The list in those
    tasks is a guess. The useful question is which archetypes get drawn often
