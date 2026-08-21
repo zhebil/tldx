@@ -51,6 +51,11 @@ verdict for yourself.
   in this loop. Never push. Never touch `main`.
 - **One unit of work per wake.** The loop's value is in small reversible steps
   with a written record. Batching destroys both.
+- **Keeping is the default.** A candidate that clears the objective gates is
+  kept unless the judge finds it *worse* on more files than it wins. Ties, and
+  files that cannot see the change, are keeps. Do not revert on a neutral
+  result - 10 of the first 12 judged hypotheses were reverted under the old
+  strict rule and the rendered output never changed.
 - **Never edit corpus fixtures to make a hypothesis win.** That is the one
   failure mode that silently invalidates everything downstream of it.
 - **Judge on pixels, not on the report.** `tools/screenshot.mts <file> <out.png>`

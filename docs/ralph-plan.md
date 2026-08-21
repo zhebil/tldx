@@ -421,8 +421,27 @@ One hypothesis per wake. Never batch. Never stop.
    the geometry report disagree, the render is the truth.** The report describes
    what layout intended; the PNG shows what tldraw actually drew.
 
-6. **Verdict.** Candidate becomes champion iff it wins strictly more files than
-   it loses. Ties go to the champion (bias toward not churning).
+   **Only files that actually changed get a vote.** Before judging, compare each
+   file's candidate geometry report and PNG against the champion's. Identical on
+   both → structural tie, never sent to a judge, no vote. A change that touches
+   two of six corpus files must not have to win over the four that cannot see
+   it.
+
+6. **Verdict — keep unless the judge says it is worse.** Count only the voting
+   files from step 5.
+
+   - Losses **strictly greater than** wins → **REVERT**.
+   - Everything else - more wins, equal wins and losses, or no voting files at
+     all → **KEEP**.
+
+   This inverts the burden of proof deliberately. The five objective gates
+   already block measurable breakage, so the judge's job is to catch the
+   regressions the metrics miss, **not** to certify improvements. Under the old
+   rule (strictly more wins, ties to the champion) 10 of 12 judged hypotheses
+   were reverted and the rendered output did not change across 13 wakes; B13
+   scored 1 win, 1 loss and 4 blind ties and was thrown away. A loop that
+   reverts almost everything learns almost nothing, and small real gains never
+   get the chance to compound.
 
 7. **Record.** Append to `docs/layout-hypotheses.md`: the hypothesis, the diff
    summary, gate results, per-file verdicts with the judge's reasoning, and
@@ -431,6 +450,16 @@ One hypothesis per wake. Never batch. Never stop.
 
 8. **Commit.** Kept → commit the change plus the ledger entry. Reverted →
    commit the ledger entry alone. Either way the wake ends with a commit.
+
+9. **Drift audit — every fifth wake, before step 1.** Keeping by default trades
+   a revert-everything failure mode for a slow-decay one, so it needs a ratchet.
+   Blind-A/B the current champion against the epoch baseline saved five wakes
+   ago, all six files. If the *older* baseline wins more files than it loses,
+   the loop has drifted: record it, and make the next wake's unit of work
+   bisecting the ledger for the change responsible and reverting it. Either way,
+   save a fresh epoch baseline (reports + PNGs) under `docs/baselines/wake-NN/`
+   and note the audit in the ledger. An audit wake counts as that wake's unit of
+   work - do not also run a hypothesis.
 
 ### Rendering for judgement
 
@@ -470,9 +499,31 @@ rather than falling back to text-only judging.
   they invalidate the champion report (regenerate it).
 - **Never let the judge see which side is the candidate.**
 - One hypothesis per wake even if it looks trivial.
-- If a hypothesis needs more than ~200 LOC, split it and put the pieces at the
-  top of the backlog.
+- **One causal claim per wake, revertible as a unit.** There is no line-count
+  cap - size was never the point. What matters is that the ledger entry stays
+  evidence: a wake changes one thing, and the verdict attributes to that one
+  thing. A diff that mixes spacing *and* anchors *and* note sizing produces a
+  verdict that means nothing, and under keep-by-default it gets absorbed whole,
+  good parts and bad parts together, with no signal that anything was wrong.
+  The drift audit's remedy is "bisect the ledger", which only works if entries
+  are individually meaningful.
+- **Bundle only when the parts are known to fail separately, and say why in the
+  ledger.** Isolating one variable is the right default, but it is wrong when
+  the variables only work together: B3 (elbow) and B4a (side anchors) each lost
+  alone for mirror-image reasons, and B13 established they have to ship as one.
+  A backlog entry marked **EPIC** is one that has already been argued to be
+  indivisible; it may also span wakes by saving a patch under `docs/patches/`
+  and picking it up next wake.
+- A diff running past a few hundred lines is a *signal*, not a violation -
+  usually it means two claims got bundled without noticing. Check, and split if
+  that is what happened.
 - Objective gates run before the judge, always. Pretty-but-broken never wins.
+- **Keeping is the default.** Revert only on a gate failure or a judged
+  regression. Neutral is a keep.
+- **A reverted hypothesis may be restored** when the rule that rejected it has
+  changed, or when a later wake removes the blocker its ledger entry named. Say
+  so explicitly in the new backlog entry, cite the original entry, and re-judge
+  from scratch - never resurrect one silently.
 - **The report models layout; the PNG shows the render. The PNG wins.** Never
   conclude anything about text fit, note size, or arrow paths from the report
   alone - those are renderer behaviour, and the report does not simulate them.
@@ -704,6 +755,27 @@ Ordered. Take from the top. Strike through when resolved.
   survives as **B22**/**B23**. Ledger entry in `docs/layout-hypotheses.md`.
 - [ ] **B9** Note sizing: notes reserve a fixed 200×80 in layout but tldraw
   resizes stickies to fit, so reserved space and rendered space disagree.
+
+- [ ] **B24** _(restored from the revert pile, wake 26)_ Re-apply
+  `docs/patches/b13-elbow-side-anchors.patch` - elbow arrows and automatic side
+  anchors, shipped together - and re-judge under the loosened verdict rule. B13
+  was reverted on 1 win / 1 loss / 4 ties where all four ties were files that
+  could not see the change; that outcome is now a KEEP. Its single loss
+  (`hexagonal`: elbow routing "cuts through the CLI box") is real, and is
+  exactly what B25 exists to fix - land B24 first so B25 has something to route
+  around. **EPIC.**
+
+- [ ] **B25** _(new, wake 26)_ Routing lanes in **placement**. Every arrow
+  hypothesis so far (B3, B4a, B13, B14, B15) changed how arrows *attach*; none
+  changed where boxes *sit*. Layout still packs children at a flat 40px gap, so
+  an orthogonal arrow has no corridor and must cross a box - the champion
+  carries **52** `arrow paths crossing a non-endpoint shape` across the corpus,
+  36 of them in `wide-fanout` alone. tldraw cannot accept a computed route (an
+  arrow is two endpoints plus one scalar; see `docs/jsx-pivot.md`), so placement
+  is the only lever left. When a container's children carry an edge that skips a
+  neighbour, widen the gap on the axis that edge must traverse. Gate 5 measures
+  the result directly. **EPIC.**
+
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
 - [x] ~~**B12** Retry B3 (default arrow `kind: "elbow"`) *after* B4 lands.
