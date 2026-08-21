@@ -23,7 +23,7 @@ export async function withServedDiagram<T>(
     await run("npm", ["run", "build:viewer"], REPO_ROOT);
   }
 
-  const child = spawn(resolve(REPO_ROOT, "node_modules", ".bin", "tsx"), ["src/cli/main.ts", "serve", file], {
+  const child = spawn(resolve(REPO_ROOT, "node_modules", ".bin", "tsx"), ["src/cli/main.ts", "serve", file, "--no-open"], {
     cwd: REPO_ROOT,
     stdio: ["ignore", "pipe", "pipe"],
   });

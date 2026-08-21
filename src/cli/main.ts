@@ -100,10 +100,11 @@ const commands: readonly Command[] = [
   },
   {
     name: "serve",
-    args: "<file>",
+    args: "<file> [--no-open]",
     description: "watch a .tldsl or .tldsl.jsx file and serve the live viewer locally",
     run: async (rest, io) => {
-      const path = rest[0];
+      const noOpen = rest.includes("--no-open");
+      const path = rest.find((arg) => !arg.startsWith("--"));
       if (path === undefined) {
         io.writeStderr("tldsl serve: missing <file> argument\n");
         return 1;
@@ -119,7 +120,7 @@ const commands: readonly Command[] = [
             log: createStderrLog(),
             clock: createSystemClock(),
             viewerBundleDir: defaultViewerBundleDir(),
-            openBrowser,
+            ...(noOpen ? {} : { openBrowser }),
           },
           io,
         });
