@@ -340,9 +340,10 @@ export function hasSkipEdge(
 
 /**
  * Per-row-boundary version of the skip widening: for a `cols`-wide grid over
- * `flowedIds`, returns one gap per row boundary, scaled by how many skip
- * edges cross it (`gap * min(SKIP_ROW_GAP_MAX, 1 + crossings)`), so a dense
- * fan gets more corridor than a single long-range edge.
+ * `flowedIds`, returns one gap per row boundary, scaled by how many edges
+ * cross it (`gap * min(SKIP_ROW_GAP_MAX, 1 + crossings)`) - any edge whose
+ * endpoints resolve to different grid rows, not just flow-order skip edges,
+ * since row membership is already known here (`cols` is resolved).
  */
 export function skipRowGaps(
   flowedIds: readonly string[],
@@ -359,7 +360,7 @@ export function skipRowGaps(
   for (const e of edges) {
     const from = pos.get(e.from);
     const to = pos.get(e.to);
-    if (from === undefined || to === undefined || Math.abs(from - to) <= 1) continue;
+    if (from === undefined || to === undefined) continue;
     const lo = Math.min(Math.floor(from / cols), Math.floor(to / cols));
     const hi = Math.max(Math.floor(from / cols), Math.floor(to / cols));
     for (let b = lo; b < hi; b++) crossings[b] = crossings[b]! + 1;

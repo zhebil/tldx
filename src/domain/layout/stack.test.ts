@@ -553,9 +553,18 @@ describe("hybridLayout per-boundary skip row gap (B32)", () => {
   });
 });
 
-describe("skipRowGaps (B32)", () => {
+describe("skipRowGaps (B33)", () => {
   it("returns the plain gap per boundary when no edges skip", () => {
     expect(skipRowGaps(["a", "b", "c", "d"], [], 2, 40)).toEqual([40]);
+  });
+
+  it("widens a boundary for a flow-adjacent edge that lands in a different row", () => {
+    // b (row 0) -> c (row 1): |Δpos| = 1, but crosses the row boundary.
+    expect(skipRowGaps(["a", "b", "c", "d"], [{ from: "b", to: "c" }], 2, 40)).toEqual([80]);
+  });
+
+  it("does not count a flow-adjacent edge that stays within a row", () => {
+    expect(skipRowGaps(["a", "b", "c", "d"], [{ from: "a", to: "b" }], 2, 40)).toEqual([40]);
   });
 
   it("scales a single boundary by its crossing count", () => {
