@@ -113,6 +113,18 @@ describe("domain/emit", () => {
     });
   });
 
+  it("sets note growY to the reserved height above tldraw's 200 base, 0 when short", () => {
+    const tall = emit(
+      doc([note({ id: "n2", text: "long", x: 0, y: 0, w: 200, h: 500 })]),
+    );
+    expect((tall.store["shape:n2"]?.props as Record<string, unknown>).growY).toBe(300);
+
+    const short = emit(
+      doc([note({ id: "n3", text: "short", x: 0, y: 0, w: 200, h: 150 })]),
+    );
+    expect((short.store["shape:n3"]?.props as Record<string, unknown>).growY).toBe(0);
+  });
+
   it("emits an edge as an arrow shape plus two bindings with default-center attach", () => {
     const scene = emit(
       doc([

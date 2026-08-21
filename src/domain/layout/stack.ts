@@ -101,7 +101,7 @@ async function sizeElement(
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
     }
     case "note": {
-      const size = estimatedNoteSize();
+      const size = estimatedNoteSize(el.text);
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
     }
     case "frame":

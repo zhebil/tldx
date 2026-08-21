@@ -174,7 +174,7 @@ export function boxShape(
 }
 
 export function noteShape(
-  input: ShapeBase & { text?: string; color?: string; size?: string },
+  input: ShapeBase & { text?: string; color?: string; size?: string; growY?: number },
 ): TLRecord {
   return {
     ...baseShapeFields(input),
@@ -187,7 +187,7 @@ export function noteShape(
       fontSizeAdjustment: 0,
       align: "middle",
       verticalAlign: "middle",
-      growY: 0,
+      growY: input.growY ?? 0,
       url: "",
       scale: 1,
       richText: richText(input.text ?? ""),

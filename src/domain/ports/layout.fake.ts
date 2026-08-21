@@ -109,7 +109,7 @@ function placeNote(
   defaultX: number,
   defaultY: number,
 ): IRNotePositioned {
-  const size = estimatedNoteSize();
+  const size = estimatedNoteSize(note.text);
   return {
     ...note,
     x: note.x ?? defaultX,

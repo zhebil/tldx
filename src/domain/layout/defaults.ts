@@ -17,9 +17,11 @@ const BOX_LINE_H = 24;
 const BOX_MIN_W = 120;
 const BOX_MIN_H = 60;
 
-const NOTE_LINE_H = 24;
-const NOTE_MIN_W = 200;
-const NOTE_MIN_H = 80;
+/** tldraw draws every sticky 200 wide and 200 tall before growY. */
+export const NOTE_SIZE = 200;
+const NOTE_PAD = 16;
+const NOTE_CHAR_PX = 15;
+const NOTE_LINE_H = 30;
 
 /** Tldraw frame title chrome. The first row of children must clear it. */
 export const FRAME_TITLE_PX = 32;
@@ -61,9 +63,13 @@ export function estimatedBoxSize(label: string | undefined): {
   return { w, h };
 }
 
-export function estimatedNoteSize(): { w: number; h: number } {
-  // Notes wrap; we don't know the wrap width, so use a fixed footprint. The
-  // note's IR w/h is ignored at emit time anyway (tldraw fits stickies), but
-  // layout still needs a rect to reserve space for routing.
-  return { w: NOTE_MIN_W, h: Math.max(NOTE_MIN_H, NOTE_LINE_H + 32) };
+/**
+ * A deliberately generous upper bound over a naive character wrap - real
+ * tldraw text metrics wrap differently, but never past this reservation.
+ * Emit turns the reserved height into `growY` so the drawn sticky matches.
+ */
+export function estimatedNoteSize(text: string | undefined): { w: number; h: number } {
+  const perLine = Math.max(1, Math.floor((NOTE_SIZE - NOTE_PAD * 2) / NOTE_CHAR_PX));
+  const lines = Math.ceil((text ?? "").length / perLine);
+  return { w: NOTE_SIZE, h: Math.max(NOTE_SIZE, lines * NOTE_LINE_H + NOTE_PAD * 2) };
 }
