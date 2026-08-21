@@ -9,9 +9,9 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
       "meta": {},
       "props": {
         "isExact": false,
-        "isPrecise": false,
+        "isPrecise": true,
         "normalizedAnchor": {
-          "x": 0.5,
+          "x": 0,
           "y": 0.5,
         },
         "snap": "none",
@@ -27,9 +27,9 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
       "meta": {},
       "props": {
         "isExact": false,
-        "isPrecise": false,
+        "isPrecise": true,
         "normalizedAnchor": {
-          "x": 0.5,
+          "x": 1,
           "y": 0.5,
         },
         "snap": "none",
@@ -45,9 +45,9 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
       "meta": {},
       "props": {
         "isExact": false,
-        "isPrecise": false,
+        "isPrecise": true,
         "normalizedAnchor": {
-          "x": 0.5,
+          "x": 0,
           "y": 0.5,
         },
         "snap": "none",
@@ -63,9 +63,9 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
       "meta": {},
       "props": {
         "isExact": false,
-        "isPrecise": false,
+        "isPrecise": true,
         "normalizedAnchor": {
-          "x": 0.5,
+          "x": 1,
           "y": 0.5,
         },
         "snap": "none",
@@ -171,7 +171,7 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
         },
         "fill": "none",
         "font": "draw",
-        "kind": "arc",
+        "kind": "elbow",
         "labelColor": "black",
         "labelPosition": 0.5,
         "scale": 1,
@@ -251,7 +251,7 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
         },
         "fill": "none",
         "font": "draw",
-        "kind": "arc",
+        "kind": "elbow",
         "labelColor": "black",
         "labelPosition": 0.5,
         "scale": 1,
