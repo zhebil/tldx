@@ -6,7 +6,14 @@ import type { AstNode } from "../parser/ast.js";
 import { astBuilders } from "../parser/ast.fixture.js";
 
 import { estimatedBoxSize } from "./defaults.js";
-import { bestGridCols, formsChain, hasSkipEdge, hybridLayout, type AutoPlacer } from "./stack.js";
+import {
+  bestGridCols,
+  formsChain,
+  hasSkipEdge,
+  hybridLayout,
+  skipRowGaps,
+  type AutoPlacer,
+} from "./stack.js";
 
 const { box, doc, edge, frame } = astBuilders();
 
@@ -502,5 +509,75 @@ describe("hybridLayout grid row gap (B25)", () => {
     const c = boxById(result.children, "c");
     expect(b.y - a.y).toBe(40 + 40);
     expect(c.y - b.y).toBe(40 + 40);
+  });
+});
+
+describe("hybridLayout per-boundary skip row gap (B32)", () => {
+  it("scales each boundary by its own crossing count (gradient)", async () => {
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2 }, [
+        box({ id: "a", label: "A", w: 100, h: 40 }),
+        box({ id: "b", label: "B", w: 100, h: 40 }),
+        box({ id: "c", label: "C", w: 100, h: 40 }),
+        box({ id: "d", label: "D", w: 100, h: 40 }),
+        box({ id: "e", label: "E", w: 100, h: 40 }),
+        box({ id: "f", label: "F", w: 100, h: 40 }),
+        edge({ id: "e1", from: "a", to: "c" }),
+        edge({ id: "e2", from: "a", to: "d" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const c = boxById(result.children, "c");
+    const e = boxById(result.children, "e");
+    expect(c.y - a.y).toBe(40 + 120);
+    expect(e.y - c.y).toBe(40 + 40);
+  });
+
+  it("caps the boundary factor at SKIP_ROW_GAP_MAX regardless of crossing count", async () => {
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2 }, [
+        box({ id: "a", label: "A", w: 100, h: 40 }),
+        box({ id: "b", label: "B", w: 100, h: 40 }),
+        box({ id: "c", label: "C", w: 100, h: 40 }),
+        box({ id: "d", label: "D", w: 100, h: 40 }),
+        edge({ id: "e1", from: "a", to: "c" }),
+        edge({ id: "e2", from: "a", to: "d" }),
+        edge({ id: "e3", from: "b", to: "d" }),
+        edge({ id: "e4", from: "a", to: "c" }),
+        edge({ id: "e5", from: "a", to: "d" }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const c = boxById(result.children, "c");
+    expect(c.y - a.y).toBe(40 + 160);
+  });
+});
+
+describe("skipRowGaps (B32)", () => {
+  it("returns the plain gap per boundary when no edges skip", () => {
+    expect(skipRowGaps(["a", "b", "c", "d"], [], 2, 40)).toEqual([40]);
+  });
+
+  it("scales a single boundary by its crossing count", () => {
+    expect(skipRowGaps(["a", "b", "c", "d"], [{ from: "a", to: "d" }], 2, 40)).toEqual([80]);
+  });
+
+  it("caps the factor at SKIP_ROW_GAP_MAX", () => {
+    const edges = [
+      { from: "a", to: "c" },
+      { from: "a", to: "d" },
+      { from: "b", to: "d" },
+      { from: "a", to: "c" },
+      { from: "a", to: "d" },
+    ];
+    expect(skipRowGaps(["a", "b", "c", "d"], edges, 2, 40)).toEqual([160]);
+  });
+
+  it("returns an empty array for cols <= 0", () => {
+    expect(skipRowGaps(["a", "b", "c", "d"], [{ from: "a", to: "d" }], 0, 40)).toEqual([]);
+  });
+
+  it("returns an empty array with fewer than 2 rows", () => {
+    expect(skipRowGaps(["a", "b"], [{ from: "a", to: "b" }], 2, 40)).toEqual([]);
   });
 });

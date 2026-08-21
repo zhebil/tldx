@@ -40,6 +40,7 @@ import {
 
 const DEFAULT_GAP = 40;
 const SKIP_ROW_GAP_FACTOR = 2;
+const SKIP_ROW_GAP_MAX = 4;
 const TARGET_ASPECT = 16 / 9;
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -224,14 +225,16 @@ async function layoutContainer(
       }
     }
     const edges = autoEdges ?? collectAutoEdges(children);
-    const rowGap =
-      flowMode === "grid" && hasSkipEdge(flowedIds, edges) ? gap * SKIP_ROW_GAP_FACTOR : gap;
+    const rowGaps =
+      flowMode === "grid"
+        ? skipRowGaps(flowedIds, edges, resolveCols(flowCols, flowedEls.length), gap)
+        : [];
     const positions = computeFlowPositions(
       flowedEls,
       flowMode,
       flowCols,
       gap,
-      rowGap,
+      rowGaps,
       pad.left,
       pad.top,
       align,
@@ -335,6 +338,39 @@ export function hasSkipEdge(
   });
 }
 
+/**
+ * Per-row-boundary version of the skip widening: for a `cols`-wide grid over
+ * `flowedIds`, returns one gap per row boundary, scaled by how many skip
+ * edges cross it (`gap * min(SKIP_ROW_GAP_MAX, 1 + crossings)`), so a dense
+ * fan gets more corridor than a single long-range edge.
+ */
+export function skipRowGaps(
+  flowedIds: readonly string[],
+  edges: readonly { from: string; to: string }[],
+  cols: number,
+  gap: number,
+): number[] {
+  if (cols <= 0) return [];
+  const rows = Math.ceil(flowedIds.length / cols);
+  if (rows < 2) return [];
+  const pos = new Map<string, number>();
+  flowedIds.forEach((id, i) => pos.set(id, i));
+  const crossings = new Array<number>(rows - 1).fill(0);
+  for (const e of edges) {
+    const from = pos.get(e.from);
+    const to = pos.get(e.to);
+    if (from === undefined || to === undefined || Math.abs(from - to) <= 1) continue;
+    const lo = Math.min(Math.floor(from / cols), Math.floor(to / cols));
+    const hi = Math.max(Math.floor(from / cols), Math.floor(to / cols));
+    for (let b = lo; b < hi; b++) crossings[b] = crossings[b]! + 1;
+  }
+  return crossings.map((count) => gap * Math.min(SKIP_ROW_GAP_MAX, 1 + count));
+}
+
+function resolveCols(cols: number | undefined, n: number): number {
+  return cols !== undefined && cols > 0 ? Math.floor(cols) : n || 1;
+}
+
 function indexDescendants(
   children: readonly IRElement[],
   ownerId: string,
@@ -376,7 +412,7 @@ function computeFlowPositions(
   mode: FlowMode,
   cols: number | undefined,
   gap: number,
-  rowGap: number,
+  rowGaps: readonly number[],
   padLeft: number,
   padTop: number,
   align: Align,
@@ -392,8 +428,8 @@ function computeFlowPositions(
     return out;
   }
   if (mode === "grid") {
-    const n = cols !== undefined && cols > 0 ? Math.floor(cols) : els.length || 1;
-    return gridPositions(els, n, gap, rowGap, padLeft, padTop);
+    const n = resolveCols(cols, els.length);
+    return gridPositions(els, n, gap, rowGaps, padLeft, padTop);
   }
   const maxW = els.reduce((m, el) => Math.max(m, el.w), 0);
   const out: { x: number; y: number }[] = [];
@@ -409,7 +445,7 @@ function gridPositions(
   els: readonly Rect[],
   cols: number,
   gap: number,
-  rowGap: number,
+  rowGaps: readonly number[],
   padLeft: number,
   padTop: number,
 ): { x: number; y: number }[] {
@@ -432,7 +468,7 @@ function gridPositions(
   let y = padTop;
   for (let r = 0; r < rows; r++) {
     rowY.push(y);
-    y += rowHeights[r]! + rowGap;
+    y += rowHeights[r]! + (rowGaps[r] ?? gap);
   }
   return els.map((_, i) => ({ x: colX[i % cols]!, y: rowY[Math.floor(i / cols)]! }));
 }
