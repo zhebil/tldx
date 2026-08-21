@@ -57,13 +57,29 @@ once A is done. The loop never terminates; the human stops it.
   boundary can only narrow, and `release-pipeline`'s flat ×4 turns out to be
   load-bearing - 48px off its first boundary puts gate 5 straight back to 10.
   **The single scalar is at its floor on that file; the next move on this line
-  is a second term (B35), not a re-tuning of the first.**
+  is a second term (B35), not a re-tuning of the first.** Wake 43 ran that
+  second term and **B35 REVERTED**: a fan-concentration term passed all five
+  gates and took `wide-fanout` 28 → 24, the loop's largest single-file gate-5
+  gain, and the judge still preferred the champion because the added 120px and
+  80px read as empty bands. So the corridor is *not* under-parameterised the way
+  wake 42 inferred - `wide-fanout` sits near a local optimum in both directions
+  (narrowing it improved gate 5 slightly, widening it improved gate 5 more,
+  neither improved the diagram). **Row-gap scalars have one hypothesis left,
+  B37; if that also fails to convince a judge, the line is exhausted.**
   Gate 5's instrument is `tools/arrow-truth.mts`, which reads the vertices
   tldraw actually drew (the old model-based tracer matched 0 of 84 corpus arrows
   and was deleted at wake 32); the champion baseline is the table at the top of
   `docs/layout-champion.md`, at 10/5/1/**8**/0/0/28 since wake 41 - seven files,
   in the alphabetical order the table uses (`release-pipeline` is the fourth
-  column, and B33 is what moved it from 10 to 8).
+  column, and B33 is what moved it from 10 to 8). Verified independently at wake
+  43 in a detached worktree at `HEAD` - the table reproduces.
+  **Gate 5 is a veto, not a score.** Wake 43 is the first time it disagreed
+  outright with a judge on the same file: it read 28 → 24 on `wide-fanout` while
+  the judge, looking at the render, saw the same edge clutter in both and
+  decided on canvas economy. Combined with wake 42, where *narrowing* the same
+  file took it 28 → 27, gate 5 on `wide-fanout` is non-monotonic in row gap.
+  Keep using it to reject, never cite a gate-5 gain there as evidence a change
+  is good.
 - **The judge may answer `WINNER: TIE`** since wake 33 (B29). Ties count as
   neither wins nor losses, and the ledger distinguishes a *judged tie* from a
   *structural tie* (a file never sent to a judge because nothing changed). The
@@ -1062,20 +1078,22 @@ Ordered. Take from the top. Strike through when resolved.
   grid files want opposite things from the same scalar, which is direct support
   for **B35**. Ledger entry in `docs/layout-hypotheses.md`.
 
-- [ ] **B35** _(deferred by drift audit #3 at wake 40, now due)_ Scale the row
-  corridor by **fan-out**, not only by crossings. Wake 40 wrote this up and
-  explicitly deferred filing it until B33 settled, on the grounds that B33 might
-  move the predicate first. B33 has settled, and it did move the predicate - but
-  only for `long-labels`; `wide-fanout` was a *structural tie* under B33 (it has
-  no flow-adjacent edge that crosses a row boundary at all), so the evidence
-  wake 40 collected is untouched by it. That evidence: three independent judge
-  pairs said `wide-fanout` wants vertical room because a 12-way fan needs
-  distinct arrow angles to stay traceable, while `long-labels` gains nothing
-  from gap it does not need. Neither B25's, B32's nor B33's predicate mentions
-  fan-out. Proposal: add the maximum out-degree of any node on the upper side of
-  a boundary as a second term in that boundary's corridor. **Sequence this after
-  B36** - stacking a new term on an unexamined cap is how B32's hand-tuned 4
-  became load-bearing in the first place.
+- [x] ~~**B35** _(deferred by drift audit #3 at wake 40)_ Scale the row corridor
+  by **fan-out**, not only by crossings: add the concentration of a boundary's
+  crossings on a single node as a second, additive term.~~ **REVERTED**
+  _(wake 43)_ - and it falsified the evidence that motivated it. Measured first:
+  `fan` really is a different signal from `crossings` (`release-pipeline` spreads
+  5 crossings over nodes carrying at most 2, `wide-fanout`'s are entirely one
+  hub's), so the term was built as
+  `gap * (min(MAX, 1 + crossings) + floor(fan / MAX))` - purely additive, no new
+  constant, `long-labels` and `release-pipeline` untouched by construction.
+  **All five gates passed** and gate 5 fell **28 → 24** on `wide-fanout`, the
+  largest single-file gate-5 gain the loop has recorded. The judge still chose
+  the champion: the 120px and 80px added to two boundaries read as "dead
+  vertical bands", not as room. Three earlier judge pairs were not wrong about
+  `wide-fanout` wanting vertical room, they were **mis-scaled** - room helps
+  until it becomes distance. Also the first outright disagreement between gate 5
+  and a judge on the same file. Ledger entry in `docs/layout-hypotheses.md`.
 
 - [ ] **B37** _(from B36's gate-5 rejection, wake 42)_ Retry the relative cap in
   the **widening-only** direction: award each boundary
@@ -1085,10 +1103,14 @@ Ordered. Take from the top. Strike through when resolved.
   boundary cannot go below `gap * 4` without putting two arrows back through two
   boxes - while saying nothing against scaling the busiest boundary up. Gate 5
   cannot regress by construction (every corridor is ≥ the champion's), so the
-  gate to watch is **canvas area**, the mirror of B36. Sequence after B35: B35
-  proposes a genuinely new term and B36 showed the single-scalar rule is already
-  at its floor on one file, so re-tuning the same scalar is the weaker of the
-  two and should not go first. Abandon if B35 changes the corridor formula.
+  gate to watch is **canvas area**, the mirror of B36. **Now at the top of the
+  backlog** - B35 ran at wake 43 and reverted without changing the corridor
+  formula, so the abandon condition did not fire. Read B35's ledger entry before
+  building: it establishes that a gate-5 gain on `wide-fanout` is not evidence a
+  change is good, and that widening that file's corridor loses to a judge. B37
+  should therefore be judged on whether it helps `release-pipeline`, and treated
+  as **the last hypothesis on row-gap scalars** - if a widening-only re-tuning
+  also fails, the line is exhausted and the remaining defects live elsewhere.
 
 - [ ] **B10** `elk.layered.considerModelOrder.strategy` for containers that do
   opt into `layout="auto"`, so even ELK respects source order as a tie-break.
@@ -2013,3 +2035,35 @@ anything that outlives the loop.)_
   to any change to the cap itself. Re-measure with the same instrumentation
   (a temporary `console.error` in `skipRowGaps` behind an env var) if the
   predicate changes again.
+
+- **(wake 43, from B35)** **The fan measurements, so the next wake need not
+  re-instrument.** Per boundary, alongside the wake-42 crossing counts, `fan` =
+  the most crossing edges incident to any one node (both endpoints counted;
+  out-degree-only gives identical numbers on this corpus): `long-labels`
+  1,1,2,1,0; `release-pipeline` 2,2; `wide-fanout` 14,8,2,2. Note
+  `release-pipeline` is the one file where `fan` and `crossings` genuinely
+  diverge (5 crossings, no node carrying more than 2), so it is the only corpus
+  evidence that concentration is a separable signal at all - and it is a single
+  data point.
+
+- **(wake 43, from B35)** **Gate 5 disagreed with a judge for the first time,
+  on `wide-fanout`.** The instrument read 28 → 24 while the judge saw the same
+  clutter in both renders and decided on canvas economy. Together with wake 42
+  (narrowing the same file: 28 → 27) this means gate 5 there is non-monotonic in
+  row gap and does not track reader legibility. Two consequences worth carrying:
+  gate 5 stays a **veto only** - never cite a gain on that file as evidence for
+  a change - and **`wide-fanout` may be the wrong file to keep tuning**. It has
+  now absorbed B25, B32, B36 and B35, and the last three all moved gate 5
+  without moving a judge. Consider whether the loop needs a corpus file whose
+  defect is *not* a single hub fanning into a grid, filed as its own hypothesis
+  (a corpus change is judged on whether it covers real diagram shapes, per the
+  Phase B rules, and it invalidates the champion report).
+
+- **(wake 43, from B35)** Two `skipRowGaps` unit tests
+  (`stack.test.ts` ~536 and ~574) assert that the **total** boundary factor is
+  capped at `SKIP_ROW_GAP_MAX`, using a fixture where node `a` is incident to 4
+  of 5 crossing edges. Any future hypothesis that adds a term *outside* that cap
+  will break both, and the honest fix is to re-base their expected numbers and
+  rename them to "caps the crossing term" - **not** to edit the fixture so it
+  stops hitting the threshold. B35 did the former; if it is retried, expect the
+  same two tests to move again.
