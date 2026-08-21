@@ -20,7 +20,8 @@
  *   (tldraw stickies are always 200 wide) and keeps `h` as `growY` above
  *   tldraw's 200 base height; `note.color` passes through the same way.
  * - `box`/`frame`/`note`/`edge` also pass through the raw tldraw style props
- *   IR carries (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd` -
+ *   IR carries (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd`,
+ *   and on `box`/`note` also `textAlign`, `verticalAlign`, `labelColor` -
  *   see `domain/ir/styles.ts`) verbatim onto the shape when present; these
  *   never affect geometry.
  * - Edges become an `arrow` shape (`x: 0, y: 0`, parented to the page) plus
@@ -111,6 +112,9 @@ function emitBox(box: IRBoxPositioned, parentId: string): TLRecord {
     ...(box.color === undefined ? {} : { color: box.color }),
     ...(box.fill === undefined ? {} : { fill: box.fill }),
     ...(box.dash === undefined ? {} : { dash: box.dash }),
+    ...(box.textAlign === undefined ? {} : { textAlign: box.textAlign }),
+    ...(box.verticalAlign === undefined ? {} : { verticalAlign: box.verticalAlign }),
+    ...(box.labelColor === undefined ? {} : { labelColor: box.labelColor }),
   });
 }
 
@@ -124,6 +128,9 @@ function emitNote(note: IRNotePositioned, parentId: string): TLRecord {
       text: note.text,
       growY: Math.max(0, note.h - NOTE_SIZE),
       ...(note.color === undefined ? {} : { color: note.color }),
+      ...(note.textAlign === undefined ? {} : { textAlign: note.textAlign }),
+      ...(note.verticalAlign === undefined ? {} : { verticalAlign: note.verticalAlign }),
+      ...(note.labelColor === undefined ? {} : { labelColor: note.labelColor }),
     });
   }
   return boxShape({
@@ -136,6 +143,9 @@ function emitNote(note: IRNotePositioned, parentId: string): TLRecord {
     text: note.text,
     color: note.color ?? "yellow",
     fill: "semi",
+    ...(note.textAlign === undefined ? {} : { textAlign: note.textAlign }),
+    ...(note.verticalAlign === undefined ? {} : { verticalAlign: note.verticalAlign }),
+    ...(note.labelColor === undefined ? {} : { labelColor: note.labelColor }),
   });
 }
 

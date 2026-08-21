@@ -156,6 +156,9 @@ export function boxShape(
     color?: string;
     fill?: string;
     dash?: string;
+    textAlign?: string;
+    verticalAlign?: string;
+    labelColor?: string;
   },
 ): TLRecord {
   return {
@@ -166,13 +169,13 @@ export function boxShape(
       h: input.h,
       geo: input.geo ?? "rectangle",
       color: input.color ?? "black",
-      labelColor: "black",
+      labelColor: input.labelColor ?? "black",
       fill: input.fill ?? "none",
       dash: input.dash ?? "draw",
       size: "m",
       font: "draw",
-      align: "middle",
-      verticalAlign: "middle",
+      align: input.textAlign ?? "middle",
+      verticalAlign: input.verticalAlign ?? "middle",
       url: "",
       growY: 0,
       scale: 1,
@@ -182,19 +185,27 @@ export function boxShape(
 }
 
 export function noteShape(
-  input: ShapeBase & { text?: string; color?: string; size?: string; growY?: number },
+  input: ShapeBase & {
+    text?: string;
+    color?: string;
+    size?: string;
+    growY?: number;
+    textAlign?: string;
+    verticalAlign?: string;
+    labelColor?: string;
+  },
 ): TLRecord {
   return {
     ...baseShapeFields(input),
     type: "note",
     props: {
       color: input.color ?? "yellow",
-      labelColor: "black",
+      labelColor: input.labelColor ?? "black",
       size: input.size ?? "m",
       font: "draw",
       fontSizeAdjustment: 0,
-      align: "middle",
-      verticalAlign: "middle",
+      align: input.textAlign ?? "middle",
+      verticalAlign: input.verticalAlign ?? "middle",
       growY: input.growY ?? 0,
       url: "",
       scale: 1,

@@ -1,6 +1,13 @@
 import type { Align, Direction, LayoutMode } from "../layout/defaults.js";
 import type { SourceSpan } from "../diagnostics/index.js";
-import type { StyleArrowhead, StyleColor, StyleDash, StyleFill } from "./styles.js";
+import type {
+  StyleArrowhead,
+  StyleColor,
+  StyleDash,
+  StyleFill,
+  StyleTextAlign,
+  StyleVerticalAlign,
+} from "./styles.js";
 
 /**
  * Normalized intermediate representation. Produced by `lower(ast)` from
@@ -63,6 +70,10 @@ export type IRBox = IRBase & {
   color?: StyleColor;
   fill?: StyleFill;
   dash?: StyleDash;
+  /** Leaf text alignment; named `textAlign` (not `align`) since `align` is the container cross-axis prop (B1). */
+  textAlign?: StyleTextAlign;
+  verticalAlign?: StyleVerticalAlign;
+  labelColor?: StyleColor;
 };
 
 export type IRNote = IRBase & {
@@ -78,6 +89,9 @@ export type IRNote = IRBase & {
   h?: number;
   /** Pass-through tldraw style; does not affect layout. */
   color?: StyleColor;
+  textAlign?: StyleTextAlign;
+  verticalAlign?: StyleVerticalAlign;
+  labelColor?: StyleColor;
 };
 
 export type IREdge = IRBase & {

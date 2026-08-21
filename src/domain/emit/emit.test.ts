@@ -362,6 +362,74 @@ describe("domain/emit: style pass-through (T9)", () => {
   });
 });
 
+describe("domain/emit: text align / label color pass-through (T10)", () => {
+  it("passes box textAlign/verticalAlign/labelColor through, defaulting to middle/middle/black", () => {
+    const scene = emit(
+      doc([
+        box({
+          id: "styled",
+          x: 0,
+          y: 0,
+          w: 100,
+          h: 50,
+          textAlign: "end",
+          verticalAlign: "start",
+          labelColor: "red",
+        }),
+        box({ id: "plain", x: 0, y: 0, w: 100, h: 50 }),
+      ]),
+    );
+    const styled = scene.store["shape:styled"]?.props as Record<string, unknown>;
+    expect(styled.align).toBe("end");
+    expect(styled.verticalAlign).toBe("start");
+    expect(styled.labelColor).toBe("red");
+
+    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    expect(plain.align).toBe("middle");
+    expect(plain.verticalAlign).toBe("middle");
+    expect(plain.labelColor).toBe("black");
+  });
+
+  it("passes geo-note and sticky textAlign/verticalAlign/labelColor through", () => {
+    const scene = emit(
+      doc([
+        note({
+          id: "n",
+          text: "hi",
+          x: 0,
+          y: 0,
+          w: 100,
+          h: 50,
+          textAlign: "start",
+          verticalAlign: "end",
+          labelColor: "blue",
+        }),
+        note({
+          id: "s",
+          text: "hi",
+          x: 0,
+          y: 0,
+          w: 200,
+          h: 200,
+          sticky: true,
+          textAlign: "start",
+          verticalAlign: "end",
+          labelColor: "blue",
+        }),
+      ]),
+    );
+    const geoProps = scene.store["shape:n"]?.props as Record<string, unknown>;
+    expect(geoProps.align).toBe("start");
+    expect(geoProps.verticalAlign).toBe("end");
+    expect(geoProps.labelColor).toBe("blue");
+
+    const stickyProps = scene.store["shape:s"]?.props as Record<string, unknown>;
+    expect(stickyProps.align).toBe("start");
+    expect(stickyProps.verticalAlign).toBe("end");
+    expect(stickyProps.labelColor).toBe("blue");
+  });
+});
+
 // -- helpers ------------------------------------------------------------------
 
 const SPAN = { file: "test.tldsl", line: 1, column: 1 };
@@ -386,6 +454,9 @@ function box(input: {
   color?: string;
   fill?: string;
   dash?: string;
+  textAlign?: string;
+  verticalAlign?: string;
+  labelColor?: string;
 }): IRBoxPositioned {
   const { label, ...rest } = input;
   return {
@@ -406,6 +477,9 @@ function note(input: {
   h: number;
   sticky?: boolean;
   color?: string;
+  textAlign?: string;
+  verticalAlign?: string;
+  labelColor?: string;
 }): IRNotePositioned {
   return {
     kind: "note",

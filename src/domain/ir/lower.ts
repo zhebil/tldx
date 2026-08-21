@@ -13,10 +13,10 @@
  * - `x | y | w | h` parse as finite numbers when present.
  * - attributes outside the fixed allowed set per element kind are rejected
  *   with `ir/unknown-prop` (replaces the type checker the MVP doesn't have).
- * - style props (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd`)
- *   must be one of tldraw's fixed enum values (`ir/styles.ts`), or
- *   `ir/invalid-style-value`. These are pure pass-through - they never
- *   affect layout.
+ * - style props (`color`, `fill`, `dash`, `arrowheadStart`, `arrowheadEnd`,
+ *   `textAlign`, `verticalAlign`, `labelColor`) must be one of tldraw's
+ *   fixed enum values (`ir/styles.ts`), or `ir/invalid-style-value`. These
+ *   are pure pass-through - they never affect layout.
  *
  * Errors do not abort lowering; the IR is produced best-effort and the
  * caller decides what to do based on `hasErrors(diagnostics)`. Edges that
@@ -39,7 +39,7 @@ import {
   type Direction,
   type LayoutMode,
 } from "../layout/defaults.js";
-import { ARROWHEADS, COLORS, DASHES, FILLS } from "./styles.js";
+import { ARROWHEADS, COLORS, DASHES, FILLS, TEXT_ALIGNS, VERTICAL_ALIGNS } from "./styles.js";
 import type {
   AstBox,
   AstEdge,
@@ -77,8 +77,22 @@ const ALLOWED_PROPS = {
     "h",
     "color",
   ],
-  box: ["id", "label", "x", "y", "w", "h", "maxW", "color", "fill", "dash"],
-  note: ["id", "on", "x", "y", "w", "h", "color"],
+  box: [
+    "id",
+    "label",
+    "x",
+    "y",
+    "w",
+    "h",
+    "maxW",
+    "color",
+    "fill",
+    "dash",
+    "textAlign",
+    "verticalAlign",
+    "labelColor",
+  ],
+  note: ["id", "on", "x", "y", "w", "h", "color", "textAlign", "verticalAlign", "labelColor"],
   edge: ["id", "from", "to", "color", "dash", "arrowheadStart", "arrowheadEnd"],
 } as const;
 
@@ -235,6 +249,9 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
   const color = readEnum(node.attrs, "color", COLORS, ctx);
   const fill = readEnum(node.attrs, "fill", FILLS, ctx);
   const dash = readEnum(node.attrs, "dash", DASHES, ctx);
+  const textAlign = readEnum(node.attrs, "textAlign", TEXT_ALIGNS, ctx);
+  const verticalAlign = readEnum(node.attrs, "verticalAlign", VERTICAL_ALIGNS, ctx);
+  const labelColor = readEnum(node.attrs, "labelColor", COLORS, ctx);
   return {
     kind: "box",
     ...assignId(node.attrs, node.span, ctx, {
@@ -248,12 +265,18 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
     ...(color === undefined ? {} : { color }),
     ...(fill === undefined ? {} : { fill }),
     ...(dash === undefined ? {} : { dash }),
+    ...(textAlign === undefined ? {} : { textAlign }),
+    ...(verticalAlign === undefined ? {} : { verticalAlign }),
+    ...(labelColor === undefined ? {} : { labelColor }),
   };
 }
 
 function lowerNote(node: AstNote, ctx: Ctx): IRNote {
   checkUnknownProps("note", node.attrs, ctx);
   const color = readEnum(node.attrs, "color", COLORS, ctx);
+  const textAlign = readEnum(node.attrs, "textAlign", TEXT_ALIGNS, ctx);
+  const verticalAlign = readEnum(node.attrs, "verticalAlign", VERTICAL_ALIGNS, ctx);
+  const labelColor = readEnum(node.attrs, "labelColor", COLORS, ctx);
   return {
     kind: "note",
     ...assignId(node.attrs, node.span, ctx, {
@@ -267,6 +290,9 @@ function lowerNote(node: AstNote, ctx: Ctx): IRNote {
     ...optionalString(node.attrs, "on"),
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
     ...(color === undefined ? {} : { color }),
+    ...(textAlign === undefined ? {} : { textAlign }),
+    ...(verticalAlign === undefined ? {} : { verticalAlign }),
+    ...(labelColor === undefined ? {} : { labelColor }),
   };
 }
 

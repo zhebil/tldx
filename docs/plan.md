@@ -904,7 +904,7 @@ to come after Phase 1.
   risks the byte-identical requirement this task is built around. Logged under
   `## Questions for the human`.
 
-- [ ] **T10. Text alignment and label colour.**
+- [x] **T10. Text alignment and label colour.**
   `textAlign` (`start|middle|end`), `verticalAlign`, `labelColor`.
   **Name collision:** `align` is already taken - B1 added it as the container
   cross-axis alignment. Do not shadow it. Use `textAlign` on leaf shapes and
@@ -912,6 +912,44 @@ to come after Phase 1.
   corpus in the same change.
   **Acceptance:** renders match the requested alignment; no prop name resolves
   to two different meanings depending on which component reads it.
+
+  **Decision: `textAlign`, not `align`.** The container prop keeps its name and
+  the corpus was not migrated - that is the change that touches least. On leaf
+  shapes the DSL name is `textAlign`, mapped to tldraw's `align` at the
+  `boxShape`/`noteShape` boundary in `src/contracts/builders.ts`. `verticalAlign`
+  and `labelColor` keep tldraw's names: neither exists on a container, so
+  neither can mean two things. `textAlign` + `verticalAlign` is also the CSS
+  pairing. No prop name now resolves to two meanings.
+
+  **What was built.** `TEXT_ALIGNS` / `VERTICAL_ALIGNS` added to
+  `src/domain/ir/styles.ts` (both `start|middle|end`; tldraw's three `-legacy`
+  horizontal values are deliberately not exposed). `textAlign`/`verticalAlign`/
+  `labelColor` added to `IRBox` and `IRNote`, read through the existing generic
+  `readEnum` in `lowerBox`/`lowerNote`, spread through `emitBox` and both
+  branches of `emitNote`. `boxShape`/`noteShape` stopped hardcoding
+  `labelColor: "black"`, `align: "middle"`, `verticalAlign: "middle"` and take
+  them as defaulted inputs. Zero layout code touched. New fixture
+  `tests/e2e/fixtures/text-align.tldsl.jsx`.
+
+  **Scope: `<Box>` and `<Note>`/`<Sticky>` only.** `<Edge>` got no `labelColor` -
+  `arrowShape` always emits `text: ""` until T12 adds arrow labels, so it would
+  be dead. `<Frame>` got none of the three - `frameShapeProps` is exactly
+  `{ w, h, name, color }`.
+
+  **The numbers: the scene JSON is byte-identical across all eight corpus files**
+  (compiled before and after via `git stash`, `diff -rq` clean). Every new prop
+  is optional and unused by the corpus, so `docs/renders/` and `docs/baseline.md`
+  were untouched - nothing moved. `npm run check` green, 403 tests in 41 files.
+  `text-metrics.mts` on the new fixture shows no unexpected wrapping.
+
+  Looked at the render: all nine `textAlign` x `verticalAlign` combinations are
+  visibly distinct on boxes, and all three on notes and stickies.
+  **Known gap:** sticky `labelColor` does not survive PNG export.
+  `NoteShapeUtil.toSvg` hardcodes `labelColor: theme[shape.props.color].note.text`
+  and ignores `props.labelColor` (its live `component()` honours it at
+  `NoteShapeUtil.mjs:251`). Geo boxes and geo-notes are unaffected - their two
+  label colours render correctly. The prop is right in the scene JSON; this is a
+  tldraw export limitation, logged under Discovered work.
 
 - [ ] **T11. Font and size, with a per-(font, size) metric table.**
   **This task invalidates the box-sizing fix if done naively.** `BOX_CHAR_PX =
@@ -1514,6 +1552,26 @@ as-is.
   report a false positive and there is no exemption path.
 
 ## Discovered work
+
+- **T10: `NoteShapeUtil.toSvg` drops `labelColor`.** Sticky label colour is
+  correct in the scene JSON and honoured by the live viewer, but every PNG from
+  `tools/screenshot.mts` derives sticky label colour from `props.color`. Any
+  future check that asserts a sticky's rendered text colour will fail for a
+  reason that is not ours.
+- **T10: `size` and `font` are still hardcoded in `builders.ts`.**
+  `boxShape`/`noteShape`/`arrowShape` all pin `size: "m"`, `font: "draw"`. T11
+  is the task that unpins them, and it is the one that has to measure - noted
+  here only so the hardcoding is not mistaken for an oversight.
+- **T10: `<Note>` and `<Sticky>` now take props that behave differently.** A
+  geo-note is a `boxShape`, a sticky is a `noteShape`; they accept the same
+  three props but tldraw honours `labelColor` on export for only one of them.
+  Worth a line in `docs/dsl.md` if the two components ever get documented as
+  interchangeable.
+- **T10: no test pins the DSL-name-to-tldraw-name mapping.** `textAlign` ->
+  `align` lives in one expression in `builders.ts`. `emit.test.ts` asserts the
+  emitted `props.align`, which covers it today, but nothing fails loudly if
+  someone "fixes" the input field name to `align` and reintroduces the
+  collision.
 
 Append here. Do not act on these during the wake that finds them; they get
 promoted into the task list by the human.

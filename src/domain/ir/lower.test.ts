@@ -263,7 +263,7 @@ describe("lower: ir/unknown-prop", () => {
     const [d] = diagnostics;
     expect(d!.code).toBe("ir/unknown-prop");
     expect(d!.message).toBe(
-      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash)",
+      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash, textAlign, verticalAlign, labelColor)",
     );
     // column 3: fixture's synthetic per-attribute column for `lable`, the
     // second attribute after `id`.
@@ -458,6 +458,61 @@ describe("lower: style props (T9)", () => {
 
   it("ir/invalid-style-value for an unknown arrowheadStart on <edge>", () => {
     const ast = doc({}, [box({ id: "a" }), edge({ from: "a", to: "a", arrowheadStart: "star" })]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+});
+
+describe("lower: text align / label color (T10)", () => {
+  it("captures textAlign/verticalAlign/labelColor on <box>", () => {
+    const ast = doc({}, [
+      box({ id: "a", textAlign: "end", verticalAlign: "start", labelColor: "red" }),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const boxIr = ir!.children[0]!;
+    if (boxIr.kind !== "box") throw new Error("expected box");
+    expect(boxIr.textAlign).toBe("end");
+    expect(boxIr.verticalAlign).toBe("start");
+    expect(boxIr.labelColor).toBe("red");
+  });
+
+  it("captures textAlign/verticalAlign/labelColor on <note>", () => {
+    const ast = doc({}, [
+      note({ id: "n", textAlign: "middle", verticalAlign: "end", labelColor: "blue" }, "hi"),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const noteIr = ir!.children[0]!;
+    if (noteIr.kind !== "note") throw new Error("expected note");
+    expect(noteIr.textAlign).toBe("middle");
+    expect(noteIr.verticalAlign).toBe("end");
+    expect(noteIr.labelColor).toBe("blue");
+  });
+
+  it("ir/invalid-style-value for an unknown textAlign on <box>, and omits the field", () => {
+    const ast = doc({}, [box({ id: "a", textAlign: "justify" })]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics).toHaveLength(1);
+    const [d] = diagnostics;
+    expect(d!.code).toBe("ir/invalid-style-value");
+    expect(d!.message).toContain("'textAlign' must be one of");
+    expect(d!.message).toContain("(got 'justify')");
+
+    const { ir } = lower(ast);
+    const boxIr = ir!.children[0]!;
+    if (boxIr.kind !== "box") throw new Error("expected box");
+    expect(boxIr.textAlign).toBeUndefined();
+  });
+
+  it("ir/invalid-style-value for an unknown verticalAlign on <note>", () => {
+    const ast = doc({}, [note({ id: "n", verticalAlign: "bottom" }, "hi")]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-style-value"]);
+  });
+
+  it("ir/invalid-style-value for an unknown labelColor on <box>", () => {
+    const ast = doc({}, [box({ id: "a", labelColor: "puce" })]);
     const { codes } = lowerAst(ast);
     expect(codes).toEqual(["ir/invalid-style-value"]);
   });

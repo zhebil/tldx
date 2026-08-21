@@ -42,3 +42,14 @@ export const ARROWHEADS = [
   "none",
 ] as const;
 export type StyleArrowhead = (typeof ARROWHEADS)[number];
+
+/**
+ * tldraw's `DefaultHorizontalAlignStyle` also has `start-legacy`/
+ * `middle-legacy`/`end-legacy` (pre-rich-text legacy values); deliberately
+ * not exposed here (T10).
+ */
+export const TEXT_ALIGNS = ["start", "middle", "end"] as const;
+export type StyleTextAlign = (typeof TEXT_ALIGNS)[number];
+
+export const VERTICAL_ALIGNS = ["start", "middle", "end"] as const;
+export type StyleVerticalAlign = (typeof VERTICAL_ALIGNS)[number];

@@ -64,8 +64,8 @@ line number and the allowed list.
 |---|---|
 | `<Doc>` | `id`, `direction`, `layout`, `gap`, `pad`, `cols` |
 | `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h`, `color` |
-| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash` |
-| `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `color` |
+| `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash`, `textAlign`, `verticalAlign`, `labelColor` |
+| `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `color`, `textAlign`, `verticalAlign`, `labelColor` |
 | `<Edge>` | `id`, `from`, `to`, `color`, `dash`, `arrowheadStart`, `arrowheadEnd` |
 
 `x`/`y`/`w`/`h`/`gap`/`pad`/`cols`/`maxW` are numbers written as strings
@@ -92,6 +92,19 @@ fill`; `dash` is `draw | solid | dashed | dotted`; `arrowheadStart` /
 `ir/unknown-prop` there. There is no `variant`, or any other CSS-style
 prop today - `className` or `style` are `ir/unknown-prop` just like a typo
 would be.
+
+`textAlign`/`verticalAlign`/`labelColor` (T10) are raw tldraw text-style
+enums on `<Box>` and `<Note>`/`<Sticky>` only, pass-through only (no effect
+on layout geometry). `textAlign` and `verticalAlign` are each `start |
+middle | end`; `labelColor` reuses the same 13-value palette as `color`. An
+unrecognized value is `ir/invalid-style-value`, same as the other style
+props. Named `textAlign`, not `align`: `align` is already the container
+cross-axis alignment prop on `<Doc>`/`<Frame>` (see B1) and reusing it here
+would make the same prop name mean two different things depending on which
+component reads it. `<Edge>` has no `labelColor` - `arrowShape` always
+emits an empty label today (arrow labels land in a later task), so it would
+be dead code. `<Frame>` has none of these three - tldraw's frame shape
+props are exactly `{ w, h, name, color }`.
 
 ## Layout
 
