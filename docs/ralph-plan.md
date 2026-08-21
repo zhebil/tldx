@@ -32,8 +32,12 @@ once A is done. The loop never terminates; the human stops it.
   `hexagonal` 5 -> 0 and `deep-nesting` 10 -> 9; against the real render the
   champion sits at 9 and 10, so that claim is void and B27 rests on a 3-2 judge
   vote whose two losses were on those same two files. Re-judging it is **B30**,
-  now top of the backlog. **B29** (let the judge return a tie) still stands and
-  should land before any further arrow hypothesis is judged.
+  now top of the backlog. **B29** (let the judge return a tie) landed at wake 33,
+  so B30 can now be judged.
+- **The judge may answer `WINNER: TIE`** since wake 33 (B29). Ties count as
+  neither wins nor losses, and the ledger distinguishes a *judged tie* from a
+  *structural tie* (a file never sent to a judge because nothing changed). The
+  exact prompt wording is fixed in protocol step 5 - use it verbatim.
 - Last drift audit (protocol step 9): **wake 30** - epoch established, audit
   vacuous, nothing to compare against. Epoch saved at
   `docs/baselines/wake-30/`. **Next audit: wake 35**, and it is the first real
@@ -440,6 +444,12 @@ One hypothesis per wake. Never batch. Never stop.
    judge). Ask for a winner and one sentence of reasoning. Never ask for a
    numeric score — pairwise comparison only.
 
+   **The judge may answer `WINNER: TIE`, and must be told so.** Required wording
+   in the prompt: *"Answer `WINNER: A`, `WINNER: B`, or `WINNER: TIE`. Choose
+   TIE only when you can see no difference that matters to a reader of the
+   diagram - do not use it to avoid a call you can make, and do not break a
+   genuine tie by guessing."* Never tell the judge how ties are counted.
+
    The judge must look at the images. Tell it explicitly: **where the render and
    the geometry report disagree, the render is the truth.** The report describes
    what layout intended; the PNG shows what tldraw actually drew.
@@ -456,6 +466,18 @@ One hypothesis per wake. Never batch. Never stop.
    - Losses **strictly greater than** wins → **REVERT**.
    - Everything else - more wins, equal wins and losses, or no voting files at
      all → **KEEP**.
+
+   **A judged tie counts as neither a win nor a loss.** It is recorded in the
+   ledger table as a *judged tie*, kept distinct from the *structural tie* of
+   step 5 (a file that never went to a judge because nothing changed). A
+   candidate whose every voting file comes back a judged tie is still a KEEP,
+   under the "no voting files at all" clause - so this does not re-introduce the
+   revert-everything failure mode. It only stops counting coin flips as
+   evidence: before this rule the judge was told not to hedge, so an
+   indistinguishable pair was decided by position, and under keep-by-default
+   that silently converted no-information files into candidate votes whenever
+   the randomiser favoured one label (B27 scored two of its three wins as "A
+   wins by default", with the candidate at A on 4 of 5 files).
 
    This inverts the burden of proof deliberately. The five objective gates
    already block measurable breakage, so the judge's job is to catch the
@@ -865,7 +887,7 @@ Ordered. Take from the top. Strike through when resolved.
   is a full A/B and needs its own gates and judge - do not shortcut it into a
   bare revert.
 
-- [ ] **B29** _(from B27, wake 31)_ **Let the judge return a tie.** Step 5 tells
+- [x] ~~**B29** _(from B27, wake 31)_ **Let the judge return a tie.** Step 5 tells
   the judge not to hedge, so a visually indistinguishable pair is decided by
   position rather than by content - two of B27's three wins were literally "A
   wins by default". Under keep-by-default that converts no-information cases
@@ -875,7 +897,12 @@ Ordered. Take from the top. Strike through when resolved.
   them in the ledger table as ties. A candidate whose every voting file comes
   back a tie is still a KEEP under step 6's "no voting files at all" clause, so
   this does not re-introduce the revert-everything failure mode - it only stops
-  counting coin flips as evidence. **Also a protocol change, not an A/B.**
+  counting coin flips as evidence. **Also a protocol change, not an A/B.**~~
+  **DONE** _(wake 33)_ - steps 5 and 6 amended in place; the prompt wording the
+  judge must be given is fixed in step 5, and judged ties are now distinct from
+  structural ties in the ledger. Taken ahead of B30 because B30 is an arrow A/B
+  with a judge and the Status block required this to land first. Ledger entry in
+  `docs/layout-hypotheses.md`.
 
 - [ ] **B25** _(new, wake 26)_ Routing lanes in **placement**. Every arrow
   hypothesis so far (B3, B4a, B13, B14, B15) changed how arrows *attach*; none

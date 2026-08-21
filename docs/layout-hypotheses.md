@@ -1671,3 +1671,44 @@ Filed as B30, at the top of the backlog.
 **Verified.** `npm run check` green: 38 test files, 308 tests. Champion PNGs not
 regenerated - no shape moved, so they cannot have changed.
 
+
+---
+
+## B29 — the judge may return a tie _(wake 33)_ — **PROTOCOL CHANGE**
+
+Not an A/B. No code changed; nothing rendered; the champion is untouched.
+
+**The defect.** Step 5 told the fable judge to pick a winner and nothing else.
+A pair it genuinely cannot separate therefore still had to come back `A` or
+`B`, and the reasoning sentence said so out loud: two of B27's three wins at
+wake 31 were literally "A wins by default". Under keep-by-default that is not a
+harmless rounding - a no-information file becomes a *vote for whichever side the
+randomiser put at that label*, and at wake 31 the candidate sat at A on 4 of 5
+files. The protocol was converting coin flips into evidence of improvement, in
+the one step of the loop that exists to be evidence.
+
+**The change.** `docs/ralph-plan.md` step 5 now requires the prompt to offer
+`WINNER: TIE`, with fixed wording that scopes it ("no difference that matters to
+a reader of the diagram") so it does not become a way to dodge a call the judge
+can make. Step 6 excludes judged ties from both counts and records them in the
+ledger table as *judged ties*, distinct from step 5's *structural ties* (files
+never sent to a judge because neither report nor PNG changed). The judge is
+never told how ties are counted.
+
+**Why this does not restore the revert-everything failure mode.** The old rule
+that produced 10 reverts in 12 was "candidate needs strictly more wins, ties go
+to the champion". This is the opposite: a tie is subtracted from the
+denominator, not awarded to the champion. A candidate whose every voting file
+ties still lands under step 6's "no voting files at all → KEEP". The only thing
+that changes is that such a keep is now *recorded as unevidenced*, instead of
+being dressed up as a 2-0 or 3-2 win.
+
+**Ordering.** B30 was the top backlog entry and is an arrow A/B with a judge.
+The Status block already said B29 must land before any further arrow hypothesis
+is judged, so the two entries were swapped rather than taken in file order: B30
+re-judges the very vote whose 3-2 margin motivated this fix, and running it
+under the unfixed judge would reproduce the defect on the one file that matters
+most.
+
+**Verified.** `npm run check` green: 38 test files, 308 tests (unchanged - the
+diff is documentation only).
