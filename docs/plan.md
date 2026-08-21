@@ -632,7 +632,7 @@ trick: the lossless part is mechanical, the lossy part is supervised.
 
 ---
 
-## Phase 8 - ship it as a Claude Code plugin
+### Phase 8 - ship it as a Claude Code plugin
 
 tldsl was built to be agent-agnostic and stays that way: the DSL, the CLI, the
 layout engine and the viewer know nothing about any model. What changes is the
@@ -640,7 +640,7 @@ layout engine and the viewer know nothing about any model. What changes is the
 skill that teaches the vocabulary, hooks that react to diagram edits, and a
 command that drives the round-trip.
 
-### The rule that keeps the core honest
+#### The rule that keeps the core honest
 
 > **The plugin is a delivery mechanism, not a layer.** Everything a hook, skill
 > or command does is a plain `tldsl` CLI invocation. Delete the plugin directory
@@ -651,7 +651,7 @@ hook, "the core is agent-agnostic" becomes a claim nobody can check. As a rule
 it has a test: **every plugin file is either prose or a shell-out.** A hook that
 computes something is a bug.
 
-### What the plugin needs from the core
+#### What the plugin needs from the core
 
 | Command | State |
 |---|---|
@@ -664,7 +664,7 @@ computes something is a bug.
 `tools/` scripts are development-only: not in `bin`, not built by
 `tsconfig.build.json`, run through `tsx`. A hook cannot call them.
 
-### Confirmed plugin mechanics
+#### Confirmed plugin mechanics
 
 Checked against the Claude Code docs, not assumed. The constraints that shape
 the design:
