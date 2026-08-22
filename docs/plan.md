@@ -2529,7 +2529,42 @@ only test it gets against material T24 did not choose.
   only corpus render that moved (one arrow of sixteen files takes a non-default
   `labelPosition`) and its PNG is re-rendered. `npm run check` green, 665 tests
   / 59 files; three new unit tests in `routing.test.ts`.
-- [ ] **T38. Fix the next defect.**
+- [x] **T38. Fix the next defect.**
+  Took group 4 - D6 and D9's wrap half - and the two turned out to be unrelated
+  mechanisms. **D6 is an export race, not a font bug**: a box label leaves
+  `editor.toImage` as HTML in a `<foreignObject>` and the browser lays it out,
+  but an arrow label leaves as a `<text>` of absolutely-positioned `<tspan>`s
+  whose `x` values `SvgTextLabel` measures on a hidden DOM node at export time.
+  `exportImage` called `toImage` as soon as the first shape was attached, before
+  `tldraw_draw` had loaded, so every span was measured in the fallback
+  `sans-serif` (`one`=33.37, space=5.56) and drawn in `tldraw_draw` (37.20,
+  6.86), which the SVG embeds - each word placed on a slot 11% too narrow and
+  overrunning the next. Two awaits fixed it:
+  `editor.fonts.loadRequiredFontsForCurrentPage()` and `document.fonts.ready`.
+  That also explains what the font story could not - why `font="sans"` only
+  reduced the loss, and why the loss is uneven within one label.
+  **D9's wrap half is the clearance shortfall, measured**: tldraw squishes a
+  horizontal arrow's label unless the arrow *body* is `w + 64` long, and the
+  body is shorter than the gap because `straight-arrow.ts` pulls the end
+  terminal back by `BOUND_ARROW_OFFSET` (10) plus half the arrow's stroke and
+  half the shape's. `dequeue` needed a 136.2px body and got 127.4 - the "~50px"
+  in the ledger was an eyeball, the real shortfall is 8.8px.
+  `ARROW_LABEL_MARGIN` is now `64 + 13.5`.
+
+  Corpus + examples: crossings 43 -> 43, crowded pairs 2 -> 2, labels over a
+  shape 7 -> 7, labels over another label 8 -> **7** (`c4-container`), no file
+  worse on any counter. That flatness is the finding - D6 changes no geometry
+  whatsoever, so no tool in this repo could ever have seen it; it is only in the
+  pixels. `examples/tcp-states` now reads `recv SYN / SYN+ACK`, `close / FIN`,
+  `recv ACK / -` throughout where it read `recvSYN/SYN+ACK` before, and
+  `web-architecture`'s `streaming replication` and `dequeue` both come out on
+  one correctly-spaced line. Four corpus renders moved (`c4-context`,
+  `checkout-services`, `order-states`, `request-lifecycle`) and all sixteen were
+  regenerated; three of those four were carrying pre-T35 drift already.
+  `npm run check` green, 665 tests / 59 files; the two `T12` clearance tests now
+  pin `+ 77.5` instead of `+ 64`. Not fixed, and still open in the ledger: a row
+  reserves nothing at all for an edge that skips a sibling.
+
   Four wakes, each taking the highest unfixed entry from T34's ordered list.
   Same rules as the rest of the plan: smallest test at the right layer,
   `npm run check` green, re-render every affected example and look at it.
@@ -2952,6 +2987,30 @@ as-is.
   would have been a program.
 
 ## Discovered work
+
+- **T38: nothing in the repo can see a text-rendering defect.** D6 was in every
+  PNG in `docs/renders/` for the whole of Phase 9 and every counter read zero,
+  because it changes no geometry: the shapes, the arrows and the label boxes are
+  all where they should be, only the glyphs inside them are wrong. The tools
+  read `editor` state; the defect lives in the raster. A cheap check would be to
+  export the SVG (`--format svg`, already supported) and assert that consecutive
+  `<tspan>` `x` values differ by the advance the same string measures in the
+  page - one comparison, no pixels, and it would have caught this on the first
+  render that had a two-word arrow label.
+- **T38: `SvgTextLabel` measures with a literal family name, the geometry
+  measures with a CSS variable.** `getArrowLabelSize` asks for
+  `var(--tl-font-draw)` and `SvgTextLabel` for `'tldraw_draw', sans-serif`. Both
+  resolve to the same font once it has loaded, so this was not the cause here -
+  but it is why the label *box* was the right size in exactly the export where
+  the *spans* inside it were not, which cost an hour of the wake to unpick. Any
+  future "the box is right, the text is wrong" symptom starts there.
+- **T38: `ARROW_LABEL_MARGIN` hard-codes size `m` for both strokes.** The
+  arrowhead setback is `10 + arrowStroke/2 + shapeStroke/2`, and the constant
+  assumes 1.75 for each, which is size `m`. An `<Edge size="xl">` into an
+  `<Box size="xl">` sets back 20px and would be 6.5px short again. The edge's
+  own size is available in `labelClearanceGap`; the bound shape's is not,
+  without threading it through. Left as a constant because every corpus fixture
+  uses the default.
 
 - **T37: the label-collision counter cannot tell stacked from overprinted.**
   `arrow labels overlapping another label` counts any two label boxes that

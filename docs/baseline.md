@@ -805,3 +805,75 @@ sizing question, not a placement one; D8's routing half is D21's. Sliding along
 the arrow cannot help when the whole arrow is inside a shape's span, which is
 what `tcp-states`' remaining two overlaps and `c4-container`'s `Mobile App`
 pile are.
+
+## T38 - an arrow label is measured in the font it is drawn in (D6, D9)
+
+Group 4 of the triage, and the two entries turned out to be two unrelated
+mechanisms that happened to produce the same complaint - the render showing a
+string the author never wrote.
+
+**D6 - the vanishing spaces are an export race, not a font bug.** A `<Box>`
+label leaves `editor.toImage` as HTML inside a `<foreignObject>`; the browser
+lays it out and the spaces are whatever the font says. An arrow label leaves as
+a `<text>` whose `<tspan>`s each carry an absolute `x`, and `SvgTextLabel`
+computes those by calling `editor.textMeasure.measureTextSpans` on a hidden DOM
+node **at export time**. `exportImage` fired `toImage` the moment the first
+shape was attached, which is before `tldraw_draw` has loaded, so the spans were
+measured in the fallback `sans-serif` and then drawn in `tldraw_draw`, which
+the exported SVG embeds:
+
+| | `one` | space | `two` | `three` | total |
+|---|---|---|---|---|---|
+| measured (`sans-serif` fallback) | 33.37 | 5.56 | 31.12 | 45.59 | 121.19 |
+| drawn (`tldraw_draw`, embedded) | 37.20 | 6.86 | 41.64 | 57.40 | 149.96 |
+
+Every word is placed on a slot ~11% narrower than the glyphs that go in it, so
+each word overruns into the next and the gaps close. The exported SVG for the
+`d6` repro carried `x="39.789"`, `x="73.148"`, `x="78.711"` - the fallback
+advances exactly. It explains the two things the "draw font eats spaces" story
+never could: `font="sans"` only *reduced* the loss because `tldraw_sans` is
+closer to the fallback than `tldraw_draw` is, and the loss is uneven within one
+label because the error accumulates per word rather than per space. The fix is
+two awaits in `src/infra/render/export-image.ts`:
+
+```ts
+await editor.fonts.loadRequiredFontsForCurrentPage();
+await document.fonts.ready;
+```
+
+after which the same export carries `x="25.031"`, `x="62.219"`, `x="69.078"` -
+the real advances - and `examples/tcp-states` reads `recv SYN / SYN+ACK`
+throughout instead of `recvSYN/SYN+ACK`.
+
+**D9 - the clearance shortfall, measured instead of estimated.** tldraw squishes
+a horizontal arrow's label to `max(min(w, 64), min(bodyWidth - 64, w))` and
+re-measures the text at that width, so the label wraps unless the arrow *body*
+is at least `w + 64` long. `labelClearanceGap` reserved exactly `w + 64` on the
+**gap** - but the body is shorter than the gap, because `straight-arrow.ts`
+pulls the end terminal back by `BOUND_ARROW_OFFSET` (10) plus half the arrow's
+stroke and half the bound shape's (1.75 each at size `m`). In the repro
+`dequeue` needs a 136.2px body and got 127.4; the ledger's "~50px short" was an
+eyeball, the real shortfall is 8.8px of body. `ARROW_LABEL_MARGIN` is now
+`64 + 13.5`.
+
+Corpus + examples, `tools/arrow-truth.mts`:
+
+| counter | before | after |
+|---|---|---|
+| arrow paths crossing a non-endpoint shape | 43 | 43 |
+| arrow pairs crowding each other | 2 | 2 |
+| arrow labels overlapping a non-endpoint shape | 7 | 7 |
+| arrow labels overlapping another label | 8 | **7** |
+
+The only counter that moved is `c4-container`'s label-label collisions, 2 -> 1;
+no file got worse on any counter. That is the point - the margin bump is 13.5px
+on gaps that already exist, and D6 is invisible to every counter in the repo
+because it changes no geometry at all. It only shows up in the pixels. Four
+corpus renders moved (`c4-context`, `checkout-services`, `order-states`,
+`request-lifecycle`) and all sixteen were regenerated; three of those four were
+already carrying pre-T35 drift.
+
+Still open from this group: `labelClearanceGap` reserves nothing at all for an
+edge that skips a sibling (`Math.abs(from - to) !== 1` bails), which is the
+half of D9 T37 also declined. And the fix is per-render, not per-viewer: the
+live viewer never had the space bug, because the DOM lays the label out itself.

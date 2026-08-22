@@ -21,7 +21,7 @@ decision.
 | 1 | **An edge is a straight segment between two shape centres, and that is the whole path model** | D1, D5, D14 (+ D21, D8 routing half) | blocker | 6 / 6 | **T35** - D1 and D5 fixed, D14 half fixed in `729f3bd` |
 | 2 | **`layout="auto"` reaches ELK with none of its inputs** | D7 | blocker | 1 / 6 | **T36** - fixed |
 | 3 | **An edge label is stamped at the geometric midpoint and nothing reserves room for it** | D13, D11, D8 (label half), D9 (clearance half) | wrong | 5 / 6 | **T37** - D13 and D11 fixed, D8's label half fixed; D9's clearance half open |
-| 4 | **Arrow label text is measured and wrapped by a different path than box label text** | D6, D9 (wrap half) | wrong | 3 / 6 | **T38** |
+| 4 | **Arrow label text is measured and wrapped by a different path than box label text** | D6, D9 (wrap half) | wrong | 3 / 6 | **T38** - both fixed; D9's skip-edge clearance open |
 | 5 | **A shape is sized by its own contents and the documented cap does not hold** | D3, D16, D20 | wrong | 3 / 6 | open |
 | 6 | **The primitive set cannot say what the notation requires** | D17, D18, D2, D4 | ugly | 4 / 6 | open |
 | 7 | **Sibling tiers are each sized to their own contents, so a layered stack is ragged** | D10 | ugly | 1 / 6 | open |
@@ -95,6 +95,18 @@ code path T0 never reached; the same string on a `<Box>` in the same font is
 correct. T32 killed the `font="sans"` workaround - the loss survives it, and is
 uneven *within* one label, which is what justification with no word-spacing
 budget looks like.
+
+**T38 fixed both, and they were two unrelated mechanisms.** The vanishing
+spaces are an export race, not a layout bug: a box label exports as HTML inside
+a `<foreignObject>` and the browser lays it out, but an arrow label exports as
+a `<text>` of absolutely-positioned `<tspan>`s whose `x` values tldraw measures
+in the DOM at export time (`SvgTextLabel` → `measureTextSpans`). `tldsl render`
+called `editor.toImage` as soon as a shape existed, before the webfont had
+loaded, so every `x` was a fallback-`sans-serif` advance while the SVG embedded
+and drew the real `tldraw_draw` - words placed on narrow-font slots and drawn in
+a wide font overprint each other. The mid-word wrap is the clearance shortfall
+D9 describes, measured exactly. Neither touches the wrap logic itself, which
+was always correct.
 
 ### 5-8. Open after T38
 
@@ -307,7 +319,24 @@ blocker.
   within one label, some gaps widened and others closed, which is what a
   justification pass with no word-spacing budget looks like. See also D9, which
   saw the same thing in `streaming replication`.
-- **Status:** open
+- **Status:** fixed in T38. Not a font bug and not a measurement bug - an export
+  race. A `<Box>` label leaves `editor.toImage` as HTML in a `<foreignObject>`,
+  so the browser lays it out and the spaces are whatever the font says. An arrow
+  label leaves as a `<text>` whose `<tspan>`s each carry an absolute `x`, and
+  those `x` values come from `SvgTextLabel` calling `measureTextSpans` on a
+  hidden DOM node **at export time**. `tldsl render` fired `toImage` as soon as
+  the first shape was attached, before `tldraw_draw` finished loading, so the
+  spans were measured in the fallback `sans-serif` (`one`=33.37, space=5.56)
+  and then drawn in `tldraw_draw` (`one`=37.20, space=6.86) which the SVG
+  embeds - every word starts ~11% too far left of where its glyphs need to be,
+  and each word overruns into the next. That explains the two things the font
+  story could not: why `font="sans"` only *reduced* the loss (`tldraw_sans` is
+  closer to the fallback than `tldraw_draw` is, not immune to it), and why the
+  loss is uneven within one label (the error is cumulative per word, not per
+  space). `exportImage` now awaits `editor.fonts.loadRequiredFontsForCurrentPage()`
+  and `document.fonts.ready` before `toImage`. Every corpus and example render
+  with a multi-word arrow label reads correctly after it - `examples/tcp-states`
+  is now `recv SYN / SYN+ACK` throughout.
 
 ### D7. `layout="auto"` does not lay the graph out
 
@@ -387,7 +416,20 @@ blocker.
   in `font="sans"` (D6 is the `draw`-font version and has a font workaround;
   this one does not - `sans` is already the workaround).
 - **Repro:** `examples/repro/d9-arrow-label-mid-word-wrap.tldsl.jsx`
-- **Status:** open
+- **Status:** wrap half and adjacent-pair clearance fixed in T38; skip-edge
+  clearance still open. tldraw squishes a horizontal arrow's label to
+  `max(min(w, 64), min(bodyWidth - 64, w))` and re-measures at that width, so
+  the label wraps unless the arrow **body** is at least `w + 64` long
+  (`arrowLabel.ts`). `labelClearanceGap` reserved exactly `labelWidth + 64` on
+  the *gap*, but the body is shorter than the gap: `straight-arrow.ts` pulls the
+  end terminal back by `BOUND_ARROW_OFFSET` (10) plus half the arrow's stroke
+  and half the bound shape's (1.75 each at size `m`). `dequeue` needed a 136.2px
+  body and got 127.4 - the ~50px in the title above was an eyeball, the real
+  shortfall was 8.8px of body. `ARROW_LABEL_MARGIN` is now `64 + 13.5` and the
+  repro renders `dequeue` on one line, as does `streaming replication` in
+  `web-architecture`. The second half of this entry - a row reserves *nothing*
+  for an edge that skips a sibling - is untouched: `labelClearanceGap` still
+  bails on `Math.abs(from - to) !== 1`.
 
 ### D10. Sibling tiers in a column are each sized to their own contents, so a layered stack is ragged
 
