@@ -20,7 +20,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { runAbsorbCli, type AbsorbIo } from "../../src/cli/absorb.js";
 import { compileFile, type CompileFileDeps } from "../../src/app/compile-file.js";
-import type { AbsorbDeps } from "../../src/app/absorb.js";
+import { runAbsorb, type AbsorbDeps } from "../../src/app/absorb.js";
 import { arrowShape, boxShape } from "../../src/contracts/builders.js";
 import { OVERLAY_VERSION, type Overlay, type OverlayEntry } from "../../src/contracts/overlay.js";
 import type { SceneJSON, TLRecord } from "../../src/contracts/scene-json.js";
@@ -206,5 +206,182 @@ describe("e2e: tldsl absorb - canvas-first case (T22 acceptance criterion)", () 
     const overlayAfter = await readFile(overlayPathFor(path), "utf8");
     expect(sourceAfter).toBe(sourceBefore);
     expect(overlayAfter).toBe(overlayBefore);
+  });
+});
+
+/**
+ * E2E for the move ladder (tldsl-d3o, docs/round-trip-scope.md §2, §7 F4.4).
+ * Each test builds the *ground truth* by compiling a second, already-edited
+ * source (reordered children / a wider gap) and reads the dragged shape's
+ * real coordinates back off that compile - so the overlay entry under test
+ * is exactly what a real drag would produce, not a hand-guessed number.
+ */
+describe("e2e: tldsl absorb - move ladder (tldsl-d3o)", () => {
+  const ROW_SOURCE = [
+    'import { Doc, Box } from "tldsl";',
+    "",
+    "export default function Diagram() {",
+    "  return (",
+    '    <Doc layout="row">',
+    '      <Box id="a" w="100" h="50" />',
+    '      <Box id="b" w="100" h="50" />',
+    '      <Box id="c" w="100" h="50" />',
+    "    </Doc>",
+    "  );",
+    "}",
+    "",
+  ].join("\n");
+
+  const REORDERED_SOURCE = [
+    'import { Doc, Box } from "tldsl";',
+    "",
+    "export default function Diagram() {",
+    "  return (",
+    '    <Doc layout="row">',
+    '      <Box id="c" w="100" h="50" />',
+    '      <Box id="a" w="100" h="50" />',
+    '      <Box id="b" w="100" h="50" />',
+    "    </Doc>",
+    "  );",
+    "}",
+    "",
+  ].join("\n");
+
+  /** Same relaxation `app/absorb.ts`'s own `diffIds` applies: `index` is an
+   *  emit-order artifact a reorder necessarily reassigns, not user data
+   *  (docs/round-trip-scope.md §4) - comparing it here would fail every
+   *  successful reorder for the right reason done. */
+  function stripIndex(scene: SceneJSON): SceneJSON {
+    const store = Object.fromEntries(
+      Object.entries(scene.store).map(([id, record]) => [
+        id,
+        Object.fromEntries(Object.entries(record).filter(([key]) => key !== "index")),
+      ]),
+    ) as SceneJSON["store"];
+    return { store, schema: scene.schema };
+  }
+
+  it("absorbs a 3-way rearrangement as a reordered <Box> list, not raw coordinates", async () => {
+    // A real drag only moves the one shape you touch - it never relocates
+    // its siblings (R1's "one drag, one overlay entry" bar). So a clean
+    // "move C in front of A" landing, with A and B undisturbed, needs A and
+    // B to have been dragged into their new slots too: three `moved`
+    // entries, one per shape, all pointing at where a `(c, a, b)` reorder
+    // would put them.
+    const dir = await makeWorkDir();
+    const path = join(dir, "diagram.tldsl.jsx");
+    const deps = makeDeps();
+    await deps.fsWrite.write(path, ROW_SOURCE);
+
+    const base = (await compileFile(path, compileFileDeps(deps))).sceneJson;
+    if (base === null) throw new Error("row fixture failed to compile");
+
+    const reorderedPath = join(dir, "reordered.tldsl.jsx");
+    await deps.fsWrite.write(reorderedPath, REORDERED_SOURCE);
+    const reordered = (await compileFile(reorderedPath, compileFileDeps(deps))).sceneJson;
+    if (reordered === null) throw new Error("reordered ground-truth fixture failed to compile");
+
+    const overlay: Overlay = {
+      v: OVERLAY_VERSION,
+      basedOn: sceneHash(base),
+      entries: {
+        "shape:a": { moved: { x: reordered.store["shape:a"]!.x as number, y: reordered.store["shape:a"]!.y as number } },
+        "shape:b": { moved: { x: reordered.store["shape:b"]!.x as number, y: reordered.store["shape:b"]!.y as number } },
+        "shape:c": { moved: { x: reordered.store["shape:c"]!.x as number, y: reordered.store["shape:c"]!.y as number } },
+      },
+    };
+    await writeOverlay(deps, path, overlay);
+    const target = applyOverlay(overlay, base).scene;
+
+    const result = await runAbsorb({ path, force: false }, deps);
+    if (result.status !== "absorbed") throw new Error(`expected absorbed, got ${JSON.stringify(result)}`);
+    expect(result.absorbedIds.sort()).toEqual(["shape:a", "shape:b", "shape:c"]);
+    expect(result.residualCount).toBe(0);
+
+    const rewritten = await readFile(path, "utf8");
+    const order = [...rewritten.matchAll(/<Box id="(\w)"/g)].map((m) => m[1]);
+    expect(order).toEqual(["c", "a", "b"]);
+
+    const rewrittenScene = (await compileFile(path, compileFileDeps(deps))).sceneJson;
+    if (rewrittenScene === null) throw new Error("rewritten source failed to compile");
+    assert.deepStrictEqual(stripIndex(rewrittenScene), stripIndex(target));
+
+    const overlayOnDisk = JSON.parse(await readFile(overlayPathFor(path), "utf8")) as Overlay;
+    expect(overlayOnDisk.entries).toEqual({});
+  });
+
+  it("absorbs dragging the last child further away as a wider gap", async () => {
+    const dir = await makeWorkDir();
+    const path = join(dir, "diagram.tldsl.jsx");
+    const deps = makeDeps();
+    const source = [
+      'import { Doc, Box } from "tldsl";',
+      "",
+      "export default function Diagram() {",
+      "  return (",
+      '    <Doc layout="row" gap="40">',
+      '      <Box id="a" w="100" h="50" />',
+      '      <Box id="b" w="100" h="50" />',
+      "    </Doc>",
+      "  );",
+      "}",
+      "",
+    ].join("\n");
+    await deps.fsWrite.write(path, source);
+
+    const base = (await compileFile(path, compileFileDeps(deps))).sceneJson;
+    if (base === null) throw new Error("fixture failed to compile");
+    const bBase = base.store["shape:b"]!;
+    const draggedX = (bBase.x as number) + 60;
+
+    const overlay: Overlay = {
+      v: OVERLAY_VERSION,
+      basedOn: sceneHash(base),
+      entries: { "shape:b": { moved: { x: draggedX, y: bBase.y as number } } },
+    };
+    await writeOverlay(deps, path, overlay);
+    const target = applyOverlay(overlay, base).scene;
+
+    const result = await runAbsorb({ path, force: false }, deps);
+    if (result.status !== "absorbed") throw new Error(`expected absorbed, got ${JSON.stringify(result)}`);
+    expect(result.absorbedIds).toContain("shape:b");
+
+    const rewritten = await readFile(path, "utf8");
+    expect(rewritten).toContain('gap="100"');
+
+    const rewrittenScene = (await compileFile(path, compileFileDeps(deps))).sceneJson;
+    if (rewrittenScene === null) throw new Error("rewritten source failed to compile");
+    assert.deepStrictEqual(rewrittenScene, target);
+  });
+
+  it("leaves an unreproducible drag in the overlay and says which shape and why", async () => {
+    const dir = await makeWorkDir();
+    const path = join(dir, "diagram.tldsl.jsx");
+    const deps = makeDeps();
+    await deps.fsWrite.write(path, ROW_SOURCE);
+
+    const base = (await compileFile(path, compileFileDeps(deps))).sceneJson;
+    if (base === null) throw new Error("row fixture failed to compile");
+    const bBase = base.store["shape:b"]!;
+    // b is a middle child - not the last, so no gap candidate exists - and
+    // a 5px nudge doesn't land on any of the discrete reorder slots.
+    const overlay: Overlay = {
+      v: OVERLAY_VERSION,
+      basedOn: sceneHash(base),
+      entries: { "shape:b": { moved: { x: (bBase.x as number) + 5, y: bBase.y as number } } },
+    };
+    await writeOverlay(deps, path, overlay);
+
+    const result = await runAbsorb({ path, force: false }, deps);
+    if (result.status !== "absorbed") throw new Error(`expected absorbed (with nothing actually absorbed), got ${JSON.stringify(result)}`);
+    expect(result.absorbedIds).toEqual([]);
+    expect(result.residualCount).toBe(1);
+    expect(result.moveNotes).toBeDefined();
+    expect(result.moveNotes?.some((n) => n.startsWith("shape:b:"))).toBe(true);
+
+    const overlayOnDisk = JSON.parse(await readFile(overlayPathFor(path), "utf8")) as Overlay;
+    expect(overlayOnDisk.entries["shape:b"]).toEqual({ moved: { x: (bBase.x as number) + 5, y: bBase.y as number } });
+    const sourceAfter = await readFile(path, "utf8");
+    expect(sourceAfter).toBe(ROW_SOURCE);
   });
 });
