@@ -161,6 +161,9 @@ export function labelExtent(label: string, w: number, ts?: TextStyle): { wl: num
 
 export type BoxStyle = TextStyle & { geo?: StyleGeo };
 
+/** How much room a label that overflows its box actually needs, in px. */
+export type LabelOverflow = { neededW: number; neededH: number };
+
 type GeoModel = "rect" | "ellipse" | "diamond" | "triangle" | "arrow";
 
 /**
@@ -207,6 +210,44 @@ const GEO_FIT: Record<Exclude<GeoModel, "rect">, (a: number, b: number) => numbe
   triangle: (a, b) => 2 * a + b,
   arrow: (a, b) => Math.max(a / 0.68, b / 0.24),
 };
+
+/**
+ * Whether `label`, wrapped to the box's *actual* `w`, needs more room than
+ * the box's actual `w`x`h` gives it. `geoScale`/`estimatedBoxSize` compute a
+ * size a box *should* be; this checks a size a box *already is* - the two
+ * diverge whenever something else won the box's final geometry (an explicit
+ * `w`/`h` on the element, or a container's shared-size vote), so the label
+ * was never re-measured against what it actually got. Returns the room the
+ * label needs, or `undefined` if it already fits.
+ *
+ * Same containment math as `geoScale`'s convergence check (`fit(wl/w, hl/h)`
+ * for a non-rect outline); a `rect` box has no such formula in `GEO_FIT`
+ * because a rectangle's fit is the padding arithmetic `boxHeightForWidth`
+ * already does, so it's inlined here instead of extending that table for one
+ * case that isn't a containment ratio.
+ */
+export function labelOverflow(
+  label: string | undefined,
+  w: number,
+  h: number,
+  style?: BoxStyle,
+): LabelOverflow | undefined {
+  if (label === undefined || label.length === 0) return undefined;
+  const { wl, hl } = labelExtent(label, w, style);
+  const model = GEO_MODEL[style?.geo ?? "rectangle"];
+
+  if (model === "rect") {
+    const contentW = w - BOX_LABEL_PAD_X;
+    const neededH = hl + BOX_PAD_Y * 2;
+    if (neededH <= h + 0.5 && wl <= contentW + 0.5) return undefined;
+    return { neededW: Math.ceil(wl + BOX_LABEL_PAD_X), neededH: Math.ceil(neededH) };
+  }
+
+  const fit = GEO_FIT[model];
+  const overflow = fit(wl / w, hl / h);
+  if (overflow <= 1.001) return undefined;
+  return { neededW: Math.ceil(w * overflow), neededH: Math.ceil(h * overflow) };
+}
 
 /**
  * Per-box scale `k >= 1` applied to both width and height so a label still

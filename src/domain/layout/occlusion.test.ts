@@ -43,8 +43,8 @@ function edge(input: { id: string; from: string; to: string; label?: string }): 
 describe("computeOcclusionDiagnostics", () => {
   it("returns nothing for a diagram with no overlaps", () => {
     const ir = doc([
-      box({ id: "a", x: 0, y: 0, w: 100, h: 50, label: "A" }),
-      box({ id: "b", x: 200, y: 0, w: 100, h: 50, label: "B" }),
+      box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" }),
+      box({ id: "b", x: 200, y: 0, w: 120, h: 62, label: "B" }),
       edge({ id: "ab", from: "a", to: "b" }),
     ]);
     expect(computeOcclusionDiagnostics(ir)).toEqual([]);
@@ -52,8 +52,8 @@ describe("computeOcclusionDiagnostics", () => {
 
   it("warns, naming both shapes, when two unrelated shapes' rects overlap", () => {
     const ir = doc([
-      box({ id: "a", x: 0, y: 0, w: 100, h: 50, label: "A" }),
-      box({ id: "b", x: 50, y: 0, w: 100, h: 50, label: "B" }),
+      box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" }),
+      box({ id: "b", x: 50, y: 0, w: 120, h: 62, label: "B" }),
     ]);
     const diags = computeOcclusionDiagnostics(ir);
     expect(diags).toHaveLength(1);
@@ -70,7 +70,7 @@ describe("computeOcclusionDiagnostics", () => {
         y: 0,
         w: 200,
         h: 200,
-        children: [box({ id: "inner", x: 10, y: 10, w: 50, h: 50, label: "Inner" })],
+        children: [box({ id: "inner", x: 10, y: 10, w: 120, h: 62, label: "Inner" })],
       }),
     ]);
     expect(computeOcclusionDiagnostics(ir)).toEqual([]);
@@ -79,9 +79,9 @@ describe("computeOcclusionDiagnostics", () => {
   it("warns, naming the covered shape, when an edge label lands on a shape the edge doesn't connect", () => {
     // a -> c skips over b, which sits directly on the midpoint of the chord.
     const ir = doc([
-      box({ id: "a", x: 0, y: 0, w: 40, h: 40, label: "A" }),
-      box({ id: "b", x: 80, y: 0, w: 40, h: 40, label: "B" }),
-      box({ id: "c", x: 160, y: 0, w: 40, h: 40, label: "C" }),
+      box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" }),
+      box({ id: "b", x: 80, y: 0, w: 120, h: 62, label: "B" }),
+      box({ id: "c", x: 160, y: 0, w: 120, h: 62, label: "C" }),
       edge({ id: "ac", from: "a", to: "c", label: "skip" }),
     ]);
     const diags = computeOcclusionDiagnostics(ir);
@@ -94,7 +94,7 @@ describe("computeOcclusionDiagnostics", () => {
   it("does not warn about a labelled edge's own endpoints", () => {
     const ir = doc([
       box({ id: "a", x: 0, y: 0, w: 200, h: 200, label: "A" }),
-      box({ id: "b", x: 50, y: 50, w: 40, h: 40, label: "B" }),
+      box({ id: "b", x: 50, y: 50, w: 120, h: 62, label: "B" }),
       edge({ id: "ab", from: "a", to: "b", label: "go" }),
     ]);
     const diags = computeOcclusionDiagnostics(ir);
@@ -103,12 +103,29 @@ describe("computeOcclusionDiagnostics", () => {
 
   it("names a note that buries another shape", () => {
     const ir = doc([
-      box({ id: "a", x: 0, y: 0, w: 40, h: 40, label: "A" }),
+      box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" }),
       note({ id: "n", x: 10, y: 10, w: 100, h: 100, text: "long note" }),
     ]);
     const diags = computeOcclusionDiagnostics(ir);
     expect(diags).toHaveLength(1);
     expect(diags[0]!.message).toContain("A");
     expect(diags[0]!.message).toContain("long note");
+  });
+
+  it("warns, naming the shape and the label, when a box's label doesn't fit its own box (D22)", () => {
+    const label =
+      "DUMB ZONE do not put smart logic here this box explicitly pins its width so the label wraps onto far more lines than the box's auto-computed height accounts for";
+    const ir = doc([box({ id: "dumb-zone", x: 0, y: 0, w: 160, h: 122, label })]);
+    const diags = computeOcclusionDiagnostics(ir);
+    const overflowDiags = diags.filter((d) => d.code === "layout/label-overflow");
+    expect(overflowDiags).toHaveLength(1);
+    expect(overflowDiags[0]).toMatchObject({ severity: "warning" });
+    expect(overflowDiags[0]!.message).toContain("dumb-zone");
+    expect(overflowDiags[0]!.message).toContain(label);
+  });
+
+  it("does not warn when a box's label fits its box", () => {
+    const ir = doc([box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" })]);
+    expect(computeOcclusionDiagnostics(ir).filter((d) => d.code === "layout/label-overflow")).toEqual([]);
   });
 });

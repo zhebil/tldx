@@ -9,6 +9,7 @@ import {
   fitBoxWidth,
   geoScale,
   labelExtent,
+  labelOverflow,
 } from "./defaults.js";
 import { lineHeightPx, textWidth } from "./glyph-metrics.js";
 
@@ -156,6 +157,47 @@ describe("geo-aware sizing (T15)", () => {
       const { wl, hl } = labelExtent(text, w);
       expect(fits[model[geo]!]!(wl / w, hl / h)).toBe(true);
       expect(geoScale(text, undefined, { geo })).toBeGreaterThanOrEqual(1);
+    }
+  });
+});
+
+describe("labelOverflow (D22)", () => {
+  it("is undefined for a box sized by estimatedBoxSize itself (the box always fits its own natural size)", () => {
+    const label = "a much longer label that wraps onto more than one line";
+    const { w, h } = estimatedBoxSize(label);
+    expect(labelOverflow(label, w, h)).toBeUndefined();
+  });
+
+  it("is undefined for an empty or absent label", () => {
+    expect(labelOverflow(undefined, 120, 62)).toBeUndefined();
+    expect(labelOverflow("", 120, 62)).toBeUndefined();
+  });
+
+  it("fires when a label is wrapped to a width narrower than the height was computed for (the explicit-w bug)", () => {
+    // This is D22 itself: estimatedBoxSize(label) picks a natural (wide,
+    // few-line) height; a box pinned to a much narrower width re-wraps the
+    // same label onto many more lines, and that height was never
+    // recomputed for it.
+    const label =
+      "DUMB ZONE do not put smart logic here this box explicitly pins its width so the label wraps onto far more lines than the box's auto-computed height accounts for";
+    const natural = estimatedBoxSize(label);
+    const pinnedW = 160;
+    const overflow = labelOverflow(label, pinnedW, natural.h);
+    expect(overflow).toBeDefined();
+    expect(overflow!.neededH).toBeGreaterThan(natural.h);
+  });
+
+  it("fires when an explicit h is too short for the label at the box's own width", () => {
+    const label = "one two three four five six seven eight nine ten";
+    const { w } = estimatedBoxSize(label);
+    expect(labelOverflow(label, w, 40)).toBeDefined();
+  });
+
+  it("stays consistent with estimatedBoxSize for non-rect geo: the box that size produces never overflows itself", () => {
+    for (const geo of ["diamond", "ellipse", "triangle"] as const) {
+      const label = "Health gate\nerror rate < 1% for 10 min";
+      const { w, h } = estimatedBoxSize(label, undefined, { geo });
+      expect(labelOverflow(label, w, h, { geo })).toBeUndefined();
     }
   });
 });
