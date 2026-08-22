@@ -12,7 +12,7 @@ export type {
   IRNote,
   IRNotePositioned,
 } from "./ir.js";
-export { isContainer } from "./ir.js";
+export { drawsChrome, isContainer } from "./ir.js";
 export { lower, type LowerResult } from "./lower.js";
 export {
   ARROWHEADS,

@@ -186,7 +186,7 @@ describe("hybridLayout", () => {
     const result = await layoutAst(
       doc({ layout: "col" }, [
         frame({ id: "outer", layout: "col", pad: 10, gap: 5 }, [
-          frame({ id: "inner", layout: "col", pad: 10, gap: 5 }, [
+          frame({ id: "inner", name: "Inner", layout: "col", pad: 10, gap: 5 }, [
             box({ id: "a", label: "A" }),
           ]),
         ]),
@@ -201,13 +201,30 @@ describe("hybridLayout", () => {
     const result = await layoutAst(
       doc({ layout: "col" }, [
         frame({ id: "outer", layout: "col", pad: 10, gap: 5 }, [
-          frame({ id: "inner", layout: "col", pad: 10, gap: 5 }, [box({ id: "a", label: "A" })], true),
+          frame(
+            { id: "inner", name: "Inner", layout: "col", pad: 10, gap: 5 },
+            [box({ id: "a", label: "A" })],
+            true,
+          ),
         ]),
       ]),
     );
     const outer = frameById(result.children, "outer");
     const inner = frameById(outer.children, "inner");
     expect(inner.y).toBe(10); // pad only - a group draws no title, no clearance needed
+  });
+
+  it("does not reserve title clearance above the first child when a nested frame has no name (D2)", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        frame({ id: "outer", layout: "col", pad: 10, gap: 5 }, [
+          frame({ id: "inner", layout: "col", pad: 10, gap: 5 }, [box({ id: "a", label: "A" })]),
+        ]),
+      ]),
+    );
+    const outer = frameById(result.children, "outer");
+    const inner = frameById(outer.children, "inner");
+    expect(inner.y).toBe(10); // pad only - an unnamed frame draws no title, no clearance needed
   });
 
   it("lays out a group's children exactly like the equivalent frame's children", async () => {
