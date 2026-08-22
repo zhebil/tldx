@@ -37,13 +37,24 @@
  *   whatever was last rendered;
  * - `putOverlay` is chained onto the same `inFlight` promise queue as
  *   compiles, so a recompile landing mid-write can't interleave with it.
+ * - `putOverlay` merges the fresh browser diff onto the on-disk overlay
+ *   (`mergeOverlayEntries`) rather than overwriting it - a source edit that
+ *   invalidates an entry's id must not delete it just because the browser's
+ *   next snapshot no longer mentions that id (tldsl-j3q).
  */
 
 import { sceneMessage } from "../contracts/builders.js";
 import { isOverlay, OVERLAY_VERSION } from "../contracts/overlay.js";
 import type { SceneJSON } from "../contracts/scene-json.js";
-import { applyOverlay, diffScenes, overlayPathFor, sceneHash } from "../domain/overlay/index.js";
+import {
+  applyOverlay,
+  diffScenes,
+  mergeOverlayEntries,
+  overlayPathFor,
+  sceneHash,
+} from "../domain/overlay/index.js";
 
+import { readOverlay } from "./absorb.js";
 import { compileFile, type CompileFileResult } from "./compile-file.js";
 import type { ExecutePort } from "./ports/execute.js";
 import { isFileNotFoundError, type FsReadPort, type FsWritePort } from "./ports/fs.js";
@@ -171,7 +182,24 @@ export function watchAndServe(
         .catch(() => undefined)
         .then(async () => {
           if (lastCompiled === null) return;
-          const entries = diffScenes(lastCompiled, snapshot);
+          const fresh = diffScenes(lastCompiled, snapshot);
+          // The fresh diff only knows the two scenes it was given - an id a
+          // source edit invalidated (its record no longer exists in
+          // `lastCompiled`) is silently absent from it, not marked
+          // `deleted`. Merging onto the on-disk overlay rather than
+          // overwriting it keeps that entry instead of losing it
+          // (tldsl-j3q; round-trip.md D2's "never silently drops an entry"
+          // extended to the write path).
+          const previous = await readOverlay(deps.fs, overlayPath);
+          const { entries, preserved } = mergeOverlayEntries(previous?.entries ?? {}, fresh);
+          if (preserved.length > 0) {
+            deps.log.log({
+              level: "warn",
+              code: "overlay/preserved",
+              msg: `kept ${preserved.length} overlay ${preserved.length === 1 ? "entry" : "entries"} not reflected in the current canvas (a source edit likely changed their ids): ${preserved.join(", ")}`,
+              fields: { ids: preserved },
+            });
+          }
           const overlay = { v: OVERLAY_VERSION, basedOn: sceneHash(lastCompiled), entries };
           await fsWrite.write(overlayPath, `${JSON.stringify(overlay, null, 2)}\n`);
           // The SSE transport replays its last message to new subscribers
