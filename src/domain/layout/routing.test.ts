@@ -122,7 +122,11 @@ describe("computeEdgeRoutes", () => {
       edge({ id: "ab", from: "a", to: "b" }),
     ]);
     const routes = computeEdgeRoutes(ir);
-    expect(routes.get("ab")).toBeUndefined();
+    // Straight, but no longer route-less: B13 attaches the facing edges
+    // explicitly rather than leaving tldraw to aim centre-to-centre.
+    expect(routes.get("ab")!.bend).toBe(0);
+    expect(routes.get("ab")!.startAnchor).toEqual({ x: 1, y: 0.5 });
+    expect(routes.get("ab")!.endAnchor).toEqual({ x: 0, y: 0.5 });
   });
 
   it("swings wide when the lane pass finds no viable side", () => {
@@ -143,7 +147,9 @@ describe("computeEdgeRoutes", () => {
     expect(route).toBeDefined();
     // Past `bottom`'s far edge (y 80) rather than the 13.5 the row alone wanted.
     expect(Math.abs(route!.bend)).toBeGreaterThan(60);
-    expect(route!.startAnchor).toBeUndefined();
+    // B13 attaches the facing edges first; the detour grows the bend around
+    // that, it does not fall back to a centre-to-centre chord.
+    expect(route!.startAnchor).toEqual({ x: 1, y: 0.5 });
   });
 
   it("signed clearance ignores a crossed shape sitting entirely on the far side of the anchored chord", () => {
@@ -329,7 +335,8 @@ describe("computeEdgeRoutes", () => {
     const ab2 = routes.get("ab2");
     expect(ab1).toBeDefined();
     expect(ab2).toBeDefined();
-    expect(ba).toBeUndefined();
+    // The middle lane keeps zero offset; B13 still attaches it face to face.
+    expect(ba!.bend).toBe(0);
     expect(ab1!.bend).not.toBe(0);
     expect(ab2!.bend).not.toBe(0);
     expect(Math.sign(ab1!.bend)).not.toBe(Math.sign(ab2!.bend));
@@ -343,7 +350,8 @@ describe("computeEdgeRoutes", () => {
       edge({ id: "ab", from: "a", to: "b" }),
     ]);
     const routes = computeEdgeRoutes(ir);
-    expect(routes.get("ab")).toBeUndefined();
+    expect(routes.get("ab")!.bend).toBe(0);
+    expect(routes.get("ab")!.startAnchor).toEqual({ x: 1, y: 0.5 });
   });
 
   describe("reciprocal pair label clearance (B1)", () => {

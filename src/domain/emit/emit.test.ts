@@ -346,7 +346,7 @@ describe("domain/emit", () => {
     });
   });
 
-  it("emits an edge as an arrow shape plus two bindings with default-center attach", () => {
+  it("emits an edge as an arrow shape plus two bindings, attached face to face", () => {
     const scene = emit(
       doc([
         box({ id: "a", x: 0, y: 0, w: 120, h: 60 }),
@@ -370,8 +370,13 @@ describe("domain/emit", () => {
     expect(end?.["toId"]).toBe("shape:b");
     expect((start?.props as { terminal: string }).terminal).toBe("start");
     expect((end?.props as { terminal: string }).terminal).toBe("end");
+    // B13: two boxes side by side attach on the facing edges, not centres.
     expect((start?.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor).toEqual({
-      x: 0.5,
+      x: 1,
+      y: 0.5,
+    });
+    expect((end?.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor).toEqual({
+      x: 0,
       y: 0.5,
     });
   });
