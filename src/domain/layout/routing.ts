@@ -20,12 +20,23 @@
  * taking the outermost lane. A lane's extra sag is dropped a step at a time
  * if it isn't viable (would bow into a neighbouring shape).
  *
- * An edge whose endpoints share no layout axis at all - the cross-container
- * case - has no lane and no side to reason about, so `detourAroundObstacles`
- * takes what the earlier passes left: it grows a bend on each side until the
- * arc tldraw would actually draw clears every box and note between the two
- * endpoints, and keeps the smaller of the two. An edge whose straight chord
- * is already clear gets nothing, so short hops stay straight lines.
+ * The candidate/lane pass's `crossed`/`gap` heuristics are analytic
+ * estimates, not ground truth - they only reason about shapes their own
+ * band-overlap test finds, so a shape that partially overlaps that band
+ * (rather than sitting fully inside or outside it) can be invisible to them
+ * and their sag can come up short of what the real render needs. Every
+ * non-self edge - whatever bend the candidate/lane pass, the fan, or neither
+ * proposed - therefore goes through one more, final check:
+ * `clearObstaclesOnEveryRoute` re-tests the edge's *actual* rendered arc
+ * against every non-endpoint box/note and grows the bend (`growBendClear`)
+ * if it doesn't clear. An edge with no committed side yet (the
+ * cross-container case, endpoints sharing no layout axis, where
+ * `computeCandidate` has nothing to work with) tries both sides and keeps
+ * whichever clears or comes closest; an edge whose side is already chosen
+ * only grows further on that same side. An edge whose straight chord is
+ * already clear is left alone, so short hops stay straight lines.
+ * `growBendClear` is the one growth loop this module has - `placeLabels`'s
+ * own last-resort label-driven growth reuses it too.
  */
 
 import type { IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
@@ -77,10 +88,6 @@ const FAN_STEP_CHORD_FACTOR = 0.3;
 /** Ceiling on the wider, label-aware fan step - see `labelAwareFanStep`. */
 const FAN_STEP_LABEL_MAX = 160;
 
-/** `placeLabels`'s last-resort bend growth: step size and step count - see its own comment. */
-const LABEL_GROW_STEP = 20;
-const LABEL_GROW_MAX_STEPS = 12;
-
 type RouteCandidate = {
   edgeId: string;
   axis: Axis;
@@ -126,7 +133,7 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
 
   fanSharedPairs(otherEdges, byId, shapes, routes);
 
-  detourAroundObstacles(otherEdges, byId, shapes, routes);
+  clearObstaclesOnEveryRoute(otherEdges, byId, shapes, routes);
 
   placeLabels(edges, byId, shapes, routes);
 
@@ -158,11 +165,11 @@ type LabelSlot = {
  * whole clearance band can overlap a shape at every candidate `t` (the same
  * arc-vs-label mismatch `labelAwareFanStep` documents, but here there's no
  * reciprocal sibling to fan against). When that happens, this grows the
- * edge's own `bend` a step at a time - the lever `fanSharedPairs` already
- * established - re-testing the label at the arc's own midpoint each step,
- * and keeps the smallest step that clears. See the `if (best.shapeScore > 0)`
- * block below for why growth checks only the midpoint and never an offset
- * `t` on top of it.
+ * edge's own `bend` via `growBendClear` - the same growth loop every other
+ * obstacle-avoiding bend in this module now shares - re-testing the label at
+ * the arc's own midpoint, and keeps the result only if it's actually better.
+ * See the `if (best.shapeScore > 0)` block below for why growth checks only
+ * the midpoint and never an offset `t` on top of it.
  */
 function placeLabels(
   edges: IREdge[],
@@ -253,21 +260,13 @@ function placeLabels(
         .filter((b): b is LabelBox => b !== null);
       const signs: (1 | -1)[] = slot.bend !== 0 ? [Math.sign(slot.bend) as 1 | -1] : [1, -1];
 
-      growth: for (const sign of signs) {
-        for (let step = 1; step <= LABEL_GROW_MAX_STEPS; step++) {
-          const candidateBend = slot.bend + sign * LABEL_GROW_STEP * step;
-          // Not monotone: the circular arc `edgeBendClearsObstacles` tests
-          // against can graze an obstacle at one sag and clear it again at a
-          // larger one, so a step that fails doesn't end the search - only
-          // the step cap does.
-          if (!edgeBendClearsObstacles(slot.edge, candidateBend, byId, blockerPool, otherLabelBoxes)) continue;
-          const box = boxAt({ ...slot, bend: candidateBend }, 0.5);
-          const { score, shapeScore } = scoreAt(box);
-          if (shapeScore < best.shapeScore || (shapeScore === best.shapeScore && score < best.score)) {
-            best = { t: 0.5, box, score, shapeScore };
-            bestBend = candidateBend;
-          }
-          if (shapeScore === 0 && score === 0) break growth;
+      const grownBend = growBendClear(slot.edge, slot.bend, byId, blockerPool, otherLabelBoxes, signs, undefined, false);
+      if (grownBend !== slot.bend) {
+        const box = boxAt({ ...slot, bend: grownBend }, 0.5);
+        const { score, shapeScore } = scoreAt(box);
+        if (shapeScore < best.shapeScore || (shapeScore === best.shapeScore && score < best.score)) {
+          best = { t: 0.5, box, score, shapeScore };
+          bestBend = grownBend;
         }
       }
     }
@@ -303,6 +302,17 @@ function bodyExitPoint(s: AbsShape, other: AbsShape): Point {
   if (dy !== 0) t = Math.min(t, ((dy > 0 ? s.y + s.h : s.y) - centre.y) / dy);
   if (!Number.isFinite(t)) return centre;
   return { x: centre.x + t * dx, y: centre.y + t * dy };
+}
+
+/**
+ * A route's actual terminal on `s`: the fixed `normalizedAnchor` face
+ * `finalizeRoute` chose for a candidate/lane edge, when one was chosen, or
+ * `bodyExitPoint`'s default ray-toward-`other`'s-centre point for every edge
+ * that never got an explicit anchor (fan, detour, unrouted). Obstacle checks
+ * that don't use the edge's actual terminal test the wrong line entirely.
+ */
+function terminalPoint(s: AbsShape, anchor: Point | undefined, other: AbsShape): Point {
+  return anchor ? { x: s.x + anchor.x * s.w, y: s.y + anchor.y * s.h } : bodyExitPoint(s, other);
 }
 
 function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
@@ -447,18 +457,19 @@ function edgeBendClearsObstacles(
   byId: Map<string, AbsShape>,
   blockerPool: AbsShape[],
   otherLabelBoxes: LabelBox[],
+  anchor?: Point,
 ): boolean {
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
   if (!from || !to) return true;
-  const start = bodyExitPoint(from, to);
-  const end = bodyExitPoint(to, from);
+  const start = terminalPoint(from, anchor, to);
+  const end = terminalPoint(to, anchor, from);
   const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
   const path = arcPolyline(start, end, bend);
   if (blockers.some((b) => polylineHitsBox(path, b))) return false;
 
   if (edge.label !== undefined) {
-    const box = approxLabelBox(edge, byId, bend);
+    const box = approxLabelBox(edge, byId, bend, anchor);
     // Inflated by `CLEAR_MARGIN`: the model this checks against is the same
     // approximation that missed the original overprint, so a near-miss here
     // is treated as a miss and this step is rejected in favour of a smaller one.
@@ -468,13 +479,13 @@ function edgeBendClearsObstacles(
 }
 
 /** Approximate label box at an edge's own midpoint for a given `bend` - `null` for an unlabelled or self edge. */
-function approxLabelBox(edge: IREdge, byId: Map<string, AbsShape>, bend: number): LabelBox | null {
+function approxLabelBox(edge: IREdge, byId: Map<string, AbsShape>, bend: number, anchor?: Point): LabelBox | null {
   if (!edge.label || edge.from === edge.to) return null;
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
   if (!from || !to) return null;
-  const start = bodyExitPoint(from, to);
-  const end = bodyExitPoint(to, from);
+  const start = terminalPoint(from, anchor, to);
+  const end = terminalPoint(to, anchor, from);
   const u = unit(start, end);
   const perp: Point = { x: -u.y, y: u.x };
   const w = arrowLabelWidth(edge.label, edge) + 2 * ARROW_LABEL_PADDING;
@@ -487,26 +498,41 @@ function approxLabelBox(edge: IREdge, byId: Map<string, AbsShape>, bend: number)
 
 /** Clearance an obstacle-avoiding detour keeps between the arc and the box it swings around. */
 const DETOUR_MARGIN = 20;
-/** Minimum growth per attempt, so the search always makes progress. */
-const DETOUR_STEP = 24;
-const DETOUR_MAX_ROUNDS = 12;
 /** Points sampled along the arc when testing it against a box. */
 const DETOUR_SAMPLES = 48;
 
+/** Minimum growth per round, so the search always makes progress even when `requiredDetourSag` reports 0 (a label-only violation, nothing in the arc's own path). */
+const GROW_STEP = 24;
+const GROW_MAX_ROUNDS = 12;
+
 /**
- * Last resort for an edge no earlier pass claimed: if its straight chord runs
- * through boxes it does not connect - the cross-container case of `docs/
- * diagram-defects.md` D21, where the two endpoints share no layout axis and
- * `computeCandidate` therefore has nothing to work with - bow it around them.
+ * The single obstacle-clearance decision every non-self edge goes through
+ * once the candidate/lane pass and the shared-pair fan (`fanSharedPairs`)
+ * have each proposed an initial bend - or left the edge at its default
+ * straight chord, the cross-container case of `docs/diagram-defects.md` D21
+ * where the two endpoints share no layout axis and `computeCandidate` has
+ * nothing to work with. Re-tests the edge's *actual* rendered arc against
+ * every non-endpoint box/note, using the same accurate circular-arc check
+ * `placeLabels`'s own last-resort growth relies on (`edgeBendClearsObstacles`),
+ * and grows the bend (`growBendClear`) if it doesn't clear.
  *
- * Both sides are tried and the smaller detour wins; an edge whose chord is
- * already clear (every short hop, and every long one that happens to run
- * through empty space) is left alone, which is what keeps a 159px backwards
- * hop a straight line. The arc is modelled as the circle tldraw actually
- * draws through the two shape centres, not the parabola `boxAt` approximates
- * it with, because at these bends the two differ by more than the margin.
+ * This exists because the analytic candidate/lane pass only ever reasons
+ * about the shapes its own `crossed`/`gap` heuristics find - a shape that
+ * partially (not fully) overlaps the band those heuristics already
+ * established from `crossed` and the endpoints is invisible to them, so the
+ * sag they compute can come up short of what the real render needs. An edge
+ * that already has a committed side (candidate, lane, or fan) only grows
+ * further on that same side, first - this doesn't re-litigate which side to
+ * bow on, only whether the chosen side needs to go further than the earlier
+ * pass assumed. Only when growing the committed side finds no improvement at
+ * all (the obstacle the earlier pass never saw sits on the side it picked,
+ * not just further along it) does this fall back to the other side, since at
+ * that point the committed side was never going to work and there's nothing
+ * to lose by trying the one nobody's picked yet. An edge nothing else has
+ * touched tries both sides from the start and keeps whichever clears (or
+ * comes closest).
  */
-function detourAroundObstacles(
+function clearObstaclesOnEveryRoute(
   edges: IREdge[],
   byId: Map<string, AbsShape>,
   shapes: AbsShape[],
@@ -515,45 +541,170 @@ function detourAroundObstacles(
   const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
 
   for (const edge of edges) {
-    if (routes.has(edge.id)) continue;
     const from = byId.get(edge.from);
     const to = byId.get(edge.to);
     if (!from || !to) continue;
 
-    const start = centreOf(from);
-    const end = centreOf(to);
-    const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
-    const straight = arcPolyline(start, end, 0);
-    if (!blockers.some((b) => polylineHitsBox(straight, b))) continue;
+    const route = routes.get(edge.id);
+    const existing = route?.bend ?? 0;
+    const anchor = route?.startAnchor;
+    if (edgeBendClearsObstacles(edge, existing, byId, blockerPool, [], anchor)) continue;
 
-    const bend = solveDetour(start, end, blockers);
-    if (bend !== null) routes.set(edge.id, { bend });
+    if (existing === 0) {
+      const bend = growBendClear(edge, existing, byId, blockerPool, [], [1, -1], anchor);
+      if (bend !== existing) routes.set(edge.id, { ...(route ?? { bend: 0 }), bend });
+      continue;
+    }
+
+    const committed = Math.sign(existing) as 1 | -1;
+    let bend = growBendClear(edge, existing, byId, blockerPool, [], [committed], anchor);
+    if (bend === existing) {
+      bend = growBendClear(edge, existing, byId, blockerPool, [], [committed === 1 ? -1 : 1], anchor);
+    }
+    if (bend !== existing) routes.set(edge.id, { ...route, bend });
   }
 }
 
-/** Smallest signed bend that clears every blocker, or null if neither side converges. */
-function solveDetour(start: Point, end: Point, blockers: AbsShape[]): number | null {
-  const cap = Math.hypot(end.x - start.x, end.y - start.y);
-  if (cap < 1) return null;
+/**
+ * The one growth loop every path-obstacle-avoiding bend in this module
+ * shares: starting from `initialBend`, tries each sign in `signs` (typically
+ * just the side a candidate/fan/lane pass already committed to, or both when
+ * nothing has picked a side yet - the old `solveDetour`'s job) and grows the
+ * sag a round at a time. Not monotone - the circular arc can graze an
+ * obstacle at one sag and clear it again at a larger one - so a failing
+ * round doesn't stop the search, only the round cap and the chord-length cap
+ * do. If nothing fully clears within the cap, keeps whichever attempt hit
+ * the fewest obstacles (`violationCount`, ties to the smaller sag), which is
+ * never worse than leaving `initialBend` alone.
+ *
+ * `useAnalyticJump` picks the step: path clearance (`clearObstaclesOnEveryRoute`)
+ * has a closed form for what a *box* in the way needs - the parabola's own
+ * lower-bound estimate (`requiredDetourSag`, which the real circular arc
+ * always beats, so the loop re-tests and grows again) - and jumping straight
+ * to it converges in far fewer rounds than a fixed step would. A *label*
+ * clearing a shape has no such formula (how far a bend has to grow before a
+ * wide rectangle slides off another is not a closed form the way a line
+ * clearing a box's corners is), so `placeLabels`'s call leaves this off and
+ * crawls `GROW_STEP` at a time - jumping by the path's own estimate there
+ * would either overshoot with nothing to aim at, or - worse - if the
+ * anchor-blind label geometry (see `placeLabels`'s own header) happens to
+ * graze a box's *line* too, jump straight past the chord-length cap on a
+ * problem the label crawl was never trying to solve.
+ */
+function growBendClear(
+  edge: IREdge,
+  initialBend: number,
+  byId: Map<string, AbsShape>,
+  blockerPool: AbsShape[],
+  otherLabelBoxes: LabelBox[],
+  signs: readonly (1 | -1)[],
+  anchor?: Point,
+  useAnalyticJump = true,
+): number {
+  const from = byId.get(edge.from);
+  const to = byId.get(edge.to);
+  if (!from || !to) return initialBend;
+  const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
 
-  let best: number | null = null;
-  for (const sign of [1, -1] as const) {
-    let sag = 0;
-    let cleared = false;
-    for (let round = 0; round < DETOUR_MAX_ROUNDS; round++) {
-      const path = arcPolyline(start, end, sign * sag);
-      const hits = blockers.filter((b) => polylineHitsBox(path, b));
-      if (hits.length === 0) {
-        cleared = true;
+  let best = initialBend;
+  let bestHits = violationCount(edge, initialBend, byId, blockers, otherLabelBoxes, anchor);
+  if (bestHits === 0) return initialBend;
+
+  const start = terminalPoint(from, anchor, to);
+  const end = terminalPoint(to, anchor, from);
+  // The chord-length cap only means something for the path-clearance case,
+  // where `start`/`end` are the edge's real terminals: a detour bigger than
+  // the chord itself has swung past pointless. `placeLabels`'s call has no
+  // such cap (its original fixed-step loop never had one either) - `start`/
+  // `end` there are `bodyExitPoint`'s anchor-blind fallback (see this
+  // function's own header), which for e.g. a vertically-stacked pair with an
+  // explicit left/right anchor collapses to a near-zero-width chord that
+  // would truncate the search long before the label actually clears.
+  const cap = useAnalyticJump ? Math.hypot(end.x - start.x, end.y - start.y) : Infinity;
+  if (cap < 1) return initialBend;
+
+  for (const sign of signs) {
+    let sag = Math.abs(initialBend);
+    for (let round = 0; round < GROW_MAX_ROUNDS; round++) {
+      // Grow before testing - `sag` at loop entry is `initialBend`'s own sag,
+      // whose "does it clear" result is already known (`bestHits`, above), so
+      // testing it again here would waste a round.
+      if (useAnalyticJump) {
+        const path = arcPolyline(start, end, sign * sag);
+        const boxHits = blockers.filter((b) => polylineHitsBox(path, b));
+        const need = boxHits.length > 0 ? requiredDetourSag(start, end, sign, boxHits) : 0;
+        sag = Math.max(need, sag + GROW_STEP);
+      } else {
+        sag += GROW_STEP;
+      }
+      if (sag > cap) break;
+
+      const bend = round1(sign * sag);
+      const hits = violationCount(edge, bend, byId, blockers, otherLabelBoxes, anchor);
+      // The path case keeps the best partial attempt when nothing fully
+      // clears - always an improvement over `initialBend`'s own (nonzero)
+      // hit count, the old `solveDetour`'s "give up, leave it straight"
+      // replaced by "grew but still not perfect". The label case keeps the
+      // original loop's all-or-nothing instead: a "hits" count that also
+      // counts path obstacles (`violationCount`) can sit at the same
+      // nonzero floor for every bend it tries - e.g. two shapes overlapping
+      // so `bodyExitPoint` starts *inside* the neighbour it's meant to
+      // clear, which no bend fixes - and a partial credit there would
+      // relocate the label on the strength of a path hit `placeLabels`
+      // never asked it to fix, not real label progress.
+      if (useAnalyticJump) {
+        if (hits < bestHits || (hits === bestHits && Math.abs(bend) < Math.abs(best))) {
+          bestHits = hits;
+          best = bend;
+        }
+      } else if (hits === 0) {
+        best = bend;
+      }
+      if (hits === 0) {
+        // The label-growth case (`useAnalyticJump` off) stops at the first
+        // side that clears, same as `placeLabels`'s original loop: its
+        // "clear" is the parabola approximation `search`'s own scoring
+        // already trusts, so exploring the *other* side too - hunting for a
+        // smaller sag the way the path case rightly does - only risks
+        // trading a value that approximation and the real render agree on
+        // for one where they happen to disagree.
+        if (!useAnalyticJump) return best;
         break;
       }
-      sag = Math.max(requiredDetourSag(start, end, sign, hits), sag + DETOUR_STEP);
-      if (sag > cap) break;
     }
-    if (!cleared || sag < MIN_BEND) continue;
-    if (best === null || sag < Math.abs(best)) best = sign * sag;
   }
-  return best === null ? null : round1(best);
+  return best;
+}
+
+/**
+ * Path-obstacle hits, plus (if `edge` is labelled) a flat penalty each for a
+ * still-uncleared label-over-shape or label-over-label - used only by
+ * `growBendClear` to rank partial attempts when nothing fully clears within
+ * its round/chord-length cap, so it can keep the closest instead of giving up.
+ */
+function violationCount(
+  edge: IREdge,
+  bend: number,
+  byId: Map<string, AbsShape>,
+  blockers: AbsShape[],
+  otherLabelBoxes: LabelBox[],
+  anchor?: Point,
+): number {
+  const from = byId.get(edge.from);
+  const to = byId.get(edge.to);
+  if (!from || !to) return 0;
+  const start = terminalPoint(from, anchor, to);
+  const end = terminalPoint(to, anchor, from);
+  const path = arcPolyline(start, end, bend);
+  let hits = blockers.filter((b) => polylineHitsBox(path, b)).length;
+  if (edge.label !== undefined) {
+    const box = approxLabelBox(edge, byId, bend, anchor);
+    if (box !== null) {
+      if (blockers.some((b) => boxesOverlap(box, b))) hits += 1;
+      if (otherLabelBoxes.some((o) => boxesOverlap(inflate(box, CLEAR_MARGIN), o))) hits += 1;
+    }
+  }
+  return hits;
 }
 
 /**
@@ -667,10 +818,6 @@ function segmentHitsBox(p: Point, q: Point, s: AbsShape): boolean {
     }
   }
   return t0 <= t1;
-}
-
-function centreOf(s: AbsShape): Point {
-  return { x: s.x + s.w / 2, y: s.y + s.h / 2 };
 }
 
 function assignLanes(candidates: RouteCandidate[]): Map<string, number> {
