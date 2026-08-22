@@ -16,6 +16,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { hasErrors, type Diagnostic, type SourceSpan, error } from "../domain/diagnostics/index.js";
 import { emit } from "../domain/emit/index.js";
 import { lower } from "../domain/ir/index.js";
+import { computeOcclusionDiagnostics } from "../domain/layout/occlusion.js";
 import type { AstNode } from "../domain/parser/index.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 import type { SceneJSON } from "../contracts/scene-json.js";
@@ -73,6 +74,7 @@ export async function compileFile(
   }
 
   const positioned = await deps.layout.layout(ir);
+  diagnostics.push(...normaliseSpans(path, computeOcclusionDiagnostics(positioned)));
   const sceneJson = emit(positioned);
   return { sceneJson, diagnostics, inputs };
 }

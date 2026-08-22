@@ -18,26 +18,21 @@ import type {
   IREdge,
   IRElementPositioned,
 } from "../src/domain/ir/index.js";
+import { isAncestor, overlapArea } from "../src/domain/layout/occlusion.js";
+import type { AbsShape, ShapeKind } from "../src/domain/layout/occlusion.js";
 import { createJsxExecute } from "../src/infra/execute-jsx/execute-jsx.js";
 import { createNodeFsRead } from "../src/infra/fs/node-fs-read.js";
 import { ElkLayoutAdapter } from "../src/infra/layout-elk/elk-layout.js";
 import { formatDiagnostics } from "../src/cli/format-diagnostics.js";
 
 // -- geometry model -----------------------------------------------------------
+//
+// `AbsShape`, `isAncestor`, `overlapArea` live in `src/domain/layout/occlusion.ts`
+// now - `tldsl check` needs the same "shape covers shape" computation this
+// report has always done, so it moved into the product and this report
+// imports it back rather than keeping a second copy (docs/diagram-defects.md D15).
 
-export type ShapeKind = "frame" | "box" | "note";
-
-export type AbsShape = {
-  id: string;
-  kind: ShapeKind;
-  label: string;
-  parentId: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  ancestorFrameIds: string[];
-};
+export type { ShapeKind, AbsShape };
 
 export type ContainerInfo = {
   id: string;
@@ -82,6 +77,7 @@ export function walk(doc: IRDocPositioned): Walked {
           w: child.w,
           h: child.h,
           ancestorFrameIds,
+          span: child.span,
         });
         visit(child.id, child.layout ?? "col", child.children, absX, absY, [
           ...ancestorFrameIds,
@@ -98,6 +94,7 @@ export function walk(doc: IRDocPositioned): Walked {
           w: child.w,
           h: child.h,
           ancestorFrameIds,
+          span: child.span,
         });
       } else {
         shapes.push({
@@ -110,6 +107,7 @@ export function walk(doc: IRDocPositioned): Walked {
           w: child.w,
           h: child.h,
           ancestorFrameIds,
+          span: child.span,
         });
       }
     }
@@ -117,16 +115,6 @@ export function walk(doc: IRDocPositioned): Walked {
 
   visit(doc.id, doc.layout ?? "col", doc.children, 0, 0, []);
   return { shapes, edges, containers };
-}
-
-function isAncestor(a: AbsShape, b: AbsShape): boolean {
-  return b.ancestorFrameIds.includes(a.id) || a.ancestorFrameIds.includes(b.id);
-}
-
-function overlapArea(a: AbsShape, b: AbsShape): number {
-  const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
-  const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
-  return ox > 0 && oy > 0 ? ox * oy : 0;
 }
 
 // -- segment geometry -----------------------------------------------------------
