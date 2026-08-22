@@ -137,23 +137,23 @@ export function Frame(props: Props, source?: JsxSource): AstFrame {
 
 /** `layout="row"` shorthand; `layout` on `props` (if any) is overridden. */
 export function Row(props: Props, source?: JsxSource): AstFrame {
-  return Frame({ ...props, layout: "row" }, source);
+  return { ...Frame({ ...props, layout: "row" }, source), tag: "Row" };
 }
 
 /** `layout="col"` shorthand; `layout` on `props` (if any) is overridden. */
 export function Col(props: Props, source?: JsxSource): AstFrame {
-  return Frame({ ...props, layout: "col" }, source);
+  return { ...Frame({ ...props, layout: "col" }, source), tag: "Col" };
 }
 
 /** `layout="grid"` shorthand; `layout` on `props` (if any) is overridden. */
 export function Grid(props: Props, source?: JsxSource): AstFrame {
-  return Frame({ ...props, layout: "grid" }, source);
+  return { ...Frame({ ...props, layout: "grid" }, source), tag: "Grid" };
 }
 
 /** A `<Frame>` that draws no frame chrome and reserves no title space; still
  * a layout container (see `domain/emit/emit.ts`'s `group` handling). */
 export function Group(props: Props, source?: JsxSource): AstFrame {
-  return { ...Frame(props, source), group: true };
+  return { ...Frame(props, source), group: true, tag: "Group" };
 }
 
 /** A row (default) or col frame whose non-edge children are auto-connected
@@ -161,7 +161,7 @@ export function Group(props: Props, source?: JsxSource): AstFrame {
  * `flow()` call needed. `layout` on `props` (if any) overrides the row
  * default. Throws if any non-edge child has no `id`. */
 export function Pipeline(props: Props, source?: JsxSource): AstNode[] {
-  const frame = Frame({ layout: "row", ...props }, source);
+  const frame: AstFrame = { ...Frame({ layout: "row", ...props }, source), tag: "Pipeline" };
   const ids = frame.children
     .filter((child) => child.kind !== "edge")
     .map((child) => {
@@ -196,6 +196,7 @@ export function Layers(props: Props, source?: JsxSource): AstFrame {
   const frame = Frame({ ...props, layout: "col" }, source);
   return {
     ...frame,
+    tag: "Layers",
     children: frame.children.map((child) => {
       if (child.kind !== "frame") return child;
       const tier = withRowLayout(child);
@@ -211,13 +212,14 @@ export function Swimlanes(props: Props, source?: JsxSource): AstFrame {
   const frame = Frame({ ...props, layout: "col" }, source);
   return {
     ...frame,
+    tag: "Swimlanes",
     children: frame.children.map((child) => (child.kind === "frame" ? withRowLayout(child) : child)),
   };
 }
 
 /** `layout="auto"` shorthand for relationships with no natural order. */
 export function Graph(props: Props, source?: JsxSource): AstFrame {
-  return Frame({ ...props, layout: "auto" }, source);
+  return { ...Frame({ ...props, layout: "auto" }, source), tag: "Graph" };
 }
 
 export function Box(props: Props, source?: JsxSource): AstBox {
@@ -246,6 +248,7 @@ export function Sticky(props: Props, source?: JsxSource): AstNote {
     attrs: propsToAttrs(props, span),
     text: noteBody(props.children),
     sticky: true,
+    tag: "Sticky",
     span,
   };
 }

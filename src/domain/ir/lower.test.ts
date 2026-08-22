@@ -263,7 +263,7 @@ describe("lower: ir/unknown-prop", () => {
     const [d] = diagnostics;
     expect(d!.code).toBe("ir/unknown-prop");
     expect(d!.message).toBe(
-      "'lable' is not supported on '<box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash, geo, textAlign, verticalAlign, labelColor, font, size)",
+      "'lable' is not supported on '<Box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash, geo, textAlign, verticalAlign, labelColor, font, size)",
     );
     // column 3: fixture's synthetic per-attribute column for `lable`, the
     // second attribute after `id`.
@@ -311,6 +311,55 @@ describe("lower: ir/unknown-prop", () => {
     const ast = doc({}, [box({ id: "a" }), edge({ from: "a", to: "a", route: "curved" })]);
     const { codes } = lowerAst(ast);
     expect(codes).toEqual(["ir/unknown-prop"]);
+  });
+});
+
+describe("lower: diagnostics name the authored component, not the IR kind (T44)", () => {
+  // Every alias the runtime exposes for `<frame>` (D12): plain `<Frame>` plus
+  // its eight container aliases. `undefined` means "don't pass a tag" -
+  // exercises the plain-`<Frame>` fallback in `displayTag`.
+  const FRAME_TAGS = [
+    undefined,
+    "Row",
+    "Col",
+    "Grid",
+    "Group",
+    "Pipeline",
+    "Layers",
+    "Swimlanes",
+    "Graph",
+  ] as const;
+
+  it.each(FRAME_TAGS)("ir/missing-id on a tagless <Frame> or alias %s names itself, not '<frame>'", (tag) => {
+    const expectedTag = tag ?? "Frame";
+    const ast = doc({}, [frame({}, [], false, tag)]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe("ir/missing-id");
+    expect(diagnostics[0]!.message).toBe(
+      `'<${expectedTag}>' is addressable and requires an explicit 'id'`,
+    );
+  });
+
+  it.each(FRAME_TAGS)("ir/unknown-prop on <Frame> or alias %s names itself, not '<frame>'", (tag) => {
+    const expectedTag = tag ?? "Frame";
+    const ast = doc({}, [frame({ id: "f", bogus: "x" }, [], false, tag)]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe("ir/unknown-prop");
+    expect(diagnostics[0]!.message).toMatch(new RegExp(`^'bogus' is not supported on '<${expectedTag}>'`));
+  });
+
+  // D16: `<Note>` and `<Sticky>` both lower to `kind: "note"`; the message
+  // must say which one the author wrote.
+  it.each(["Note", "Sticky"] as const)("ir/unknown-prop on <%s> names itself, not '<note>'", (tag) => {
+    const ast = doc({}, [note({ id: "n", maxW: 160 }, "hi", tag === "Sticky", tag === "Note" ? undefined : tag)]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe("ir/unknown-prop");
+    expect(diagnostics[0]!.message).toBe(
+      `'maxW' is not supported on '<${tag}>' (allowed: id, on, x, y, w, h, color, textAlign, verticalAlign, labelColor, font, size)`,
+    );
   });
 });
 

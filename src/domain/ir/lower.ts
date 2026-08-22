@@ -137,6 +137,27 @@ const ALLOWED_PROPS = {
 } as const;
 
 /**
+ * The JSX tag the author actually typed, for diagnostics. Container/note
+ * aliases (`<Row>`, `<Group>`, `<Sticky>`, ...) all lower to the same IR kind
+ * (`frame`/`note`); `AstFrame.tag`/`AstNote.tag` records which alias the
+ * runtime component was, so an error can name it instead of the IR kind.
+ */
+function displayTag(node: AstNode): string {
+  switch (node.kind) {
+    case "doc":
+      return "Doc";
+    case "frame":
+      return node.tag ?? "Frame";
+    case "box":
+      return "Box";
+    case "note":
+      return node.tag ?? "Note";
+    case "edge":
+      return "Edge";
+  }
+}
+
+/**
  * Reject attributes outside the fixed allowed set for this element kind.
  * This is the safety net standing in for a type checker: unknown props
  * (typos, unimplemented DSL surface) become `ir/unknown-prop` diagnostics
@@ -144,6 +165,7 @@ const ALLOWED_PROPS = {
  */
 function checkUnknownProps(
   kind: keyof typeof ALLOWED_PROPS,
+  tag: string,
   attrs: Attrs,
   ctx: Ctx,
 ): void {
@@ -153,7 +175,7 @@ function checkUnknownProps(
     ctx.diagnostics.push(
       error(
         "ir/unknown-prop",
-        `'${name}' is not supported on '<${kind}>' (allowed: ${allowed.join(", ")})`,
+        `'${name}' is not supported on '<${tag}>' (allowed: ${allowed.join(", ")})`,
         attr.nameSpan,
       ),
     );
@@ -176,7 +198,7 @@ export function lower(ast: AstNode | null): LowerResult {
     diagnostics.push(
       error(
         "ir/root-not-doc",
-        `top-level element must be '<doc>', got '<${ast.kind}>'`,
+        `top-level element must be '<doc>', got '<${displayTag(ast)}>'`,
         ast.span,
       ),
     );
@@ -189,11 +211,12 @@ export function lower(ast: AstNode | null): LowerResult {
     synthetic: new SyntheticIdAllocator(),
   };
 
-  checkUnknownProps("doc", ast.attrs, ctx);
+  checkUnknownProps("doc", displayTag(ast), ast.attrs, ctx);
 
   // Pass 1: walk and assign ids.
   const idHeader = assignId(ast.attrs, ast.span, ctx, {
     kind: "doc",
+    tag: displayTag(ast),
     addressable: false,
     contentFields: () => [],
   });
@@ -255,7 +278,8 @@ function lowerNode(node: AstNode, ctx: Ctx): IRElement | null {
 }
 
 function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
-  checkUnknownProps("frame", node.attrs, ctx);
+  const tag = displayTag(node);
+  checkUnknownProps("frame", tag, node.attrs, ctx);
   const direction = readDirection(node.attrs, ctx);
   const layout = readLayoutMode(node.attrs, ctx);
   const align = readAlign(node.attrs, ctx);
@@ -264,6 +288,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
     kind: "frame",
     ...assignId(node.attrs, node.span, ctx, {
       kind: "frame",
+      tag,
       addressable: true,
       contentFields: () => [getRaw(node.attrs, "name") ?? ""],
     }),
@@ -286,7 +311,8 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
 }
 
 function lowerBox(node: AstBox, ctx: Ctx): IRBox {
-  checkUnknownProps("box", node.attrs, ctx);
+  const tag = displayTag(node);
+  checkUnknownProps("box", tag, node.attrs, ctx);
   const color = readEnum(node.attrs, "color", COLORS, ctx);
   const fill = readEnum(node.attrs, "fill", FILLS, ctx);
   const dash = readEnum(node.attrs, "dash", DASHES, ctx);
@@ -300,6 +326,7 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
     kind: "box",
     ...assignId(node.attrs, node.span, ctx, {
       kind: "box",
+      tag,
       addressable: true,
       contentFields: () => [getRaw(node.attrs, "label") ?? ""],
     }),
@@ -319,7 +346,8 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
 }
 
 function lowerNote(node: AstNote, ctx: Ctx): IRNote {
-  checkUnknownProps("note", node.attrs, ctx);
+  const tag = displayTag(node);
+  checkUnknownProps("note", tag, node.attrs, ctx);
   const color = readEnum(node.attrs, "color", COLORS, ctx);
   const textAlign = readEnum(node.attrs, "textAlign", TEXT_ALIGNS, ctx);
   const verticalAlign = readEnum(node.attrs, "verticalAlign", VERTICAL_ALIGNS, ctx);
@@ -330,6 +358,7 @@ function lowerNote(node: AstNote, ctx: Ctx): IRNote {
     kind: "note",
     ...assignId(node.attrs, node.span, ctx, {
       kind: "note",
+      tag,
       addressable: false,
       contentFields: () => [node.text],
     }),
@@ -348,7 +377,8 @@ function lowerNote(node: AstNote, ctx: Ctx): IRNote {
 }
 
 function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
-  checkUnknownProps("edge", node.attrs, ctx);
+  const tag = displayTag(node);
+  checkUnknownProps("edge", tag, node.attrs, ctx);
   const fromAttr = node.attrs.from;
   const toAttr = node.attrs.to;
   if (fromAttr === undefined || toAttr === undefined) {
@@ -378,6 +408,7 @@ function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
     kind: "edge",
     ...assignId(node.attrs, node.span, ctx, {
       kind: "edge",
+      tag,
       addressable: false,
       contentFields: () => [from, to],
     }),
@@ -407,6 +438,8 @@ function assignId(
   ctx: Ctx,
   spec: {
     kind: "doc" | "frame" | "box" | "note" | "edge";
+    /** The authored tag to name in diagnostics (see `displayTag`); `spec.kind` stays the structural IR kind, used for the synthetic-id content hash. */
+    tag: string;
     addressable: boolean;
     contentFields: () => readonly string[];
   },
@@ -426,7 +459,7 @@ function assignId(
     ctx.diagnostics.push(
       error(
         "ir/missing-id",
-        `'<${spec.kind}>' is addressable and requires an explicit 'id'`,
+        `'<${spec.tag}>' is addressable and requires an explicit 'id'`,
         elementSpan,
       ),
     );

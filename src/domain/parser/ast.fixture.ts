@@ -37,24 +37,26 @@ export function astBuilders(file = "test.tldsl") {
     doc(props: Props, children: AstNode[] = []): AstDoc {
       return { kind: "doc", attrs: attrs(props), children, span: elSpan };
     },
-    frame(props: Props, children: AstNode[] = [], group = false): AstFrame {
+    frame(props: Props, children: AstNode[] = [], group = false, tag?: string): AstFrame {
       return {
         kind: "frame",
         attrs: attrs(props),
         children,
         ...(group ? { group: true } : {}),
+        ...(tag !== undefined ? { tag } : {}),
         span: elSpan,
       };
     },
     box(props: Props): AstBox {
       return { kind: "box", attrs: attrs(props), span: elSpan };
     },
-    note(props: Props, text: string, sticky = false): AstNote {
+    note(props: Props, text: string, sticky = false, tag?: string): AstNote {
       return {
         kind: "note",
         attrs: attrs(props),
         text,
         ...(sticky ? { sticky: true } : {}),
+        ...(tag !== undefined ? { tag } : {}),
         span: elSpan,
       };
     },

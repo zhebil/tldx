@@ -35,6 +35,8 @@ export type AstFrame = {
   children: AstNode[];
   /** Set by the `<Group>` runtime component; `<Frame>` leaves this unset. Not a user-facing prop. */
   group?: boolean;
+  /** The JSX tag the author actually typed (`Row`, `Group`, `Layers`, ...). Unset for plain `<Frame>`; the IR falls back to `"Frame"` for diagnostics. Not a user-facing prop. */
+  tag?: string;
   span: SourceSpan;
 };
 
@@ -51,6 +53,8 @@ export type AstNote = {
   text: string;
   /** Set by the `<Sticky>` runtime component; `<Note>` leaves this unset. Not a user-facing prop. */
   sticky?: boolean;
+  /** The JSX tag the author actually typed (`Sticky`). Unset for plain `<Note>`; the IR falls back to `"Note"` for diagnostics. Not a user-facing prop. */
+  tag?: string;
   span: SourceSpan;
 };
 
