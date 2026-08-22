@@ -72,6 +72,13 @@ export async function exportImage(url: string, outPath: string, opts: RenderOpti
       async ({ frame, shapes, padding, scale, format, dark, background, pixelRatio }) => {
         const editor = (window as unknown as { editor: Editor }).editor;
 
+        // Arrow labels export as absolutely-positioned <tspan>s whose x values
+        // come from measuring the text in the DOM at export time. Measure
+        // before the webfont lands and every x is a fallback-font advance while
+        // the SVG renders the real font, so words overprint each other (D6).
+        await editor.fonts.loadRequiredFontsForCurrentPage();
+        await document.fonts.ready;
+
         const allIds = [...editor.getCurrentPageShapeIds()];
         const validIds = allIds.map((tlId) => tlId.replace(/^shape:/, "")).sort();
 

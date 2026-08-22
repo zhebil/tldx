@@ -51,8 +51,15 @@ const DEFAULT_GAP = 40;
 const SKIP_ROW_GAP_FACTOR = 2;
 const SKIP_ROW_GAP_MAX = 4;
 const TARGET_ASPECT = 16 / 9;
-/** tldraw `arrowLabel.ts`'s squish margin: a straight arrow's body must be at least `label width + 64` before its label renders unsquished. */
-const ARROW_LABEL_MARGIN = 64;
+/**
+ * tldraw `arrowLabel.ts`'s squish margin (64: a straight arrow's body must be
+ * at least `label width + 64` before its label renders unsquished) plus the
+ * gap the *body* loses to the arrowhead end - `BOUND_ARROW_OFFSET` (10) plus
+ * half the arrow's stroke and half the bound shape's, both 1.75 at size `m`
+ * (`straight-arrow.ts`). Reserving only the 64 leaves the body ~13px short and
+ * the label wraps mid-word (D9).
+ */
+const ARROW_LABEL_MARGIN = 64 + 13.5;
 
 type Rect = { x: number; y: number; w: number; h: number };
 type FlowMode = "row" | "col" | "grid";

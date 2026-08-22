@@ -400,7 +400,8 @@ describe("hybridLayout: labeled-edge gap clearance (T12)", () => {
         edge({ id: "e", from: "a", to: "b", label: "reads from cache" }),
       ]),
     );
-    expect(boxById(result.children, "b").x).toBe(50 + arrowLabelWidth("reads from cache") + 64);
+    // 64 is tldraw's squish margin, 13.5 the body the arrowhead end eats (D9).
+    expect(boxById(result.children, "b").x).toBe(50 + arrowLabelWidth("reads from cache") + 77.5);
   });
 
   it("does not widen the gap for a labeled edge between non-adjacent siblings", async () => {
@@ -462,7 +463,7 @@ describe("hybridLayout: labeled-edge gap clearance (T12)", () => {
     const f = frameById(result.children, "f");
     const a = boxById(f.children, "a");
     const b = boxById(f.children, "b");
-    expect(b.x).toBe(a.x + a.w + arrowLabelWidth("reads from cache") + 64);
+    expect(b.x).toBe(a.x + a.w + arrowLabelWidth("reads from cache") + 77.5);
   });
 });
 
