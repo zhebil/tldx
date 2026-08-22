@@ -40,11 +40,31 @@
  */
 
 import type { IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
-import { ARROW_LABEL_PADDING, arrowLabelLineHeight, arrowLabelWidth } from "./glyph-metrics.js";
+import {
+  ARROW_LABEL_FONT_PX,
+  ARROW_LABEL_PADDING,
+  arrowLabelLineHeight,
+  arrowLabelWidth,
+  DEFAULT_FONT_SIZE,
+} from "./glyph-metrics.js";
 
 /** tldraw's own MIN_ARROW_BEND: anything smaller renders as a straight line, so round down to 0. */
 const MIN_BEND = 8;
 const CLEAR_MARGIN = 12;
+
+/**
+ * tldraw `arrowLabel.ts`'s own squish margin (64: a horizontal-ish arrow's
+ * body must be at least `label width + 64` wide before its label renders on
+ * one line, else it's re-measured at the squished width and wraps) plus the
+ * same body-vs-terminal margin `stack.ts`'s `ARROW_LABEL_MARGIN` reserves
+ * for a labelled edge between adjacent siblings (T12/D9: `BOUND_ARROW_OFFSET`
+ * plus half the arrow's stroke and half the bound shape's). `stack.ts` only
+ * ever sees same-container adjacent edges, though - it has no gap to widen
+ * for a labelled edge that skips across `<Group>`/`<Frame>` boundaries, so
+ * `growBendForLabelSquish` reserves the identical budget here, post-layout,
+ * by growing the edge's own bend instead (B4).
+ */
+const SQUISH_MARGIN = 64 + 13.5;
 
 type ShapeKind = "frame" | "box" | "note";
 
@@ -155,6 +175,8 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
   fanSharedPairs(otherEdges, byId, shapes, routes);
 
   clearObstaclesOnEveryRoute(otherEdges, byId, shapes, routes);
+
+  growBendForLabelSquish(otherEdges, byId, shapes, routes);
 
   placeLabels(edges, byId, shapes, routes);
 
@@ -626,6 +648,57 @@ function clearObstaclesOnEveryRoute(
 }
 
 /**
+ * B4: `stack.ts`'s `labelClearanceGap` reserves enough gap between two
+ * *adjacent siblings in the same container* to keep tldraw from squishing a
+ * labelled edge's wrap width - but it has no way to see a labelled edge
+ * whose endpoints were never siblings sharing one gap to reserve at all
+ * (nested `<Group>`s/`<Frame>`s, a `layout="auto"` graph laid out by ELK
+ * with no label-width awareness). That's exactly the shape of the edge this
+ * grows: after obstacle clearing has already settled every route
+ * (`clearObstaclesOnEveryRoute`), any labelled edge still rendering short of
+ * tldraw's own unsquished-width threshold gets its bend grown further (the
+ * same shared `growBendClear` primitive, so it can never give back an
+ * obstacle clearance to do it - see `violationCount`'s squish term).
+ *
+ * A diagonal chord's bend directly widens the dimension tldraw's own
+ * width-branch squish reads (`squishFraction`); a near-horizontal or
+ * near-vertical chord's bend can't move *that* dimension, but can still
+ * push the arc's bounding box past square, onto tldraw's other branch (a
+ * fixed `16 * fontSize` cap, independent of geometry) - genuinely a no-op
+ * only when the label is too wide for that cap too, or already narrower
+ * than tldraw's own 64px squish floor (never squished at all, any
+ * geometry). Only then does fixing this mean moving a box, which is
+ * layout's job (`stack.ts`/ELK), not this module's.
+ */
+function growBendForLabelSquish(
+  edges: IREdge[],
+  byId: Map<string, AbsShape>,
+  shapes: AbsShape[],
+  routes: Map<string, EdgeRoute>,
+): void {
+  const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
+
+  for (const edge of edges) {
+    if (edge.label === undefined) continue;
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (!from || !to) continue;
+
+    const route = routes.get(edge.id);
+    const bend = route?.bend ?? 0;
+    const startAnchor = route?.startAnchor;
+    const endAnchor = route?.endAnchor;
+    const start = terminalPoint(from, startAnchor, to);
+    const end = terminalPoint(to, endAnchor, from);
+    if (squishFraction(arcPolyline(start, end, bend), edge) === 0) continue;
+
+    const signs: (1 | -1)[] = bend !== 0 ? [Math.sign(bend) as 1 | -1] : [1, -1];
+    const grown = growBendClear(edge, bend, byId, blockerPool, [], signs, startAnchor, endAnchor);
+    if (grown !== bend) routes.set(edge.id, { ...(route ?? { bend: 0 }), bend: grown });
+  }
+}
+
+/**
  * The one growth loop every path-obstacle-avoiding bend in this module
  * shares: starting from `initialBend`, tries each sign in `signs` (typically
  * just the side a candidate/fan/lane pass already committed to, or both when
@@ -767,8 +840,58 @@ function violationCount(
       if (blockers.some((b) => boxesOverlap(box, b))) hits += 1;
       if (otherLabelBoxes.some((o) => boxesOverlap(inflate(box, CLEAR_MARGIN), o))) hits += 1;
     }
+    // A soft violation, scaled well under 1 so it only ever breaks a tie
+    // between bends that already agree on every hard (obstacle/label)
+    // count above - `growBendForLabelSquish` is the only caller that starts
+    // from a nonzero value here, and it must never trade away an obstacle
+    // clearance `clearObstaclesOnEveryRoute` already settled for less squish.
+    hits += squishFraction(path, edge) * 0.5;
   }
   return hits;
+}
+
+/**
+ * How far short this bend's rendered arc bounding box falls of the width
+ * tldraw's own `arrowLabel.ts` needs to draw `edge`'s label on as few lines
+ * as a same-container sibling edge would get, as a fraction of that target
+ * (`0` = not squished, approaching `1` = nowhere close). Mirrors *both* of
+ * `arrowLabel.ts`'s branches, not just the one a bend can influence: once a
+ * bend has pushed the arc's bounding box taller than it is wide, tldraw
+ * switches to its other branch, a fixed `16 * fontSize` cap that doesn't
+ * depend on the arc's geometry at all - reporting that branch as "0
+ * violation" just because the bend happened to cross over would let a bend
+ * that fixed nothing read as fixed (confirmed against a purely horizontal
+ * reciprocal pair, where a bend moves the bounding box's height but never
+ * its width - growth has to be a genuine no-op there, not a false "clear").
+ */
+function squishFraction(path: Point[], edge: IREdge): number {
+  if (edge.label === undefined || path.length === 0) return 0;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const p of path) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const w = maxX - minX;
+  const h = maxY - minY;
+  const natural = arrowLabelWidth(edge.label, edge);
+  if (w > h) {
+    // tldraw's own formula floors the squished width at `min(natural, 64)`
+    // (`Math.max(Math.min(w, margin), ...)` in `arrowLabel.ts`) - a label
+    // already narrower than the squish margin renders at its natural width
+    // no matter how short the arrow's body is, so it's never a violation.
+    if (natural <= 64) return 0;
+    const target = natural + SQUISH_MARGIN;
+    if (target <= w) return 0;
+    return Math.min(0.99, (target - w) / target);
+  }
+  const cap = 16 * ARROW_LABEL_FONT_PX[edge.size ?? DEFAULT_FONT_SIZE];
+  if (natural <= cap) return 0;
+  return Math.min(0.99, (natural - cap) / natural);
 }
 
 /**
