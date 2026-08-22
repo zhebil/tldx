@@ -21,7 +21,6 @@ import { createSystemClock } from "../src/infra/clock/system-clock.js";
 import { createJsxExecute } from "../src/infra/execute-jsx/execute-jsx.js";
 import { createChokidarWatch } from "../src/infra/fs/chokidar-watch.js";
 import { createNodeFsRead } from "../src/infra/fs/node-fs-read.js";
-import { createNodeFsWrite } from "../src/infra/fs/node-fs-write.js";
 import { ElkLayoutAdapter } from "../src/infra/layout-elk/elk-layout.js";
 import { createStderrLog } from "../src/infra/log/stderr-log.js";
 import { exportImage } from "../src/infra/render/export-image.js";
@@ -58,11 +57,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  // No fsWrite: this is a read-only export, same as `tldsl render` -
+  // it must never write an overlay sidecar (tldsl-jwh).
   const handle = await runServe({
     path: file,
     deps: {
       fs: createNodeFsRead(),
-      fsWrite: createNodeFsWrite(),
       watch: createChokidarWatch(),
       layout: new ElkLayoutAdapter(),
       execute: createJsxExecute(),

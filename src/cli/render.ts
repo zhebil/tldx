@@ -11,6 +11,14 @@
  *
  * `--reuse-only` skips the ephemeral-boot fallback and errors instead, so a
  * hook can render only when a warm `tldsl serve` is already free to use.
+ *
+ * Read-only (tldsl-jwh): `render` never writes `*.tldsl.overlay.json`. Its
+ * own ephemeral boot strips `fsWrite` from the deps it hands to `runServe`
+ * (`withoutFsWrite` below), which disables the overlay round-trip for that
+ * throwaway server entirely - see `cli/serve.ts`'s module docs. A reused
+ * server is a separate, already-running `tldsl serve` process render does
+ * not control; it was wired with `fsWrite` by its own invocation because it
+ * legitimately supports human canvas edits.
  */
 
 import { existsSync } from "node:fs";
@@ -100,6 +108,18 @@ export type RunRenderArgs = {
   io: ServeIo;
 };
 
+/**
+ * Render's own ephemeral server must never wire `fsWrite` - a read-only
+ * export must not enable the overlay round-trip (tldsl-jwh). Returns a copy
+ * of `deps` with `fsWrite` dropped entirely (not set to `undefined` - the
+ * key is absent, matching `ServeDeps.fsWrite`'s optionality).
+ */
+export function withoutFsWrite(deps: ServeDeps): ServeDeps {
+  const soloDeps: ServeDeps = { ...deps };
+  delete soloDeps.fsWrite;
+  return soloDeps;
+}
+
 export async function runRender(args: RunRenderArgs): Promise<number> {
   const { deps, io } = args;
   try {
@@ -116,7 +136,7 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
       if (reuseOnly) {
         throw new Error(`no running \`tldsl serve\` for ${file}; start one, or drop --reuse-only to boot a browser`);
       }
-      const handle = await runServe({ path: file, deps, io });
+      const handle = await runServe({ path: file, deps: withoutFsWrite(deps), io });
       try {
         await exportImage(handle.url, out, opts);
       } finally {

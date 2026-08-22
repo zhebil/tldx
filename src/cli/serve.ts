@@ -20,6 +20,11 @@
  * - On infra failure during boot (`startDevServer` throws), already-created
  *   resources are torn down before the error propagates so the caller does
  *   not need to clean up.
+ *
+ * Overlay-write opt-out (tldsl-jwh): `deps.fsWrite` is optional. Omitting it
+ * disables the overlay round-trip entirely for this server - `render`'s
+ * ephemeral boot does this so a read-only export never writes a
+ * `*.tldsl.overlay.json` sidecar. `tldsl serve` always wires a real one.
  */
 
 import { watchAndServe, type WatchAndServeHandle } from "../app/watch-and-serve.js";
@@ -39,7 +44,8 @@ export type ServeIo = {
 
 export type ServeDeps = {
   fs: FsReadPort;
-  fsWrite: FsWritePort;
+  /** Enables the overlay round-trip when present. Omit for a read-only server (see module docs). */
+  fsWrite?: FsWritePort;
   watch: WatchPort;
   layout: LayoutPort;
   execute: ExecutePort;
@@ -106,7 +112,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
 
   const watch = watchAndServe(path, {
     fs: deps.fs,
-    fsWrite: deps.fsWrite,
+    ...(deps.fsWrite !== undefined ? { fsWrite: deps.fsWrite } : {}),
     watch: deps.watch,
     layout: deps.layout,
     execute: deps.execute,

@@ -186,7 +186,10 @@ const commands: readonly Command[] = [
         argv: rest,
         deps: {
           fs: createNodeFsRead(),
-          fsWrite: createNodeFsWrite(),
+          // No fsWrite: render is read-only and must never write an overlay
+          // sidecar (tldsl-jwh). runRender strips it defensively too, since
+          // a reused server is a separate process this deps object doesn't
+          // reach anyway.
           watch: createChokidarWatch(),
           layout: new ElkLayoutAdapter(),
           execute: createJsxExecute(),
