@@ -81,7 +81,7 @@ entry. If a task needs an essay, it belongs in the ledger or in
   Renders are byte-identical to `docs/renders/`, so the `EdgeRoute.labelBox` it
   added really is non-behavioural.
 
-- [ ] **T42. Keep ELK's routed geometry instead of discarding it.** *(D21, D8's
+- [x] **T42. Keep ELK's routed geometry instead of discarding it.** *(D21, D8's
   routing half, D14's distant half)*
   The largest open mechanism and the only remaining `wrong`-severity one. Every
   edge whose endpoints sit in different containers is drawn as a straight chord
@@ -96,6 +96,18 @@ entry. If a task needs an essay, it belongs in the ledger or in
   shape; `d21-backward-edge-is-a-chord` and `d8-auto-edges-cross-nodes` route
   around their obstacles; across the 23 measured files the crossing total falls
   and **no file rises**; `rollback -> deploy-prod` is still a short clean hop.
+  **Done in `ab61acf`, and the task's premise was wrong.** ELK is not in the
+  path for these diagrams at all - `placeAuto` runs only for `layout="auto"`,
+  and `cicd-pipeline` is a deterministic `col` of `row` frames - and a tldraw
+  arrow is `arc | elbow` with two bindings, so there is no polyline to preserve
+  even where ELK does run. `elkjs`'s `.d.ts` and tldraw's arrow schema were both
+  read before building. What shipped instead is a domain-level `detourAroundObstacles`
+  pass triggered by *the chord already running through something*, not by length
+  or direction, which is what D21's correction asked for. Crossings 43 -> 29,
+  label-over-shape 7 -> 5, label-over-label 7 -> 6, no file rises; verified
+  independently on the merged tree. `fail` and `rejected` in `cicd-pipeline`
+  were deliberately left as chords: clearing that row needs a sagitta 2-4x the
+  chord, which reads worse. That is placement, not routing.
 
 - [ ] **T43. A note takes a side that is free and a width that is readable.**
   *(D3)*
@@ -215,6 +227,20 @@ own entry into the task list; the human does that.
 - T41's `layout/shape-overlap` message picks its direction arbitrarily - it says
   the topic box covers the note when the render shows the reverse - and inlines
   the note's whole text, so a one-sentence note makes a 140-character warning.
+- **`tldsl render` writes a `*.tldsl.overlay.json` next to every diagram it
+  renders**, from z-index noise plus a few `parentId`/`y` deltas. Since
+  `render = apply(overlay, compile(jsx))`, a stale one silently changes a later
+  render - a live footgun for anyone measuring the corpus. Found by T42, which
+  deleted them before every measurement to keep its numbers clean.
+- T42's detour may swing an arc **outside its own container** to clear an
+  obstacle: `Serializer -> Gateway` in `deep-nesting` now leaves the `System`
+  frame entirely. It reads as an obvious return edge and beats cutting through
+  `Router` and `Validator`, but nothing stops it leaving in a way that reads
+  wrong on some other diagram.
+- T42 found `computeCandidate` picks its side by *available gap* rather than
+  *required sag*, which is why `t-payments -> dlq` bows 144px left out of the
+  frame when ~60px right would have cleared `notifications`. This is D14's
+  distant half.
 - T41 relaxed the corpus tests from `diagnostics === []` to
   `hasErrors() === false`, correctly (order-states has a genuine warning), but
   nothing now fails if a change adds spurious warnings to a corpus file.
