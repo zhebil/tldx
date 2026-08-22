@@ -23,8 +23,8 @@
  *                        overlay.
  */
 
-import { realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createSystemClock } from "../infra/clock/system-clock.js";
@@ -79,6 +79,56 @@ function defaultViewerBundleDir(): string {
  */
 export function shouldOpenBrowser(noOpen: boolean, live: { readonly pid: number } | undefined): boolean {
   return !noOpen && live === undefined;
+}
+
+function newestMtimeMs(dir: string): number {
+  let newest = 0;
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return newest;
+  }
+  for (const entry of entries) {
+    if (entry.name === "node_modules") continue;
+    const full = resolve(dir, entry.name);
+    try {
+      newest = Math.max(newest, entry.isDirectory() ? newestMtimeMs(full) : statSync(full).mtimeMs);
+    } catch {
+      // best-effort; a raced-away file must not crash the CLI
+    }
+  }
+  return newest;
+}
+
+/**
+ * Detects a `dist/` built from an older `src/` than what's on disk - the
+ * failure mode behind tldsl-ppj: `overlay`/`verify` existed in source but a
+ * stale build made them print "unknown command" instead of running. Only
+ * fires when actually running the compiled `dist/cli/main.js` (not `tsx
+ * src/cli/main.ts` in dev, where "stale" would be a false positive since
+ * there is no build to be behind) and only in a dev checkout that still has
+ * `src/` next to `dist/` - an installed package ships `dist/` alone.
+ *
+ * `here` defaults to this running file's own directory but is injectable so
+ * tests can point it at a throwaway `dist/cli` + `src/` fixture instead of
+ * mtime-racing the real repo.
+ */
+export function distStalenessHint(
+  here: string = dirname(fileURLToPath(import.meta.url)),
+): string | undefined {
+  if (basename(resolve(here, "..")) !== "dist") return undefined;
+  const srcDir = resolve(here, "..", "..", "src");
+  if (!existsSync(srcDir)) return undefined;
+  try {
+    const builtAt = statSync(resolve(here, "main.js")).mtimeMs;
+    if (newestMtimeMs(srcDir) > builtAt) {
+      return "dist/ looks stale (src/ has changed since the last build) - run `npm run build`";
+    }
+  } catch {
+    // best-effort
+  }
+  return undefined;
 }
 
 /**
@@ -297,7 +347,9 @@ export async function main(argv: readonly string[], io: CliIo): Promise<number> 
 
   const cmd = commands.find((c) => c.name === parsed.name);
   if (cmd === undefined) {
-    io.writeStderr(`tldsl: unknown command: ${parsed.name}\n${usage}\n`);
+    const hint = distStalenessHint();
+    const hintLine = hint !== undefined ? `${hint}\n` : "";
+    io.writeStderr(`tldsl: unknown command: ${parsed.name}\n${hintLine}${usage}\n`);
     return 1;
   }
 
