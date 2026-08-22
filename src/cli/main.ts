@@ -23,8 +23,8 @@
  *                        overlay.
  */
 
-import { realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createSystemClock } from "../infra/clock/system-clock.js";
@@ -36,10 +36,11 @@ import { gitStatus } from "../infra/git/git-status.js";
 import { ElkLayoutAdapter } from "../infra/layout-elk/elk-layout.js";
 import { createStderrLog } from "../infra/log/stderr-log.js";
 import { openBrowser } from "../infra/open-browser/open-browser.js";
-import { recordServe } from "../infra/serve-registry/serve-registry.js";
+import { findServe, recordServe } from "../infra/serve-registry/serve-registry.js";
 
 import { runAbsorbCli } from "./absorb.js";
 import { runCheck, type CheckIo } from "./check.js";
+import { runMeasure } from "./measure.js";
 import { runOverlayCli } from "./overlay.js";
 import { runRender } from "./render.js";
 import { runServe } from "./serve.js";
@@ -68,6 +69,66 @@ type ParsedInvocation =
 function defaultViewerBundleDir(): string {
   const here = dirname(fileURLToPath(import.meta.url));
   return resolve(here, "..", "..", "dist", "viewer");
+}
+
+/**
+ * A restart shouldn't pile up browser tabs (tldsl-69w): if a live
+ * `tldsl serve` is already recorded for this file, a tab already points at
+ * it, so this invocation should not open a second one - independent of
+ * whether the user passed `--no-open`.
+ */
+export function shouldOpenBrowser(noOpen: boolean, live: { readonly pid: number } | undefined): boolean {
+  return !noOpen && live === undefined;
+}
+
+function newestMtimeMs(dir: string): number {
+  let newest = 0;
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return newest;
+  }
+  for (const entry of entries) {
+    if (entry.name === "node_modules") continue;
+    const full = resolve(dir, entry.name);
+    try {
+      newest = Math.max(newest, entry.isDirectory() ? newestMtimeMs(full) : statSync(full).mtimeMs);
+    } catch {
+      // best-effort; a raced-away file must not crash the CLI
+    }
+  }
+  return newest;
+}
+
+/**
+ * Detects a `dist/` built from an older `src/` than what's on disk - the
+ * failure mode behind tldsl-ppj: `overlay`/`verify` existed in source but a
+ * stale build made them print "unknown command" instead of running. Only
+ * fires when actually running the compiled `dist/cli/main.js` (not `tsx
+ * src/cli/main.ts` in dev, where "stale" would be a false positive since
+ * there is no build to be behind) and only in a dev checkout that still has
+ * `src/` next to `dist/` - an installed package ships `dist/` alone.
+ *
+ * `here` defaults to this running file's own directory but is injectable so
+ * tests can point it at a throwaway `dist/cli` + `src/` fixture instead of
+ * mtime-racing the real repo.
+ */
+export function distStalenessHint(
+  here: string = dirname(fileURLToPath(import.meta.url)),
+): string | undefined {
+  if (basename(resolve(here, "..")) !== "dist") return undefined;
+  const srcDir = resolve(here, "..", "..", "src");
+  if (!existsSync(srcDir)) return undefined;
+  try {
+    const builtAt = statSync(resolve(here, "main.js")).mtimeMs;
+    if (newestMtimeMs(srcDir) > builtAt) {
+      return "dist/ looks stale (src/ has changed since the last build) - run `npm run build`";
+    }
+  } catch {
+    // best-effort
+  }
+  return undefined;
 }
 
 /**
@@ -150,6 +211,11 @@ const commands: readonly Command[] = [
         return 1;
       }
       try {
+        const live = findServe(path);
+        const openThisTime = shouldOpenBrowser(noOpen, live);
+        if (!openThisTime && !noOpen && live !== undefined) {
+          io.writeStdout(`tldsl serve: a server for ${path} is already live at ${live.url}; not opening another tab\n`);
+        }
         const handle = await runServe({
           path,
           deps: {
@@ -161,7 +227,7 @@ const commands: readonly Command[] = [
             log: createStderrLog(),
             clock: createSystemClock(),
             viewerBundleDir: defaultViewerBundleDir(),
-            ...(noOpen ? {} : { openBrowser }),
+            ...(openThisTime ? { openBrowser } : {}),
           },
           io,
         });
@@ -236,6 +302,21 @@ const commands: readonly Command[] = [
         io,
       }),
   },
+  {
+    name: "measure",
+    args: "<file> [--frame <id>]",
+    description: "print each shape's id, size, and position",
+    run: (rest, io) =>
+      runMeasure({
+        argv: rest,
+        deps: {
+          fs: createNodeFsRead(),
+          layout: new ElkLayoutAdapter(),
+          execute: createJsxExecute(),
+        },
+        io,
+      }),
+  },
 ];
 
 function parseArgs(argv: readonly string[]): ParsedInvocation {
@@ -266,7 +347,9 @@ export async function main(argv: readonly string[], io: CliIo): Promise<number> 
 
   const cmd = commands.find((c) => c.name === parsed.name);
   if (cmd === undefined) {
-    io.writeStderr(`tldsl: unknown command: ${parsed.name}\n${usage}\n`);
+    const hint = distStalenessHint();
+    const hintLine = hint !== undefined ? `${hint}\n` : "";
+    io.writeStderr(`tldsl: unknown command: ${parsed.name}\n${hintLine}${usage}\n`);
     return 1;
   }
 
