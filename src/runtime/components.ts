@@ -54,7 +54,7 @@ function isAstNode(value: unknown): value is AstNode {
 }
 
 /** Flattens `.map()` arrays, drops null/undefined/boolean. Any string throws
- * - only <Note> and <Text> accept text children. */
+ * - only <Sticky> and <Text> accept text children. */
 export function flattenNodes(children: unknown, componentName: string): AstNode[] {
   const nodes: AstNode[] = [];
   function walk(child: unknown): void {
@@ -65,7 +65,7 @@ export function flattenNodes(children: unknown, componentName: string): AstNode[
     }
     if (typeof child === "string") {
       throw new Error(
-        `<${componentName}> does not accept text children (only <Note> and <Text> do)`,
+        `<${componentName}> does not accept text children (only <Sticky> and <Text> do)`,
       );
     }
     if (isAstNode(child)) {
@@ -78,7 +78,7 @@ export function flattenNodes(children: unknown, componentName: string): AstNode[
   return nodes;
 }
 
-/** Joins/trims text children into a single body string. Shared by `<Note>`, `<Sticky>` and `<Text>`. */
+/** Joins/trims text children into a single body string. Shared by `<Sticky>` and `<Text>`. */
 function bodyText(children: unknown, componentName: string): string {
   const parts: string[] = [];
   function walk(child: unknown): void {
@@ -229,19 +229,12 @@ export function Box(props: Props, source?: JsxSource): AstBox {
   return { kind: "box", attrs: propsToAttrs(props, span), span };
 }
 
-export function Note(props: Props, source?: JsxSource): AstNote {
-  const span = toSpan(source);
-  return {
-    kind: "note",
-    attrs: propsToAttrs(props, span),
-    text: bodyText(props.children, "Note"),
-    span,
-  };
-}
-
-/** Same AST node kind as `<Note>` (`"note"`), marked `sticky: true` so the
- * pipeline keeps it on the old fixed-width tldraw-sticky path (hypothesis
- * B9) instead of sizing it as a geo box. Not exposed as a `<Note>` prop. */
+/** A real tldraw sticky note - fixed 200px wide, self-growing height. The
+ * only surviving "note" alias (C2, tldsl-npd): the old plain `<Note>`, which
+ * emitted a hand-rolled geo-rectangle imitation, is retired in favour of
+ * this (attached or free-floating annotation) or `<Text>` (borderless,
+ * unstyled caption). Same AST node kind as the old `<Note>` (`"note"`),
+ * marked `sticky: true`. */
 export function Sticky(props: Props, source?: JsxSource): AstNote {
   const span = toSpan(source);
   return {
@@ -257,8 +250,7 @@ export function Sticky(props: Props, source?: JsxSource): AstNote {
 /** A borderless, fill-less caption - just glyphs on the canvas. Same "box"
  * IR kind as `<Box>` (`IRBox.text`), so it sizes and flows exactly like one;
  * `domain/emit/emit.ts` emits it as a tldraw `text` shape instead of a `geo`
- * rectangle. Content is JSX children (like `<Note>`/`<Sticky>`), not a
- * `label` prop. */
+ * rectangle. Content is JSX children (like `<Sticky>`), not a `label` prop. */
 export function Text(props: Props, source?: JsxSource): AstBox {
   const span = toSpan(source);
   return {

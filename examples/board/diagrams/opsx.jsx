@@ -1,4 +1,4 @@
-import { Frame, Group, Box, Edge, Note, flow } from "tldsl";
+import { Frame, Group, Box, Edge, flow } from "tldsl";
 
 export const OpsxLifecycle = () => (
   <Frame id="opsx" name="opsx lifecycle" layout="row" gap="64" pad="48">

@@ -1,4 +1,4 @@
-import { Frame, Group, Box, Edge, Note, flow } from "tldsl";
+import { Frame, Group, Box, Edge, Sticky, flow } from "tldsl";
 
 export const WhenToCompact = () => (
   <Frame id="compact" name="When to /compact" layout="col" gap="56" pad="48" align="center">
@@ -20,6 +20,6 @@ export const WhenToCompact = () => (
 <Edge from="c-q2" to="c-q3" label="yes" />
 <Edge from="c-q3" to="c-compact" label="yes" color="blue" />
 <Edge from="c-q3" to="c-clear" label={"no - unrelated\nnext task"} color="green" dash="dashed" />
-<Note on="c-compact">Say what to keep: "compact, keep the auth refactor plan and the failing test".</Note>
+<Sticky on="c-compact">Say what to keep: "compact, keep the auth refactor plan and the failing test".</Sticky>
   </Frame>
 );

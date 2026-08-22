@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Edge, Note } from "tldsl";
+import { Doc, Frame, Box, Edge, Text } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -31,10 +31,10 @@ export default function Diagram() {
         <Edge id="s-refunded-draft" from="refunded" to="draft" label="reorder" color="grey" dash="dashed" />
       </Frame>
 
-      <Note id="n-cycle" color="yellow" w="300">
+      <Text id="n-cycle" w="300">
         Two cycles: on hold returns to awaiting payment on a retried card, and a
         refunded order can be reordered back to draft.
-      </Note>
+      </Text>
     </Doc>
   );
 }

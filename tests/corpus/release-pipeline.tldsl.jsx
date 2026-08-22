@@ -1,4 +1,4 @@
-import { Doc, Box, Edge, Note } from "tldsl";
+import { Doc, Box, Edge, Text } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -41,10 +41,10 @@ export default function Diagram() {
       <Edge id="e-scan-notify" from="scan" to="notify" />
       <Edge id="e-smoke-notify" from="smoke" to="notify" />
 
-      <Note id="note-rollback">
+      <Text id="note-rollback" maxW="420">
         Rollback re-deploys the previously published image rather than
         rebuilding, so it skips every stage up to the registry push.
-      </Note>
+      </Text>
     </Doc>
   );
 }

@@ -9,7 +9,6 @@ export {
   Grid,
   Group,
   Layers,
-  Note,
   Pipeline,
   Row,
   Sticky,

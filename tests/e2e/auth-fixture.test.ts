@@ -19,9 +19,9 @@ import {
   boxShape,
   documentRecord,
   frameShape,
-  noteShape,
   pageRecord,
   sceneJson,
+  textShape,
 } from "../../src/contracts/builders.js";
 import type { SceneJSON, TLRecord } from "../../src/contracts/scene-json.js";
 import { compileFile } from "../../src/app/compile-file.js";
@@ -104,11 +104,12 @@ function expectedScene(): SceneJSON {
       index: "a5",
     }),
 
-    noteShape({
+    textShape({
       id: "shape:n-design",
       parentId: FRAME,
       x: 20,
       y: 210,
+      w: 400,
       text: "Token store is the only writer of session tokens.",
       index: "a6",
     }),
@@ -190,9 +191,10 @@ describe("e2e fixture: auth.tldsl.jsx", () => {
       if (frame?.kind !== "frame") throw new Error("expected frame at root");
 
       const elementKinds = frame.children.map((c) => c.kind);
-      expect(elementKinds.filter((k) => k === "box")).toHaveLength(5);
+      // 5 boxes + 1 <Text> (also IR/AST kind "box" - see IRBox.text).
+      expect(elementKinds.filter((k) => k === "box")).toHaveLength(6);
       expect(elementKinds.filter((k) => k === "edge")).toHaveLength(4);
-      expect(elementKinds.filter((k) => k === "note")).toHaveLength(1);
+      expect(elementKinds.filter((k) => k === "note")).toHaveLength(0);
     },
     30_000,
   );

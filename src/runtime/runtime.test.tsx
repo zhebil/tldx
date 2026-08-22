@@ -13,9 +13,9 @@ import {
   Grid,
   Group,
   Layers,
-  Note,
   Pipeline,
   Row,
+  Sticky,
   Swimlanes,
   Text,
   flow,
@@ -63,7 +63,7 @@ function buildTree(): AstDoc {
       <Frame name="Auth" w={320}>
         <Box id="login" label="Login form" />
         <Box id="verify" label="Verify creds" />
-        <Note id="note1">Ask about session length</Note>
+        <Sticky id="note1">Ask about session length</Sticky>
         <Edge from="login" to="verify" />
         {EXTRA_IDS.map((id) => (
           <Box id={id} label={id} />
@@ -91,6 +91,8 @@ describe("JSX runtime - AST shape", () => {
               kind: "note",
               attrs: { id: { value: "note1" } },
               text: "Ask about session length",
+              sticky: true,
+              tag: "Sticky",
             },
             { kind: "edge", attrs: { from: { value: "login" }, to: { value: "verify" } } },
             { kind: "box", attrs: { id: { value: "extra1" }, label: { value: "extra1" } } },
@@ -106,7 +108,7 @@ describe("JSX runtime - AST shape", () => {
     const jsxAst = buildTree();
     const lines = spanLines(jsxAst);
 
-    // Doc, Frame, 2 named boxes, Note, Edge, and the mapped box all sit on
+    // Doc, Frame, 2 named boxes, Sticky, Edge, and the mapped box all sit on
     // lines 62-69 in buildTree() above.
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {

@@ -132,7 +132,15 @@ export type IRBox = IRBase & {
 export type IRNote = IRBase & {
   kind: "note";
   text: string;
-  /** True for `<Sticky>` (real tldraw sticky, `noteShape`); false/absent for `<Note>` (geo box). */
+  /**
+   * True for `<Sticky>` (real tldraw sticky, `noteShape`). `<Sticky>` is the
+   * only runtime producer left (C2, tldsl-npd) - the old `<Note>` that left
+   * this unset and emitted a fake geo-rectangle "note" is retired in favour
+   * of `<Text>` (borderless annotation) or `<Box>` (bordered). The field
+   * stays optional rather than required `true`: `domain/layout/stack.ts` and
+   * `domain/layout/attach.ts` still branch on it, and tightening it here
+   * would force changes into files this issue doesn't own.
+   */
   sticky?: boolean;
   /** Id of the box/frame/note/edge this note annotates. Validated at lower time (`ir/note-target-not-found`); placed by `domain/layout/attach.ts`. */
   on?: string;

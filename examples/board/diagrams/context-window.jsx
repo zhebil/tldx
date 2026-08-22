@@ -1,4 +1,4 @@
-import { Frame, Group, Box, Edge, Note, flow } from "tldsl";
+import { Frame, Group, Box, Edge, flow } from "tldsl";
 
 export const ContextWindow = () => (
   <Frame id="ctx" name="Context window" layout="col" gap="90" pad="40">

@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Edge, Note } from "tldsl";
+import { Doc, Frame, Box, Edge, Text } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -15,7 +15,7 @@ export default function Diagram() {
         <Edge id="e-auth-tokens" from="auth" to="tokens" />
         <Edge id="e-tokens-app" from="tokens" to="app" />
 
-        <Note id="n-design">Token store is the only writer of session tokens.</Note>
+        <Text id="n-design">Token store is the only writer of session tokens.</Text>
       </Frame>
     </Doc>
   );

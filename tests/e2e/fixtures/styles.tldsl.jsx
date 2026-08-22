@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Edge, Note, Sticky } from "tldsl";
+import { Doc, Frame, Box, Edge, Text, Sticky } from "tldsl";
 
 const COLORS = [
   "black", "grey", "light-violet", "violet", "blue", "light-blue", "yellow",
@@ -45,7 +45,7 @@ export default function Diagram() {
         />
       ))}
 
-      <Note id="n-note" color="light-green" on="palette">Note color pass-through.</Note>
+      <Text id="n-note" color="light-green">Text color pass-through.</Text>
       <Sticky id="s-note" color="light-red" on="arrows">Sticky color pass-through.</Sticky>
     </Doc>
   );

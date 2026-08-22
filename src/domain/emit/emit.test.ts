@@ -323,19 +323,21 @@ describe("domain/emit", () => {
     expect((short.store["shape:n3"]?.props as Record<string, unknown>).growY).toBe(0);
   });
 
-  it("emits a non-sticky note as a geo rectangle with IR w/h and a warm fill", () => {
+  // C2 (tldsl-npd): the fake-geo branch for a non-sticky note is retired.
+  // Any note IR that reaches emit without `sticky: true` (impossible through
+  // the public authoring surface now that <Note> is gone - only <Sticky>
+  // produces `kind: "note"`) still emits as a real tldraw note, same as a
+  // sticky one; there is no second, geo-rectangle code path left to test.
+  it("emits a non-sticky note IR as a real note shape too (no fake-geo path left)", () => {
     const scene = emit(
       doc([note({ id: "n4", text: "two sentences of context", x: 5, y: 6, w: 240, h: 90 })]),
     );
     const shape = scene.store["shape:n4"];
-    expect(shape?.type).toBe("geo");
+    expect(shape?.type).toBe("note");
     expect(shape?.x).toBe(5);
     expect(shape?.y).toBe(6);
     const props = shape?.props as Record<string, unknown>;
-    expect(props.w).toBe(240);
-    expect(props.h).toBe(90);
-    expect(props.color).toBe("yellow");
-    expect(props.fill).toBe("semi");
+    expect(props.w).toBeUndefined();
     expect(props.richText).toEqual({
       type: "doc",
       content: [
@@ -582,22 +584,6 @@ describe("domain/emit: style pass-through (T9)", () => {
     expect((defaulted.store["shape:g"]?.props as Record<string, unknown>).color).toBe("black");
   });
 
-  it("passes geo-note color through, overriding the warm-fill default", () => {
-    const scene = emit(
-      doc([note({ id: "n", text: "hi", x: 0, y: 0, w: 100, h: 50, color: "violet" })]),
-    );
-    const props = scene.store["shape:n"]?.props as Record<string, unknown>;
-    expect(props.color).toBe("violet");
-    expect(props.fill).toBe("semi");
-  });
-
-  it("defaults geo-note color to yellow when absent (unchanged behavior)", () => {
-    const scene = emit(doc([note({ id: "n", text: "hi", x: 0, y: 0, w: 100, h: 50 })]));
-    const props = scene.store["shape:n"]?.props as Record<string, unknown>;
-    expect(props.color).toBe("yellow");
-    expect(props.fill).toBe("semi");
-  });
-
   it("passes sticky color through", () => {
     const scene = emit(
       doc([note({ id: "s", text: "hi", x: 0, y: 0, w: 200, h: 200, sticky: true, color: "orange" })]),
@@ -670,7 +656,7 @@ describe("domain/emit: text align / label color pass-through (T10)", () => {
     expect(plain.labelColor).toBe("black");
   });
 
-  it("passes geo-note and sticky textAlign/verticalAlign/labelColor through", () => {
+  it("passes textAlign/verticalAlign/labelColor through on a note regardless of sticky", () => {
     const scene = emit(
       doc([
         note({
@@ -698,10 +684,10 @@ describe("domain/emit: text align / label color pass-through (T10)", () => {
         }),
       ]),
     );
-    const geoProps = scene.store["shape:n"]?.props as Record<string, unknown>;
-    expect(geoProps.align).toBe("start");
-    expect(geoProps.verticalAlign).toBe("end");
-    expect(geoProps.labelColor).toBe("blue");
+    const nonStickyProps = scene.store["shape:n"]?.props as Record<string, unknown>;
+    expect(nonStickyProps.align).toBe("start");
+    expect(nonStickyProps.verticalAlign).toBe("end");
+    expect(nonStickyProps.labelColor).toBe("blue");
 
     const stickyProps = scene.store["shape:s"]?.props as Record<string, unknown>;
     expect(stickyProps.align).toBe("start");
@@ -727,7 +713,7 @@ describe("domain/emit: font / size pass-through (T11)", () => {
     expect(plain.size).toBe("m");
   });
 
-  it("passes geo-note and sticky font/size through, defaulting to draw/m", () => {
+  it("passes font/size through on a note regardless of sticky, defaulting to draw/m", () => {
     const scene = emit(
       doc([
         note({ id: "n", text: "hi", x: 0, y: 0, w: 100, h: 50, font: "mono", size: "l" }),
@@ -745,9 +731,9 @@ describe("domain/emit: font / size pass-through (T11)", () => {
         note({ id: "s2", text: "hi", x: 0, y: 0, w: 200, h: 200, sticky: true }),
       ]),
     );
-    const geoProps = scene.store["shape:n"]?.props as Record<string, unknown>;
-    expect(geoProps.font).toBe("mono");
-    expect(geoProps.size).toBe("l");
+    const nonStickyProps = scene.store["shape:n"]?.props as Record<string, unknown>;
+    expect(nonStickyProps.font).toBe("mono");
+    expect(nonStickyProps.size).toBe("l");
 
     const stickyProps = scene.store["shape:s"]?.props as Record<string, unknown>;
     expect(stickyProps.font).toBe("sans");

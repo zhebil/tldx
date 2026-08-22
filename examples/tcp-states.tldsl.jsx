@@ -1,4 +1,4 @@
-import { Doc, Graph, Box, Edge, Note } from "tldsl";
+import { Doc, Graph, Box, Edge, Sticky } from "tldsl";
 
 // RFC 793 figure 6, as a graph: eleven states, twenty transitions, each
 // labelled `event / action` - the event that fires it and the segment it puts
@@ -58,7 +58,7 @@ export default function TcpStates() {
         <Edge from={from} to={to} label={label} color={hue(from, to)} font="sans" size="s" />
       ))}
 
-      <Note on="time_wait">2 MSL is the only timed transition.</Note>
+      <Sticky on="time_wait">2 MSL is the only timed transition.</Sticky>
     </Doc>
   );
 }
