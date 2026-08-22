@@ -1,13 +1,14 @@
 /** @jsxImportSource ../runtime */
 import { describe, expect, it } from "vitest";
 
-import type { AstDoc, AstFrame, AstNode } from "../domain/parser/ast.js";
+import type { AstDoc, AstEdge, AstFrame, AstNode } from "../domain/parser/ast.js";
 
 import {
   Box,
   Col,
   Doc,
   Edge,
+  Edges,
   Frame,
   Graph,
   Grid,
@@ -109,14 +110,14 @@ describe("JSX runtime - AST shape", () => {
     const lines = spanLines(jsxAst);
 
     // Doc, Frame, 2 named boxes, Sticky, Edge, and the mapped box all sit on
-    // lines 62-69 in buildTree() above.
+    // lines 63-70 in buildTree() above.
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {
-      expect(line).toBeGreaterThanOrEqual(62);
-      expect(line).toBeLessThanOrEqual(69);
+      expect(line).toBeGreaterThanOrEqual(63);
+      expect(line).toBeLessThanOrEqual(70);
     }
 
-    expect((jsxAst as { span: { line: number } }).span.line).toBe(62);
+    expect((jsxAst as { span: { line: number } }).span.line).toBe(63);
   });
 });
 
@@ -145,6 +146,123 @@ describe("flow()", () => {
   it("returns an empty array for fewer than two ids", () => {
     expect(flow()).toEqual([]);
     expect(flow("only-one")).toEqual([]);
+  });
+});
+
+describe("<Edges> (tldsl-2rr)", () => {
+  it("builds edges from one line per hop, with an optional trailing label", () => {
+    const edges = (
+      <Edges>{`
+        a -> b
+        b -> c: hop two
+      `}</Edges>
+    ) as AstEdge[];
+    expect(stripSpans(edges)).toEqual([
+      { kind: "edge", attrs: { from: { value: "a" }, to: { value: "b" } } },
+      {
+        kind: "edge",
+        attrs: { from: { value: "b" }, to: { value: "c" }, label: { value: "hop two" } },
+      },
+    ]);
+  });
+
+  it("expands a multi-hop chain on one line into consecutive edges sharing the label", () => {
+    const edges = (<Edges>{`a -> b -> c: chained`}</Edges>) as AstEdge[];
+    expect(stripSpans(edges)).toEqual([
+      {
+        kind: "edge",
+        attrs: { from: { value: "a" }, to: { value: "b" }, label: { value: "chained" } },
+      },
+      {
+        kind: "edge",
+        attrs: { from: { value: "b" }, to: { value: "c" }, label: { value: "chained" } },
+      },
+    ]);
+  });
+
+  it("skips blank lines", () => {
+    const edges = (
+      <Edges>{`
+        a -> b
+
+        b -> c
+      `}</Edges>
+    ) as AstEdge[];
+    expect(edges).toHaveLength(2);
+  });
+
+  it("applies block-level style props (not children) to every edge produced", () => {
+    const edges = (
+      <Edges color="red" font="sans" size="s">{`
+        a -> b
+        b -> c
+      `}</Edges>
+    ) as AstEdge[];
+    expect(stripSpans(edges)).toEqual([
+      {
+        kind: "edge",
+        attrs: {
+          color: { value: "red" },
+          font: { value: "sans" },
+          size: { value: "s" },
+          from: { value: "a" },
+          to: { value: "b" },
+        },
+      },
+      {
+        kind: "edge",
+        attrs: {
+          color: { value: "red" },
+          font: { value: "sans" },
+          size: { value: "s" },
+          from: { value: "b" },
+          to: { value: "c" },
+        },
+      },
+    ]);
+  });
+
+  it("a line with no '->' becomes an edge missing 'to', reusing ir/missing-edge-endpoint downstream", () => {
+    const edges = (<Edges>{`just-an-id`}</Edges>) as AstEdge[];
+    expect(edges).toHaveLength(1);
+    expect(edges[0]!.attrs.from?.value).toBe("just-an-id");
+    expect(edges[0]!.attrs.to).toBeUndefined();
+  });
+
+  it("throws when children isn't a plain string (bare JSX text or elements)", () => {
+    expect(() => Edges({ children: 42 }, undefined)).toThrow(/single string of edge specs/);
+  });
+
+  it("gives every edge a real, non-zero per-line span - not the zero span flow() carries (tldsl-7kx)", () => {
+    const edges = (
+      <Edges>{`
+        a -> b
+        b -> c
+      `}</Edges>
+    ) as AstEdge[];
+    expect(edges).toHaveLength(2);
+    const [first, second] = edges as [AstEdge, AstEdge];
+    expect(first.span.line).toBeGreaterThan(0);
+    // Adjacent spec lines are adjacent source lines - the span tracks the
+    // template literal's real layout, not one shared span for the block.
+    expect(second.span.line).toBe(first.span.line + 1);
+    expect(first.span).not.toEqual({ file: "", line: 0, column: 0 });
+  });
+
+  it("keeps a real, correctly-lined span on a line with a typo'd id - the diagnostic this feeds still gets a useful location", () => {
+    const edges = (
+      <Edges>{`
+        user -> login
+        usre -> auth
+        auth -> tokens
+      `}</Edges>
+    ) as AstEdge[];
+    const typoed = edges.find((e) => e.attrs.from?.value === "usre");
+    expect(typoed).toBeDefined();
+    // The typo'd line sits exactly one line after "user -> login" and one
+    // line before "auth -> tokens" in the template above.
+    expect(typoed!.span.line).toBe(edges[0]!.span.line + 1);
+    expect(typoed!.span.line).toBe(edges[2]!.span.line - 1);
   });
 });
 

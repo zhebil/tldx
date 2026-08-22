@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Diagnostic } from "../diagnostics/index.js";
-import type { AstNode } from "../parser/ast.js";
+import type { AstEdge, AstNode } from "../parser/ast.js";
 import { astBuilders } from "../parser/ast.fixture.js";
 
 import type { IRDoc, IRElement } from "./ir.js";
@@ -191,6 +191,44 @@ describe("lower: diagnostics", () => {
     if (f.kind !== "frame") throw new Error("expected frame");
     expect(f.colGap).toBe(300);
     expect(f.rowGap).toBe(8);
+  });
+});
+
+describe("lower: <Edges> compact-form seam (tldsl-2rr)", () => {
+  // <Edges> (src/runtime/components.ts) builds plain AstEdge nodes with a
+  // real per-line span, no id, and no unusual attrs - the same shape a
+  // hand-written <Edge> produces. These tests hand-build that exact shape
+  // (lower.ts must not import runtime/, so they can't call <Edges> itself -
+  // see CONTEXT.md's dependency rules) to pin down that a typo'd id from the
+  // compact form gets the identical diagnostic, at the identical span, as
+  // one from the verbose tag.
+  it("a typo'd id from a compact-form edge still gets ir/unknown-reference, at the compact form's own span", () => {
+    const compactSpan = { file: "diagram.tldsl.jsx", line: 41, column: 8 };
+    const compactEdge: AstEdge = {
+      kind: "edge",
+      attrs: {
+        from: { value: "usre", span: compactSpan, nameSpan: compactSpan },
+        to: { value: "auth", span: compactSpan, nameSpan: compactSpan },
+      },
+      span: compactSpan,
+    };
+    const ast = doc({}, [box({ id: "auth" }), compactEdge]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe("ir/unknown-reference");
+    expect(diagnostics[0]!.message).toContain("usre");
+    expect(diagnostics[0]!.span).toEqual(compactSpan);
+  });
+
+  it("a compact-form line with no '->' (missing 'to') gets ir/missing-edge-endpoint, same as a hand-written <Edge> missing 'to'", () => {
+    const compactSpan = { file: "diagram.tldsl.jsx", line: 12, column: 8 };
+    const malformed: AstEdge = {
+      kind: "edge",
+      attrs: { from: { value: "just-an-id", span: compactSpan, nameSpan: compactSpan } },
+      span: compactSpan,
+    };
+    const { codes } = lowerAst(doc({}, [malformed]));
+    expect(codes).toEqual(["ir/missing-edge-endpoint"]);
   });
 });
 
