@@ -58,7 +58,7 @@ entry. If a task needs an essay, it belongs in the ledger or in
 
 ## Tasks
 
-- [ ] **T41. Make `check` see the diagram, not just the IR.** *(D15)*
+- [x] **T41. Make `check` see the diagram, not just the IR.** *(D15)*
   `check` validates the IR and says nothing about the picture. It printed
   nothing at all on a diagram where a note covered three of the four topic
   boxes. Meanwhile `tools/layout-report.mts` already computes
@@ -73,6 +73,13 @@ entry. If a task needs an essay, it belongs in the ledger or in
   names the covered shapes; `check examples/event-driven.tldsl.jsx` reports its
   four overlapping pairs; all twelve corpus files that are clean on every
   counter stay silent; `npm run check` green.
+  **Done in `380823a`.** `domain/layout/occlusion.ts` computes two warnings from
+  the positioned IR - `layout/shape-overlap` and `layout/label-overlap` - and
+  `layout-report.mts` now imports its geometry from there instead of keeping a
+  duplicate. All four acceptance clauses verified independently: twelve clean
+  files silent, `event-driven` reports exactly its four pairs, exit code still 0.
+  Renders are byte-identical to `docs/renders/`, so the `EdgeRoute.labelBox` it
+  added really is non-behavioural.
 
 - [ ] **T42. Keep ELK's routed geometry instead of discarding it.** *(D21, D8's
   routing half, D14's distant half)*
@@ -205,6 +212,12 @@ own entry into the task list; the human does that.
   never regenerated.
 - `docs/baseline.md` is 933 lines of append-only history and is heading the same
   way `docs/plan.md` did.
+- T41's `layout/shape-overlap` message picks its direction arbitrarily - it says
+  the topic box covers the note when the render shows the reverse - and inlines
+  the note's whole text, so a one-sentence note makes a 140-character warning.
+- T41 relaxed the corpus tests from `diagnostics === []` to
+  `hasErrors() === false`, correctly (order-states has a genuine warning), but
+  nothing now fails if a change adds spurious warnings to a corpus file.
 
 ## Questions for the human
 
