@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { compileFile } from "../../src/app/compile-file.js";
+import { hasErrors } from "../../src/domain/diagnostics/index.js";
 import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
 import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
 import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
@@ -139,8 +140,11 @@ describe("shorthand-equivalence: Row/Col/Grid produce identical scene JSON to Fr
             compileFile(tmpPath, deps),
           ]);
 
-          expect(originalResult.diagnostics).toEqual([]);
-          expect(rewrittenResult.diagnostics).toEqual([]);
+          // Same reasoning as corpus.test.ts: a fixture may carry a legitimate
+          // occlusion warning (T41); the invariant under test is that the
+          // rewrite is scene-JSON-identical, not that either form is silent.
+          expect(hasErrors(originalResult.diagnostics)).toBe(false);
+          expect(hasErrors(rewrittenResult.diagnostics)).toBe(false);
           expect(rewrittenResult.sceneJson).not.toBeNull();
           expect(JSON.stringify(rewrittenResult.sceneJson)).toBe(
             JSON.stringify(originalResult.sceneJson),

@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { compileFile } from "../../src/app/compile-file.js";
+import { hasErrors } from "../../src/domain/diagnostics/index.js";
 import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
 import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
 import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
@@ -35,7 +36,7 @@ describe("corpus: layout bench fixtures compile clean", () => {
 
   for (const name of fixtures) {
     it(
-      `${name} compiles with zero diagnostics`,
+      `${name} compiles with no errors`,
       async () => {
         const path = join(HERE, name);
         const result = await compileFile(path, {
@@ -44,7 +45,10 @@ describe("corpus: layout bench fixtures compile clean", () => {
           execute: createJsxExecute(),
         });
 
-        expect(result.diagnostics).toEqual([]);
+        // "Compiles clean" pins compile success, not layout output - occlusion
+        // warnings (T41) are a legitimate finding on a bench fixture, not a
+        // compile failure. See docs/diagram-defects.md D15.
+        expect(hasErrors(result.diagnostics)).toBe(false);
         expect(result.sceneJson).not.toBeNull();
       },
       30_000,

@@ -44,7 +44,16 @@ type Axis = "horizontal" | "vertical";
 type Side = "neg" | "pos";
 type Point = { x: number; y: number };
 
-export type EdgeRoute = { bend: number; startAnchor?: Point; endAnchor?: Point; labelPosition?: number };
+export type LabelBox = { x: number; y: number; w: number; h: number };
+
+export type EdgeRoute = {
+  bend: number;
+  startAnchor?: Point;
+  endAnchor?: Point;
+  labelPosition?: number;
+  /** Final placed label rect (page space), for every labelled edge - occlusion checks read this. */
+  labelBox?: LabelBox;
+};
 
 /** Extra sag, in px, per lane a skip edge is pushed out from its innermost sibling. */
 const LANE_STEP = 20;
@@ -112,8 +121,6 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
 
 /** Candidate `t` positions along an arrow, ordered nearest-to-midpoint first (first-wins tie-break). */
 const LABEL_CANDIDATE_TS = [0.5, 0.38, 0.62, 0.28, 0.72, 0.2, 0.8];
-
-type LabelBox = { x: number; y: number; w: number; h: number };
 
 type LabelSlot = {
   edge: IREdge;
@@ -187,13 +194,12 @@ function placeLabels(
     }
 
     slot.box = bestBox;
-    if (bestT !== 0.5) {
-      const existing = routes.get(slot.edge.id);
-      routes.set(
-        slot.edge.id,
-        existing === undefined ? { bend: 0, labelPosition: bestT } : { ...existing, labelPosition: bestT },
-      );
-    }
+    const existing = routes.get(slot.edge.id);
+    routes.set(slot.edge.id, {
+      ...(existing ?? { bend: 0 }),
+      labelBox: bestBox,
+      ...(bestT === 0.5 ? {} : { labelPosition: bestT }),
+    });
   }
 }
 
