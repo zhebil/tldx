@@ -42,6 +42,12 @@ export type IRDoc = IRBase & {
   pad?: number;
   cols?: number;
   align?: Align;
+  /**
+   * `false` opts a `col`/`grid` out of giving every flowed box the same
+   * height (the default); use when the box height *is* the data. Width
+   * sharing in `col`/`grid` is unaffected.
+   */
+  equalize?: boolean;
   children: IRElement[];
 };
 
@@ -60,6 +66,12 @@ export type IRFrame = IRBase & {
   pad?: number;
   cols?: number;
   align?: Align;
+  /**
+   * `false` opts a `col`/`grid` out of giving every flowed box the same
+   * height (the default); use when the box height *is* the data. Width
+   * sharing in `col`/`grid` is unaffected.
+   */
+  equalize?: boolean;
   x?: number;
   y?: number;
   w?: number;

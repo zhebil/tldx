@@ -111,6 +111,7 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
     placeAuto,
     mayAutoGrid,
     docEdges,
+    ir.equalize ?? true,
   );
   return attachNotes({
     ...ir,
@@ -173,6 +174,7 @@ async function sizeFrame(
     placeAuto,
     false,
     docEdges,
+    frame.equalize ?? true,
   );
   const w = frame.w ?? contentW;
   const h = frame.h ?? contentH;
@@ -202,6 +204,8 @@ async function layoutContainer(
   placeAuto: AutoPlacer,
   mayAutoGrid: boolean,
   docEdges: readonly AutoEdge[],
+  /** `equalize` (defaults `true`): give every flowed box the shared sibling height. */
+  equalizeH: boolean,
 ): Promise<{
   children: IRElementPositioned[];
   w: number;
@@ -227,7 +231,7 @@ async function layoutContainer(
     });
 
   if (mode === "row" || mode === "col" || mode === "grid") {
-    applyContainerBoxSizing(children, sized, flowedIndices, mode);
+    applyContainerBoxSizing(children, sized, flowedIndices, mode, equalizeH);
   }
   if (mode === "row" || mode === "col") {
     applyStretchAlign(children, sized, flowedIndices, mode, align);
@@ -357,12 +361,19 @@ async function layoutContainer(
  * its own text at whatever width it lands on. Otherwise every box in a
  * grid like `release-pipeline` (62px-tall boxes) would inherit a note's
  * multi-line height and balloon to ~300px.
+ *
+ * `equalizeH=false` (container's `equalize="false"`) skips only the shared-
+ * height vote below, not the width sharing above - a natural-sized column
+ * still wants consistent widths, it just stops forcing every box to the
+ * tallest sibling's height. Escape hatch for the minority case where a box's
+ * height *is* the data (e.g. proportions in a diagram).
  */
 function applyContainerBoxSizing(
   children: readonly IRElement[],
   sized: (IRBoxPositioned | IRNotePositioned | IRFramePositioned | null)[],
   flowedIndices: readonly number[],
   mode: "row" | "col" | "grid",
+  equalizeH: boolean,
 ): void {
   const boxIdx = flowedIndices.filter((i) => children[i]!.kind === "box");
   if (boxIdx.length === 0) return;
@@ -397,6 +408,8 @@ function applyContainerBoxSizing(
       sized[i] = { ...sized[i]!, w: sharedW, h: boxHeightForWidth(noteEl.text, sharedW, noteEl) };
     }
   }
+
+  if (!equalizeH) return;
 
   // A non-rect geo's sized `h` includes geoScale's inflation - grown so its
   // label fits inside a diamond/ellipse outline, not a measure of how tall

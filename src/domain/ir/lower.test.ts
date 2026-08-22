@@ -147,6 +147,27 @@ describe("lower: diagnostics", () => {
     expect(codes).toEqual(["ir/bad-align"]);
   });
 
+  it("ir/invalid-boolean-attr on an unknown equalize value", () => {
+    const { codes } = lowerAst(doc({ equalize: "nope" }));
+    expect(codes).toEqual(["ir/invalid-boolean-attr"]);
+  });
+
+  it("accepts equalize='false' on <doc> and <frame> (C5)", () => {
+    const ast = doc({ equalize: "false" }, [frame({ id: "f", equalize: "false" })]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    expect(ir?.equalize).toBe(false);
+    const f = ir!.children[0]!;
+    if (f.kind !== "frame") throw new Error("expected frame");
+    expect(f.equalize).toBe(false);
+  });
+
+  it("leaves equalize unset when absent (default stays true downstream)", () => {
+    const { ir, codes } = lowerAst(doc({}));
+    expect(codes).toEqual([]);
+    expect(ir?.equalize).toBeUndefined();
+  });
+
   it("accepts align='stretch' on <doc> and <frame> (D10)", () => {
     const ast = doc({ align: "stretch" }, [frame({ id: "f", align: "stretch" })]);
     const { ir, codes } = lowerAst(ast);
