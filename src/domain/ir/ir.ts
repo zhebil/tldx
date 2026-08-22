@@ -161,12 +161,33 @@ export type IRNote = IRBase & {
   size?: StyleFontSize;
 };
 
+/**
+ * Fraction of a shape's own bounding box, `0..1` on each axis (`0,0` top
+ * left, `1,1` bottom right) - tldraw's own `normalizedAnchor` shape, and the
+ * same convention `domain/layout/routing.ts`'s analytic passes already
+ * compute internally. `IREdge.fromAnchor`/`toAnchor` are the authored form
+ * of the same value (B9); see `lower.ts`'s `ANCHOR_SIDES` for the 8-compass-
+ * point-plus-`center` names an author can spell instead of a raw fraction.
+ */
+export type IRAnchor = { x: number; y: number };
+
 export type IREdge = IRBase & {
   kind: "edge";
   /** Id of the source addressable element. Resolved at lower time. */
   from: string;
   /** Id of the destination addressable element. Resolved at lower time. */
   to: string;
+  /**
+   * Authored exit/entry side (`fromSide`/`toSide`), separate props rather
+   * than dotted `id.anchor` syntax to avoid colliding with the `-`/`_`
+   * namespace convention some ids already use a `.` for by mistake
+   * (tldsl-4s1) - see `lower.ts`'s `parseAnchorSide`. Wins over anything
+   * `domain/layout/routing.ts` would otherwise compute; routing works
+   * around a set anchor (grows bend to clear obstacles from it) rather than
+   * overriding it.
+   */
+  fromAnchor?: IRAnchor;
+  toAnchor?: IRAnchor;
   /** Pass-through tldraw arrow style; does not affect layout. */
   color?: StyleColor;
   dash?: StyleDash;

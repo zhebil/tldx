@@ -29,7 +29,14 @@ function frame(input: {
   return { kind: "frame", idExplicit: true, span: SPAN, ...input };
 }
 
-function edge(input: { id: string; from: string; to: string; label?: string }): IREdge {
+function edge(input: {
+  id: string;
+  from: string;
+  to: string;
+  label?: string;
+  fromAnchor?: { x: number; y: number };
+  toAnchor?: { x: number; y: number };
+}): IREdge {
   return { kind: "edge", idExplicit: true, span: SPAN, ...input };
 }
 
@@ -572,6 +579,85 @@ describe("computeEdgeRoutes", () => {
       // candidate/lane pass either way - the fix has to actually change the
       // outcome once the obstacle is real.
       expect(Math.sign(correctedBend)).not.toBe(Math.sign(bareBend));
+    });
+  });
+
+  describe("authored anchors win over the router (B9)", () => {
+    it("an authored fromSide/toSide overrides the candidate/lane pass's own anchor pick", () => {
+      // Same shape as "bows a chord over two boxes in a row upward" - left
+      // to itself the router ties to the top face ({0.5,0}) on both ends.
+      // Authoring the bottom face instead must survive candidate/lane.
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
+        box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
+        edge({
+          id: "ad",
+          from: "a",
+          to: "d",
+          fromAnchor: { x: 0.5, y: 1 },
+          toAnchor: { x: 0.5, y: 1 },
+        }),
+      ]);
+      const route = computeEdgeRoutes(ir).get("ad");
+      expect(route?.startAnchor).toEqual({ x: 0.5, y: 1 });
+      expect(route?.endAnchor).toEqual({ x: 0.5, y: 1 });
+    });
+
+    it("a self-loop's authored anchors override the default loop terminals", () => {
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        edge({
+          id: "loop",
+          from: "a",
+          to: "a",
+          fromAnchor: { x: 0.1, y: 0 },
+          toAnchor: { x: 0.9, y: 0 },
+        }),
+      ]);
+      const route = computeEdgeRoutes(ir).get("loop");
+      expect(route?.startAnchor).toEqual({ x: 0.1, y: 0 });
+      expect(route?.endAnchor).toEqual({ x: 0.9, y: 0 });
+    });
+
+    it("obstacle clearing grows the bend around a fixed authored anchor instead of overriding it", () => {
+      // a and c share no layout axis (computeCandidate has nothing to
+      // work with), so without an authored anchor this edge would stay a
+      // straight, anchor-less chord. fromSide="right"/toSide="left" pins a
+      // straight line that runs directly through "blocker".
+      const withoutBlocker = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "c", x: 300, y: 200, w: 100, h: 50 }),
+        edge({
+          id: "ac",
+          from: "a",
+          to: "c",
+          fromAnchor: { x: 1, y: 0.5 },
+          toAnchor: { x: 0, y: 0.5 },
+        }),
+      ]);
+      const bareRoute = computeEdgeRoutes(withoutBlocker).get("ac");
+      expect(bareRoute?.bend ?? 0).toBe(0);
+
+      const withBlocker = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "c", x: 300, y: 200, w: 100, h: 50 }),
+        box({ id: "blocker", x: 150, y: 95, w: 100, h: 60 }),
+        edge({
+          id: "ac",
+          from: "a",
+          to: "c",
+          fromAnchor: { x: 1, y: 0.5 },
+          toAnchor: { x: 0, y: 0.5 },
+        }),
+      ]);
+      const route = computeEdgeRoutes(withBlocker).get("ac");
+      // The anchor itself is a fixed constraint, never overridden...
+      expect(route?.startAnchor).toEqual({ x: 1, y: 0.5 });
+      expect(route?.endAnchor).toEqual({ x: 0, y: 0.5 });
+      // ...but the obstacle it now runs through still gets routed around.
+      expect(route?.bend ?? 0).not.toBe(0);
     });
   });
 });

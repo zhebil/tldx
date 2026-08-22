@@ -114,13 +114,34 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
     const shape = byId.get(edge.from);
     if (!shape) continue;
     const loop = Math.max(LOOP_MIN, Math.min(LOOP_SHAPE_FACTOR * shape.w, LOOP_MAX));
-    routes.set(edge.id, { bend: loop, startAnchor: { x: 0.75, y: 0 }, endAnchor: { x: 0.25, y: 0 } });
+    routes.set(edge.id, {
+      bend: loop,
+      startAnchor: edge.fromAnchor ?? { x: 0.75, y: 0 },
+      endAnchor: edge.toAnchor ?? { x: 0.25, y: 0 },
+    });
   }
 
   const otherEdges = edges.filter((edge) => !selfEdges.has(edge.id));
 
+  // An authored `fromSide`/`toSide` (B9) wins over anything the router would
+  // otherwise compute - seed it before the candidate/lane pass so
+  // `finalizeRoute` never overwrites it, and before every later pass so each
+  // one treats the author's choice as a fixed constraint to route around
+  // (`clearObstaclesOnEveryRoute`, `growBendForLabelSquish`) rather than
+  // something to override. `fanSharedPairs` already skips any edge that
+  // already has a route entry, so it never touches one of these either.
+  for (const edge of otherEdges) {
+    if (edge.fromAnchor === undefined && edge.toAnchor === undefined) continue;
+    routes.set(edge.id, {
+      bend: 0,
+      ...(edge.fromAnchor === undefined ? {} : { startAnchor: edge.fromAnchor }),
+      ...(edge.toAnchor === undefined ? {} : { endAnchor: edge.toAnchor }),
+    });
+  }
+
   const candidates: RouteCandidate[] = [];
   for (const edge of otherEdges) {
+    if (routes.has(edge.id)) continue;
     const candidate = computeCandidate(edge, byId, shapes);
     if (candidate !== null) candidates.push(candidate);
   }
@@ -186,15 +207,23 @@ function placeLabels(
     const to = byId.get(edge.to);
     if (!from || !to) continue;
 
-    const start = bodyExitPoint(from, to);
-    const end = bodyExitPoint(to, from);
+    // `terminalPoint` (an edge's real anchor when one was chosen, or the
+    // same ray-toward-the-other-centre fallback `bodyExitPoint` always used)
+    // - not `bodyExitPoint` unconditionally, which ignores a route's real
+    // `normalizedAnchor` and, for a vertically-stacked pair carrying an
+    // explicit left/right anchor, can collapse to a near-zero-width chord
+    // (flagged pre-existing, B5; B9 makes an authored anchor common enough
+    // that this module now has to get it right).
+    const route = routes.get(edge.id);
+    const start = terminalPoint(from, route?.startAnchor, to);
+    const end = terminalPoint(to, route?.endAnchor, from);
     const u = unit(start, end);
     const slot: LabelSlot = {
       edge,
       start,
       end,
       perp: { x: -u.y, y: u.x },
-      bend: routes.get(edge.id)?.bend ?? 0,
+      bend: route?.bend ?? 0,
       w: arrowLabelWidth(edge.label, edge) + 2 * ARROW_LABEL_PADDING,
       h: arrowLabelLineHeight(edge) + 2 * ARROW_LABEL_PADDING,
       box: { x: 0, y: 0, w: 0, h: 0 },
@@ -206,6 +235,7 @@ function placeLabels(
   for (const slot of slots) {
     const blockers = blockerPool.filter((s) => s.id !== slot.edge.from && s.id !== slot.edge.to);
     const others = slots.filter((o) => o !== slot);
+    const slotRoute = routes.get(slot.edge.id);
 
     const scoreAt = (box: LabelBox): { score: number; shapeScore: number } => {
       let shapeScore = 0;
@@ -256,11 +286,24 @@ function placeLabels(
     // rather than the offset alone.
     if (best.shapeScore > 0) {
       const otherLabelBoxes = others
-        .map((o) => approxLabelBox(o.edge, byId, routes.get(o.edge.id)?.bend ?? 0))
+        .map((o) => {
+          const r = routes.get(o.edge.id);
+          return approxLabelBox(o.edge, byId, r?.bend ?? 0, r?.startAnchor, r?.endAnchor);
+        })
         .filter((b): b is LabelBox => b !== null);
       const signs: (1 | -1)[] = slot.bend !== 0 ? [Math.sign(slot.bend) as 1 | -1] : [1, -1];
 
-      const grownBend = growBendClear(slot.edge, slot.bend, byId, blockerPool, otherLabelBoxes, signs, undefined, false);
+      const grownBend = growBendClear(
+        slot.edge,
+        slot.bend,
+        byId,
+        blockerPool,
+        otherLabelBoxes,
+        signs,
+        slotRoute?.startAnchor,
+        slotRoute?.endAnchor,
+        false,
+      );
       if (grownBend !== slot.bend) {
         const box = boxAt({ ...slot, bend: grownBend }, 0.5);
         const { score, shapeScore } = scoreAt(box);
@@ -457,19 +500,20 @@ function edgeBendClearsObstacles(
   byId: Map<string, AbsShape>,
   blockerPool: AbsShape[],
   otherLabelBoxes: LabelBox[],
-  anchor?: Point,
+  startAnchor?: Point,
+  endAnchor?: Point,
 ): boolean {
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
   if (!from || !to) return true;
-  const start = terminalPoint(from, anchor, to);
-  const end = terminalPoint(to, anchor, from);
+  const start = terminalPoint(from, startAnchor, to);
+  const end = terminalPoint(to, endAnchor, from);
   const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
   const path = arcPolyline(start, end, bend);
   if (blockers.some((b) => polylineHitsBox(path, b))) return false;
 
   if (edge.label !== undefined) {
-    const box = approxLabelBox(edge, byId, bend, anchor);
+    const box = approxLabelBox(edge, byId, bend, startAnchor, endAnchor);
     // Inflated by `CLEAR_MARGIN`: the model this checks against is the same
     // approximation that missed the original overprint, so a near-miss here
     // is treated as a miss and this step is rejected in favour of a smaller one.
@@ -479,13 +523,19 @@ function edgeBendClearsObstacles(
 }
 
 /** Approximate label box at an edge's own midpoint for a given `bend` - `null` for an unlabelled or self edge. */
-function approxLabelBox(edge: IREdge, byId: Map<string, AbsShape>, bend: number, anchor?: Point): LabelBox | null {
+function approxLabelBox(
+  edge: IREdge,
+  byId: Map<string, AbsShape>,
+  bend: number,
+  startAnchor?: Point,
+  endAnchor?: Point,
+): LabelBox | null {
   if (!edge.label || edge.from === edge.to) return null;
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
   if (!from || !to) return null;
-  const start = terminalPoint(from, anchor, to);
-  const end = terminalPoint(to, anchor, from);
+  const start = terminalPoint(from, startAnchor, to);
+  const end = terminalPoint(to, endAnchor, from);
   const u = unit(start, end);
   const perp: Point = { x: -u.y, y: u.x };
   const w = arrowLabelWidth(edge.label, edge) + 2 * ARROW_LABEL_PADDING;
@@ -547,19 +597,29 @@ function clearObstaclesOnEveryRoute(
 
     const route = routes.get(edge.id);
     const existing = route?.bend ?? 0;
-    const anchor = route?.startAnchor;
-    if (edgeBendClearsObstacles(edge, existing, byId, blockerPool, [], anchor)) continue;
+    const startAnchor = route?.startAnchor;
+    const endAnchor = route?.endAnchor;
+    if (edgeBendClearsObstacles(edge, existing, byId, blockerPool, [], startAnchor, endAnchor)) continue;
 
     if (existing === 0) {
-      const bend = growBendClear(edge, existing, byId, blockerPool, [], [1, -1], anchor);
+      const bend = growBendClear(edge, existing, byId, blockerPool, [], [1, -1], startAnchor, endAnchor);
       if (bend !== existing) routes.set(edge.id, { ...(route ?? { bend: 0 }), bend });
       continue;
     }
 
     const committed = Math.sign(existing) as 1 | -1;
-    let bend = growBendClear(edge, existing, byId, blockerPool, [], [committed], anchor);
+    let bend = growBendClear(edge, existing, byId, blockerPool, [], [committed], startAnchor, endAnchor);
     if (bend === existing) {
-      bend = growBendClear(edge, existing, byId, blockerPool, [], [committed === 1 ? -1 : 1], anchor);
+      bend = growBendClear(
+        edge,
+        existing,
+        byId,
+        blockerPool,
+        [],
+        [committed === 1 ? -1 : 1],
+        startAnchor,
+        endAnchor,
+      );
     }
     if (bend !== existing) routes.set(edge.id, { ...route, bend });
   }
@@ -598,7 +658,8 @@ function growBendClear(
   blockerPool: AbsShape[],
   otherLabelBoxes: LabelBox[],
   signs: readonly (1 | -1)[],
-  anchor?: Point,
+  startAnchor?: Point,
+  endAnchor?: Point,
   useAnalyticJump = true,
 ): number {
   const from = byId.get(edge.from);
@@ -607,19 +668,21 @@ function growBendClear(
   const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
 
   let best = initialBend;
-  let bestHits = violationCount(edge, initialBend, byId, blockers, otherLabelBoxes, anchor);
+  let bestHits = violationCount(edge, initialBend, byId, blockers, otherLabelBoxes, startAnchor, endAnchor);
   if (bestHits === 0) return initialBend;
 
-  const start = terminalPoint(from, anchor, to);
-  const end = terminalPoint(to, anchor, from);
+  const start = terminalPoint(from, startAnchor, to);
+  const end = terminalPoint(to, endAnchor, from);
   // The chord-length cap only means something for the path-clearance case,
   // where `start`/`end` are the edge's real terminals: a detour bigger than
   // the chord itself has swung past pointless. `placeLabels`'s call has no
   // such cap (its original fixed-step loop never had one either) - `start`/
-  // `end` there are `bodyExitPoint`'s anchor-blind fallback (see this
-  // function's own header), which for e.g. a vertically-stacked pair with an
-  // explicit left/right anchor collapses to a near-zero-width chord that
-  // would truncate the search long before the label actually clears.
+  // `end` there now come from the edge's own real anchor (or the same
+  // ray-toward-the-other-centre fallback every unrouted edge gets) the same
+  // way every other caller's do (B5's flagged bug, fixed for B9): a pair of
+  // shapes close enough together that this chord is short can still
+  // truncate the search before the label actually clears, which is exactly
+  // why this branch has no cap at all.
   const cap = useAnalyticJump ? Math.hypot(end.x - start.x, end.y - start.y) : Infinity;
   if (cap < 1) return initialBend;
 
@@ -640,7 +703,7 @@ function growBendClear(
       if (sag > cap) break;
 
       const bend = round1(sign * sag);
-      const hits = violationCount(edge, bend, byId, blockers, otherLabelBoxes, anchor);
+      const hits = violationCount(edge, bend, byId, blockers, otherLabelBoxes, startAnchor, endAnchor);
       // The path case keeps the best partial attempt when nothing fully
       // clears - always an improvement over `initialBend`'s own (nonzero)
       // hit count, the old `solveDetour`'s "give up, leave it straight"
@@ -688,17 +751,18 @@ function violationCount(
   byId: Map<string, AbsShape>,
   blockers: AbsShape[],
   otherLabelBoxes: LabelBox[],
-  anchor?: Point,
+  startAnchor?: Point,
+  endAnchor?: Point,
 ): number {
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
   if (!from || !to) return 0;
-  const start = terminalPoint(from, anchor, to);
-  const end = terminalPoint(to, anchor, from);
+  const start = terminalPoint(from, startAnchor, to);
+  const end = terminalPoint(to, endAnchor, from);
   const path = arcPolyline(start, end, bend);
   let hits = blockers.filter((b) => polylineHitsBox(path, b)).length;
   if (edge.label !== undefined) {
-    const box = approxLabelBox(edge, byId, bend, anchor);
+    const box = approxLabelBox(edge, byId, bend, startAnchor, endAnchor);
     if (box !== null) {
       if (blockers.some((b) => boxesOverlap(box, b))) hits += 1;
       if (otherLabelBoxes.some((o) => boxesOverlap(inflate(box, CLEAR_MARGIN), o))) hits += 1;
