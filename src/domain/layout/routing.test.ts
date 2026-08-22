@@ -524,4 +524,54 @@ describe("computeEdgeRoutes", () => {
       expect(Math.abs(route!.bend)).toBeGreaterThan(bareBend);
     });
   });
+
+  describe("obstacle correction after candidate/lane (B5)", () => {
+    it("moves a candidate edge off its analytically-chosen side when that side actually crosses an off-axis shape invisible to computeCandidate (event-driven.tldsl.jsx repro)", () => {
+      // t-payments -> dlq is a vertical-axis skip; `notifications` is the one
+      // shape computeCandidate's own `crossed` set finds (its y-centre sits
+      // strictly between the endpoints), so its x-extent (181..440) sets
+      // `bandMin`/`bandMax` for the "how far can we lean" check. `t-orders`
+      // sits beside t-payments (same row, not between the endpoints, so
+      // `crossed` never sees it) but its right edge (284) sits *inside* that
+      // band (181..440) rather than fully outside it - the one case the old
+      // `gap()` heuristic's "only shapes fully outside the band limit us"
+      // rule doesn't count as a limiter, so the analytic pass picks a side
+      // as if nothing were in the way there. The real arc, still ramping up
+      // its bow near t-payments, clips t-orders anyway - `computeCandidate`
+      // is unchanged by B5 and picks the identical side whether or not
+      // t-orders is even in the diagram, so the two variants below get the
+      // same bend from the analytic pass alone. `clearObstaclesOnEveryRoute`
+      // is the only pass that re-tests the *actual* rendered arc against
+      // every shape (not just `crossed`), so a materially different final
+      // bend once t-orders is added is only explainable by that correction
+      // actually firing.
+      const tPayments = { id: "t-payments", x: 332, y: 238, w: 175, h: 62 };
+      const dlq = { id: "dlq", x: 294, y: 653, w: 217, h: 62 };
+      const tOrders = { id: "t-orders", x: 145, y: 238, w: 139, h: 62 };
+      const notifications = { id: "notifications", x: 181, y: 446, w: 259, h: 62 };
+
+      const withoutTOrders = doc("root", [
+        box(tPayments),
+        box(dlq),
+        box(notifications),
+        edge({ id: "e", from: "t-payments", to: "dlq" }),
+      ]);
+      const bareBend = computeEdgeRoutes(withoutTOrders).get("e")!.bend;
+
+      const withTOrders = doc("root", [
+        box(tPayments),
+        box(dlq),
+        box(tOrders),
+        box(notifications),
+        edge({ id: "e", from: "t-payments", to: "dlq" }),
+      ]);
+      const correctedBend = computeEdgeRoutes(withTOrders).get("e")!.bend;
+
+      // A blind correction pass would leave this identical to `bareBend`
+      // (same sign, same magnitude) since t-orders is invisible to the
+      // candidate/lane pass either way - the fix has to actually change the
+      // outcome once the obstacle is real.
+      expect(Math.sign(correctedBend)).not.toBe(Math.sign(bareBend));
+    });
+  });
 });
