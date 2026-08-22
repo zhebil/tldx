@@ -322,3 +322,9 @@ In this repo, unbuilt: `npm run dev:cli -- serve diagram.tldsl.jsx`.
 4. `ir/unknown-prop` - there is no `className`, `style` or `variant`. The message
    lists what is allowed.
 5. `ir/invalid-style-value` - a colour or `geo` outside the sets above.
+
+`check` also warns without rejecting: `layout/label-overflow` fires when a
+box's label doesn't fit the size it ended up with, naming the shape, the text,
+and the size it needed versus the size it got. It's a warning, not an
+error - `check` still exits clean, so this is one more reason a clean `check`
+is not a finished diagram. Render and look.
