@@ -65,6 +65,7 @@ export async function runAbsorbCli(args: RunAbsorbCliArgs): Promise<number> {
         result.residualCount > 0
           ? `${result.residualCount} overlay entr${result.residualCount === 1 ? "y" : "ies"} left in the overlay (not expressible in JSX yet)`
           : "overlay is now empty",
+        ...(result.moveNotes ?? []).map((note) => `  ${note}`),
       ];
       io.writeStdout(`${lines.join("\n")}\n`);
       return 0;

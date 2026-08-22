@@ -86,8 +86,7 @@ export type AbsorbResult =
       /** One line per `moved` entry the ladder looked at but couldn't
        *  absorb (docs/round-trip-scope.md §7 F4: "say precisely which
        *  element and why, not fail silently"). Empty when there was
-       *  nothing to explain. `cli/absorb.ts` doesn't print this yet - it's
-       *  surfaced in the result for a follow-up CLI change. */
+       *  nothing to explain. Printed by `cli/absorb.ts`. */
       moveNotes?: string[];
     };
 
