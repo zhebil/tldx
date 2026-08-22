@@ -179,8 +179,15 @@ describe("computeEdgeRoutes", () => {
     // overlap on x in 350..500. Both tie-break to "neg" like the single-edge
     // cases above, landing them in the same lane group. ce is shorter so it
     // sorts first and keeps rank 0 (sag 12, matching a lone c->e skip); ad is
-    // longer, ranks above it (sag 13.5 + one 20px lane step = 33.5), so its
-    // bow reaches farther from the row than ce's.
+    // longer, ranks above it - the candidate/lane pass alone would give it
+    // sag 13.5 + one 20px lane step = 33.5, but B12's final minimisation
+    // (`minimizeBends`) shrinks that back toward zero once it isn't needed:
+    // ad's own obstacle clearance only requires ~13.5, and the only other
+    // thing pinning it above that is staying clear of ce's own arc - which
+    // bottoms out at -19.03 (measured), still well clear of ce's -12 and of
+    // both boxes it skips, without paying for the full, un-minimised lane
+    // step. See the identically-shaped LCA-grouped test below for the same
+    // number under nested frames.
     const ir = doc("root", [
       box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
       box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
@@ -198,7 +205,7 @@ describe("computeEdgeRoutes", () => {
     expect(ad!.bend).toBeLessThan(0);
     expect(ce!.bend).toBeLessThan(0);
     expect(ce!.bend).toBeCloseTo(-12, 5);
-    expect(ad!.bend).toBeCloseTo(-33.5, 5);
+    expect(ad!.bend).toBeCloseTo(-19.03, 2);
     expect(Math.abs(ad!.bend)).toBeGreaterThan(Math.abs(ce!.bend));
   });
 
@@ -229,7 +236,9 @@ describe("computeEdgeRoutes", () => {
     // "outer" frame alongside top-level b/c/d. ad's endpoints (f1, outer)
     // and ce's endpoints (outer, f5) both resolve to the same LCA, "outer",
     // so they land in the same lane group exactly as the flat case: ce
-    // (shorter span) keeps rank 0 (-12), ad ranks above it (-33.5).
+    // (shorter span) keeps rank 0 (-12), ad ranks above it, then B12's final
+    // minimisation shrinks ad's un-minimised lane sag (33.5) down to the
+    // same measured -19.03 the flat case above settles on.
     const ir = doc("root", [
       frame({
         id: "outer",
@@ -254,7 +263,7 @@ describe("computeEdgeRoutes", () => {
     expect(ad).toBeDefined();
     expect(ce).toBeDefined();
     expect(ce!.bend).toBeCloseTo(-12, 5);
-    expect(ad!.bend).toBeCloseTo(-33.5, 5);
+    expect(ad!.bend).toBeCloseTo(-19.03, 2);
     expect(Math.abs(ad!.bend)).toBeGreaterThan(Math.abs(ce!.bend));
   });
 
