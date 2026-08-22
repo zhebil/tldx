@@ -325,6 +325,39 @@ describe("lower: ir/unknown-prop", () => {
   });
 });
 
+// D19: a JSX string-literal `label` does not process `\n` - it stays two
+// literal characters, not a line break. `check` should warn, not stay silent.
+describe("lower: ir/literal-newline-in-label (D19)", () => {
+  it("warns when a <box> label contains a literal backslash-n", () => {
+    const ast = doc({}, [box({ id: "a", label: "line one\\nline two" })]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.severity).toBe("warning");
+    expect(diagnostics[0]!.code).toBe("ir/literal-newline-in-label");
+  });
+
+  it("warns when an <edge> label contains a literal backslash-n", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      edge({ from: "a", to: "a", label: "line one\\nline two" }),
+    ]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics.map((d) => d.code)).toContain("ir/literal-newline-in-label");
+  });
+
+  it("does not warn on a label with an actual newline character (the expression form)", () => {
+    const ast = doc({}, [box({ id: "a", label: "line one\nline two" })]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("does not warn on a label with no newline at all", () => {
+    const ast = doc({}, [box({ id: "a", label: "one line" })]);
+    const diagnostics = lowerDiagnostics(ast);
+    expect(diagnostics).toEqual([]);
+  });
+});
+
 describe("lower: diagnostics name the authored component, not the IR kind (T44)", () => {
   // Every alias the runtime exposes for `<frame>` (D12): plain `<Frame>` plus
   // its eight container aliases. `undefined` means "don't pass a tag" -

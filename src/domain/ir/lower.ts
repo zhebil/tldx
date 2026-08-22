@@ -27,6 +27,7 @@
 
 import {
   error,
+  warning,
   type Diagnostic,
   type SourceSpan,
 } from "../diagnostics/index.js";
@@ -183,6 +184,27 @@ function checkUnknownProps(
   }
 }
 
+/**
+ * A JSX string-literal attribute (`label="a\nb"`) is raw text - it does not
+ * process backslash escapes, so a literal `\n` in one stays two characters
+ * (`\` and `n`) instead of becoming a line break (D19). Warn rather than
+ * reject: it is valid JSX, just probably not what the author meant. The
+ * working multiline form is the expression container, `label={"a\nb"}`,
+ * which is ordinary JS and does process the escape before it ever reaches
+ * the AST.
+ */
+function checkLiteralNewlineInLabel(attrs: Attrs, ctx: Ctx): void {
+  const attr = attrs.label;
+  if (attr === undefined || !attr.value.includes("\\n")) return;
+  ctx.diagnostics.push(
+    warning(
+      "ir/literal-newline-in-label",
+      `'label' contains a literal '\\n', which renders as the two characters '\\' and 'n', not a line break - JSX string attributes do not process escapes. Use the expression form instead: label={"line one\\nline two"}`,
+      attr.span,
+    ),
+  );
+}
+
 export type LowerResult = {
   /** The lowered document, or null if the AST root is not `<doc>`. */
   ir: IRDoc | null;
@@ -314,6 +336,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
 function lowerBox(node: AstBox, ctx: Ctx): IRBox {
   const tag = displayTag(node);
   checkUnknownProps("box", tag, node.attrs, ctx);
+  checkLiteralNewlineInLabel(node.attrs, ctx);
   const color = readEnum(node.attrs, "color", COLORS, ctx);
   const fill = readEnum(node.attrs, "fill", FILLS, ctx);
   const dash = readEnum(node.attrs, "dash", DASHES, ctx);
@@ -380,6 +403,7 @@ function lowerNote(node: AstNote, ctx: Ctx): IRNote {
 function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
   const tag = displayTag(node);
   checkUnknownProps("edge", tag, node.attrs, ctx);
+  checkLiteralNewlineInLabel(node.attrs, ctx);
   const fromAttr = node.attrs.from;
   const toAttr = node.attrs.to;
   if (fromAttr === undefined || toAttr === undefined) {
