@@ -877,3 +877,57 @@ Still open from this group: `labelClearanceGap` reserves nothing at all for an
 edge that skips a sibling (`Math.abs(from - to) !== 1` bails), which is the
 half of D9 T37 also declined. And the fix is per-render, not per-viewer: the
 live viewer never had the space bug, because the DOM lays the label out itself.
+
+## T40 - end state
+
+The regression gate. Every diagram file in the repo was run through
+`tldsl check` and `tldsl render`: 16 in `tests/corpus/`, 7 in `examples/`, 21
+in `examples/repro/`. **All 44 compile and all 44 render**, both exit 0. The
+sixteen fresh corpus PNGs are byte-identical to the committed `docs/renders/`,
+so nothing has moved since T38 and no re-render was needed.
+
+Corpus + examples, `tools/arrow-truth.mts`:
+
+| counter | T38 | T40 |
+|---|---|---|
+| arrow paths crossing a non-endpoint shape | 43 | 43 |
+| arrow pairs crowding each other | 2 | 2 |
+| arrow labels overlapping a non-endpoint shape | 7 | 7 |
+| arrow labels overlapping another label | 7 | 7 |
+
+Unchanged on every counter, which is the result the gate is for: no wake
+between T38 and here moved a number in either direction.
+
+Per file, where anything is non-zero (`crossings / crowded / label-over-shape /
+label-over-label`):
+
+| file | c | w | ls | ll |
+|---|---|---|---|---|
+| corpus/checkout-services | 1 | 0 | 0 | 0 |
+| corpus/deep-nesting | 3 | 0 | 0 | 0 |
+| corpus/hexagonal | 6 | 0 | 0 | 0 |
+| corpus/order-states | 3 | 0 | 1 | 1 |
+| examples/c4-container | 3 | 0 | 1 | 1 |
+| examples/cicd-pipeline | 6 | 1 | 1 | 0 |
+| examples/event-driven | 11 | 0 | 0 | 4 |
+| examples/kernel | 1 | 0 | 0 | 0 |
+| examples/tcp-lifecycle | 3 | 0 | 1 | 0 |
+| examples/tcp-states | 5 | 1 | 2 | 0 |
+| examples/web-architecture | 1 | 0 | 1 | 1 |
+| **total (23 files)** | **43** | **2** | **7** | **7** |
+
+The other twelve - `c4-context`, `graph-topology`, `layers-stack`,
+`long-labels`, `multi-region`, `pipeline-build`, `release-pipeline`,
+`request-lifecycle`, `sequence`, `sparse-graph`, `swimlanes-release`,
+`wide-fanout` - are zero on all four.
+
+For the record on where the 43 sit: `event-driven` alone holds 11 of them, and
+it plus `hexagonal` and `cicd-pipeline` hold 23 of 43. Compared with the T1
+baseline's 60 crossings over the 8 files that existed then, the corpus has since
+roughly tripled in size and the count fell, but the fall is not evenly spread -
+the fan-shaped and cross-container files still carry nearly all of it.
+
+Every one of the 44 PNGs was looked at. The visible damage is all in ledger
+entries already open and deliberately unfixed (D3, D8, D11's remainder, D21,
+D2's `Frame` caption); three defects seen that no ledger entry and no counter
+covers went to the plan's *Discovered work* rather than being fixed here.
