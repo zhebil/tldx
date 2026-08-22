@@ -1,4 +1,4 @@
-import { Doc, Row, Box, Edge, Note } from "tldsl";
+import { Doc, Row, Box, Edge, Sticky } from "tldsl";
 
 // D15. `check` only validates the IR, never rendered geometry, so an
 // occluding note and a mid-skip label both pass clean while the diagram
@@ -13,10 +13,10 @@ export default function D15() {
         <Box id="third" label="third" />
       </Row>
       <Edge from="first" to="third" label="skip" font="sans" size="s" />
-      <Note on="first">
+      <Sticky on="first">
         This note is deliberately long, long enough that it drifts sideways
         far enough to bury both of its neighbours completely.
-      </Note>
+      </Sticky>
     </Doc>
   );
 }

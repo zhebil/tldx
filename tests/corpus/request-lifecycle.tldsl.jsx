@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Edge, Note, flow } from "tldsl";
+import { Doc, Frame, Box, Edge, Sticky, flow } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -23,9 +23,9 @@ export default function Diagram() {
       <Edge id="e-auth-reject" from="auth" to="reject" label="no token" color="red" />
       <Edge id="e-cache-cached" from="cache" to="cached" label="hit" color="green" />
 
-      <Note id="n-cache" on="cached" color="yellow" w="220">
+      <Sticky id="n-cache" on="cached" color="yellow">
         A cache hit skips the handler and the database entirely.
-      </Note>
+      </Sticky>
     </Doc>
   );
 }

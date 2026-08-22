@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Edge, Note, flow } from "tldsl";
+import { Doc, Frame, Box, Edge, Sticky, flow } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -20,9 +20,9 @@ export default function Diagram() {
       <Edge id="e-orders-payments" from="orders" to="payments" />
       <Edge id="e-orders-db" from="orders" to="db" />
 
-      <Note on="auth">Only the gateway terminates TLS.</Note>
-      <Note on="backend">Backend services scale independently of ingress.</Note>
-      <Note on="e-gateway-orders">Retries are idempotent here.</Note>
+      <Sticky on="auth">Only the gateway terminates TLS.</Sticky>
+      <Sticky on="backend">Backend services scale independently of ingress.</Sticky>
+      <Sticky on="e-gateway-orders">Retries are idempotent here.</Sticky>
     </Doc>
   );
 }

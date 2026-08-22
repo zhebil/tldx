@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Edge, Note, flow } from "tldsl";
+import { Doc, Frame, Box, Edge, Text, flow } from "tldsl";
 
 const REGIONS = [
   { ns: "use1", name: "us-east-1 (primary)" },
@@ -46,11 +46,11 @@ export default function Diagram() {
         <Edge id={`gslb-${r.ns}`} from="gslb" to={`${r.ns}-api`} />
       ))}
 
-      <Note id="n-failover">
+      <Text id="n-failover" maxW="480">
         GSLB health-checks each region's API tier. On failure it drains that
         region and shifts traffic to us-east-1, which holds the primary
         Postgres; the other regions run read replicas.
-      </Note>
+      </Text>
     </Doc>
   );
 }

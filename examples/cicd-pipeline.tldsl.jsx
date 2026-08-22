@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Edge, Note, flow } from "tldsl";
+import { Doc, Frame, Box, Edge, Sticky, flow } from "tldsl";
 
 // A CI/CD pipeline for a containerised service: commit through build, tests,
 // a manual approval gate, staging, smoke tests and production - with the two
@@ -64,7 +64,7 @@ export default function CicdPipeline() {
       <Edge from="health-gate" to="rollback" label="unhealthy" font="sans" size="s" color="red" />
       <Edge from="rollback" to="deploy-prod" label="previous image tag" font="sans" size="s" dash="dashed" color="red" />
 
-      <Note on="rollback">Rollback re-enters the pipeline at the deploy stage; it is not a separate release path.</Note>
+      <Sticky on="rollback">Rollback re-enters the pipeline at the deploy stage; it is not a separate release path.</Sticky>
     </Doc>
   );
 }

@@ -18,7 +18,7 @@ in the source are an escape hatch, not the normal way to work.
 ## The file
 
 ```jsx
-import { Doc, Frame, Box, Edge, Note, flow } from "tldsl";
+import { Doc, Frame, Box, Edge, Sticky, flow } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -29,7 +29,7 @@ export default function Diagram() {
       </Frame>
       <Box id="db" label="Postgres" geo="ellipse" color="blue" />
       {flow("lb", "app", "db")}
-      <Note on="db">Single writer. Replicas are read-only.</Note>
+      <Sticky on="db">Single writer. Replicas are read-only.</Sticky>
     </Doc>
   );
 }
@@ -66,9 +66,9 @@ All from `"tldsl"`.
 | `<Layers id>` | Column of tiers; each child frame becomes a row. Unnamed tiers lose their chrome. |
 | `<Swimlanes id>` | Like `<Layers>` but lanes keep their border and title. |
 | `<Graph id>` | `layout="auto"` - hands this container to ELK. **Last resort**, see below. |
-| `<Box id label>` | A leaf. `id` required. |
-| `<Note on>text</Note>` | Annotation. Text is children, not a prop. |
-| `<Sticky>text</Sticky>` | A real tldraw sticky note, fixed 200px wide. |
+| `<Box id label>` | A leaf with a border and fill. `id` required. |
+| `<Text>text</Text>` | Borderless, fill-less caption - just glyphs. No `id` required. Text is children, not a `label` prop. |
+| `<Sticky on>text</Sticky>` | A real tldraw sticky note, fixed 200px wide. `on` attaches it beside another element. |
 | `<Edge from to>` | One arrow. |
 | `flow("a","b","c")` | Returns the chain of edges. Splice with `{flow(...)}`. |
 
@@ -178,8 +178,11 @@ that is how you get structure, and nesting is cheaper than positioning.
 
 ### Size and position
 
-`w`, `h`, `x`, `y` are valid on `<Box>`, `<Frame>`, and `<Note>` - numeric
-strings, same as `gap`. They are the escape hatch flagged at the top of this
+`w`, `x`, `y` are valid on `<Box>`, `<Frame>`, and `<Text>` - numeric
+strings, same as `gap`. `h` is valid on `<Box>` and `<Frame>` only - a
+`<Text>`'s height is derived from its wrapped content; tldraw's real text
+shape has no `h` at all, so one written on `<Text>` is rejected
+(`ir/unknown-prop`). These are the escape hatch flagged at the top of this
 doc.
 
 - `w` / `h` pin a box's size instead of deriving it from the label. Use for a
@@ -195,10 +198,14 @@ doc.
 - `x` / `y` pin an absolute position and take the element out of flow
   layout - it stops reflowing with its siblings, and they stop making room
   for it.
+- On `<Text>`, `w` (or `maxW`) is the wrap budget. Leave both off and it
+  still won't run off the canvas - it reuses `<Box>`'s own sizing (the same
+  aspect-bounded default that keeps a long label from spreading into one
+  unreadable line), just with no border drawn around it.
 
 ## Style
 
-On `<Box>` / `<Note>` / `<Sticky>`:
+On `<Box>` / `<Sticky>`:
 
 - `color`, `labelColor` - `black grey light-violet violet blue light-blue yellow
   orange green light-green light-red red white`
@@ -210,9 +217,14 @@ On `<Box>` / `<Note>` / `<Sticky>`:
 - `geo` (Box only) - `rectangle` (default) `ellipse oval diamond rhombus
   hexagon octagon pentagon triangle trapezoid star cloud heart check-box x-box
   arrow-up arrow-down arrow-left arrow-right`
-- `maxW` - caps how wide a label may run before wrapping. Works on `<Box>`
-  and `<Note>`; a `<Sticky>`'s width is fixed by tldraw at 200px, so `maxW`
-  has no effect there.
+- `maxW` - caps how wide a label may run before wrapping. Works on `<Box>`;
+  a `<Sticky>`'s width is fixed by tldraw at 200px, so `maxW` has no effect
+  there.
+
+On `<Text>`: a narrower set - `color`, `font`, `size`, `textAlign`, `maxW`
+only. No `fill`, `dash`, `geo`, `verticalAlign`, or `labelColor` - tldraw's
+real text shape has none of them, so they're rejected rather than silently
+ignored.
 
 On `<Edge>`: `color`, `dash`, `label`, `labelColor`, `font`, `size`,
 `arrowheadStart` / `arrowheadEnd` (`arrow triangle square dot pipe diamond
@@ -254,18 +266,25 @@ looping off the shape - the natural way to draw a flowchart polling loop
 **Never put a `.` in an id.** A dot in `from`/`to` is parsed as anchor syntax,
 which is not implemented, so it always fails. Use `-` or `_`.
 
-## Notes
+## Notes and captions
 
-`<Note on="app">…</Note>` parks the note beside `app` and takes it out of
-layout, so it never pushes anything around. `on` accepts any box, frame, note or
-edge id. A note on an edge sits at that edge's midpoint. Without `on`, a note
-flows like a normal child.
+`<Sticky on="app">…</Sticky>` parks the note beside `app` and takes it out of
+layout, so it never pushes anything around. `on` accepts any box, frame,
+sticky or edge id. A sticky on an edge sits at that edge's midpoint. Without
+`on`, a sticky flows like a normal child.
 
-Because an attached note is outside layout, it does not just risk overlap -
-it drifts. On a wide diagram an attached note can land far from its target,
+Because an attached sticky is outside layout, it does not just risk overlap -
+it drifts. On a wide diagram an attached sticky can land far from its target,
 and it can end up outside its own frame entirely. Keep the text to a
-sentence, and check the live viewer (or a render) on any note-heavy diagram
+sentence, and check the live viewer (or a render) on any sticky-heavy diagram
 before you call it done.
+
+`<Text>` has no `on` - it is not attach-capable, only `<Sticky>` is. Reach
+for `<Text>` for anything that just flows like a normal child: a section
+heading in a `<Col>`, a caption under a diagram, a label that doesn't need a
+box around it. Reach for `<Sticky>` when you want the yellow-note look, or
+when the annotation needs to be parked beside a specific element instead of
+flowing with its siblings.
 
 ## Workflow
 

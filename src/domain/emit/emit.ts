@@ -13,12 +13,17 @@
  *   shapes parent to `page:main`, frame children parent to the frame's
  *   shape id. Shape `x | y` is whatever layout produced (frame-relative when
  *   nested), preserved verbatim.
- * - `<Note>` (non-sticky) emits as a `geo` rectangle sized like a box (IR
- *   `w`/`h` pass through verbatim), warm-filled by default (`color: "yellow",
- *   fill: "semi"`, overridden by IR `note.color` when set) to read as an
- *   annotation. `<Sticky>` (`note.sticky`) keeps the old path: drops IR `w`
+ * - `<Text>` (`box.text`, IRBox) emits as a real tldraw `text` shape - no
+ *   border, no fill - instead of a `box`'s `geo` rectangle. It shares every
+ *   box layout rule (sizing, flow, `w`/`maxW` wrap budget); only emit
+ *   branches on `box.text` to pick the shape kind. There is no `h` on the
+ *   wire - a text shape's height is derived from wrapped content.
+ * - `<Sticky>` (`note.sticky`) is a real tldraw note shape: drops IR `w`
  *   (tldraw stickies are always 200 wide) and keeps `h` as `growY` above
- *   tldraw's 200 base height; `note.color` passes through the same way.
+ *   tldraw's 200 base height; `note.color` passes through. It is the only
+ *   `kind: "note"` producer left (C2, tldsl-npd) - the old plain `<Note>`,
+ *   which emitted a hand-rolled `geo` rectangle pretending to be an
+ *   annotation, is retired in favour of `<Text>` or `<Sticky>`.
  * - `box`/`frame`/`note`/`edge` also pass through the raw tldraw style props
  *   IR carries (`color`, `fill`, `dash`, `geo` (`box` only), `arrowheadStart`, `arrowheadEnd`,
  *   and on `box`/`note`/`edge` also `labelColor`, `font`, `size`, and on
@@ -56,6 +61,7 @@ import {
   noteShape,
   pageRecord,
   sceneJson,
+  textShape,
 } from "../../contracts/builders.js";
 import type { SceneJSON, TLRecord } from "../../contracts/scene-json.js";
 import { NOTE_SIZE } from "../layout/defaults.js";
@@ -169,7 +175,11 @@ function emitElement(
       const index = nextIndex(ctx, parentId);
       ctx.chainOf.set(el.id, chain);
       ctx.indexOf.set(shapeId(el.id), index);
-      out.push(emitBox(el, parentId, index, offsetX, offsetY));
+      out.push(
+        el.text
+          ? emitText(el, parentId, index, offsetX, offsetY)
+          : emitBox(el, parentId, index, offsetX, offsetY),
+      );
       return;
     }
     case "note": {
@@ -235,6 +245,43 @@ function emitBox(
   });
 }
 
+/**
+ * Borderless caption (`<Text>`, `IRBox.text`): a real tldraw `text` shape,
+ * not a `geo` rectangle. `box.w` is whatever `domain/layout/stack.ts` already
+ * computed for this element - box sizing (`estimatedBoxSize`, aspect-bounded
+ * by default per `BOX_ASPECT_TARGET`) is reused wholesale, so a `<Text>`
+ * with no `w`/`maxW` still gets a bounded wrap width, never an unbounded
+ * line. There is no `h` on the wire - a text shape's height is derived from
+ * its wrapped content, not settable (see `contracts/builders.ts#textShape`).
+ */
+function emitText(
+  box: IRBoxPositioned,
+  parentId: string,
+  index: string,
+  offsetX: number,
+  offsetY: number,
+): TLRecord {
+  return textShape({
+    id: shapeId(box.id),
+    parentId,
+    index,
+    x: box.x + offsetX,
+    y: box.y + offsetY,
+    w: box.w,
+    text: box.label ?? "",
+    ...(box.color === undefined ? {} : { color: box.color }),
+    ...(box.textAlign === undefined ? {} : { textAlign: box.textAlign }),
+    ...(box.font === undefined ? {} : { font: box.font }),
+    ...(box.size === undefined ? {} : { size: box.size }),
+  });
+}
+
+/**
+ * Always a real tldraw sticky note. The fake-geo-rectangle branch for a
+ * non-sticky `<Note>` is retired (C2, tldsl-npd): `<Sticky>` is the only
+ * runtime producer of `kind: "note"` left, so `note.sticky` is always true
+ * on any IR that reaches here through the public authoring surface.
+ */
 function emitNote(
   note: IRNotePositioned,
   parentId: string,
@@ -242,34 +289,15 @@ function emitNote(
   offsetX: number,
   offsetY: number,
 ): TLRecord {
-  if (note.sticky) {
-    return noteShape({
-      id: shapeId(note.id),
-      parentId,
-      index,
-      x: note.x + offsetX,
-      y: note.y + offsetY,
-      text: note.text,
-      growY: Math.max(0, note.h - NOTE_SIZE),
-      ...(note.color === undefined ? {} : { color: note.color }),
-      ...(note.textAlign === undefined ? {} : { textAlign: note.textAlign }),
-      ...(note.verticalAlign === undefined ? {} : { verticalAlign: note.verticalAlign }),
-      ...(note.labelColor === undefined ? {} : { labelColor: note.labelColor }),
-      ...(note.font === undefined ? {} : { font: note.font }),
-      ...(note.size === undefined ? {} : { size: note.size }),
-    });
-  }
-  return boxShape({
+  return noteShape({
     id: shapeId(note.id),
     parentId,
     index,
     x: note.x + offsetX,
     y: note.y + offsetY,
-    w: note.w,
-    h: note.h,
     text: note.text,
-    color: note.color ?? "yellow",
-    fill: "semi",
+    growY: Math.max(0, note.h - NOTE_SIZE),
+    ...(note.color === undefined ? {} : { color: note.color }),
     ...(note.textAlign === undefined ? {} : { textAlign: note.textAlign }),
     ...(note.verticalAlign === undefined ? {} : { verticalAlign: note.verticalAlign }),
     ...(note.labelColor === undefined ? {} : { labelColor: note.labelColor }),

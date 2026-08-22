@@ -1,4 +1,4 @@
-import { Doc, Group, Box, Edge, Note } from "tldsl";
+import { Doc, Group, Box, Edge, Sticky } from "tldsl";
 
 // One entry per instant on the connection. `c` / `s` are the states the two
 // peers hold once that entry's segment has been sent; `dir` is which way the
@@ -67,7 +67,7 @@ export default function TcpLifecycle() {
         ),
       )}
 
-      <Note on="client-ack2">TIME_WAIT holds for 2 MSL, so a late duplicate cannot reach a new connection.</Note>
+      <Sticky on="client-ack2">TIME_WAIT holds for 2 MSL, so a late duplicate cannot reach a new connection.</Sticky>
     </Doc>
   );
 }

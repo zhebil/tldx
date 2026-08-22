@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Edge, Note } from "tldsl";
+import { Doc, Frame, Box, Edge, Sticky } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -40,9 +40,9 @@ export default function Diagram() {
       <Edge id="e-pricing-redis" from="pricing" to="redis" label="cache" color="green" />
       <Edge id="e-payment-kafka" from="payment" to="kafka" label="events" color="green" />
 
-      <Note id="n-idempotency" on="ledger" color="yellow" w="220">
+      <Sticky id="n-idempotency" on="ledger" color="yellow">
         Authorization is keyed by checkout id, so a retry never charges twice.
-      </Note>
+      </Sticky>
     </Doc>
   );
 }

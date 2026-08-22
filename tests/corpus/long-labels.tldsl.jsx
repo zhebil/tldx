@@ -1,4 +1,4 @@
-import { Doc, Box, Edge, Note } from "tldsl";
+import { Doc, Box, Edge, Text } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -53,17 +53,17 @@ export default function Diagram() {
       <Edge id="e-payments-notifier" from="payments" to="notifier" />
       <Edge id="e-orders-audit" from="orders" to="audit" />
 
-      <Note id="note-reporting">
+      <Text id="note-reporting" maxW="480">
         Reporting reads from the audit log rather than the live order table so
         that nightly aggregation never competes with request traffic for locks.
         The dashboard is therefore always at least one day behind the live state.
-      </Note>
-      <Note id="note-payments">
+      </Text>
+      <Text id="note-payments" maxW="480">
         Payment charges are idempotent per order id. A retried charge for the
         same order returns the original result instead of charging the card
         twice, which matters because the payment service itself has no retry
         budget of its own.
-      </Note>
+      </Text>
     </Doc>
   );
 }

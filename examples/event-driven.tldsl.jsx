@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Edge, Note } from "tldsl";
+import { Doc, Frame, Box, Edge, Sticky } from "tldsl";
 
 // An event-driven order pipeline. Seven services talk only through the bus:
 // four core services that both publish and subscribe, three derived consumers
@@ -56,7 +56,7 @@ export default function EventDriven() {
       <Edge from="shipping" to="t-orders" label="ShipmentFailed" color="light-red" dash="dashed" font="sans" size="s" />
       <Edge from="payments" to="t-orders" label="PaymentRefunded" color="light-red" dash="dashed" font="sans" size="s" />
 
-      <Note on="t-orders">Checkout saga: orders, payments and shipping compensate back through orders.v1.</Note>
+      <Sticky on="t-orders">Checkout saga: orders, payments and shipping compensate back through orders.v1.</Sticky>
     </Doc>
   );
 }

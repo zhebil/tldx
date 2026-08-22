@@ -116,12 +116,31 @@ export type IRBox = IRBase & {
   labelColor?: StyleColor;
   font?: StyleFont;
   size?: StyleFontSize;
+  /**
+   * True for `<Text>`: the same "box" IR kind, sized and flowed exactly like
+   * a `<Box>` (`domain/layout/stack.ts` never special-cases it), but emitted
+   * as a borderless tldraw `text` shape instead of a `geo` rectangle
+   * (`domain/emit/emit.ts`). `fill`/`dash`/`geo`/`verticalAlign`/`labelColor`
+   * are meaningless for this variant - `domain/ir/lower.ts` rejects them via
+   * a narrower allowed-prop set - but the fields stay on `IRBox` rather than
+   * forking the type, so every box-shaped layout rule keeps working
+   * unmodified. Unset for plain `<Box>`.
+   */
+  text?: boolean;
 };
 
 export type IRNote = IRBase & {
   kind: "note";
   text: string;
-  /** True for `<Sticky>` (real tldraw sticky, `noteShape`); false/absent for `<Note>` (geo box). */
+  /**
+   * True for `<Sticky>` (real tldraw sticky, `noteShape`). `<Sticky>` is the
+   * only runtime producer left (C2, tldsl-npd) - the old `<Note>` that left
+   * this unset and emitted a fake geo-rectangle "note" is retired in favour
+   * of `<Text>` (borderless annotation) or `<Box>` (bordered). The field
+   * stays optional rather than required `true`: `domain/layout/stack.ts` and
+   * `domain/layout/attach.ts` still branch on it, and tightening it here
+   * would force changes into files this issue doesn't own.
+   */
   sticky?: boolean;
   /** Id of the box/frame/note/edge this note annotates. Validated at lower time (`ir/note-target-not-found`); placed by `domain/layout/attach.ts`. */
   on?: string;

@@ -1,4 +1,4 @@
-import { Frame, Group, Box, Edge, Note, flow } from "tldsl";
+import { Frame, Group, Box, Edge, Sticky, flow } from "tldsl";
 import { SAVE_TO_DB, YDOC, CLIENTS, EditorServer, Translation, Provider, ClientEditor, clientEdges } from "./shared.jsx";
 
 export const CollabBoard = () => (
@@ -122,7 +122,7 @@ export const CollabBoard = () => (
 {CLIENTS.map((i) => (
   <Edge from={`ex-u${i}`} to="ex-db" label="Atomic update event" color="red" />
 ))}
-<Note on="ex-db">Every keystroke-level event hits the server. That is the bottleneck.</Note>
+<Sticky on="ex-db">Every keystroke-level event hits the server. That is the bottleneck.</Sticky>
 {clientEdges("p1")}
 {CLIENTS.map((i) => clientEdges(`nf${i}`))}
 {CLIENTS.map((i) => (
@@ -130,7 +130,7 @@ export const CollabBoard = () => (
 ))}
 <Edge from="nf-pstate" to="nf-cmp" label="Content updated" color="violet" />
 <Edge from="nf-cmp" to="nf-db" label="Atomic update events" color="blue" />
-<Note on="nf-pstate">Custom throttling lives here - the server sees batches, not keystrokes.</Note>
+<Sticky on="nf-pstate">Custom throttling lives here - the server sees batches, not keystrokes.</Sticky>
 <Edge from="cv-user" to="cv-collab" label="flag on" color="green" />
 <Edge from="cv-user" to="cv-plain" label="flag off" color="red" />
 <Edge from="cv-collab" to="cv-shared" label="Update events" />
@@ -146,7 +146,7 @@ export const CollabBoard = () => (
 <Edge from="pv-user" to="pv-update" label="Add comment" />
 <Edge from="pv-update" to="pv-yjs" label="Send update" color="orange" arrowheadStart="arrow" />
 <Edge from="pv-update" to="pv-user" label="Return updated data" color="green" />
-<Note on="pv-yjs">Only when the room exists - i.e. collaboration is active.</Note>
+<Sticky on="pv-yjs">Only when the room exists - i.e. collaboration is active.</Sticky>
 <Edge from="ds-prov" to="ds-routine" label="ContentUpdated" color="orange" />
 <Edge from="ds-client" to="ds-routine" label="Preview opened" color="grey" />
 <Edge from="ds-routine" to="ds-db" label="Persist" color="blue" />

@@ -9,10 +9,10 @@ export {
   Grid,
   Group,
   Layers,
-  Note,
   Pipeline,
   Row,
   Sticky,
   Swimlanes,
+  Text,
   flow,
 } from "./components.js";

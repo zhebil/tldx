@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Note, Sticky } from "tldsl";
+import { Doc, Frame, Box, Text, Sticky } from "tldsl";
 
 const TEXT_ALIGNS = ["start", "middle", "end"];
 const VERTICAL_ALIGNS = ["start", "middle", "end"];
@@ -24,19 +24,14 @@ export default function Diagram() {
         )}
       </Frame>
 
-      <Frame id="notes" name="Note alignment" layout="grid" cols="3" gap="16" pad="16">
+      {/* <Text> has no verticalAlign/labelColor/h - tldraw's real text shape
+          has neither (see contracts/builders.ts#textShape); only textAlign
+          and w (wrap budget) carry over from the old Note-alignment grid. */}
+      <Frame id="texts" name="Text alignment" layout="row" gap="24" pad="16">
         {TEXT_ALIGNS.map((textAlign, i) => (
-          <Note
-            key={`n-${i}`}
-            id={`n-${i}`}
-            w="260"
-            h="140"
-            textAlign={textAlign}
-            verticalAlign={VERTICAL_ALIGNS[i]}
-            labelColor={LABEL_COLORS[i % LABEL_COLORS.length]}
-          >
-            Note
-          </Note>
+          <Text key={`t-${i}`} id={`t-${i}`} w="180" textAlign={textAlign}>
+            Text
+          </Text>
         ))}
       </Frame>
 

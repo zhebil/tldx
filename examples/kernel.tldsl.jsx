@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Note, Sticky, Edge } from "tldsl";
+import { Doc, Frame, Box, Sticky, Edge } from "tldsl";
 
 const RING3 = ["Applications", "Shell", "System daemons", "libc / language runtime"];
 
@@ -119,14 +119,14 @@ export default function KernelArchitecture() {
         />
       ))}
 
-      <Note id="n-syscall" on="syscall" color="violet" font="sans" size="s">
+      <Sticky id="n-syscall" on="syscall" color="violet" font="sans" size="s">
         The only legal way in. Privilege switches from ring 3 to ring 0 here, and every
         argument crossing this line is untrusted until validated.
-      </Note>
+      </Sticky>
 
-      <Note id="n-sched" on="ipc" color="green" font="sans" size="s">
+      <Sticky id="n-sched" on="ipc" color="green" font="sans" size="s">
         Scheduling is preemptive: a timer IRQ can suspend any task mid-stream.
-      </Note>
+      </Sticky>
 
       <Sticky id="legend" on="hal" color="yellow" font="sans" size="s">
         Solid = calls down. Dashed = device traffic. Dotted = optional.

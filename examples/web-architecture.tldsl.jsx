@@ -1,4 +1,4 @@
-import { Doc, Frame, Group, Box, Edge, Note } from "tldsl";
+import { Doc, Frame, Group, Box, Edge, Sticky } from "tldsl";
 
 // The everyday three-tier web stack: a browser at the top, a CDN and load
 // balancer at the edge, three interchangeable app servers, a cache and a
@@ -58,7 +58,7 @@ export default function WebArchitecture() {
       <Edge from="worker" to="objects" label="upload" font="sans" size="s" />
       <Edge from="worker" to="payments" label="charge" color="red" dash="dashed" font="sans" size="s" />
 
-      <Note on="worker">One worker spans three tiers: queue, data, and the external gateway.</Note>
+      <Sticky on="worker">One worker spans three tiers: queue, data, and the external gateway.</Sticky>
     </Doc>
   );
 }

@@ -1,4 +1,4 @@
-import { Doc, Frame, Box, Note, Sticky } from "tldsl";
+import { Doc, Frame, Box, Text, Sticky } from "tldsl";
 
 const FONTS = ["draw", "sans", "serif", "mono"];
 const FONT_SIZES = ["s", "m", "l", "xl"];
@@ -20,10 +20,10 @@ export default function Diagram() {
         )}
       </Frame>
 
-      <Frame id="notes" name="Note / sticky fonts" layout="row" gap="24" pad="16">
-        <Note id="n-serif" font="serif" size="l">
-          Serif note, large.
-        </Note>
+      <Frame id="notes" name="Text / sticky fonts" layout="row" gap="24" pad="16">
+        <Text id="n-serif" font="serif" size="l">
+          Serif text, large.
+        </Text>
         <Sticky id="s-mono" font="mono" size="s">
           Mono sticky, small.
         </Sticky>

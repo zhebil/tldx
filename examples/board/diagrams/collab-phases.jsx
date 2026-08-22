@@ -1,4 +1,4 @@
-import { Frame, Group, Box, Edge, Note, flow } from "tldsl";
+import { Frame, Group, Box, Edge, Sticky, flow } from "tldsl";
 import { SAVE_TO_DB, YDOC, CLIENTS, EditorServer, Translation, Provider, ClientEditor, clientEdges } from "./shared.jsx";
 
 export const Phase1 = () => (
@@ -10,7 +10,7 @@ export const Phase1 = () => (
     </Frame>
 <Edge from="p1-shared" to="p1-cmp" label="Doc changed" />
 <Edge from="p1-cmp" to="p1-db" label="Atomic update events" color="blue" />
-<Note on="p1-trans">No backend changes required - the document is not collaborative at this point.</Note>
+<Sticky on="p1-trans">No backend changes required - the document is not collaborative at this point.</Sticky>
   </Frame>
 );
 
@@ -35,6 +35,6 @@ export const Phase2 = () => (
 <Edge from="p2-yjs" to="p2-user" label="Collaborative editing" color="green" arrowheadStart="arrow" />
 <Edge from="p2-yjs" to="p2-svc" label="Sync into DB" color="green" />
 <Edge from="p2-yjs" to="p2-clean" label="All users left" color="red" />
-<Note on="p2-room">Blue = init, green = editing, red = cleanup.</Note>
+<Sticky on="p2-room">Blue = init, green = editing, red = cleanup.</Sticky>
   </Frame>
 );

@@ -5,12 +5,12 @@
  * absorb.ts` calls this after partitioning the overlay into absorbable vs.
  * residual entries, and owns guardrails/writing/verification.
  *
- * A `geo` record becomes `<Box>`; a `note` record becomes `<Sticky>`, not
- * `<Note>` - `domain/emit/emit.ts` only emits a `type: "note"` tldraw record
- * for `<Sticky>` (plain `<Note>` emits a `geo` box, warm-filled by default).
- * Emitting `<Note>` here would recompile to the wrong tldraw type and fail
- * absorb's own verification step every time, so `<Sticky>` is the only
- * choice that can round-trip a `type: "note"` record at all.
+ * A `geo` record becomes `<Box>`; a `note` record becomes `<Sticky>` - the
+ * only vocabulary left that `domain/emit/emit.ts` compiles to a `type:
+ * "note"` tldraw record (C2, tldsl-npd: the old plain `<Note>`, which
+ * emitted a `geo` box pretending to be an annotation, is retired). Emitting
+ * anything else here would recompile to the wrong tldraw type and fail
+ * absorb's own verification step every time.
  */
 
 import type { TLRecord } from "../../contracts/scene-json.js";

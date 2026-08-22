@@ -43,6 +43,12 @@ export type AstFrame = {
 export type AstBox = {
   kind: "box";
   attrs: Attrs;
+  /** Set by the `<Text>` runtime component: a borderless, fill-less box variant. Plain `<Box>` leaves this unset. Not a user-facing prop. */
+  text?: boolean;
+  /** Body text for the `<Text>` variant, taken from JSX children (like `<Note>`, not a `label` attribute). Unset for plain `<Box>`. */
+  body?: string;
+  /** The JSX tag the author actually typed (`Text`). Unset for plain `<Box>`; the IR falls back to `"Box"` for diagnostics. Not a user-facing prop. */
+  tag?: string;
   span: SourceSpan;
 };
 

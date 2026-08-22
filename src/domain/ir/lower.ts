@@ -111,6 +111,12 @@ const ALLOWED_PROPS = {
     "font",
     "size",
   ],
+  // <Text> is the same "box" IR kind as <Box> (see IRBox.text), but a
+  // deliberately narrower prop set: no border/fill props (fill, dash, geo),
+  // no verticalAlign/labelColor/h (tldraw's TLTextShapeProps has neither -
+  // there is no h at all, height is derived from wrapped content), no
+  // `label` (content is JSX children, like <Note>, not an attribute).
+  text: ["id", "x", "y", "w", "maxW", "color", "textAlign", "font", "size"],
   note: [
     "id",
     "on",
@@ -154,7 +160,7 @@ function displayTag(node: AstNode): string {
     case "frame":
       return node.tag ?? "Frame";
     case "box":
-      return "Box";
+      return node.tag ?? "Box";
     case "note":
       return node.tag ?? "Note";
     case "edge":
@@ -342,7 +348,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
 
 function lowerBox(node: AstBox, ctx: Ctx): IRBox {
   const tag = displayTag(node);
-  checkUnknownProps("box", tag, node.attrs, ctx);
+  checkUnknownProps(node.text ? "text" : "box", tag, node.attrs, ctx);
   checkLiteralNewlineInLabel(node.attrs, ctx);
   const color = readEnum(node.attrs, "color", COLORS, ctx);
   const fill = readEnum(node.attrs, "fill", FILLS, ctx);
@@ -353,16 +359,22 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
   const labelColor = readEnum(node.attrs, "labelColor", COLORS, ctx);
   const font = readEnum(node.attrs, "font", FONTS, ctx);
   const size = readEnum(node.attrs, "size", FONT_SIZES, ctx);
+  // <Text>'s content is JSX children (node.body), like <Note>; <Box>'s is
+  // the `label` attribute. Both land in IRBox.label - emit/layout don't
+  // need to know which source it came from.
+  const label = node.text ? node.body : getRaw(node.attrs, "label");
   return {
     kind: "box",
     ...assignId(node.attrs, node.span, ctx, {
       kind: "box",
       tag,
-      addressable: true,
-      contentFields: () => [getRaw(node.attrs, "label") ?? ""],
+      // <Text> is an annotation like <Note> - anonymous is fine, an id is
+      // synthesized (ADR-12) when omitted. <Box> stays addressable-required.
+      addressable: !node.text,
+      contentFields: () => [label ?? ""],
     }),
     span: node.span,
-    ...optionalString(node.attrs, "label"),
+    ...(label === undefined ? {} : { label }),
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h", "maxW"] as const),
     ...(color === undefined ? {} : { color }),
     ...(fill === undefined ? {} : { fill }),
@@ -373,6 +385,7 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
     ...(labelColor === undefined ? {} : { labelColor }),
     ...(font === undefined ? {} : { font }),
     ...(size === undefined ? {} : { size }),
+    ...(node.text ? { text: true as const } : {}),
   };
 }
 
