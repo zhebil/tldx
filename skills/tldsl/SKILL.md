@@ -18,7 +18,7 @@ in the source are an escape hatch, not the normal way to work.
 ## The file
 
 ```jsx
-import { Doc, Frame, Box, Edge, Sticky, flow } from "tldsl";
+import { Doc, Frame, Box, Edges, Sticky } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -28,7 +28,9 @@ export default function Diagram() {
         <Box id="app" label="App server" />
       </Frame>
       <Box id="db" label="Postgres" geo="ellipse" color="blue" />
-      {flow("lb", "app", "db")}
+      <Edges>{`
+        lb -> app -> db: TLS terminates at lb
+      `}</Edges>
       <Sticky on="db">Single writer. Replicas are read-only.</Sticky>
     </Doc>
   );
@@ -49,8 +51,9 @@ Rules that are not negotiable:
 - Loops are `.map()`. **Do not pass `key`** - it is silently swallowed, and it is
   the only mistake in this language that produces no error.
 - Numeric props are strings: `gap="48"`, not `gap={48}`.
-- `<Edge>` and `{flow(...)}` are ordinary children. Put them wherever reads best -
-  usually last, at the top level, after the containers they connect.
+- `<Edges>`, `<Edge>`, and `{flow(...)}` are ordinary children. Put them wherever
+  reads best - usually last, at the top level, after the containers they
+  connect. Default to `<Edges>` for more than one or two arrows; see Edges below.
 
 ## Components
 
@@ -69,8 +72,9 @@ All from `"tldsl"`.
 | `<Box id label>` | A leaf with a border and fill. `id` required. |
 | `<Text>text</Text>` | Borderless, fill-less caption - just glyphs. No `id` required. Text is children, not a `label` prop. |
 | `<Sticky on>text</Sticky>` | A real tldraw sticky note, fixed 200px wide. `on` attaches it beside another element. |
-| `<Edge from to>` | One arrow. |
-| `flow("a","b","c")` | Returns the chain of edges. Splice with `{flow(...)}`. |
+| `<Edges>` | One line per arrow, `a -> b: label`. **Default for more than a couple of edges.** See Edges below. |
+| `<Edge from to>` | One arrow, full props. Fallback for what `<Edges>` can't say: an explicit `id`, or a style that differs edge-by-edge within one batch. |
+| `flow("a","b","c")` | Unlabelled chain as a function call, no JSX. Still fine for a short plain sequence; carries no source span (tldsl-7kx) - prefer `<Edges>` when that matters. |
 
 Reusable components are just functions that return JSX - no registration, no
 mechanism. Give them an `ns` prop and interpolate it into every `id` they
@@ -251,6 +255,43 @@ labelled `<Box>` for an actor or a datastore.
 
 ## Edges
 
+**Default to `<Edges>` for a batch of arrows.** One line per edge -
+`id -> id` or `id -> id: label` - and a chain (`a -> b -> c`) expands to
+every hop, sharing the trailing label if there is one:
+
+```jsx
+<Edges>{`
+  user -> login -> auth: submits credentials
+  auth -> tokens: writes session
+`}</Edges>
+```
+
+Children must be a `{`...`}` template literal, not bare JSX text - a bare
+`->` between tags is an unescaped `>`, which esbuild rejects, and bare JSX
+text collapses newlines anyway. Start the template with a newline right
+after the opening backtick so the first spec line lines up with the line
+below `<Edges>`; that's also what keeps a diagnostic pointing at the exact
+line with the typo, the same as it would for a hand-written `<Edge>`.
+
+Any prop other than the spec text - `color`, `dash`, `arrowheadStart`,
+`arrowheadEnd`, `labelColor`, `font`, `size` - goes on `<Edges>` itself and
+applies to every edge the block produces:
+
+```jsx
+<Edges color="red" font="sans" size="s">{`
+  fin_wait_1 -> closing: recv FIN / ACK
+  closing -> time_wait: recv ACK / -
+`}</Edges>
+```
+
+`<Edges>` does not cover an explicit `id` on an edge, or a style that needs
+to differ edge-by-edge within one block - drop to a hand-written `<Edge>`
+for those, right alongside the `<Edges>` block if the rest of the batch is
+still compact. `examples/tcp-states.tldsl.jsx` shows the mix: two
+same-styled runs of eight and ten transitions as `<Edges>` blocks, plus two
+individual `<Edge>` tags for the two transitions that don't fit either
+block's color.
+
 `from` and `to` are ids, resolved across the whole document - a frame does not
 scope them. `<Edge from="lb" to="app" label="tls" color="blue" />`.
 
@@ -264,7 +305,9 @@ looping off the shape - the natural way to draw a flowchart polling loop
 (`Time up? --No-->` itself).
 
 **Never put a `.` in an id.** A dot in `from`/`to` is parsed as anchor syntax,
-which is not implemented, so it always fails. Use `-` or `_`.
+which is not implemented, so it always fails. Use `-` or `_`. Inside
+`<Edges>` specifically, an id also can't contain a literal `->` or `:` -
+those are the grammar's own delimiters.
 
 ## Notes and captions
 

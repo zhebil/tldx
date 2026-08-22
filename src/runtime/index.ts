@@ -4,6 +4,7 @@ export {
   Col,
   Doc,
   Edge,
+  Edges,
   Frame,
   Graph,
   Grid,
