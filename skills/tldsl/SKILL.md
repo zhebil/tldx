@@ -184,11 +184,14 @@ doc.
 
 - `w` / `h` pin a box's size instead of deriving it from the label. Use for a
   percentage bar or a tall lane box, where the size is the content.
-- `h` appears to need `w` alongside it to be reliable. Reported: `h` alone
-  applied in a multi-child row, was silently ignored on a lone child, and
-  adding an explicit `w` fixed it every time. Root cause is open and tracked
-  separately, not a documentation problem - if a lone `h` doesn't seem to
-  take, add a `w`.
+- `h` works on its own. It used to be silently discarded in `col` and `grid`
+  containers (a sizing pass recomputed height for any box without an explicit
+  `w`), which is why adding a `w` appeared to "fix" it - the `w` was skipping
+  the buggy branch, not making `h` work. Fixed; no workaround needed.
+- **A prop only reaches a `<Box>` if the component passes it on.** Components
+  are plain functions, so `<MyThing h="420" />` does nothing unless `MyThing`
+  destructures `h` and forwards it. Nothing can warn about this - there is no
+  allowlist to check a function call against.
 - `x` / `y` pin an absolute position and take the element out of flow
   layout - it stops reflowing with its siblings, and they stop making room
   for it.
