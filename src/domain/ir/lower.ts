@@ -8,8 +8,9 @@
  * - non-addressable elements (`<note>`, `<edge>`) get a synthesized id per
  *   ADR-12 (`<content-hash>-<n>`) when none is authored;
  * - `id`s are unique across the document;
- * - `<edge from to>` reference real ids and use bare-id form (anchor and
- *   free-endpoint syntaxes are phase 1, not MVP);
+ * - `<edge from to>` reference real ids and use bare-id form (dotted
+ *   `id.anchor` and free-endpoint syntaxes are phase 1, not MVP; an anchor
+ *   is instead authored via the separate `fromSide`/`toSide` props, B9);
  * - `x | y | w | h` parse as finite numbers when present.
  * - attributes outside the fixed allowed set per element kind are rejected
  *   with `ir/unknown-prop` (replaces the type checker the MVP doesn't have).
@@ -64,6 +65,7 @@ import type {
 } from "../parser/index.js";
 
 import type {
+  IRAnchor,
   IRBox,
   IRDoc,
   IREdge,
@@ -136,6 +138,8 @@ const ALLOWED_PROPS = {
     "id",
     "from",
     "to",
+    "fromSide",
+    "toSide",
     "color",
     "dash",
     "arrowheadStart",
@@ -441,6 +445,8 @@ function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
   const to = validateEndpoint(toAttr, "to", ctx);
   if (from === null || to === null) return null;
 
+  const fromAnchor = parseAnchorSide(node.attrs.fromSide, "fromSide", ctx);
+  const toAnchor = parseAnchorSide(node.attrs.toSide, "toSide", ctx);
   const color = readEnum(node.attrs, "color", COLORS, ctx);
   const dash = readEnum(node.attrs, "dash", DASHES, ctx);
   const arrowheadStart = readEnum(node.attrs, "arrowheadStart", ARROWHEADS, ctx);
@@ -460,6 +466,8 @@ function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
     span: node.span,
     from,
     to,
+    ...(fromAnchor === undefined ? {} : { fromAnchor }),
+    ...(toAnchor === undefined ? {} : { toAnchor }),
     ...optionalString(node.attrs, "label"),
     ...(color === undefined ? {} : { color }),
     ...(dash === undefined ? {} : { dash }),
@@ -529,6 +537,64 @@ function recordExplicit(id: string, span: SourceSpan, ctx: Ctx): void {
     return;
   }
   ctx.explicitIds.set(id, span);
+}
+
+/**
+ * 8 compass points + `center` (docs/jsx-pivot.md decision 4, ADR-6) -
+ * fractions of the target shape's own bounding box, `0,0` top-left. An
+ * author can also write the fraction directly (`fromSide="0.25,1"`) for
+ * anything a name doesn't cover; `normalizedAnchor` is continuous, so a
+ * bigger fixed table would buy nothing (same reasoning the ADR gives for
+ * not enumerating more than 8+1 names).
+ */
+const ANCHOR_SIDES: Record<string, IRAnchor> = {
+  center: { x: 0.5, y: 0.5 },
+  top: { x: 0.5, y: 0 },
+  bottom: { x: 0.5, y: 1 },
+  left: { x: 0, y: 0.5 },
+  right: { x: 1, y: 0.5 },
+  "top-left": { x: 0, y: 0 },
+  "top-right": { x: 1, y: 0 },
+  "bottom-left": { x: 0, y: 1 },
+  "bottom-right": { x: 1, y: 1 },
+};
+
+/**
+ * `fromSide`/`toSide` (B9): separate props rather than the `id.anchor` dot
+ * syntax the design doc originally sketched, which collides with an id that
+ * happens to use `.` as a namespace separator (tldsl-4s1) - `from`/`to` stay
+ * plain id strings this way, so nothing about them needs to change, and a
+ * dotted id (still discouraged, see `ir/anchor-not-supported` above) is no
+ * longer even a *latent* conflict, since anchor syntax no longer lives
+ * inside the endpoint string at all.
+ */
+function parseAnchorSide(
+  attr: AttrValue | undefined,
+  attrName: "fromSide" | "toSide",
+  ctx: Ctx,
+): IRAnchor | undefined {
+  if (attr === undefined) return undefined;
+  const raw = attr.value.trim();
+  const named = ANCHOR_SIDES[raw];
+  if (named !== undefined) return named;
+
+  const parts = raw.split(",");
+  if (parts.length === 2) {
+    const x = Number(parts[0]);
+    const y = Number(parts[1]);
+    if (Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+      return { x, y };
+    }
+  }
+
+  ctx.diagnostics.push(
+    error(
+      "ir/invalid-anchor-side",
+      `'${attrName}' must be one of ${Object.keys(ANCHOR_SIDES).join(", ")}, or an "x,y" fraction with each in 0..1 (got '${raw}')`,
+      attr.span,
+    ),
+  );
+  return undefined;
 }
 
 function validateEndpoint(

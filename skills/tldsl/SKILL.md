@@ -232,7 +232,8 @@ ignored.
 
 On `<Edge>`: `color`, `dash`, `label`, `labelColor`, `font`, `size`,
 `arrowheadStart` / `arrowheadEnd` (`arrow triangle square dot pipe diamond
-inverted bar none`).
+inverted bar none`), `fromSide` / `toSide` (which face the arrow leaves/
+arrives at - see Edges below).
 
 `<Frame>` only supports `color` - tldraw's frame shape has nothing else.
 
@@ -304,10 +305,32 @@ stand in for the group.
 looping off the shape - the natural way to draw a flowchart polling loop
 (`Time up? --No-->` itself).
 
-**Never put a `.` in an id.** A dot in `from`/`to` is parsed as anchor syntax,
-which is not implemented, so it always fails. Use `-` or `_`. Inside
-`<Edges>` specifically, an id also can't contain a literal `->` or `:` -
-those are the grammar's own delimiters.
+**Never put a `.` in an id.** A dot in `from`/`to` always fails
+(`ir/anchor-not-supported`) - it's reserved, not parsed as anything useful.
+Use `-` or `_`. Inside `<Edges>` specifically, an id also can't contain a
+literal `->` or `:` - those are the grammar's own delimiters.
+
+**Picking a side (`fromSide`/`toSide`).** `<Edge from to>` binds
+centre-to-centre by default - tldraw then picks wherever that ray crosses
+each box's outline, which is fine until it isn't (an edge entering a frame
+dead-centre and crossing the frame's own title is the case that motivated
+this). Pin the exit/entry face directly instead of fighting the default:
+
+```jsx
+<Edge from="a" to="b" fromSide="right" toSide="top" />
+```
+
+Value is one of the 8 compass points plus `center` - `top`, `bottom`, `left`,
+`right`, `top-left`, `top-right`, `bottom-left`, `bottom-right`, `center` -
+or an exact `"x,y"` fraction of the target's own box, each `0..1`
+(`fromSide="0.25,1"` is 25% across, flush with the bottom). An authored side
+wins over anything the router would otherwise compute; the router still
+routes *around* it (bows the arrow clear of any shape in the way) rather
+than overriding it. Separate props, not `id.anchor` dotted syntax - `from`/
+`to` stay plain id strings, so this never collides with the `.`-is-reserved
+rule above. `<Edges>` doesn't have a per-line spelling for this yet - drop
+to a hand-written `<Edge>` when a side needs pinning, the same escape hatch
+as an explicit `id` or a one-off style.
 
 ## Notes and captions
 
@@ -384,6 +407,8 @@ In this repo, unbuilt: `npm run dev:cli -- serve diagram.tldsl.jsx`.
 4. `ir/unknown-prop` - there is no `className`, `style` or `variant`. The message
    lists what is allowed.
 5. `ir/invalid-style-value` - a colour or `geo` outside the sets above.
+6. `ir/invalid-anchor-side` - `fromSide`/`toSide` isn't one of the 8 compass
+   points + `center`, or an `"x,y"` fraction with each in `0..1`.
 
 `check` also warns without rejecting: `layout/label-overflow` fires when a
 box's label doesn't fit the size it ended up with, naming the shape, the text,

@@ -131,6 +131,68 @@ describe("lower: diagnostics", () => {
     expect(codes).toEqual(["ir/free-endpoint-not-supported"]);
   });
 
+  it("fromSide/toSide (B9) parse a named compass point into a normalizedAnchor fraction", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      box({ id: "b" }),
+      edge({ from: "a", to: "b", fromSide: "right", toSide: "top-left" }),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const edgeIr = ir!.children[2]!;
+    if (edgeIr.kind !== "edge") throw new Error("expected edge");
+    expect(edgeIr.fromAnchor).toEqual({ x: 1, y: 0.5 });
+    expect(edgeIr.toAnchor).toEqual({ x: 0, y: 0 });
+  });
+
+  it("fromSide/toSide (B9) parse an 'x,y' fraction directly", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      box({ id: "b" }),
+      edge({ from: "a", to: "b", fromSide: "0.25,1" }),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const edgeIr = ir!.children[2]!;
+    if (edgeIr.kind !== "edge") throw new Error("expected edge");
+    expect(edgeIr.fromAnchor).toEqual({ x: 0.25, y: 1 });
+    expect(edgeIr.toAnchor).toBeUndefined();
+  });
+
+  it("fromSide/toSide (B9) does not collide with a dotted id (tldsl-4s1)", () => {
+    // The whole point of the separate-props design: `from`/`to` stay plain
+    // id strings, so an id with a literal '.' (still discouraged, see the
+    // dotted-anchor rejection above) is only a `from`/`to` concern, never an
+    // anchor-syntax one - fromSide/toSide never look inside the endpoint string.
+    const ast = doc({}, [
+      box({ id: "use1.api" }),
+      box({ id: "b" }),
+      edge({ from: "use1.api", to: "b" }),
+    ]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/anchor-not-supported"]);
+  });
+
+  it("ir/invalid-anchor-side for an unrecognized fromSide value", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      box({ id: "b" }),
+      edge({ from: "a", to: "b", fromSide: "northeast" }),
+    ]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-anchor-side"]);
+  });
+
+  it("ir/invalid-anchor-side for a fraction outside 0..1", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      box({ id: "b" }),
+      edge({ from: "a", to: "b", toSide: "1.5,0" }),
+    ]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-anchor-side"]);
+  });
+
   it("ir/invalid-numeric-attr on non-numeric x", () => {
     const ast = doc({}, [box({ id: "a", x: "left" })]);
     const { codes } = lowerAst(ast);

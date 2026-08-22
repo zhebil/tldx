@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { IRBoxPositioned, IRDocPositioned, IREdge, IRElementPositioned, IRFramePositioned } from "../ir/index.js";
 
+import { ARROW_LABEL_PADDING, arrowLabelLineHeight } from "./glyph-metrics.js";
 import { computeEdgeRoutes, type LabelBox } from "./routing.js";
 
 function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
@@ -29,7 +30,14 @@ function frame(input: {
   return { kind: "frame", idExplicit: true, span: SPAN, ...input };
 }
 
-function edge(input: { id: string; from: string; to: string; label?: string }): IREdge {
+function edge(input: {
+  id: string;
+  from: string;
+  to: string;
+  label?: string;
+  fromAnchor?: { x: number; y: number };
+  toAnchor?: { x: number; y: number };
+}): IREdge {
   return { kind: "edge", idExplicit: true, span: SPAN, ...input };
 }
 
@@ -572,6 +580,154 @@ describe("computeEdgeRoutes", () => {
       // candidate/lane pass either way - the fix has to actually change the
       // outcome once the obstacle is real.
       expect(Math.sign(correctedBend)).not.toBe(Math.sign(bareBend));
+    });
+  });
+
+  describe("authored anchors win over the router (B9)", () => {
+    it("an authored fromSide/toSide overrides the candidate/lane pass's own anchor pick", () => {
+      // Same shape as "bows a chord over two boxes in a row upward" - left
+      // to itself the router ties to the top face ({0.5,0}) on both ends.
+      // Authoring the bottom face instead must survive candidate/lane.
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
+        box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
+        edge({
+          id: "ad",
+          from: "a",
+          to: "d",
+          fromAnchor: { x: 0.5, y: 1 },
+          toAnchor: { x: 0.5, y: 1 },
+        }),
+      ]);
+      const route = computeEdgeRoutes(ir).get("ad");
+      expect(route?.startAnchor).toEqual({ x: 0.5, y: 1 });
+      expect(route?.endAnchor).toEqual({ x: 0.5, y: 1 });
+    });
+
+    it("a self-loop's authored anchors override the default loop terminals", () => {
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        edge({
+          id: "loop",
+          from: "a",
+          to: "a",
+          fromAnchor: { x: 0.1, y: 0 },
+          toAnchor: { x: 0.9, y: 0 },
+        }),
+      ]);
+      const route = computeEdgeRoutes(ir).get("loop");
+      expect(route?.startAnchor).toEqual({ x: 0.1, y: 0 });
+      expect(route?.endAnchor).toEqual({ x: 0.9, y: 0 });
+    });
+
+    it("obstacle clearing grows the bend around a fixed authored anchor instead of overriding it", () => {
+      // a and c share no layout axis (computeCandidate has nothing to
+      // work with), so without an authored anchor this edge would stay a
+      // straight, anchor-less chord. fromSide="right"/toSide="left" pins a
+      // straight line that runs directly through "blocker".
+      const withoutBlocker = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "c", x: 300, y: 200, w: 100, h: 50 }),
+        edge({
+          id: "ac",
+          from: "a",
+          to: "c",
+          fromAnchor: { x: 1, y: 0.5 },
+          toAnchor: { x: 0, y: 0.5 },
+        }),
+      ]);
+      const bareRoute = computeEdgeRoutes(withoutBlocker).get("ac");
+      expect(bareRoute?.bend ?? 0).toBe(0);
+
+      const withBlocker = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "c", x: 300, y: 200, w: 100, h: 50 }),
+        box({ id: "blocker", x: 150, y: 95, w: 100, h: 60 }),
+        edge({
+          id: "ac",
+          from: "a",
+          to: "c",
+          fromAnchor: { x: 1, y: 0.5 },
+          toAnchor: { x: 0, y: 0.5 },
+        }),
+      ]);
+      const route = computeEdgeRoutes(withBlocker).get("ac");
+      // The anchor itself is a fixed constraint, never overridden...
+      expect(route?.startAnchor).toEqual({ x: 1, y: 0.5 });
+      expect(route?.endAnchor).toEqual({ x: 0, y: 0.5 });
+      // ...but the obstacle it now runs through still gets routed around.
+      expect(route?.bend ?? 0).not.toBe(0);
+    });
+  });
+
+  describe("label squish avoidance (B4)", () => {
+    it("grows the bend of a short diagonal skip so a long label stops wrapping to more lines than a box label would", () => {
+      // Mirrors tcp-groups.tldsl.jsx's `listen -> syn_rcvd` defect: a short
+      // diagonal gap between two nested-container boxes with a label wide
+      // enough that tldraw's own arrowLabel.ts squishes it hard.
+      const LONG_LABEL = "recv SYN / SYN,ACK";
+      const withLabel = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 140, y: 114, w: 100, h: 50 }),
+        edge({ id: "e", from: "a", to: "b", label: LONG_LABEL }),
+      ]);
+      const withoutLabel = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 140, y: 114, w: 100, h: 50 }),
+        edge({ id: "e", from: "a", to: "b" }),
+      ]);
+
+      const bareBend = computeEdgeRoutes(withoutLabel).get("e")?.bend ?? 0;
+      const route = computeEdgeRoutes(withLabel).get("e");
+
+      // Nothing else would move this edge (no shared axis, no obstacle) -
+      // any bend at all is squish avoidance, not some other pass.
+      expect(bareBend).toBe(0);
+      expect(Math.abs(route?.bend ?? 0)).toBeGreaterThan(0);
+
+      // tldraw only ever wraps to whole lines - a label rendered at (close
+      // to) a single line's height is materially better than the 3-line
+      // wrap the un-widened chord produces.
+      const oneLine = arrowLabelLineHeight({ label: LONG_LABEL } as never) + 2 * ARROW_LABEL_PADDING;
+      expect(route?.labelBox?.h ?? Infinity).toBeLessThan(oneLine * 1.5);
+    });
+
+    it("leaves a reciprocal pair's fan step alone when both labels are short enough tldraw never squishes them", () => {
+      // A label narrower than tldraw's own 64px squish floor renders at its
+      // natural width no matter how short the gap is - this must stay a
+      // pure no-op, the same guarantee the pre-existing fan-step test above
+      // already pins for the *fan* pass; this one pins it for the new
+      // squish pass specifically.
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b", label: "ok" }),
+      ]);
+      const bare = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b" }),
+      ]);
+      expect(computeEdgeRoutes(ir).get("ab")?.bend ?? 0).toBe(
+        computeEdgeRoutes(bare).get("ab")?.bend ?? 0,
+      );
+    });
+
+    it("never grows a bend into an obstacle just to relieve squish", () => {
+      const LONG_LABEL = "recv SYN / SYN,ACK";
+      const blocked = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 140, y: 114, w: 100, h: 50 }),
+        // Covers both perpendicular directions the chord could bow into.
+        box({ id: "blocker-pos", x: -400, y: -400, w: 900, h: 900 }),
+        edge({ id: "e", from: "a", to: "b", label: LONG_LABEL }),
+      ]);
+      const route = computeEdgeRoutes(blocked).get("e");
+      // A blocker this large leaves no room to grow into on either side -
+      // the squish pass must give up rather than cross it.
+      expect(route?.bend ?? 0).toBe(0);
     });
   });
 });
