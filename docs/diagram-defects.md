@@ -216,7 +216,13 @@ blocker.
   shipped diagram does - but a placeholder name should not be invented for a
   container whose author declined to name it.
 - **Repro:** `examples/repro/d2-unnamed-frame-caption.tldsl.jsx`
-- **Status:** open
+- **Status:** fixed in T46. `domain/ir/ir.ts`'s `drawsChrome` now says no chrome
+  for any frame with no `name` - not just `group: true` - so `emit.ts` skips
+  the frame shape and `stack.ts` stops reserving title clearance for it in its
+  parent, the same path `<Group>` already took. Covers `<Graph>` too, so
+  `tcp-states` loses its stray caption without needing a workaround. A named
+  frame (`group` or not) is untouched - `examples/kernel.tldsl.jsx` renders
+  pixel-identical.
 - **Also seen:** T29 - `<Graph>` does it too, and `<Graph>` has no chrome-free
   alternative the way `<Row>`/`<Col>` have `<Group>`, so
   `examples/tcp-states.tldsl.jsx` ships with a stray "Frame" caption.
