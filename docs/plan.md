@@ -109,7 +109,7 @@ entry. If a task needs an essay, it belongs in the ledger or in
   were deliberately left as chords: clearing that row needs a sagitta 2-4x the
   chord, which reads worse. That is placement, not routing.
 
-- [ ] **T43. A note takes a side that is free and a width that is readable.**
+- [x] **T43. A note takes a side that is free and a width that is readable.**
   *(D3)*
   An attached note is parked to the right of its anchor at whatever width the
   container gives it. In `tcp-lifecycle` that hides the server's `CLOSED` state;
@@ -124,6 +124,16 @@ entry. If a task needs an essay, it belongs in the ledger or in
   **Acceptance:** `d3-note-covers-shape` and `event-driven` drop to 0
   overlapping shape pairs; the `tcp-lifecycle` render shows the server reaching
   `CLOSED`; T41's new warning fires on neither.
+  **Done in `340b75f`.** Two mechanisms: `NOTE_MEASURE_PX = 260` gives a note its
+  own readable measure instead of the `BOX_ASPECT_TARGET` meant for shape labels
+  sharing a row width, and `pushClear` in `attach.ts` slides a candidate along
+  its side past whatever still blocks it rather than rejecting the whole side at
+  the first 24px collision. All four files go to **0** overlapping pairs, kernel
+  included - it had three nobody had noticed. Merge conflict with T45 resolved as
+  `el.maxW ?? NOTE_MEASURE_PX`: an author's explicit cap beats the default.
+  **This was the biggest single win of the phase.** Nine of `event-driven`'s
+  eleven crossings were edges crossing the misplaced note, so moving it took the
+  corpus from 26 crossings to **10**, and crowded pairs to 0.
 
 - [x] **T44. A diagnostic names the component the author wrote.** *(D12, half of
   D16)*
@@ -214,7 +224,7 @@ entry. If a task needs an essay, it belongs in the ledger or in
   `d10-tiers-not-stretched` renders four tiers of equal width;
   `web-architecture` re-renders with aligned bands.
 
-- [ ] **T49. The two notation gaps C4 exposed.** *(D17, D18)*
+- [x] **T49. The two notation gaps C4 exposed.** *(D17, D18)*
   A `<Frame>` takes `color` and nothing else, so a C4 system boundary cannot be
   dashed - and since a `<Box dash="dashed">` *is* allowed, the shipped render
   has boldly dashed external systems around a hairline boundary, C4's emphasis
@@ -225,6 +235,60 @@ entry. If a task needs an essay, it belongs in the ledger or in
   not - see Standing decisions.
   **Acceptance:** both repros render the notation they describe; `c4-container`
   re-renders with a dashed boundary and distinguishable actors and datastore.
+  **Both struck in `fba5983`, no code changed, and the citations check out.**
+  `TLFrameShapeProps` is exactly `{ w, h, name, color }` - `dash` does not exist
+  on tldraw's frame shape, and the heading is drawn by `FrameShapeUtil` with
+  `fontSize: 12` hardcoded in `frameHelpers.ts:62`, reachable by no prop. `person`
+  and `cylinder` are absent from the 20-value `GeoShapeGeoStyle` enum, which
+  `styles.ts` already mirrors verbatim. Accepting `dash` on a frame would have
+  been a silent no-op - the same trap T45 left with `maxW` on `<Sticky>` - and
+  compositing a cylinder from primitives breaks the 1 IR element : 1 tldraw shape
+  assumption that `emit`, `overlay`, `absorb` and viewer selection all rest on.
+  I verified all three schema claims myself.
+
+- [ ] **T51. The export crop cuts arrow labels off.**
+  Found twice independently: `tcp-states` renders `passive open / -` as
+  `ive open / -`, and a human benchmarking `layout="free"` hit the same thing on
+  `recv FIN,ACK / ACK`, which renders as `IN,ACK / ACK`. The export bounds are
+  computed from shape geometry, and an arrow *label* sits outside the arrow's own
+  bounds, so anything hanging off the left or top of the content box is sliced.
+  Cheapest correct fix is probably to union the label boxes into the export
+  bounds - `EdgeRoute.labelBox` exists now, T41 added it - rather than inflating
+  `padding`, which papers over it and wastes space on every other diagram.
+  **Acceptance:** `tcp-states` renders `passive open / -` in full; the same holds
+  for a free-layout file with a label hanging off the left edge; no other render
+  gains whitespace.
+
+- [ ] **T52. Two edges sharing a corridor overprint their labels.**
+  T38 fixed a label sliding off *its own* shape and T37 fixed the midpoint stamp,
+  but two different edges running the same corridor still stamp labels on top of
+  each other. On the free-layout benchmark, `active open / SYN` and
+  `close / timeout` collide at the top left. `arrow-truth` counts this as
+  *arrow labels overlapping another label*, currently **3** across the corpus.
+  T41's `layout/label-overlap` warning already reports it, so the measurement
+  exists; this is the resolution half.
+  **Acceptance:** label-over-label falls and no file rises; the benchmark file's
+  top-left pair reads.
+
+- [ ] **T53. Use ELK's routes where ELK actually runs, or stop asking for them.**
+  `placeAuto` sets `"elk.edgeRouting": "ORTHOGONAL"`, ELK computes the routes,
+  and the adapter reads only `result.children` - `result.edges[].sections` is
+  dropped. It is not merely an adapter oversight: `AutoPlaceResult` has no field
+  to carry a route, so the discard is baked into the domain/adapter contract, and
+  the ORTHOGONAL option is paying for computation nobody reads.
+  **Two constraints, both checked against the schema, that bound this task.**
+  ELK runs *only* for `layout="auto"` - `placeAuto` is called inside
+  `if (mode === "auto")` in `stack.ts` - so this cannot help `row`/`col`/`free`
+  diagrams, which is why it is not urgent. And a tldraw arrow is
+  `kind: "arc" | "elbow"`; the elbow is orthogonal but carries a single
+  `elbowMidPoint` scalar, so a 2-bend ELK section maps onto it and a 4-bend one
+  does not. Do not try to pour an arbitrary polyline into an arrow.
+  So the honest options are: map the simple sections onto elbow arrows and leave
+  the rest to `detourAroundObstacles`, or drop the ORTHOGONAL option and stop
+  paying for it. Either is a result; decide from the render.
+  **Acceptance:** either `tcp-states` and `d8-auto-edges-cross-nodes` improve on
+  the counters with no file rising, or the option is removed and the ledger says
+  why.
 
 - [ ] **T50. Regression gate.**
   Same shape as T40. Every diagram file in the repo through `tldsl check` and
@@ -277,6 +341,17 @@ own entry into the task list; the human does that.
   nothing now fails if a change adds spurious warnings to a corpus file.
 
 ## Questions for the human
+
+- **T49 - tldsl cannot draw C4, and the fix is a layer, not a prop.** D17 and D18
+  are both blocked by tldraw itself: a frame has no `dash` and no font-size lever,
+  and `person`/`cylinder` are not in the geo enum. The only real routes are a
+  custom `ShapeUtil` registered in *both* `viewer/` and `infra/render`, plus a
+  widened `contracts/scene-json.ts` - or accepting that C4's notation is out of
+  scope and saying so in the skill.
+  **Default taken:** struck both, with the schema citations in the ledger.
+  **What the default costs:** a C4 diagram renders with its emphasis inverted -
+  dashed external systems around a hairline boundary - and actors and datastores
+  that look identical.
 
 Parked from Phases 1-9, unread, in `docs/plan-archive-phase1-9.md`. Two are
 load-bearing rather than cosmetic and are repeated here so they are not lost:
