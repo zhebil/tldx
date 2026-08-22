@@ -36,7 +36,7 @@ import { gitStatus } from "../infra/git/git-status.js";
 import { ElkLayoutAdapter } from "../infra/layout-elk/elk-layout.js";
 import { createStderrLog } from "../infra/log/stderr-log.js";
 import { openBrowser } from "../infra/open-browser/open-browser.js";
-import { recordServe } from "../infra/serve-registry/serve-registry.js";
+import { findServe, recordServe } from "../infra/serve-registry/serve-registry.js";
 
 import { runAbsorbCli } from "./absorb.js";
 import { runCheck, type CheckIo } from "./check.js";
@@ -69,6 +69,16 @@ type ParsedInvocation =
 function defaultViewerBundleDir(): string {
   const here = dirname(fileURLToPath(import.meta.url));
   return resolve(here, "..", "..", "dist", "viewer");
+}
+
+/**
+ * A restart shouldn't pile up browser tabs (tldsl-69w): if a live
+ * `tldsl serve` is already recorded for this file, a tab already points at
+ * it, so this invocation should not open a second one - independent of
+ * whether the user passed `--no-open`.
+ */
+export function shouldOpenBrowser(noOpen: boolean, live: { readonly pid: number } | undefined): boolean {
+  return !noOpen && live === undefined;
 }
 
 /**
@@ -151,6 +161,11 @@ const commands: readonly Command[] = [
         return 1;
       }
       try {
+        const live = findServe(path);
+        const openThisTime = shouldOpenBrowser(noOpen, live);
+        if (!openThisTime && !noOpen && live !== undefined) {
+          io.writeStdout(`tldsl serve: a server for ${path} is already live at ${live.url}; not opening another tab\n`);
+        }
         const handle = await runServe({
           path,
           deps: {
@@ -162,7 +177,7 @@ const commands: readonly Command[] = [
             log: createStderrLog(),
             clock: createSystemClock(),
             viewerBundleDir: defaultViewerBundleDir(),
-            ...(noOpen ? {} : { openBrowser }),
+            ...(openThisTime ? { openBrowser } : {}),
           },
           io,
         });
