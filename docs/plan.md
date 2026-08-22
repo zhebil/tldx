@@ -2491,7 +2491,44 @@ only test it gets against material T24 did not choose.
   here. `npm run check` green, 662 tests / 59 files; one new unit test in
   `stack.test.ts` asserting the placer receives an edge declared outside its
   container.
-- [ ] **T37. Fix the next defect.**
+- [x] **T37. Fix the next defect.**
+  Took group 3 of the triage - D13, D11 and D8's label half - as one mechanism.
+  `labelPosition` was hardcoded to `0.5` in `arrowShape`, so every label sat at
+  its arrow's midpoint whatever was already there. `computeEdgeRoutes` now ends
+  in a `placeLabels` pass: each labelled edge gets a measured label box (the
+  same `arrowLabelWidth`/`arrowLabelLineHeight` metrics `labelClearanceGap`
+  uses) and the pass scores seven positions along the arrow, nearest-to-midpoint
+  first, against non-endpoint boxes and notes **and against every other label**;
+  the first clear one wins and reaches tldraw as `labelPosition`. Every label is
+  seeded at its own midpoint before any is moved - the first cut only blocked on
+  labels already placed, and that let an early edge move off a shape onto a
+  later edge's default spot, which is exactly how `order-states` and
+  `web-architecture` each traded a shape overlap for a new label collision.
+  `tools/arrow-truth.mts` gained the counter D13 needed
+  (`arrow labels overlapping another label`), because labels colliding with each
+  other were invisible to every tool in the repo.
+
+  Corpus + examples: labels over a non-endpoint shape **12 -> 6**, labels over
+  another label **20 -> 7**, and no file worse on either. `d13` repro 2 -> 0
+  collisions, `d11` repro 2 -> 0 overlaps, `examples/event-driven` 12 -> 4
+  collisions and 1 -> 0 overlaps, `c4-container` 3 -> 1 and 4 -> 2,
+  `tcp-states` 4 -> 2 and 2 -> 0. Looked at the PNGs: `d13` was one glyph run
+  reading `publishOrderPlacsubscribelishPaymentCaptured` and is now four
+  separate labels, and `event-driven`'s bus reads label by label for the first
+  time. `web-architecture` and `order-states` hold at 1/1 and both read better -
+  `origin pull` is off `app-3` but stacks a line above `charge`, `retry` and
+  `declined` are staggered rather than run together; the counter cannot tell
+  "stacked, both readable" from "overprinted".
+
+  Deliberately not done: D9's clearance half (a row reserves a span ~50px short
+  for an adjacent-pair label and nothing at all for a skip edge) is a sizing
+  question in the container, not a placement one, and stays open in the ledger;
+  D8's routing half stays with D21. Sliding along an arrow cannot help when the
+  whole arrow is inside a shape's span, which is what `tcp-states`' remaining
+  two overlaps and `c4-container`'s `Mobile App` pile are. `order-states` is the
+  only corpus render that moved (one arrow of sixteen files takes a non-default
+  `labelPosition`) and its PNG is re-rendered. `npm run check` green, 665 tests
+  / 59 files; three new unit tests in `routing.test.ts`.
 - [ ] **T38. Fix the next defect.**
   Four wakes, each taking the highest unfixed entry from T34's ordered list.
   Same rules as the rest of the plan: smallest test at the right layer,
@@ -2915,6 +2952,23 @@ as-is.
   would have been a program.
 
 ## Discovered work
+
+- **T37: the label-collision counter cannot tell stacked from overprinted.**
+  `arrow labels overlapping another label` counts any two label boxes that
+  intersect, so two labels sitting a line apart and both perfectly readable
+  score the same as two printed on top of each other. Two of the three files
+  that did not improve on the counter improved visibly in the render. A
+  severity-weighted version (fraction of the smaller box covered, say) would
+  make the metric agree with the pixels.
+- **T37: `placeLabels` scores a shape overlap and a label collision the same.**
+  One point each, so the pass refuses to trade one for the other and, where
+  both are unavoidable, takes whichever candidate comes first. The triage ranks
+  falsified text above displaced text (D13 is `wrong`, D11 is `ugly`), so a
+  label-label collision arguably deserves the heavier weight.
+- **T37: nothing reserves room for a label, it only moves to where room already
+  is.** On a dense diagram every candidate scores non-zero and the label stays
+  where it was. This is D9's clearance half seen from the router: the container
+  is where the space would have to come from.
 
 - **T36: the flow branch still cannot see edges declared outside its
   container.** T36 widened only the `mode === "auto"` branch to the document-wide

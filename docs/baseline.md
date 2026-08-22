@@ -735,3 +735,73 @@ Still wrong in `tcp-states`, and owned by T37/T38, not fixed here: three labels
 overprint each other on `FIN_WAIT_1` (D13), and `passive open / -` is clipped at
 the canvas edge because nothing reserves room for a label outside the node box
 (D8).
+
+## T37 - an edge label slides off what it lands on (D13, D11, D8's label half)
+
+Placement was unconditional: `labelPosition: 0.5`, hardcoded in `arrowShape`,
+so every label sat at its arrow's midpoint regardless of what was already
+there. `computeEdgeRoutes` now ends in a `placeLabels` pass. Each labelled edge
+gets a measured label box (`arrowLabelWidth`/`arrowLabelLineHeight`, the same
+metrics `labelClearanceGap` uses, plus tldraw's `ARROW_LABEL_PADDING`), and the
+pass scores seven positions along the arrow - `0.5, 0.38, 0.62, 0.28, 0.72,
+0.2, 0.8`, nearest-to-midpoint first - against the non-endpoint boxes and notes
+and against *every other label*. First zero-score position wins; if none is
+clear, the lowest-scoring one does, which for a short arrow with a wide label
+is the midpoint it already had. The arrow body is the centre-to-centre chord
+clipped at each endpoint's rectangle, and a bowed arrow's arc is approximated
+by the parabola `bend * 4t(1-t)` on the perpendicular - an estimate, used only
+for scoring. tldraw clamps `labelPosition` into a range that keeps the label
+off the terminals (`getClampedPosition` in `arrowLabel.js`), so a slide it
+cannot honour degrades to today's behaviour rather than pushing a label onto an
+arrowhead.
+
+Every label is a blocker for every other **from the start**: all labels are
+seeded at their own midpoints before any is moved. The first cut only counted
+labels already placed, which let an early edge move off a shape and land on a
+later edge's default spot - `order-states` and `web-architecture` each traded
+one shape overlap for one new label collision that way. Seeding removes the
+trade: no file in the corpus or examples gets worse on either counter.
+
+`tools/arrow-truth.mts` gained the metric D13 needed, since labels colliding
+with *each other* were invisible to every tool in the repo:
+
+```
+arrow labels overlapping another label: N
+```
+
+| file | label over shape | label over label |
+|---|---|---|
+| `repro/d13-fan-labels-collide` | 0 -> 0 | 2 -> **0** |
+| `repro/d11-edge-label-over-shape` | 2 -> **0** | 0 -> 0 |
+| `repro/d8-auto-edges-cross-nodes` | 2 -> **1** | 0 -> 0 |
+| examples/event-driven | 1 -> **0** | 12 -> **4** |
+| examples/c4-container | 3 -> **1** | 4 -> **2** |
+| examples/tcp-states | 4 -> **2** | 2 -> **0** |
+| examples/web-architecture | 1 -> 1 | 1 -> 1 |
+| tests/corpus/order-states | 1 -> 1 | 1 -> 1 |
+| **corpus + examples total** | **12 -> 6** | **20 -> 7** |
+
+The two rows that hold at 1/1 both moved and both read better. In
+`web-architecture` `origin pull` has come off `app-3`, which was unreadable and
+now reads - but `origin pull` now stacks a line above `charge`, and `enqueue`
+has come off `streaming replication` onto the top edge of the `Postgres
+primary` ellipse. Every one of those four strings is legible either way; the
+counters cannot tell "stacked, both readable" from "overprinted". In
+`order-states`
+`retry` and `declined` are staggered rather than run together, still close
+enough to count. Looking at the renders is the check that matters here: the
+`d13` repro was one glyph run reading `publishOrderPlacsubscribelishPaymentCaptured`
+and is now four separate labels, and `event-driven`'s bus reads label by label
+for the first time.
+
+`order-states` is the only corpus render that moved - one arrow in sixteen
+files takes a non-default `labelPosition` (`s-awaiting-hold` at 0.72) - and its
+PNG is re-rendered. Everything else in `tests/corpus/` compiles to the same
+scene, so the rest of `docs/renders/` is untouched.
+
+Not addressed, and still open: D9's clearance half (a row reserves a span ~50px
+short for an adjacent-pair label, and nothing at all for a skip edge) is a
+sizing question, not a placement one; D8's routing half is D21's. Sliding along
+the arrow cannot help when the whole arrow is inside a shape's span, which is
+what `tcp-states`' remaining two overlaps and `c4-container`'s `Mobile App`
+pile are.

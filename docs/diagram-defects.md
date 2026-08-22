@@ -20,7 +20,7 @@ decision.
 |---|---|---|---|---|---|
 | 1 | **An edge is a straight segment between two shape centres, and that is the whole path model** | D1, D5, D14 (+ D21, D8 routing half) | blocker | 6 / 6 | **T35** - D1 and D5 fixed, D14 half fixed in `729f3bd` |
 | 2 | **`layout="auto"` reaches ELK with none of its inputs** | D7 | blocker | 1 / 6 | **T36** - fixed |
-| 3 | **An edge label is stamped at the geometric midpoint and nothing reserves room for it** | D13, D11, D8 (label half), D9 (clearance half) | wrong | 5 / 6 | **T37** |
+| 3 | **An edge label is stamped at the geometric midpoint and nothing reserves room for it** | D13, D11, D8 (label half), D9 (clearance half) | wrong | 5 / 6 | **T37** - D13 and D11 fixed, D8's label half fixed; D9's clearance half open |
 | 4 | **Arrow label text is measured and wrapped by a different path than box label text** | D6, D9 (wrap half) | wrong | 3 / 6 | **T38** |
 | 5 | **A shape is sized by its own contents and the documented cap does not hold** | D3, D16, D20 | wrong | 3 / 6 | open |
 | 6 | **The primitive set cannot say what the notation requires** | D17, D18, D2, D4 | ugly | 4 / 6 | open |
@@ -79,6 +79,11 @@ The asymmetry is the finding: clearance exists for the easy case and is absent
 for every other. **T37 should take D13 first** - it is the `wrong` one, and
 labels colliding with each other is invisible to both `layout-report` and
 `arrow-truth`.
+
+**T37 took D13, D11 and D8's label half** with one `placeLabels` pass and gave
+`arrow-truth` the missing counter. It moved the label rather than reserving
+room for it, so D9's clearance half - a sizing question, in the container, not
+in the router - is untouched and stays open.
 
 ### 4. Arrow-label text - D6, D9's wrap half → T38
 
@@ -355,7 +360,12 @@ blocker.
   Distinct from D7: fixing the node placement would shorten the chords but would
   still leave labels unaccounted for.
 - **Repro:** `examples/repro/d8-auto-edges-cross-nodes.tldsl.jsx`
-- **Status:** open
+- **Status:** label half fixed in T37 (repro 2 label-over-shape pairs -> 1,
+  `examples/tcp-states` 4 -> 2 and its 2 label-label collisions -> 0). An auto
+  container still reserves no space for a label; what changed is that the label
+  moves to where the space already is. The routing half - the adapter discards
+  ELK's routed geometry, so a transition still crosses whatever is between its
+  endpoints - stays open with D21.
 
 ### D9. An edge label wraps mid-word, and the row's label clearance is short by ~50px
 
@@ -420,7 +430,12 @@ blocker.
   the asymmetry with D9: a row *does* widen its gap to clear the label of an
   edge between two **adjacent** children, and reserves nothing at all for an
   edge that skips one.
-- **Status:** open
+- **Status:** fixed in T37, by the same `placeLabels` pass as D13. The repro
+  goes 2 label-over-shape pairs -> 0 and `c4-container` 3 -> 1; in
+  `web-architecture` `origin pull` comes off `app-3` but lands a line above
+  `charge`, so that file's counters hold at 1 while reading better. Sliding
+  along the arrow cannot help when the whole arrow is inside the shape's span,
+  which is what `c4-container`'s remaining `Mobile App` pile is.
 
 ### D12. `<Group>` requires an `id`, the skill does not say so, and the error names `<frame>`
 
@@ -462,7 +477,12 @@ blocker.
   `arrow-truth` only checks label-versus-shape, so the diagram measures clean
   on both while being unreadable.
 - **Repro:** `examples/repro/d13-fan-labels-collide.tldsl.jsx`
-- **Status:** open
+- **Status:** fixed in T37. `computeEdgeRoutes` ends in a `placeLabels` pass
+  that slides each label along its own arrow to the nearest-to-midpoint spot
+  clear of every other label and of any non-endpoint box or note, via tldraw's
+  `labelPosition`. `arrow-truth` gained the counter this defect needed
+  (`arrow labels overlapping another label`): the repro goes 2 -> 0 and
+  `examples/event-driven` 12 -> 4.
 
 ### D14. Antiparallel edges are separated by a bow that is huge when it should be small and absent when it should be there
 
