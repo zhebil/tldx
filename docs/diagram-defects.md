@@ -709,7 +709,18 @@ blocker.
   row from 152 to 320px tall, which is why `Commit` is a 310px-tall rectangle
   holding four words.
 - **Repro:** `examples/repro/d20-maxw-ignored-on-diamond.tldsl.jsx`
-- **Status:** open
+- **Status:** fixed in `3fa4a77` (T47). Root cause was one step downstream of
+  the ledger's own inscribed-rectangle-alone-in-col-mode check: `geoScale`
+  inflates a box's width *and* height together, uniformly, so the label still
+  fits the outline once the box is scaled up - and that inflation ran after
+  `fitBoxWidth` had already respected `maxW` as a wrap budget, so the
+  *scaled* width (`rw * k`) blew straight past the cap with nothing to catch
+  it. `estimatedBoxSize` now scales the whole box down by the same factor
+  when `rw * k` would exceed `maxW`, so height comes down with width instead
+  of the uncapped `k` staying applied to an already-clamped width. Repro:
+  `health-gate` 492x320 -> 200x131 (row-shared height in `cicd-pipeline`
+  152); `quality-gate` 369x310 -> 200x182, and `Commit` drops from a
+  310px-tall box holding four words to 182px.
 
 ### D21. A cross-container edge is a straight chord, and a backwards one is the worst case
 

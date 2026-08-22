@@ -235,8 +235,20 @@ export function estimatedBoxSize(
   h: number;
 } {
   const k = geoScale(label, maxW, style);
-  const w = fitBoxWidth(label, maxW, style);
-  return { w: Math.ceil(w * k), h: Math.ceil(boxHeightForWidth(label, w, style) * k) };
+  const rw = fitBoxWidth(label, maxW, style);
+  const naturalW = Math.ceil(rw * k);
+  const naturalH = Math.ceil(boxHeightForWidth(label, rw, style) * k);
+  // geoScale's k inflates width and height together (uniformly) so the label
+  // fits inside a non-rect outline (diamond, ellipse, ...) - that inflation is
+  // what makes the scaled width overshoot maxW even though rw itself respected
+  // it as a wrap budget. Re-clamping only the width and leaving height as-is
+  // (or re-deriving it from a narrower re-wrap) breaks the aspect the fit was
+  // solved for and inflates height further instead of shrinking it. Scaling
+  // the whole box down by the same factor keeps that aspect and brings both
+  // dimensions down together.
+  if (maxW === undefined || naturalW <= maxW) return { w: naturalW, h: naturalH };
+  const scale = maxW / naturalW;
+  return { w: maxW, h: Math.max(1, Math.ceil(naturalH * scale)) };
 }
 
 /**
