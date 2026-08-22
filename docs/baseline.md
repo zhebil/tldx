@@ -695,3 +695,43 @@ vertical drop. `long-labels` is a wash: `auth -> router` swaps a down-left
 diagonal for a down-right one of identical length, and its rows now read
 backwards, which for a diagram whose boxes are full sentences is arguably worse
 prose order even though no metric notices.
+
+## T36 - `layout="auto"` gets its edges (D7)
+
+`collectAutoEdges(children)` walked only the container's own subtree, so an
+`<Edge>` declared as a *sibling* of the `<Graph>` - which is how every
+`layout="auto"` fixture in the repo is written - never reached ELK. With zero
+edges, `elk.algorithm: layered` has nothing to layer and falls through to
+component packing, which ignores `elk.spacing.nodeNode` (it uses
+`componentComponent`, default 20) and ignores `elk.direction`. One cause, all
+three of D7's symptoms. The doc-wide edge list that already threads down for
+label clearance is now the input to `resolveEdgeOwners` in the auto branch, and
+`elk.spacing.componentComponent` is set to the requested gap so a genuinely
+disconnected graph honours it too.
+
+Repro `examples/repro/d7-auto-ignores-graph.tldsl.jsx` (`a -> b -> c -> d`,
+`gap="400"`, `direction="RIGHT"`): 2x2 block at 324 x 208 with 20px between
+boxes, now a straight horizontal chain at 2344 x 126 with 600px between layers.
+The same file at `gap="40" direction="DOWN"` is a vertical chain at 184 x 492
+with 60px between layers - the two now differ, which is the acceptance D7 asked
+for.
+
+| file | canvas | crossings | crowded pairs | label overlaps |
+|---|---|---|---|---|
+| examples/tcp-states | 473 x 429 -> **817 x 1543** | 13 -> **5** | 5 -> **1** | 31 -> **4** |
+| sparse-graph | 707 x 472 -> 671 x 572 | 0 -> 0 | 0 -> 0 | 0 -> 0 |
+| graph-topology | unchanged | 0 | 0 | 0 |
+| order-states | unchanged | 3 | 0 | 1 |
+
+`tcp-states` is the diagram D7 was filed against and it stops being a pile: the
+eleven states now read top-down as a real layered state machine, `LISTEN` and
+`SYN_SENT` on the entry layer and `CLOSED` on the exit layer. `sparse-graph`
+moved because its 24 disconnected nodes now separate at the requested gap rather
+than ELK's 20px default - it repacks 5-wide to 4-wide and grows 100px taller,
+with every counter still at zero. `graph-topology` and `order-states` render
+byte-identically: both already declare their edges inside the auto container.
+
+Still wrong in `tcp-states`, and owned by T37/T38, not fixed here: three labels
+overprint each other on `FIN_WAIT_1` (D13), and `passive open / -` is clipped at
+the canvas edge because nothing reserves room for a label outside the node box
+(D8).

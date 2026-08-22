@@ -2452,7 +2452,45 @@ only test it gets against material T24 did not choose.
   an obstacle-clearance requirement, not a separation artefact - is untouched.
   That half is D21's, which the triage already deferred. `npm run check` green
   (661 tests); four new unit tests in `src/domain/layout/routing.test.ts`.
-- [ ] **T36. Fix the next defect.**
+- [x] **T36. Fix the next defect.**
+  Took D7, the second row of the triage. All three of its symptoms - a chain
+  packing as a 2x2 block, `gap="40"` and `gap="400"` rendering identically at
+  20px, `direction` inert - are **one cause**: `collectAutoEdges(children)`
+  walked only the container's own subtree, and in `tcp-states` (and in the D7
+  repro, and in the way the skill documents `<Graph>`) the `<Edge>` elements are
+  siblings of the `<Graph>`, not children of it. ELK was handed a graph with
+  eleven nodes and zero edges. Checked rather than assumed: a direct `elkjs`
+  probe showed `layered` with no edges degenerates to component packing, which
+  reads `elk.spacing.componentComponent` (default **20**) and has no direction to
+  honour - exactly the three symptoms, from one missing input. The auto branch of
+  `layoutContainer` now resolves owners against the document-wide edge list that
+  was already threaded down for label clearance (`docLabeledEdges` widened to
+  `docEdges`, filtered at its one clearance use site), and the adapter sets
+  `elk.spacing.componentComponent` to the requested gap so a genuinely
+  disconnected graph honours it too.
+
+  Repro: `a -> b -> c -> d` at `gap="400" direction="RIGHT"` was 324 x 208 with
+  20px between boxes, now a straight horizontal chain at 2344 x 126 with 600px
+  between layers; the same file at `gap="40" direction="DOWN"` is a vertical
+  chain at 184 x 492 with 60px between layers. The two differ, which is what D7
+  asked for. `examples/tcp-states`: crossings **13 -> 5**, crowded pairs
+  **5 -> 1**, label overlaps **31 -> 4**, and the render stops being a pile -
+  eleven states read top-down as a real state machine. `sparse-graph` moved
+  (707 x 472 -> 671 x 572, repacks 5-wide to 4-wide) because its disconnected
+  nodes now separate at the requested gap; every counter stays at zero and its
+  PNG is re-rendered. `graph-topology` and `order-states` are byte-identical -
+  both declare their edges inside the auto container already.
+
+  Two things deliberately not done. The **flow** branch still uses
+  `collectAutoEdges(children)` for its fan and chain heuristics, so a `<Row>`
+  whose edges are declared outside it still cannot see them; widening that too
+  would move every grid render in the corpus and belongs in its own wake
+  (logged in Discovered work). And `tcp-states` is still visibly wrong in its
+  **labels** - three overprint each other on `FIN_WAIT_1`, `passive open / -` is
+  clipped at the canvas edge - which is D13 and D8, owned by T37. Not touched
+  here. `npm run check` green, 662 tests / 59 files; one new unit test in
+  `stack.test.ts` asserting the placer receives an edge declared outside its
+  container.
 - [ ] **T37. Fix the next defect.**
 - [ ] **T38. Fix the next defect.**
   Four wakes, each taking the highest unfixed entry from T34's ordered list.
@@ -2878,6 +2916,24 @@ as-is.
 
 ## Discovered work
 
+- **T36: the flow branch still cannot see edges declared outside its
+  container.** T36 widened only the `mode === "auto"` branch to the document-wide
+  edge list. `findFanGroups`, `formsChain` and the serpentine decision in the
+  row/col/grid branch still call `collectAutoEdges(children)`, which walks only
+  the container's own subtree - so a `<Row>` or `<Col>` whose `<Edge>` elements
+  sit outside it gets no fan collapse and no chain detection, the same class of
+  bug D7 was. It was left alone on purpose: it would move every grid render in
+  the corpus at once and there would be no way to attribute the result to D7.
+  Worth its own wake with its own before/after.
+- **T36: `<Graph id="machine">` renders a frame titled `Frame`.** The auto
+  container in `tcp-states` has an `id` but no `name`, and the export writes the
+  literal string `Frame` into the frame's title. Visible at the top-left of
+  `examples/tcp-states`. Cosmetic, unrelated to placement, not in the ledger.
+- **T36: `elk.edgeRouting: "ORTHOGONAL"` is requested and then thrown away.**
+  The adapter asks ELK to route the edges and reads back only
+  `result.children`; the routed geometry is discarded, and arrows are redrawn as
+  straight chords by `computeEdgeRoutes`. Either consume the routes or stop
+  asking for them - D8's routing half and D21 both want the first option.
 - **T35: four corpus renders had already drifted from their committed PNGs
   before this wake touched anything.** Re-rendering `tests/corpus/` produced a
   different file for `c4-context`, `checkout-services`, `request-lifecycle` and

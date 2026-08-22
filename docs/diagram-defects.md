@@ -19,7 +19,7 @@ decision.
 | # | Group | Entries | Severity | Diagrams | Consumed by |
 |---|---|---|---|---|---|
 | 1 | **An edge is a straight segment between two shape centres, and that is the whole path model** | D1, D5, D14 (+ D21, D8 routing half) | blocker | 6 / 6 | **T35** - D1 and D5 fixed, D14 half fixed in `729f3bd` |
-| 2 | **`layout="auto"` reaches ELK with none of its inputs** | D7 | blocker | 1 / 6 | **T36** |
+| 2 | **`layout="auto"` reaches ELK with none of its inputs** | D7 | blocker | 1 / 6 | **T36** - fixed |
 | 3 | **An edge label is stamped at the geometric midpoint and nothing reserves room for it** | D13, D11, D8 (label half), D9 (clearance half) | wrong | 5 / 6 | **T37** |
 | 4 | **Arrow label text is measured and wrapped by a different path than box label text** | D6, D9 (wrap half) | wrong | 3 / 6 | **T38** |
 | 5 | **A shape is sized by its own contents and the documented cap does not hold** | D3, D16, D20 | wrong | 3 / 6 | open |
@@ -324,7 +324,19 @@ blocker.
   with twenty labelled arrows between them, which is the illegible render this
   example ships.
 - **Repro:** `examples/repro/d7-auto-ignores-graph.tldsl.jsx`
-- **Status:** open
+- **Status:** fixed in T36. One cause behind all three symptoms: the auto
+  container collected edges only from its **own subtree**, and in every
+  `layout="auto"` file that renders badly the `<Edge>` elements are siblings of
+  the `<Graph>`, not children of it. ELK therefore received a graph with zero
+  edges, and `layered` with no edges degenerates to component packing - which
+  reads `elk.spacing.componentComponent` (default 20) instead of
+  `elk.spacing.nodeNode`, and has no direction to honour. The auto branch of
+  `layoutContainer` now resolves owners against the document-wide edge list that
+  was already threaded down for label clearance, and the adapter sets
+  `componentComponent` to the requested gap as well. `tcp-states` goes from 13
+  crossings / 5 crowded pairs / 31 label overlaps to 5 / 1 / 4 and reads as a
+  layered state machine. What is left in that diagram is labels, not placement -
+  D8 and D13 still stand.
 
 ### D8. An auto container reserves no room for edge labels and routes arrows over its nodes
 
