@@ -105,20 +105,25 @@ describe("computeEdgeRoutes", () => {
     expect(routes.get("ab")).toBeUndefined();
   });
 
-  it("stays straight when boxed in on both sides (no viable side)", () => {
+  it("swings wide when the lane pass finds no viable side", () => {
     const ir = doc("root", [
       box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
       box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
       box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
       box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
       // Squeezed in just above and below the row - not enough clearance
-      // for the 13.5 sag the chord over b/c would otherwise need.
+      // for the 13.5 sag the chord over b/c would otherwise need, so the
+      // lane pass declines and the detour pass bows right past them.
       box({ id: "top", x: 200, y: -30, w: 50, h: 20 }),
       box({ id: "bottom", x: 200, y: 60, w: 50, h: 20 }),
       edge({ id: "ad", from: "a", to: "d" }),
     ]);
     const routes = computeEdgeRoutes(ir);
-    expect(routes.get("ad")).toBeUndefined();
+    const route = routes.get("ad");
+    expect(route).toBeDefined();
+    // Past `bottom`'s far edge (y 80) rather than the 13.5 the row alone wanted.
+    expect(Math.abs(route!.bend)).toBeGreaterThan(60);
+    expect(route!.startAnchor).toBeUndefined();
   });
 
   it("signed clearance ignores a crossed shape sitting entirely on the far side of the anchored chord", () => {
@@ -321,6 +326,54 @@ describe("computeEdgeRoutes", () => {
     expect(routes.get("ab")).toBeUndefined();
   });
 
+  describe("detour around obstacles", () => {
+    it("bows a diagonal edge around the box its straight chord runs through", () => {
+      const ir = doc("root", [
+        frame({ id: "top", x: 0, y: 0, w: 500, h: 100, children: [box({ id: "a", x: 20, y: 20, w: 100, h: 50 })] }),
+        frame({
+          id: "middle",
+          x: 0,
+          y: 200,
+          w: 500,
+          h: 100,
+          children: [box({ id: "mid", x: 150, y: 20, w: 120, h: 50 })],
+        }),
+        frame({
+          id: "bottom",
+          x: 0,
+          y: 400,
+          w: 500,
+          h: 100,
+          children: [box({ id: "z", x: 300, y: 20, w: 100, h: 50 })],
+        }),
+        edge({ id: "az", from: "a", to: "z" }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      const route = routes.get("az");
+      expect(route).toBeDefined();
+      expect(Math.abs(route!.bend)).toBeGreaterThanOrEqual(8);
+      // Centre bindings: the detour never re-anchors, it only bends.
+      expect(route!.startAnchor).toBeUndefined();
+      expect(route!.endAnchor).toBeUndefined();
+    });
+
+    it("leaves a long diagonal edge alone when its chord already runs through empty space", () => {
+      const ir = doc("root", [
+        frame({ id: "top", x: 0, y: 0, w: 900, h: 100, children: [box({ id: "a", x: 20, y: 20, w: 100, h: 50 })] }),
+        frame({
+          id: "bottom",
+          x: 0,
+          y: 800,
+          w: 900,
+          h: 100,
+          children: [box({ id: "z", x: 700, y: 20, w: 100, h: 50 })],
+        }),
+        edge({ id: "az", from: "a", to: "z" }),
+      ]);
+      expect(computeEdgeRoutes(ir).get("az")).toBeUndefined();
+    });
+  });
+
   describe("label placement", () => {
     it("slides two labels spanning the same gap apart when their midpoint boxes would overlap", () => {
       const ir = doc("root", [
@@ -338,10 +391,12 @@ describe("computeEdgeRoutes", () => {
     });
 
     it("slides a label off a foreign box sitting at its geometric midpoint", () => {
+      // The obstacle is a wall far wider than the chord, so no detour bend
+      // gets around it and the label is the only thing left to move.
       const ir = doc("root", [
         box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
         box({ id: "d", x: 300, y: 300, w: 100, h: 50 }),
-        box({ id: "obstacle", x: 150, y: 125, w: 100, h: 100 }),
+        box({ id: "obstacle", x: -800, y: 125, w: 2000, h: 100 }),
         edge({ id: "ad", from: "a", to: "d", label: "build" }),
       ]);
       const routes = computeEdgeRoutes(ir);

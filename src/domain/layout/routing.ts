@@ -19,6 +19,13 @@
  * different amounts instead of stacking into one stroke, the longest chord
  * taking the outermost lane. A lane's extra sag is dropped a step at a time
  * if it isn't viable (would bow into a neighbouring shape).
+ *
+ * An edge whose endpoints share no layout axis at all - the cross-container
+ * case - has no lane and no side to reason about, so `detourAroundObstacles`
+ * takes what the earlier passes left: it grows a bend on each side until the
+ * arc tldraw would actually draw clears every box and note between the two
+ * endpoints, and keeps the smaller of the two. An edge whose straight chord
+ * is already clear gets nothing, so short hops stay straight lines.
  */
 
 import type { IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
@@ -108,11 +115,12 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
   const rankOf = assignLanes(candidates);
 
   for (const candidate of candidates) {
-    const route = finalizeRoute(candidate, rankOf.get(candidate.edgeId) ?? 0);
-    if (route !== null) routes.set(candidate.edgeId, route);
+    routes.set(candidate.edgeId, finalizeRoute(candidate, rankOf.get(candidate.edgeId) ?? 0));
   }
 
   fanSharedPairs(otherEdges, byId, routes);
+
+  detourAroundObstacles(otherEdges, byId, shapes, routes);
 
   placeLabels(edges, byId, shapes, routes);
 
@@ -272,6 +280,194 @@ function fanSharedPairs(
   }
 }
 
+/** Clearance an obstacle-avoiding detour keeps between the arc and the box it swings around. */
+const DETOUR_MARGIN = 20;
+/** Minimum growth per attempt, so the search always makes progress. */
+const DETOUR_STEP = 24;
+const DETOUR_MAX_ROUNDS = 12;
+/** Points sampled along the arc when testing it against a box. */
+const DETOUR_SAMPLES = 48;
+
+/**
+ * Last resort for an edge no earlier pass claimed: if its straight chord runs
+ * through boxes it does not connect - the cross-container case of `docs/
+ * diagram-defects.md` D21, where the two endpoints share no layout axis and
+ * `computeCandidate` therefore has nothing to work with - bow it around them.
+ *
+ * Both sides are tried and the smaller detour wins; an edge whose chord is
+ * already clear (every short hop, and every long one that happens to run
+ * through empty space) is left alone, which is what keeps a 159px backwards
+ * hop a straight line. The arc is modelled as the circle tldraw actually
+ * draws through the two shape centres, not the parabola `boxAt` approximates
+ * it with, because at these bends the two differ by more than the margin.
+ */
+function detourAroundObstacles(
+  edges: IREdge[],
+  byId: Map<string, AbsShape>,
+  shapes: AbsShape[],
+  routes: Map<string, EdgeRoute>,
+): void {
+  const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
+
+  for (const edge of edges) {
+    if (routes.has(edge.id)) continue;
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (!from || !to) continue;
+
+    const start = centreOf(from);
+    const end = centreOf(to);
+    const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
+    const straight = arcPolyline(start, end, 0);
+    if (!blockers.some((b) => polylineHitsBox(straight, b))) continue;
+
+    const bend = solveDetour(start, end, blockers);
+    if (bend !== null) routes.set(edge.id, { bend });
+  }
+}
+
+/** Smallest signed bend that clears every blocker, or null if neither side converges. */
+function solveDetour(start: Point, end: Point, blockers: AbsShape[]): number | null {
+  const cap = Math.hypot(end.x - start.x, end.y - start.y);
+  if (cap < 1) return null;
+
+  let best: number | null = null;
+  for (const sign of [1, -1] as const) {
+    let sag = 0;
+    let cleared = false;
+    for (let round = 0; round < DETOUR_MAX_ROUNDS; round++) {
+      const path = arcPolyline(start, end, sign * sag);
+      const hits = blockers.filter((b) => polylineHitsBox(path, b));
+      if (hits.length === 0) {
+        cleared = true;
+        break;
+      }
+      sag = Math.max(requiredDetourSag(start, end, sign, hits), sag + DETOUR_STEP);
+      if (sag > cap) break;
+    }
+    if (!cleared || sag < MIN_BEND) continue;
+    if (best === null || sag < Math.abs(best)) best = sign * sag;
+  }
+  return best === null ? null : round1(best);
+}
+
+/**
+ * Parabola estimate of the sag needed to put every corner of `hits` (inflated
+ * by the margin) on the inside of the arc. tldraw's circular arc bulges
+ * further from the chord than the parabola does at every `t`, so this is a
+ * lower bound the real arc always beats - the caller re-tests and grows again.
+ */
+function requiredDetourSag(start: Point, end: Point, sign: 1 | -1, hits: AbsShape[]): number {
+  const u = unit(start, end);
+  const perp: Point = { x: -u.y, y: u.x };
+  const len = Math.hypot(end.x - start.x, end.y - start.y);
+
+  let need = 0;
+  for (const s of hits) {
+    const xs = [s.x - DETOUR_MARGIN, s.x + s.w + DETOUR_MARGIN];
+    const ys = [s.y - DETOUR_MARGIN, s.y + s.h + DETOUR_MARGIN];
+    for (const cx of xs) {
+      for (const cy of ys) {
+        const dx = cx - start.x;
+        const dy = cy - start.y;
+        const off = (dx * perp.x + dy * perp.y) * sign;
+        if (off <= 0) continue;
+        const raw = (dx * u.x + dy * u.y) / len;
+        const t = Math.min(0.95, Math.max(0.05, raw));
+        need = Math.max(need, off / (4 * t * (1 - t)));
+      }
+    }
+  }
+  return need;
+}
+
+/** The arc `start -> end` with this bend, sampled as a polyline. */
+function arcPolyline(start: Point, end: Point, bend: number): Point[] {
+  const at = arcSampler(start, end, bend);
+  const points: Point[] = [];
+  for (let i = 0; i <= DETOUR_SAMPLES; i++) points.push(at(i / DETOUR_SAMPLES));
+  return points;
+}
+
+function polylineHitsBox(path: Point[], s: AbsShape): boolean {
+  for (let i = 1; i < path.length; i++) {
+    if (segmentHitsBox(path[i - 1]!, path[i]!, s)) return true;
+  }
+  return false;
+}
+
+/**
+ * `t -> point` along the circular arc tldraw renders for `bend` (the signed
+ * sagitta at the midpoint, measured along `(-u.y, u.x)`). Uniform in angle,
+ * which for a circle is uniform in arc length.
+ */
+function arcSampler(a: Point, b: Point, bend: number): (t: number) => Point {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  const lerp = (t: number): Point => ({ x: a.x + dx * t, y: a.y + dy * t });
+  if (len === 0 || Math.abs(bend) < 0.5) return lerp;
+
+  const perp: Point = { x: -dy / len, y: dx / len };
+  const radius = (len * len) / 4 / (2 * Math.abs(bend)) + Math.abs(bend) / 2;
+  const centre: Point = {
+    x: a.x + dx / 2 + perp.x * (bend - Math.sign(bend) * radius),
+    y: a.y + dy / 2 + perp.y * (bend - Math.sign(bend) * radius),
+  };
+  const a0 = Math.atan2(a.y - centre.y, a.x - centre.x);
+  const a1 = Math.atan2(b.y - centre.y, b.x - centre.x);
+  let delta = a1 - a0;
+  while (delta > Math.PI) delta -= 2 * Math.PI;
+  while (delta <= -Math.PI) delta += 2 * Math.PI;
+
+  // Two sweeps join the endpoints; keep the one that runs through the apex.
+  const apex: Point = { x: a.x + dx / 2 + perp.x * bend, y: a.y + dy / 2 + perp.y * bend };
+  const distToApex = (d: number): number => {
+    const ang = a0 + d / 2;
+    return Math.hypot(centre.x + radius * Math.cos(ang) - apex.x, centre.y + radius * Math.sin(ang) - apex.y);
+  };
+  const other = delta > 0 ? delta - 2 * Math.PI : delta + 2 * Math.PI;
+  const sweep = distToApex(other) < distToApex(delta) ? other : delta;
+
+  return (t: number) => {
+    const ang = a0 + sweep * t;
+    return { x: centre.x + radius * Math.cos(ang), y: centre.y + radius * Math.sin(ang) };
+  };
+}
+
+/** Liang-Barsky segment/rect clip - same rule `tools/arrow-truth.mts` counts crossings with. */
+function segmentHitsBox(p: Point, q: Point, s: AbsShape): boolean {
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const checks: [number, number][] = [
+    [-dx, p.x - s.x],
+    [dx, s.x + s.w - p.x],
+    [-dy, p.y - s.y],
+    [dy, s.y + s.h - p.y],
+  ];
+  let t0 = 0;
+  let t1 = 1;
+  for (const [pk, qk] of checks) {
+    if (pk === 0) {
+      if (qk < 0) return false;
+      continue;
+    }
+    const r = qk / pk;
+    if (pk < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+  }
+  return t0 <= t1;
+}
+
+function centreOf(s: AbsShape): Point {
+  return { x: s.x + s.w / 2, y: s.y + s.h / 2 };
+}
+
 function assignLanes(candidates: RouteCandidate[]): Map<string, number> {
   const groups = new Map<string, RouteCandidate[]>();
   for (const c of candidates) {
@@ -305,7 +501,7 @@ function assignLanes(candidates: RouteCandidate[]): Map<string, number> {
   return rankOf;
 }
 
-function finalizeRoute(candidate: RouteCandidate, assignedRank: number): EdgeRoute | null {
+function finalizeRoute(candidate: RouteCandidate, assignedRank: number): EdgeRoute {
   const { axis, side, baseSag, gap, slack, startPoint, endPoint } = candidate;
 
   let rank = assignedRank;
@@ -319,11 +515,11 @@ function finalizeRoute(candidate: RouteCandidate, assignedRank: number): EdgeRou
   const sideDir = sideDirection(axis, side);
   const sign = p.x * sideDir.x + p.y * sideDir.y >= 0 ? 1 : -1;
 
+  // A sag under tldraw's MIN_ARROW_BEND renders straight, but the face anchors
+  // still matter: they are what lifts the chord off the boxes in between.
   const bend = round1(sag * sign);
-  if (Math.abs(bend) < MIN_BEND) return null;
-
   const anchor = normalizedAnchor(axis, side);
-  return { bend, startAnchor: anchor, endAnchor: { ...anchor } };
+  return { bend: Math.abs(bend) < MIN_BEND ? 0 : bend, startAnchor: anchor, endAnchor: { ...anchor } };
 }
 
 function collect(ir: IRDocPositioned): { shapes: AbsShape[]; edges: IREdge[] } {
