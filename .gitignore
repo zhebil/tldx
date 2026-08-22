@@ -18,3 +18,6 @@ build/
 
 # overlay sidecars are generated, never source
 *.overlay.json
+
+# Debug renders belong in a temp dir, never the repo.
+*.png
