@@ -51,6 +51,7 @@ import type { SceneJSON, TLRecord } from "../../contracts/scene-json.js";
 import { NOTE_SIZE } from "../layout/defaults.js";
 import { computeEdgeRoutes } from "../layout/routing.js";
 import type { EdgeRoute } from "../layout/routing.js";
+import { drawsChrome } from "../ir/index.js";
 import type {
   IRBoxPositioned,
   IRDocPositioned,
@@ -77,9 +78,10 @@ export function emit(ir: IRDocPositioned): SceneJSON {
 }
 
 /**
- * `offsetX`/`offsetY` fold in the origin of any enclosing `<Group>` ancestors
- * between this element and its emitted parent - a group draws no frame shape,
- * so its children must carry the group's position into their own coords.
+ * `offsetX`/`offsetY` fold in the origin of any enclosing chrome-free-frame
+ * ancestors between this element and its emitted parent - a chrome-free
+ * frame draws no frame shape, so its children must carry its position into
+ * their own coords.
  */
 function emitElement(
   el: IRElementPositioned,
@@ -97,7 +99,7 @@ function emitElement(
       out.push(emitNote(el, parentId, offsetX, offsetY));
       return;
     case "frame":
-      if (el.group === true) {
+      if (!drawsChrome(el)) {
         for (const child of el.children) {
           emitElement(child, parentId, out, routes, offsetX + el.x, offsetY + el.y);
         }

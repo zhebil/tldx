@@ -130,6 +130,7 @@ describe("domain/emit", () => {
               y: 20,
               w: 200,
               h: 150,
+              name: "Inner",
               children: [box({ id: "a", x: 10, y: 10, w: 100, h: 50, label: "A" })],
             }),
           ],
@@ -175,6 +176,50 @@ describe("domain/emit", () => {
     expect(scene.store["shape:a"]?.parentId).toBe("page:main");
     expect(scene.store["shape:a"]?.x).toBe(16);
     expect(scene.store["shape:a"]?.y).toBe(16);
+  });
+
+  it("emits no shape for an unnamed frame (D2: a declined name is not a placeholder caption), same as <Group>", () => {
+    const scene = emit(
+      doc([
+        frame({
+          id: "row",
+          x: 40,
+          y: 40,
+          w: 400,
+          h: 200,
+          children: [
+            box({ id: "a", x: 20, y: 60, w: 120, h: 60, label: "A" }),
+            box({ id: "b", x: 180, y: 60, w: 120, h: 60, label: "B" }),
+          ],
+        }),
+      ]),
+    );
+
+    expect(scene.store["shape:row"]).toBeUndefined();
+    expect(scene.store["shape:a"]?.parentId).toBe("page:main");
+    expect(scene.store["shape:a"]?.x).toBe(60);
+    expect(scene.store["shape:a"]?.y).toBe(100);
+  });
+
+  it("still emits a frame shape (border + name) for a named frame - unaffected by D2", () => {
+    const scene = emit(
+      doc([
+        frame({
+          id: "kernel",
+          x: 40,
+          y: 40,
+          w: 400,
+          h: 200,
+          name: "Kernel",
+          children: [box({ id: "a", x: 20, y: 60, w: 120, h: 60, label: "A" })],
+        }),
+      ]),
+    );
+
+    expect(scene.store["shape:kernel"]).toBeDefined();
+    expect(scene.store["shape:kernel"]?.type).toBe("frame");
+    expect((scene.store["shape:kernel"]?.props as Record<string, unknown>).name).toBe("Kernel");
+    expect(scene.store["shape:a"]?.parentId).toBe("shape:kernel");
   });
 
   it("emits a sticky as a note shape and drops its IR w/h", () => {
@@ -400,11 +445,13 @@ describe("domain/emit: style pass-through (T9)", () => {
 
   it("passes frame color through, defaulting to black when absent", () => {
     const scene = emit(
-      doc([frame({ id: "f", x: 0, y: 0, w: 100, h: 50, color: "green", children: [] })]),
+      doc([frame({ id: "f", x: 0, y: 0, w: 100, h: 50, name: "F", color: "green", children: [] })]),
     );
     expect((scene.store["shape:f"]?.props as Record<string, unknown>).color).toBe("green");
 
-    const defaulted = emit(doc([frame({ id: "g", x: 0, y: 0, w: 100, h: 50, children: [] })]));
+    const defaulted = emit(
+      doc([frame({ id: "g", x: 0, y: 0, w: 100, h: 50, name: "G", children: [] })]),
+    );
     expect((defaulted.store["shape:g"]?.props as Record<string, unknown>).color).toBe("black");
   });
 

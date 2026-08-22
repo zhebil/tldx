@@ -63,6 +63,20 @@ export type IRFrame = IRBase & {
   group?: boolean;
 };
 
+/**
+ * Whether a frame draws tldraw chrome (border + title bar). `<Group>`
+ * (`group: true`) never does. An unnamed non-group frame - `<Row>`/`<Col>`/
+ * `<Grid>`/`<Graph>`/bare `<Frame>` with no `name` - doesn't either: tldraw
+ * captions an empty-name frame with the literal word "Frame", and a
+ * placeholder shouldn't be invented for a container whose author declined to
+ * name one (D2). A named frame is unaffected. Consumed by `domain/emit/emit.ts`
+ * (whether to emit a frame shape) and `domain/layout/stack.ts` (whether an
+ * ancestor must reserve clearance for this frame's title bar).
+ */
+export function drawsChrome(frame: Pick<IRFrame, "group" | "name">): boolean {
+  return frame.group !== true && frame.name !== undefined;
+}
+
 export type IRBox = IRBase & {
   kind: "box";
   label?: string;

@@ -42,7 +42,9 @@ const NOTE_LINE_H = 30;
  * Tldraw draws the frame heading rect at y in [-30, -6] relative to the
  * frame's own top edge - outside the frame, not inside it. So this is the
  * clearance a frame needs *above* it, reserved only by a frame that contains
- * a nested frame.
+ * a nested frame that itself draws chrome (see `domain/ir/ir.ts`'s
+ * `drawsChrome` - a chrome-free frame draws no heading, so nothing needs
+ * clearance for it).
  */
 export const FRAME_TITLE_PX = 30;
 /** Inner padding inside a frame, applied uniformly except top (see below). */
