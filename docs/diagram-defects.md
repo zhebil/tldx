@@ -496,6 +496,21 @@ blocker.
 - **Repro:** `examples/repro/d12-group-requires-id.tldsl.jsx` (compiles, as every
   repro here does; the comment in it says which line to delete to get the error)
 - **Status:** open
+- **Also seen:** T39 - the rule is not `<Group>`'s, it is every container's. All
+  eight aliases (`<Row> <Col> <Grid> <Group> <Pipeline> <Layers> <Swimlanes>
+  <Graph>`) reject a missing `id` with the identical `<frame>` message, and the
+  component table carried required props on `<Frame>` and `<Box>` only. This is
+  what failed T39's blind re-test: an agent given nothing but the skill and the
+  sentence "draw the OSI seven-layer model with an example protocol at each
+  layer" wrote a clean seven-tier `<Layers>` stack and `check` rejected it on
+  line 6 for the one prop the skill never asked for. Adding `id="osi"` - one
+  attribute, no other change - makes it compile clean and render legibly. The
+  severity is worth restating on that evidence: as a papercut it costs a known
+  author a minute, but it is the sole thing standing between a first-time author
+  and a working diagram, and the diagnostic names an element they did not write.
+  Fixed in the **skill** in T39 (a non-negotiable rule plus `id` in every table
+  row); the diagnostic naming `<frame>` is untouched and this entry stays open
+  for it.
 
 ### D13. Parallel edge labels are stamped at their own midpoints and overprint each other
 

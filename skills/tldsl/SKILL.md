@@ -39,6 +39,11 @@ Rules that are not negotiable:
 
 - The default export is a **function** returning a single `<Doc>`. Not a bare
   `<Doc>` element, not a class.
+- **Every container needs an `id`** - `<Row>`, `<Col>`, `<Grid>`, `<Group>`,
+  `<Pipeline>`, `<Layers>`, `<Swimlanes>` and `<Graph>`, not just `<Frame>`, and
+  whether or not anything points at it. Omit one and `check` reports
+  `ir/missing-id` against `<frame>`, a name that does not appear in your file;
+  the source location is what tells you which element it means.
 - `"tldsl"` resolves without installing anything - the CLI aliases it.
 - No React. No hooks, no state, no `useMemo`. It is JSX-as-data.
 - Loops are `.map()`. **Do not pass `key`** - it is silently swallowed, and it is
@@ -55,12 +60,12 @@ All from `"tldsl"`.
 |---|---|
 | `<Doc>` | Root. One per file, top level only. |
 | `<Frame id name>` | Visual container - border and a title. `id` required. |
-| `<Row> <Col> <Grid>` | `<Frame>` with `layout` preset. `<Grid cols="3">`. |
-| `<Group>` | Container that draws no chrome. Groups for layout only. Never point an edge at a `<Group>` id. |
-| `<Pipeline>` | Row whose children get wired in source order automatically. Every child needs an `id`. |
-| `<Layers>` | Column of tiers; each child frame becomes a row. Unnamed tiers lose their chrome. |
-| `<Swimlanes>` | Like `<Layers>` but lanes keep their border and title. |
-| `<Graph>` | `layout="auto"` - hands this container to ELK. Use for graph-shaped things with no natural reading order. |
+| `<Row id> <Col id> <Grid id>` | `<Frame>` with `layout` preset. `<Grid cols="3">`. |
+| `<Group id>` | Container that draws no chrome. Groups for layout only. Never point an edge at a `<Group>` id. |
+| `<Pipeline id>` | Row whose children get wired in source order automatically. Every child needs an `id`. |
+| `<Layers id>` | Column of tiers; each child frame becomes a row. Unnamed tiers lose their chrome. |
+| `<Swimlanes id>` | Like `<Layers>` but lanes keep their border and title. |
+| `<Graph id>` | `layout="auto"` - hands this container to ELK. Use for graph-shaped things with no natural reading order. |
 | `<Box id label>` | A leaf. `id` required. |
 | `<Note on>text</Note>` | Annotation. Text is children, not a prop. |
 | `<Sticky>text</Sticky>` | A real tldraw sticky note, fixed 200px wide. |
@@ -153,7 +158,8 @@ In this repo, unbuilt: `npm run dev:cli -- check diagram.tldsl.jsx`.
 
 ## What `check` will reject
 
-1. `ir/missing-id` - `<Box>` and `<Frame>` always need an explicit `id`.
+1. `ir/missing-id` - every `<Box>` and every container needs an explicit
+   `id`. Reported against `<frame>` whichever container alias you wrote.
 2. `ir/anchor-not-supported` - a `.` in an edge endpoint.
 3. `ir/duplicate-id` - usually a component instantiated twice without `ns`.
 4. `ir/unknown-prop` - there is no `className`, `style` or `variant`. The message
