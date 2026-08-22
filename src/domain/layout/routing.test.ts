@@ -491,5 +491,37 @@ describe("computeEdgeRoutes", () => {
       const route = routes.get("ab");
       expect(route === undefined || route.labelPosition === undefined || route.labelPosition === 0.5).toBe(true);
     });
+
+    it("grows the bend to pull a label off a shape no candidate `t` clears (B2/D11)", () => {
+      // Same shape of the tcp-groups.tldsl.jsx repro: `fin1 -> timeWait` is a
+      // vertical-axis skip whose minimal (unlabelled) bend only has to clear
+      // the two flanking shapes' *line*, not a label wide enough to still
+      // cover one of them at every candidate `t` - sliding along the arc
+      // can't fix that, only widening the arc can.
+      const fin1 = { id: "fin1", x: 246, y: 0, w: 180, h: 60 };
+      const timeWait = { id: "timeWait", x: 246, y: 500, w: 180, h: 60 };
+      const fin2 = { id: "fin2", x: 96, y: 90, w: 180, h: 380 };
+      const closing = { id: "closing", x: 396, y: 90, w: 180, h: 380 };
+
+      const bareIr = doc("root", [box(fin1), box(timeWait), box(fin2), box(closing), edge({ id: "e", from: "fin1", to: "timeWait" })]);
+      const bareBend = Math.abs(computeEdgeRoutes(bareIr).get("e")!.bend);
+
+      const ir = doc("root", [
+        box(fin1),
+        box(timeWait),
+        box(fin2),
+        box(closing),
+        edge({ id: "e", from: "fin1", to: "timeWait", label: "recv FIN,ACK / ACK" }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      const route = routes.get("e");
+      expect(route?.labelBox).toBeDefined();
+      expect(boxesOverlap(route!.labelBox!, fin2)).toBe(false);
+      expect(boxesOverlap(route!.labelBox!, closing)).toBe(false);
+      // The fix widens the bend past what clearing the shapes' outlines
+      // alone would need - otherwise this is just re-testing the plain
+      // detour, not the label-driven growth.
+      expect(Math.abs(route!.bend)).toBeGreaterThan(bareBend);
+    });
   });
 });
