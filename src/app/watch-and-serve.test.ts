@@ -218,6 +218,87 @@ describe("watchAndServe", () => {
     expect(transport.pushed).toHaveLength(1);
   });
 
+  describe("putOverlay merge (tldsl-j3q)", () => {
+    const SRC_WITH_DASH = "src-with-dash";
+    const SRC_DASH_REMOVED = "src-dash-removed";
+    const AST_WITH_DASH = doc({ id: "auth" }, [
+      box({ id: "login", label: "Login" }),
+      box({ id: "dash", label: "Dashboard" }),
+    ]);
+    const AST_DASH_REMOVED = doc({ id: "auth" }, [box({ id: "login", label: "Login" })]);
+
+    it("preserves an overlay entry a source edit invalidates instead of silently dropping it", async () => {
+      const execute = new FakeExecute();
+      execute.setResult(SRC_WITH_DASH, { ast: AST_WITH_DASH, inputs: [AUTH_PATH] });
+      execute.setResult(SRC_DASH_REMOVED, { ast: AST_DASH_REMOVED, inputs: [AUTH_PATH] });
+      const fs = new InMemoryFs({ [AUTH_PATH]: SRC_WITH_DASH });
+      const watch = new FakeWatch();
+      const transport = new InMemoryTransport();
+      const log = new CaptureLog();
+      const deps: WatchAndServeDeps = {
+        fs,
+        fsWrite: fs,
+        watch,
+        transport,
+        log,
+        layout: new StubLayout(),
+        execute,
+      };
+      const overlayPath = "auth.tldsl.overlay.json";
+
+      const handle = watchAndServe(AUTH_PATH, deps);
+      await handle.ready;
+
+      // The user drags "dash" on the canvas; the browser PUTs its current
+      // snapshot and putOverlay records the edit.
+      const initial = transport.pushed[0]!;
+      if (!isScene(initial)) throw new Error("expected initial push to be a scene");
+      const dashRecord = initial.payload.store["shape:dash"]!;
+      await handle.putOverlay({
+        schema: initial.payload.schema,
+        store: {
+          ...initial.payload.store,
+          "shape:dash": { ...dashRecord, x: 999, y: 999 },
+        },
+      });
+
+      const afterDrag = JSON.parse(await fs.read(overlayPath)) as { entries: Record<string, unknown> };
+      expect(afterDrag.entries["shape:dash"]).toBeDefined();
+
+      // An unrelated source edit drops "dash" from the diagram entirely -
+      // the compiled scene no longer has a record for it at all.
+      fs.setFile(AUTH_PATH, SRC_DASH_REMOVED);
+      watch.emitChange(AUTH_PATH);
+      await handle.idle();
+
+      // A bare recompile never writes the overlay file - it is untouched.
+      const afterRecompile = JSON.parse(await fs.read(overlayPath)) as {
+        entries: Record<string, unknown>;
+      };
+      expect(afterRecompile.entries["shape:dash"]).toBeDefined();
+
+      // The browser posts its next snapshot - whatever was last pushed to
+      // it, which no longer contains shape:dash since its overlay entry no
+      // longer resolves against the fresh compile.
+      const pushedAfterRecompile = transport.pushed.at(-1)!;
+      if (!isScene(pushedAfterRecompile)) throw new Error("expected a scene push after recompile");
+      expect(pushedAfterRecompile.payload.store["shape:dash"]).toBeUndefined();
+      await handle.putOverlay(pushedAfterRecompile.payload);
+
+      // Before the fix this overwrite dropped shape:dash for good - a
+      // source edit elsewhere silently destroying real canvas work.
+      const afterSecondPut = JSON.parse(await fs.read(overlayPath)) as {
+        entries: Record<string, unknown>;
+      };
+      expect(afterSecondPut.entries["shape:dash"]).toBeDefined();
+      const preservedLogs = log.byCode("overlay/preserved");
+      expect(preservedLogs).toHaveLength(1);
+      expect(preservedLogs[0]!.fields).toEqual({ ids: ["shape:dash"] });
+
+      await handle.close();
+    });
+  });
+
   describe("module graph re-subscription", () => {
     const ENTRY = "a.tldsl.jsx";
     const SRC_OK = "ok-source";
