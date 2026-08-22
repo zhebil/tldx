@@ -116,6 +116,17 @@ export type IRBox = IRBase & {
   labelColor?: StyleColor;
   font?: StyleFont;
   size?: StyleFontSize;
+  /**
+   * True for `<Text>`: the same "box" IR kind, sized and flowed exactly like
+   * a `<Box>` (`domain/layout/stack.ts` never special-cases it), but emitted
+   * as a borderless tldraw `text` shape instead of a `geo` rectangle
+   * (`domain/emit/emit.ts`). `fill`/`dash`/`geo`/`verticalAlign`/`labelColor`
+   * are meaningless for this variant - `domain/ir/lower.ts` rejects them via
+   * a narrower allowed-prop set - but the fields stay on `IRBox` rather than
+   * forking the type, so every box-shaped layout rule keeps working
+   * unmodified. Unset for plain `<Box>`.
+   */
+  text?: boolean;
 };
 
 export type IRNote = IRBase & {

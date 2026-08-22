@@ -14,5 +14,6 @@ export {
   Row,
   Sticky,
   Swimlanes,
+  Text,
   flow,
 } from "./components.js";

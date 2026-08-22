@@ -7,7 +7,7 @@ import { astBuilders } from "../parser/ast.fixture.js";
 import type { IRDoc, IRElement } from "./ir.js";
 import { lower } from "./lower.js";
 
-const { box, doc, edge, frame, note } = astBuilders();
+const { box, doc, edge, frame, note, text } = astBuilders();
 
 function lowerAst(ast: AstNode): { ir: IRDoc | null; codes: string[] } {
   const { ir, diagnostics } = lower(ast);
@@ -471,6 +471,68 @@ describe("lower: note sticky marker", () => {
     const noteIr = ir!.children[0]!;
     if (noteIr.kind !== "note") throw new Error("expected note");
     expect(noteIr.sticky).toBeUndefined();
+  });
+});
+
+// C1 (tldsl-b8v): <Text> lowers to the same "box" IR kind as <Box> (IRBox.text)
+// - it shares every box layout rule - but takes its content from JSX
+// children (like <Note>/<Sticky>), not a `label` attribute, is not
+// addressable-required (an anonymous heading is fine), and rejects the
+// border/fill-only props a real tldraw text shape doesn't have.
+describe("lower: box text marker (C1)", () => {
+  it("<Text> lowers to a box IR node with text: true and its body as label", () => {
+    const ast = doc({}, [text({ id: "t" }, "Phase 1")]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const boxIr = ir!.children[0]!;
+    if (boxIr.kind !== "box") throw new Error("expected box");
+    expect(boxIr.text).toBe(true);
+    expect(boxIr.label).toBe("Phase 1");
+  });
+
+  it("<Box> does not set text", () => {
+    const ast = doc({}, [box({ id: "b", label: "hi" })]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const boxIr = ir!.children[0]!;
+    if (boxIr.kind !== "box") throw new Error("expected box");
+    expect(boxIr.text).toBeUndefined();
+  });
+
+  it("<Text> does not require an id (annotation, like <Note>)", () => {
+    const ast = doc({}, [text({}, "hi")]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+  });
+
+  it("<Box> still requires an id", () => {
+    const ast = doc({}, [box({ label: "hi" })]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/missing-id"]);
+  });
+
+  it("rejects fill/dash/geo/verticalAlign/labelColor/h/label on <Text>", () => {
+    const ast = doc({}, [
+      text({ id: "t", fill: "solid", dash: "dashed", geo: "ellipse", verticalAlign: "end", labelColor: "red", h: 40, label: "nope" }, "hi"),
+    ]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(Array(7).fill("ir/unknown-prop"));
+  });
+
+  it("accepts w/maxW/color/textAlign/font/size on <Text>", () => {
+    const ast = doc({}, [
+      text({ id: "t", w: 200, maxW: 300, color: "blue", textAlign: "end", font: "mono", size: "l" }, "hi"),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const boxIr = ir!.children[0]!;
+    if (boxIr.kind !== "box") throw new Error("expected box");
+    expect(boxIr.w).toBe(200);
+    expect(boxIr.maxW).toBe(300);
+    expect(boxIr.color).toBe("blue");
+    expect(boxIr.textAlign).toBe("end");
+    expect(boxIr.font).toBe("mono");
+    expect(boxIr.size).toBe("l");
   });
 });
 

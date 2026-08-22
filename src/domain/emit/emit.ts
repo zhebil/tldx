@@ -13,6 +13,11 @@
  *   shapes parent to `page:main`, frame children parent to the frame's
  *   shape id. Shape `x | y` is whatever layout produced (frame-relative when
  *   nested), preserved verbatim.
+ * - `<Text>` (`box.text`, IRBox) emits as a real tldraw `text` shape - no
+ *   border, no fill - instead of a `box`'s `geo` rectangle. It shares every
+ *   box layout rule (sizing, flow, `w`/`maxW` wrap budget); only emit
+ *   branches on `box.text` to pick the shape kind. There is no `h` on the
+ *   wire - a text shape's height is derived from wrapped content.
  * - `<Note>` (non-sticky) emits as a `geo` rectangle sized like a box (IR
  *   `w`/`h` pass through verbatim), warm-filled by default (`color: "yellow",
  *   fill: "semi"`, overridden by IR `note.color` when set) to read as an
@@ -56,6 +61,7 @@ import {
   noteShape,
   pageRecord,
   sceneJson,
+  textShape,
 } from "../../contracts/builders.js";
 import type { SceneJSON, TLRecord } from "../../contracts/scene-json.js";
 import { NOTE_SIZE } from "../layout/defaults.js";
@@ -169,7 +175,11 @@ function emitElement(
       const index = nextIndex(ctx, parentId);
       ctx.chainOf.set(el.id, chain);
       ctx.indexOf.set(shapeId(el.id), index);
-      out.push(emitBox(el, parentId, index, offsetX, offsetY));
+      out.push(
+        el.text
+          ? emitText(el, parentId, index, offsetX, offsetY)
+          : emitBox(el, parentId, index, offsetX, offsetY),
+      );
       return;
     }
     case "note": {
@@ -230,6 +240,37 @@ function emitBox(
     ...(box.textAlign === undefined ? {} : { textAlign: box.textAlign }),
     ...(box.verticalAlign === undefined ? {} : { verticalAlign: box.verticalAlign }),
     ...(box.labelColor === undefined ? {} : { labelColor: box.labelColor }),
+    ...(box.font === undefined ? {} : { font: box.font }),
+    ...(box.size === undefined ? {} : { size: box.size }),
+  });
+}
+
+/**
+ * Borderless caption (`<Text>`, `IRBox.text`): a real tldraw `text` shape,
+ * not a `geo` rectangle. `box.w` is whatever `domain/layout/stack.ts` already
+ * computed for this element - box sizing (`estimatedBoxSize`, aspect-bounded
+ * by default per `BOX_ASPECT_TARGET`) is reused wholesale, so a `<Text>`
+ * with no `w`/`maxW` still gets a bounded wrap width, never an unbounded
+ * line. There is no `h` on the wire - a text shape's height is derived from
+ * its wrapped content, not settable (see `contracts/builders.ts#textShape`).
+ */
+function emitText(
+  box: IRBoxPositioned,
+  parentId: string,
+  index: string,
+  offsetX: number,
+  offsetY: number,
+): TLRecord {
+  return textShape({
+    id: shapeId(box.id),
+    parentId,
+    index,
+    x: box.x + offsetX,
+    y: box.y + offsetY,
+    w: box.w,
+    text: box.label ?? "",
+    ...(box.color === undefined ? {} : { color: box.color }),
+    ...(box.textAlign === undefined ? {} : { textAlign: box.textAlign }),
     ...(box.font === undefined ? {} : { font: box.font }),
     ...(box.size === undefined ? {} : { size: box.size }),
   });

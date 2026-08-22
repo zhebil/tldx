@@ -54,7 +54,7 @@ function isAstNode(value: unknown): value is AstNode {
 }
 
 /** Flattens `.map()` arrays, drops null/undefined/boolean. Any string throws
- * - only <Note> accepts text children. */
+ * - only <Note> and <Text> accept text children. */
 export function flattenNodes(children: unknown, componentName: string): AstNode[] {
   const nodes: AstNode[] = [];
   function walk(child: unknown): void {
@@ -65,7 +65,7 @@ export function flattenNodes(children: unknown, componentName: string): AstNode[
     }
     if (typeof child === "string") {
       throw new Error(
-        `<${componentName}> does not accept text children (only <Note> does)`,
+        `<${componentName}> does not accept text children (only <Note> and <Text> do)`,
       );
     }
     if (isAstNode(child)) {
@@ -78,7 +78,8 @@ export function flattenNodes(children: unknown, componentName: string): AstNode[
   return nodes;
 }
 
-function noteBody(children: unknown): string {
+/** Joins/trims text children into a single body string. Shared by `<Note>`, `<Sticky>` and `<Text>`. */
+function bodyText(children: unknown, componentName: string): string {
   const parts: string[] = [];
   function walk(child: unknown): void {
     if (child === null || child === undefined || typeof child === "boolean") return;
@@ -90,7 +91,7 @@ function noteBody(children: unknown): string {
       parts.push(child);
       return;
     }
-    throw new Error("<Note> may only contain text, not an element");
+    throw new Error(`<${componentName}> may only contain text, not an element`);
   }
   walk(children);
   return parts.join("").trim();
@@ -233,7 +234,7 @@ export function Note(props: Props, source?: JsxSource): AstNote {
   return {
     kind: "note",
     attrs: propsToAttrs(props, span),
-    text: noteBody(props.children),
+    text: bodyText(props.children, "Note"),
     span,
   };
 }
@@ -246,9 +247,26 @@ export function Sticky(props: Props, source?: JsxSource): AstNote {
   return {
     kind: "note",
     attrs: propsToAttrs(props, span),
-    text: noteBody(props.children),
+    text: bodyText(props.children, "Sticky"),
     sticky: true,
     tag: "Sticky",
+    span,
+  };
+}
+
+/** A borderless, fill-less caption - just glyphs on the canvas. Same "box"
+ * IR kind as `<Box>` (`IRBox.text`), so it sizes and flows exactly like one;
+ * `domain/emit/emit.ts` emits it as a tldraw `text` shape instead of a `geo`
+ * rectangle. Content is JSX children (like `<Note>`/`<Sticky>`), not a
+ * `label` prop. */
+export function Text(props: Props, source?: JsxSource): AstBox {
+  const span = toSpan(source);
+  return {
+    kind: "box",
+    attrs: propsToAttrs(props, span),
+    text: true,
+    body: bodyText(props.children, "Text"),
+    tag: "Text",
     span,
   };
 }

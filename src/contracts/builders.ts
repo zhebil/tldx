@@ -217,6 +217,42 @@ export function noteShape(
   } satisfies TLRecord;
 }
 
+/**
+ * A borderless, fill-less tldraw `text` shape (`com.tldraw.shape.text`,
+ * registered in `DEFAULT_SCHEMA` above). Unlike `boxShape`/`noteShape`, wire
+ * field is `textAlign` (not `align`) and there is no `h` at all - height is
+ * derived from wrapped content, never sent. `w` is always the fixed wrap
+ * budget (`autoSize: false`); `domain/emit/emit.ts` always has a concrete
+ * `w` by the time it calls this (layout already sized the box the `<Text>`
+ * element travels as - see `IRBox.text`), so autoSize never needs to be true
+ * on the wire.
+ */
+export function textShape(
+  input: ShapeBase & {
+    w: number;
+    text?: string;
+    color?: string;
+    textAlign?: string;
+    font?: string;
+    size?: string;
+  },
+): TLRecord {
+  return {
+    ...baseShapeFields(input),
+    type: "text",
+    props: {
+      w: input.w,
+      color: input.color ?? "black",
+      size: input.size ?? "m",
+      font: input.font ?? "draw",
+      textAlign: input.textAlign ?? "start",
+      autoSize: false,
+      scale: 1,
+      richText: richText(input.text ?? ""),
+    },
+  } satisfies TLRecord;
+}
+
 export function frameShape(
   input: ShapeBase & {
     w: number;

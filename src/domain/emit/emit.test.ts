@@ -58,6 +58,66 @@ describe("domain/emit", () => {
     });
   });
 
+  it("emits a <Text> box (box.text) as a borderless text shape, not geo", () => {
+    const scene = emit(
+      doc([box({ id: "heading", x: 10, y: 20, w: 240, h: 30, label: "Phase 1", text: true })]),
+    );
+    const shape = scene.store["shape:heading"];
+    expect(shape?.type).toBe("text");
+    expect(shape?.parentId).toBe("page:main");
+    expect(shape?.x).toBe(10);
+    expect(shape?.y).toBe(20);
+    const props = shape?.props as Record<string, unknown>;
+    // w is the fixed wrap budget layout already computed; there is no h at
+    // all on the wire - a text shape's height is derived from content.
+    expect(props.w).toBe(240);
+    expect(props.h).toBeUndefined();
+    expect(props.autoSize).toBe(false);
+    expect(props.richText).toEqual({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Phase 1" }] }],
+    });
+  });
+
+  it("emits a label-less <Text> box with empty rich text rather than dropping the field", () => {
+    const scene = emit(doc([box({ id: "blank", x: 0, y: 0, w: 80, h: 20, text: true })]));
+    const props = scene.store["shape:blank"]?.props as { richText: unknown };
+    expect(props.richText).toEqual({ type: "doc", content: [{ type: "paragraph" }] });
+  });
+
+  it("defaults <Text> color/textAlign/font/size to black/start/draw/m", () => {
+    const scene = emit(doc([box({ id: "t", x: 0, y: 0, w: 80, h: 20, text: true })]));
+    const props = scene.store["shape:t"]?.props as Record<string, unknown>;
+    expect(props.color).toBe("black");
+    expect(props.textAlign).toBe("start");
+    expect(props.font).toBe("draw");
+    expect(props.size).toBe("m");
+  });
+
+  it("passes <Text> color/textAlign/font/size through when set", () => {
+    const scene = emit(
+      doc([
+        box({
+          id: "t",
+          x: 0,
+          y: 0,
+          w: 80,
+          h: 20,
+          text: true,
+          color: "blue",
+          textAlign: "end",
+          font: "mono",
+          size: "xl",
+        }),
+      ]),
+    );
+    const props = scene.store["shape:t"]?.props as Record<string, unknown>;
+    expect(props.color).toBe("blue");
+    expect(props.textAlign).toBe("end");
+    expect(props.font).toBe("mono");
+    expect(props.size).toBe("xl");
+  });
+
   it("parents frame children to the frame's shape id (not the page)", () => {
     const scene = emit(
       doc([
@@ -783,6 +843,7 @@ function box(input: {
   labelColor?: string;
   font?: string;
   size?: string;
+  text?: boolean;
 }): IRBoxPositioned {
   const { label, ...rest } = input;
   return {

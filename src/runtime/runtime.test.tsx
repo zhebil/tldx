@@ -17,6 +17,7 @@ import {
   Pipeline,
   Row,
   Swimlanes,
+  Text,
   flow,
 } from "./index.js";
 import { jsx } from "./jsx-runtime.js";
@@ -106,14 +107,27 @@ describe("JSX runtime - AST shape", () => {
     const lines = spanLines(jsxAst);
 
     // Doc, Frame, 2 named boxes, Note, Edge, and the mapped box all sit on
-    // lines 61-68 in buildTree() above.
+    // lines 62-69 in buildTree() above.
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {
-      expect(line).toBeGreaterThanOrEqual(61);
-      expect(line).toBeLessThanOrEqual(68);
+      expect(line).toBeGreaterThanOrEqual(62);
+      expect(line).toBeLessThanOrEqual(69);
     }
 
-    expect((jsxAst as { span: { line: number } }).span.line).toBe(61);
+    expect((jsxAst as { span: { line: number } }).span.line).toBe(62);
+  });
+});
+
+describe("<Text> (C1, tldsl-b8v)", () => {
+  it("builds a box AST node with text: true and its children joined as the label field", () => {
+    const node = (<Text id="heading">Phase 1 (non collaborative)</Text>) as AstNode;
+    expect(stripSpans(node)).toEqual({
+      kind: "box",
+      attrs: { id: { value: "heading" } },
+      text: true,
+      body: "Phase 1 (non collaborative)",
+      tag: "Text",
+    });
   });
 });
 
