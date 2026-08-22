@@ -141,7 +141,7 @@ entry. If a task needs an essay, it belongs in the ledger or in
   table-driven test. `<box>` became `<Box>` in the bargain - same principle,
   name what the author typed.
 
-- [ ] **T45. `maxW` and multiline labels: make the prop tables true.** *(D16,
+- [x] **T45. `maxW` and multiline labels: make the prop tables true.** *(D16,
   D19)*
   Two documented things that do not work. `maxW` is documented on
   `<Note>`/`<Sticky>` and rejected by `check` (the allowed set has `w`
@@ -156,6 +156,12 @@ entry. If a task needs an essay, it belongs in the ledger or in
   currently finds that out by experiment.
   **Acceptance:** both repros compile in their documented form; the skill shows
   the multiline form; `check` warns on the literal one.
+  **Done in `acc79b3` and `4182e55`.** `maxW` implemented rather than documented
+  away, after tracing the geometry: a `<Note>` emits as a real geo box sized like
+  a `<Box>`, so a wrap cap is meaningful; a `<Sticky>` emits via tldraw's
+  `noteShape`, which hardcodes 200px. The new `ir/literal-newline-in-label`
+  warning fires on the string-attribute form and stays quiet on `label={"a\nb"}`.
+  The skill gained four lines, not a reference manual.
 
 - [x] **T46. An unnamed container is unnamed.** *(D2)*
   A `<Row>` / `<Col>` / `<Grid>` / `<Graph>` with no `name` draws a border and captions
@@ -247,6 +253,11 @@ own entry into the task list; the human does that.
 - T41's `layout/shape-overlap` message picks its direction arbitrarily - it says
   the topic box covers the note when the render shows the reverse - and inlines
   the note's whole text, so a one-sentence note makes a 140-character warning.
+- **`maxW` on a `<Sticky>` is now accepted and silently does nothing** - tldraw
+  fixes sticky width at 200px. The skill says so, but a no-op prop is a trap, and
+  T44's `tag` on the AST now makes it possible to warn on that tag specifically.
+- A flowed (non-`on`) `<Note maxW>` inside a `col`/`grid` is still overridden to
+  the container's shared width by `applyContainerBoxSizing`. T45 left it to T43.
 - **`tldsl render` writes a `*.tldsl.overlay.json` next to every diagram it
   renders**, from z-index noise plus a few `parentId`/`y` deltas. Since
   `render = apply(overlay, compile(jsx))`, a stale one silently changes a later
