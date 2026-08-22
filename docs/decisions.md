@@ -118,6 +118,8 @@ ADR-ish log of the key design calls made during the 2026-05-03 brainstorm. Each 
 
 **Rejected: incompatible with the JSX execution model (JSX pivot)**. `{/* ... */}` is a JavaScript comment; esbuild strips it during transform, so it never becomes a call, never reaches `jsxDEV`, never exists at runtime. No flag or pragma recovers it - see `docs/jsx-pivot.md` decision 10. Rebuilding it means running a comment-extractor over the source, i.e. reintroducing a parser to the front end of a pivot whose entire point was deleting the parser. Use `<Note>` to annotate.
 
+**Update (`<Text>` ships, `<Note>` retired - C1/C2, tldsl-npd)**: `<Note>` is no longer a component - it emitted a hand-rolled geo-rectangle imitation of a sticky and is gone from `src/runtime/components.ts`. Annotate with `<Sticky>` (a real tldraw sticky note, attach-capable via `on`) or `<Text>` (borderless, unstyled, not attach-capable) - see `docs/dsl.md`.
+
 ---
 
 ## 12. ID rules: explicit on addressable, namespaced via import, reorder-stable
