@@ -410,6 +410,73 @@ describe("domain/emit", () => {
   });
 });
 
+describe("domain/emit: z-order index (R1, docs/round-trip-scope.md §7)", () => {
+  it("assigns non-arrow shapes a gapped index per parent, in emit order", () => {
+    const scene = emit(
+      doc([
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 200, y: 0, w: 100, h: 50 }),
+        box({ id: "c", x: 400, y: 0, w: 100, h: 50 }),
+      ]),
+    );
+    expect(scene.store["shape:a"]?.index).toBe("a1");
+    expect(scene.store["shape:b"]?.index).toBe("a3");
+    expect(scene.store["shape:c"]?.index).toBe("a5");
+  });
+
+  it("gives an arrow the slot strictly between its highest-indexed endpoint and the next sibling above", () => {
+    const scene = emit(
+      doc([
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 200, y: 0, w: 100, h: 50 }),
+        box({ id: "c", x: 400, y: 0, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b" }),
+      ]),
+    );
+    // a=a1, b=a3, c=a5 (siblings); the arrow's highest bound sibling is b
+    // (a3), so it must land strictly above a3 and strictly below the next
+    // non-arrow sibling, c (a5) - the even slot in between.
+    expect(scene.store["shape:ab"]?.index).toBe("a4");
+  });
+
+  it("parents an arrow to the common ancestor frame, not the page, when both endpoints live in a named frame", () => {
+    const scene = emit(
+      doc([
+        frame({
+          id: "f",
+          name: "Container",
+          x: 0,
+          y: 0,
+          w: 400,
+          h: 200,
+          children: [
+            box({ id: "a", x: 0, y: 0, w: 120, h: 60 }),
+            box({ id: "b", x: 200, y: 0, w: 120, h: 60 }),
+            edge({ id: "e", from: "a", to: "b" }),
+          ],
+        }),
+      ]),
+    );
+    expect(scene.store["shape:e"]?.parentId).toBe("shape:f");
+    // Above its highest sibling (b) with no non-arrow sibling above it in f.
+    const bIndex = scene.store["shape:b"]?.index as string;
+    const arrowIndex = scene.store["shape:e"]?.index as string;
+    expect(arrowIndex > bIndex).toBe(true);
+  });
+
+  it("two arrows bound to the same highest sibling may share an index", () => {
+    const scene = emit(
+      doc([
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 200, y: 0, w: 100, h: 50 }),
+        edge({ id: "e1", from: "a", to: "b" }),
+        edge({ id: "e2", from: "a", to: "b" }),
+      ]),
+    );
+    expect(scene.store["shape:e1"]?.index).toBe(scene.store["shape:e2"]?.index);
+  });
+});
+
 describe("domain/emit: style pass-through (T9)", () => {
   it("passes box color/fill/dash through to props, defaulting when absent", () => {
     const scene = emit(

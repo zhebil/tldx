@@ -91,7 +91,7 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
     },
     "shape:auth": {
       "id": "shape:auth",
-      "index": "a1",
+      "index": "a5",
       "isLocked": false,
       "meta": {},
       "opacity": 1,
@@ -153,11 +153,11 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
     },
     "shape:l-a": {
       "id": "shape:l-a",
-      "index": "a1",
+      "index": "a6",
       "isLocked": false,
       "meta": {},
       "opacity": 1,
-      "parentId": "page:main",
+      "parentId": "shape:auth-flow",
       "props": {
         "arrowheadEnd": "arrow",
         "arrowheadStart": "none",
@@ -190,7 +190,7 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
     },
     "shape:login": {
       "id": "shape:login",
-      "index": "a1",
+      "index": "a3",
       "isLocked": false,
       "meta": {},
       "opacity": 1,
@@ -233,11 +233,11 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
     },
     "shape:u-l": {
       "id": "shape:u-l",
-      "index": "a1",
+      "index": "a4",
       "isLocked": false,
       "meta": {},
       "opacity": 1,
-      "parentId": "page:main",
+      "parentId": "shape:auth-flow",
       "props": {
         "arrowheadEnd": "arrow",
         "arrowheadStart": "none",
