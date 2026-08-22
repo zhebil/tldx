@@ -622,10 +622,14 @@ blocker.
   wrong, and an author cannot tell which without running `check`.
 - **Repro:** `examples/repro/d16-note-maxw-rejected.tldsl.jsx` (compiles, with
   the comment naming the prop to add back)
-- **Status:** open. The naming half is fixed in `ee8ec31` (T44) - the
-  `ir/unknown-prop` message now says `<Note>` or `<Sticky>` (whichever the
-  author wrote) instead of `<note>`; whether `maxW` should be accepted at all
-  is untouched and stays open for T45.
+- **Status:** fixed in `acc79b3` (T45), on top of the naming half in `ee8ec31`
+  (T44). `maxW` is accepted on `<Note>` and caps its wrap width the same way
+  it caps a `<Box>`'s - the repro's note stays 160px wide instead of
+  spreading across the row. It is accepted on `<Sticky>` too (same IR `note`
+  kind) but has no visual effect there: tldraw's `noteShape` fixes a sticky's
+  width at 200px regardless of anything the IR says, so a wrap cap has no
+  geometry to attach to. The skill now says so instead of promising a cap
+  that can't hold.
 
 ### D17. A `<Frame>` cannot be a C4 boundary: no `dash`, and its name is the smallest text on the canvas
 
@@ -689,7 +693,11 @@ blocker.
   found by experiment.
 - **Repro:** `examples/repro/d19-literal-newline-in-label.tldsl.jsx` (both forms
   side by side; both pass `check`, only one is a label)
-- **Status:** open
+- **Status:** fixed in `4182e55` (T45). `check` now warns
+  `ir/literal-newline-in-label` on a `<Box>` or `<Edge>` label containing a
+  literal `\n` - the string-literal repro triggers it, the expression-form
+  repro next to it does not. `skills/tldsl/SKILL.md` documents the
+  `label={"a\nb"}` form.
 
 ### D20. `maxW` holds on a rectangle and is ignored on a diamond
 
