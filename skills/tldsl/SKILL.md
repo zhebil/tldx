@@ -85,6 +85,47 @@ const Service = ({ ns, label }) => (
 );
 ```
 
+## Multi-file diagrams
+
+Split a diagram across files with plain ES `import` - nothing tldsl-specific,
+no registration. A module exports a component that returns one element
+(usually a `<Frame>`); the entry file imports it and places it inside `<Doc>`.
+Only the entry file needs the `.tldsl.jsx` extension - modules it imports are
+plain `.jsx`.
+
+```jsx
+// diagrams/checkout.jsx
+import { Frame, Box, Edge } from "tldsl";
+
+export function Checkout({ ns }) {
+  return (
+    <Frame id={`${ns}-checkout`} name="Checkout" layout="row" gap="60">
+      <Box id={`${ns}-cart`} label="Cart" />
+      <Box id={`${ns}-pay`} label="Payment" />
+      <Edge from={`${ns}-cart`} to={`${ns}-pay`} />
+    </Frame>
+  );
+}
+```
+
+```jsx
+// board.tldsl.jsx
+import { Doc } from "tldsl";
+import { Checkout } from "./diagrams/checkout.jsx";
+
+export default function Diagram() {
+  return (
+    <Doc layout="col" gap="120">
+      <Checkout ns="ck" />
+    </Doc>
+  );
+}
+```
+
+Nest a module's own `<Edge>`s inside the `<Frame>` it returns, as above. They
+render correctly and take up no layout space, so a module is self-contained -
+it never needs to export a separate edge array alongside its JSX.
+
 ## Nest `<Group>` - this is how you control layout
 
 **Reach for nested `<Group>` before anything else, including for graph-shaped
@@ -169,6 +210,15 @@ label.
 
 `from` and `to` are ids, resolved across the whole document - a frame does not
 scope them. `<Edge from="lb" to="app" label="tls" color="blue" />`.
+
+An endpoint can resolve to a `<Frame>` id, not just a box -
+`<Edge from="checkout" to="payments" />` points at the whole frame. Use it
+for "this drives that subsystem" without picking one box inside the frame to
+stand in for the group.
+
+`from` and `to` can be the same id. A self-edge renders as a circular arrow
+looping off the shape - the natural way to draw a flowchart polling loop
+(`Time up? --No-->` itself).
 
 **Never put a `.` in an id.** A dot in `from`/`to` is parsed as anchor syntax,
 which is not implemented, so it always fails. Use `-` or `_`.
