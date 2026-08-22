@@ -166,7 +166,7 @@ entry. If a task needs an essay, it belongs in the ledger or in
   **Acceptance:** `d2-unnamed-frame-caption` renders with no captions and no
   borders; `tcp-states` loses its stray "Frame"; a *named* frame is unchanged.
 
-- [ ] **T47. `maxW` holds on every geo, not just rectangles.** *(D20)*
+- [x] **T47. `maxW` holds on every geo, not just rectangles.** *(D20)*
   The same label with the same `maxW="200"` renders 188x152 as a rectangle and
   492x320 as a diamond - 2.5x its cap - and drags every sibling in its row to
   320px tall. Not the inscribed-rectangle factor: a diamond alone in a column
@@ -174,6 +174,18 @@ entry. If a task needs an essay, it belongs in the ledger or in
   **Acceptance:** `d20-maxw-ignored-on-diamond` renders both shapes at their
   cap; `cicd-pipeline`'s `Commit` box stops being a 310px-tall box holding four
   words.
+  **Done in `a8803df`, after two rejected attempts.** Three separate bugs stacked:
+  `estimatedBoxSize` never re-checked `geoScale`'s inflated width against the cap
+  (the root cause); capping by shrinking the whole box undid the inflation that
+  kept the label *inside* the outline, so text rendered outside the diamond; and
+  a row's shared height voted with the already-inflated `h`, so one capped
+  diamond dragged `Commit` to 465px - worse than the 310px this task exists to
+  fix. Final shape: cap the width, grow height until the outline-fit predicate
+  holds, and vote for the row's shared height with *natural* content height.
+  `Commit` 159x182, `quality-gate` 200x465 with its label contained. The tighter
+  boxes also moved the arrow counters: 29 -> 26 crossings, crowded 2 -> 1.
+  **Both rejections were caught by looking at the render, not the report** - each
+  attempt's numbers were defensible and each render was wrong.
 
 - [ ] **T48. Per-axis gap, and a tier that fills its parent.** *(D4, D10)*
   Two missing levers on containers, both worked around today by restructuring
