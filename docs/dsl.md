@@ -127,8 +127,8 @@ line number and the allowed list.
 
 | element | allowed props |
 |---|---|
-| `<Doc>` | `id`, `direction`, `layout`, `gap`, `pad`, `cols` |
-| `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h`, `color` |
+| `<Doc>` | `id`, `direction`, `layout`, `gap`, `rowGap`, `colGap`, `pad`, `cols`, `align`, `equalize` |
+| `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `rowGap`, `colGap`, `pad`, `cols`, `align`, `equalize`, `x`, `y`, `w`, `h`, `color` |
 | `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash`, `geo`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
 | `<Text>` | `id`, `x`, `y`, `w`, `maxW`, `color`, `textAlign`, `font`, `size` |
 | `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `maxW`, `color`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
@@ -229,6 +229,13 @@ are sized first, then the container places them (`grid` uses `cols` for the
 column count). `auto` is the only mode that calls ELK, and it sees a *flat*
 graph of that container's already-sized direct children - not the whole
 document, so cross-container topology doesn't factor in.
+
+In `row`, `col` and `grid`, boxes that flow in the same container are given a
+shared height so a row of cards lines up. `equalize="false"` opts a container
+out of that, letting each box keep the height its own content needs - use it
+when a box's height *is* data. It only turns off the height vote; `col` and
+`grid` still share widths, because a column of mismatched widths reads as a
+mistake rather than as information.
 
 Each container lays itself out independently: a `<Frame layout="row">`
 nested inside a `<Doc layout="col">` runs its children left-to-right
