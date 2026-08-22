@@ -249,7 +249,7 @@ export async function extractTruth(url: string): Promise<PageTruth> {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: "networkidle" });
+    await page.goto(url, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("[data-shape-id]", { timeout: 15_000, state: "attached" });
     return await page.evaluate(() => {
       const editor = (window as unknown as { editor: Editor }).editor;

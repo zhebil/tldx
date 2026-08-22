@@ -213,7 +213,7 @@ function emitEdge(edge: IREdge, out: TLRecord[], route: EdgeRoute | undefined): 
       arrowId,
       shapeId: shapeId(edge.from),
       terminal: "start",
-      ...(route === undefined ? {} : { normalizedAnchor: route.startAnchor, isPrecise: true, isExact: true }),
+      ...(route?.startAnchor === undefined ? {} : { normalizedAnchor: route.startAnchor, isPrecise: true, isExact: true }),
     }),
   );
   out.push(
@@ -222,7 +222,7 @@ function emitEdge(edge: IREdge, out: TLRecord[], route: EdgeRoute | undefined): 
       arrowId,
       shapeId: shapeId(edge.to),
       terminal: "end",
-      ...(route === undefined ? {} : { normalizedAnchor: route.endAnchor, isPrecise: true, isExact: true }),
+      ...(route?.endAnchor === undefined ? {} : { normalizedAnchor: route.endAnchor, isPrecise: true, isExact: true }),
     }),
   );
 }

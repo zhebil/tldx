@@ -253,4 +253,71 @@ describe("computeEdgeRoutes", () => {
     expect(ad!.bend).toBeCloseTo(-13.5, 5);
     expect(eh!.bend).toBeCloseTo(-13.5, 5);
   });
+
+  it("gives a self edge a loop route with distinct anchors and a non-zero bend", () => {
+    const ir = doc("root", [
+      box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+      edge({ id: "aa", from: "a", to: "a" }),
+    ]);
+    const routes = computeEdgeRoutes(ir);
+    const route = routes.get("aa");
+    expect(route).toBeDefined();
+    expect(route!.bend).not.toBe(0);
+    expect(route!.startAnchor).toBeDefined();
+    expect(route!.endAnchor).toBeDefined();
+    expect(route!.startAnchor).not.toEqual(route!.endAnchor);
+  });
+
+  it("fans two edges on one pair with nothing between them into equal-magnitude bends, no anchors", () => {
+    const ir = doc("root", [
+      box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+      box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+      edge({ id: "ab", from: "a", to: "b" }),
+      edge({ id: "ba", from: "b", to: "a" }),
+    ]);
+    const routes = computeEdgeRoutes(ir);
+    const ab = routes.get("ab");
+    const ba = routes.get("ba");
+    expect(ab).toBeDefined();
+    expect(ba).toBeDefined();
+    // `bend` is measured against the arrow's own direction of travel, so two
+    // antiparallel arrows carrying the same bend bow to opposite sides in page space.
+    expect(ab!.bend).toBeCloseTo(ba!.bend, 5);
+    expect(Math.abs(ab!.bend)).toBeGreaterThanOrEqual(8);
+    expect(ab!.startAnchor).toBeUndefined();
+    expect(ab!.endAnchor).toBeUndefined();
+    expect(ba!.startAnchor).toBeUndefined();
+    expect(ba!.endAnchor).toBeUndefined();
+  });
+
+  it("fans three edges on one pair, dropping the zero-offset middle lane", () => {
+    const ir = doc("root", [
+      box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+      box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+      edge({ id: "ab1", from: "a", to: "b" }),
+      edge({ id: "ba", from: "b", to: "a" }),
+      edge({ id: "ab2", from: "a", to: "b" }),
+    ]);
+    const routes = computeEdgeRoutes(ir);
+    const ab1 = routes.get("ab1");
+    const ba = routes.get("ba");
+    const ab2 = routes.get("ab2");
+    expect(ab1).toBeDefined();
+    expect(ab2).toBeDefined();
+    expect(ba).toBeUndefined();
+    expect(ab1!.bend).not.toBe(0);
+    expect(ab2!.bend).not.toBe(0);
+    expect(Math.sign(ab1!.bend)).not.toBe(Math.sign(ab2!.bend));
+    expect(Math.abs(ab1!.bend)).toBeCloseTo(Math.abs(ab2!.bend), 5);
+  });
+
+  it("leaves a lone edge on a pair with nothing between it straight (fan does not fire for singletons)", () => {
+    const ir = doc("root", [
+      box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+      box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+      edge({ id: "ab", from: "a", to: "b" }),
+    ]);
+    const routes = computeEdgeRoutes(ir);
+    expect(routes.get("ab")).toBeUndefined();
+  });
 });
