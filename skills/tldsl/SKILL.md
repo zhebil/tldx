@@ -247,9 +247,11 @@ layout, so it never pushes anything around. `on` accepts any box, frame, note or
 edge id. A note on an edge sits at that edge's midpoint. Without `on`, a note
 flows like a normal child.
 
-Because an attached note is outside layout, it can land on top of something.
-Keep the text to a sentence, and watch the live viewer if a diagram is
-note-heavy.
+Because an attached note is outside layout, it does not just risk overlap -
+it drifts. On a wide diagram an attached note can land far from its target,
+and it can end up outside its own frame entirely. Keep the text to a
+sentence, and check the live viewer (or a render) on any note-heavy diagram
+before you call it done.
 
 ## Workflow
 
@@ -272,12 +274,18 @@ tldsl check  diagram.tldsl.jsx          # parse + validate. Fast, no browser.
 tldsl render diagram.tldsl.jsx out.png  # export, cropped to content
 ```
 
-- **`check` before you claim it is done.** Every diagnostic carries a code and a
-  source location.
+- **`check`, then render and look.** `check` catches parse and validation
+  errors - every diagnostic carries a code and a source location - but it
+  cannot see clipping, overlap, or a label that fell out of its box. A clean
+  `check` is not a finished diagram.
 - **`render` is your debugging tool, not a deliverable.** A diagram that
   validates can still read badly, and you cannot see the browser tab - so export
   a PNG and Read it when you need to judge the pixels yourself. `--frame <id>`
   exports one region, `--scale`, `--dark`, `--format png|svg|jpeg|webp`.
+- **A stale `serve` outlives your edits.** `render` reuses a running server
+  for the same file instead of booting its own. If `render` reports an id
+  that exists in your source, suspect a reused server before you suspect the
+  compiler - restart `serve` and try again.
 - **Write those PNGs to a temp dir, never into the repo.** `/tmp/foo.png`, not
   `docs/renders/foo.png`. They are scratch output of your own verification loop
   and committing them bloats the repo with files nobody reads. The only time a
