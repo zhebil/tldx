@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { IRBoxPositioned, IRDocPositioned, IREdge, IRElementPositioned, IRFramePositioned } from "../ir/index.js";
 
-import { computeEdgeRoutes } from "./routing.js";
+import { computeEdgeRoutes, type LabelBox } from "./routing.js";
+
+function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
 
 const SPAN = { file: "test.tldsl", line: 1, column: 1 };
 
@@ -324,6 +328,78 @@ describe("computeEdgeRoutes", () => {
     ]);
     const routes = computeEdgeRoutes(ir);
     expect(routes.get("ab")).toBeUndefined();
+  });
+
+  describe("reciprocal pair label clearance (B1)", () => {
+    // Reproduces the tcp-groups.tldsl.jsx defect: `A -> B` and `B -> A` on a
+    // short chord with long labels bow apart (T35's fan) but, at the bare
+    // fan step, still stamp their labels on the same spot (D14's other half).
+    const LONG_LABEL_A = "active open / SYN";
+    const LONG_LABEL_B = "close / timeout";
+
+    it("widens the fan step for a labelled reciprocal pair so their labels don't overlap", () => {
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b", label: LONG_LABEL_A }),
+        edge({ id: "ba", from: "b", to: "a", label: LONG_LABEL_B }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      const ab = routes.get("ab");
+      const ba = routes.get("ba");
+      expect(ab?.labelBox).toBeDefined();
+      expect(ba?.labelBox).toBeDefined();
+      expect(boxesOverlap(ab!.labelBox!, ba!.labelBox!)).toBe(false);
+
+      // Wider than the bare (unlabelled) fan gives the same pair geometry -
+      // otherwise this is just re-testing T35's plain fan, not the label fix.
+      const bareIr = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b" }),
+        edge({ id: "ba", from: "b", to: "a" }),
+      ]);
+      const bareBend = Math.abs(computeEdgeRoutes(bareIr).get("ab")!.bend);
+      expect(Math.abs(ab!.bend)).toBeGreaterThan(bareBend);
+    });
+
+    it("leaves the fan step alone when a reciprocal pair's labels already fit", () => {
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b", label: "ok" }),
+        edge({ id: "ba", from: "b", to: "a", label: "no" }),
+      ]);
+      const bareIr = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b" }),
+        edge({ id: "ba", from: "b", to: "a" }),
+      ]);
+      const bend = Math.abs(computeEdgeRoutes(ir).get("ab")!.bend);
+      const bareBend = Math.abs(computeEdgeRoutes(bareIr).get("ab")!.bend);
+      expect(bend).toBeCloseTo(bareBend, 5);
+    });
+
+    it("does not widen the fan step past a box the wider arc would cross", () => {
+      const withoutBlocker = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b", label: LONG_LABEL_A }),
+        edge({ id: "ba", from: "b", to: "a", label: LONG_LABEL_B }),
+      ]);
+      const wideBend = Math.abs(computeEdgeRoutes(withoutBlocker).get("ab")!.bend);
+
+      const withBlocker = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+        box({ id: "blocker", x: 60, y: 40 + wideBend / 2, w: 80, h: 40 }),
+        edge({ id: "ab", from: "a", to: "b", label: LONG_LABEL_A }),
+        edge({ id: "ba", from: "b", to: "a", label: LONG_LABEL_B }),
+      ]);
+      const guardedBend = Math.abs(computeEdgeRoutes(withBlocker).get("ab")!.bend);
+      expect(guardedBend).toBeLessThan(wideBend);
+    });
   });
 
   describe("detour around obstacles", () => {
