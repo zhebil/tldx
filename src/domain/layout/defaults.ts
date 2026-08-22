@@ -238,17 +238,41 @@ export function estimatedBoxSize(
   const rw = fitBoxWidth(label, maxW, style);
   const naturalW = Math.ceil(rw * k);
   const naturalH = Math.ceil(boxHeightForWidth(label, rw, style) * k);
-  // geoScale's k inflates width and height together (uniformly) so the label
-  // fits inside a non-rect outline (diamond, ellipse, ...) - that inflation is
-  // what makes the scaled width overshoot maxW even though rw itself respected
-  // it as a wrap budget. Re-clamping only the width and leaving height as-is
-  // (or re-deriving it from a narrower re-wrap) breaks the aspect the fit was
-  // solved for and inflates height further instead of shrinking it. Scaling
-  // the whole box down by the same factor keeps that aspect and brings both
-  // dimensions down together.
   if (maxW === undefined || naturalW <= maxW) return { w: naturalW, h: naturalH };
-  const scale = maxW / naturalW;
-  return { w: maxW, h: Math.max(1, Math.ceil(naturalH * scale)) };
+
+  // geoScale's k inflates width and height together so the label fits inside
+  // a non-rect outline - that inflation is what pushed naturalW past maxW
+  // even though rw itself respected it as a wrap budget. maxW caps the
+  // shape's outer width, so pin w there and re-wrap the label to the room
+  // actually available at that width, then grow (never shrink) h until the
+  // re-wrapped label fits the outline again. Shrinking h instead - scaling
+  // the whole box down uniformly - would undo exactly the inflation that
+  // kept the label inside the outline, so the label spills past the shape.
+  const model = GEO_MODEL[style?.geo ?? "rectangle"];
+  if (model === "rect" || label === undefined || label.length === 0) {
+    return { w: maxW, h: boxHeightForWidth(label, maxW, style) };
+  }
+  const fit = GEO_FIT[model];
+  const { wl, hl } = labelExtent(label, maxW, style);
+  const a = wl / maxW;
+  // `a` (the label's width fraction of the capped box) is fixed once w is
+  // pinned to maxW, so this is a single-variable search: grow h until
+  // fit(a, hl / h) <= 1. Binary search, not geoScale's fixed-point multiply,
+  // because a close to 1 (a long label against a tight cap) makes that
+  // fixed point converge too slowly to land inside tolerance in a handful of
+  // passes.
+  let lo = boxHeightForWidth(label, maxW, style);
+  if (fit(a, hl / lo) > 1.001) {
+    let hi = lo;
+    for (let i = 0; i < 24 && fit(a, hl / hi) > 1.001; i++) hi *= 2;
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (fit(a, hl / mid) > 1.001) lo = mid;
+      else hi = mid;
+    }
+    lo = hi;
+  }
+  return { w: maxW, h: Math.ceil(lo) };
 }
 
 /**

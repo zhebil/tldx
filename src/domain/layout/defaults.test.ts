@@ -75,19 +75,32 @@ describe("estimatedBoxSize", () => {
     expect(diamond.w).toBeLessThanOrEqual(200);
   });
 
-  it("shrinks the capped diamond's height along with its width, instead of inflating it further", () => {
+  it("grows the capped diamond's height instead of shrinking it and spilling the label past the outline", () => {
     const label = "Health gate\nerror rate < 1% for 10 min";
-    const uncappedDiamond = estimatedBoxSize(label, undefined, { geo: "diamond" });
     const cappedDiamond = estimatedBoxSize(label, 200, { geo: "diamond" });
     const cappedRect = estimatedBoxSize(label, 200, { geo: "rectangle" });
 
-    // Before the fix, capping only clipped the report's width and left the
-    // uncapped k applied to height, so the box got narrower AND taller
-    // (492x320 -> attempted fixes landed at 200x790). Capping should bring
-    // height down with width, landing close to the rectangle sibling's
-    // height rather than the diamond's own uncapped height.
-    expect(cappedDiamond.h).toBeLessThan(uncappedDiamond.h);
-    expect(cappedDiamond.h).toBeLessThan(cappedRect.h * 2);
+    // A 200-wide diamond has less inscribed room than a 200-wide rectangle
+    // for the same label, so it must be taller, not shorter, to hold it -
+    // shrinking height to hit the cap (the first fix attempt) undoes the
+    // inflation that kept the label inside the outline. Taller is correct;
+    // unbounded is not (a sane ceiling, not a tuned ratio: this is a 3-line
+    // label in a 200px-wide diamond, genuinely a tall shape).
+    expect(cappedDiamond.h).toBeGreaterThan(cappedRect.h);
+    expect(cappedDiamond.h).toBeLessThan(600);
+  });
+
+  it("keeps the label rectangle inside the outline at the capped width, for diamond and ellipse alike", () => {
+    const label = "Health gate\nerror rate < 1% for 10 min";
+    for (const geo of ["diamond", "ellipse"] as const) {
+      const { w, h } = estimatedBoxSize(label, 200, { geo });
+      expect(w).toBeLessThanOrEqual(200);
+      const { wl, hl } = labelExtent(label, w);
+      const a = wl / w;
+      const b = hl / h;
+      const fits = geo === "diamond" ? a + b <= 1.001 : Math.hypot(a, b) <= 1.001;
+      expect(fits).toBe(true);
+    }
   });
 });
 
