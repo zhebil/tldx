@@ -659,7 +659,35 @@ blocker.
 - **Repro:** `examples/repro/d17-frame-boundary-undashed.tldsl.jsx` (compiles;
   the comment says which prop to add to get the error, and rendering it shows
   the dashed external box beside the hairline boundary)
-- **Status:** open
+- **Status:** struck (investigated for T49, both halves). tldraw's frame shape
+  (pinned `tldraw@3.15.6`) has no `dash` field to plumb into: `TLFrameShapeProps`
+  (`@tldraw/tlschema/src/shapes/TLFrameShape.ts:8-13`) is exactly
+  `{ w, h, name, color }`, its validator `frameShapeProps` (same file, 19-28)
+  has no `dash` key, and `contracts/builders.ts`'s `frameShape()` (220-238)
+  already mirrors that schema. Accepting `dash` on `<Frame>` and dropping it
+  would be a silent no-op - the same trap flagged for `maxW` on `<Sticky>` in
+  T45 - and drawing a dashed box behind the frame to fake a boundary is ruled
+  out by the task brief. Today's `ir/unknown-prop` rejection is the honest
+  behaviour; nothing changed.
+  The name-size half is equally blocked: the title is drawn entirely by
+  tldraw's `FrameShapeUtil`, not by shape props. `getFrameHeadingOpts()`
+  (`tldraw/src/lib/shapes/frame/frameHelpers.ts:60-76`) hardcodes
+  `fontSize: 12`, and both the live heading (`FrameShapeUtil.tsx`'s
+  `component()`, via `FrameHeading`) and the export path (`toSvg()`, same
+  file 262-315) call it with no override parameter. `FrameShapeOptions`
+  (same file, 50-55) exposes only `showColors` - there is no shape prop,
+  style, or `configure()`-time knob that reaches this constant; it is
+  module-scope inside tldraw. The only way to change it is to subclass
+  `FrameShapeUtil` in `viewer/` and reimplement its heading measurement and
+  SVG export by hand, kept in sync with `infra/render`'s headless export too
+  - a much bigger, fragile change for one label's font size than this task
+  covers, so declined. (`FRAME_TITLE_PX` in `domain/layout/defaults.ts` is
+  layout clearance reserved above a nested frame's chrome, not the label's
+  font size - it moves geometry, not text, and is unrelated to this gap.)
+  Not a tldsl design decision - struck because the pinned tldraw release
+  offers no lever for either half. `c4-container` and the repro render
+  unchanged: the boundary stays a hairline solid rectangle with a small
+  title next to boldly-dashed external systems.
 
 ### D18. `geo` has no `person` and no `cylinder`, the two shapes C4 mandates
 
@@ -678,7 +706,35 @@ blocker.
   to `geo="ellipse"` plus a colour, so in the render a person and a database are
   the same shape as each other, distinguished only by blue versus green.
 - **Repro:** `examples/repro/d18-no-person-or-cylinder-geo.tldsl.jsx`
-- **Status:** open
+- **Status:** struck (investigated for T49). tldraw's `geo` enum,
+  `GeoShapeGeoStyle` (`@tldraw/tlschema/src/shapes/TLGeoShape.ts:26-50`), is 20
+  values on the installed `tldraw@3.15.6`; `person` and `cylinder` are not
+  among them, and `domain/ir/styles.ts`'s `GEOS` already mirrors that list
+  verbatim. Adding either name to `GEOS` without a matching tldraw enum member
+  would make `check` accept `geo="person"` while the viewer's own schema
+  validator rejects the resulting shape at render time - a worse failure
+  (silent acceptance in the tool, a live crash in the browser) than today's
+  honest `ir/invalid-style-value`.
+  Composing a real person/cylinder icon from two or more primitive shapes was
+  considered and declined, for the cost the task brief itself calls out:
+  `emit.ts` is a strict one-IR-element-to-one-tldraw-shape mapping
+  (`shapeId(irId)`), and every downstream consumer assumes it -
+  `domain/overlay`'s `diffScenes`/`applyOverlay` key edits by shape id,
+  `domain/absorb` maps one overlay-added shape back to one JSX element, and
+  viewer selection is per-shape. A composite icon needs either a new
+  multi-shape IR element (breaking that assumption in all three places) or a
+  genuine custom tldraw `ShapeUtil` registered in both `viewer/` and
+  `infra/render`'s headless export, plus a widened `contracts/scene-json.ts` -
+  none of which exists anywhere in the codebase today (MVP's shape mapping is
+  fixed to `geo`/`note`/`frame`/`arrow`, per CONTEXT.md). That is a
+  multi-layer feature, not an `ugly`-severity prop addition, so not built here.
+  No code shipped; `GEOS` is unchanged. Already available today without any
+  compiler change, for whoever edits the diagrams next: pick a different
+  existing `geo` per element (e.g. `rectangle` for the datastore instead of
+  `ellipse`) so actor and datastore at least differ in shape, or put a
+  distinguishing glyph in the label text - both are author choices the tool
+  already allows, just unused in `examples/c4-container.tldsl.jsx` and the
+  repro.
 
 ### D19. A `\n` in a label attribute renders as the characters `\n`, and multiline labels are undocumented
 
