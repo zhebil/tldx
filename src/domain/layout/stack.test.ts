@@ -167,6 +167,21 @@ describe("hybridLayout", () => {
     expect(d.x).toBe(a.x);
   });
 
+  it("keeps an explicit h in col mode, where the width pass used to clobber it (A3)", async () => {
+    const col = await layoutAst(
+      doc({ layout: "col", gap: 40 }, [
+        box({ id: "tall", label: "Tall", h: 200 }),
+        box({ id: "plain", label: "Plain" }),
+      ]),
+    );
+    expect(boxById(col.children, "tall").h).toBe(200);
+
+    const row = await layoutAst(
+      doc({ layout: "row", gap: 40 }, [box({ id: "solo", label: "Solo", h: 200 })]),
+    );
+    expect(boxById(row.children, "solo").h).toBe(200);
+  });
+
   it("sets rowGap and colGap independently on a grid (D4)", async () => {
     const result = await layoutAst(
       doc({ layout: "grid", cols: 2, gap: 200, rowGap: 16 }, [

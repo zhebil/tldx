@@ -380,7 +380,7 @@ function applyContainerBoxSizing(
       if (box.w !== undefined) continue;
       const w = box.maxW === undefined ? sharedW : Math.min(sharedW, box.maxW);
       const k = geoScale(box.label, box.maxW, box);
-      const h = Math.ceil(boxHeightForWidth(box.label, w / k, box) * k);
+      const h = box.h ?? Math.ceil(boxHeightForWidth(box.label, w / k, box) * k);
       sized[i] = { ...sized[i]!, w, h };
     }
     if (sharedW === 0) {
