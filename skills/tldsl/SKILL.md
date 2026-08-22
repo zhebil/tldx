@@ -61,11 +61,11 @@ All from `"tldsl"`.
 | `<Doc>` | Root. One per file, top level only. |
 | `<Frame id name>` | Visual container - border and a title. `id` required. |
 | `<Row id> <Col id> <Grid id>` | `<Frame>` with `layout` preset. `<Grid cols="3">`. |
-| `<Group id>` | Container that draws no chrome. Groups for layout only. Never point an edge at a `<Group>` id. |
+| `<Group id>` | Container that draws no chrome - pure layout. **The main tool for controlling layout.** Never point an edge at a `<Group>` id. |
 | `<Pipeline id>` | Row whose children get wired in source order automatically. Every child needs an `id`. |
 | `<Layers id>` | Column of tiers; each child frame becomes a row. Unnamed tiers lose their chrome. |
 | `<Swimlanes id>` | Like `<Layers>` but lanes keep their border and title. |
-| `<Graph id>` | `layout="auto"` - hands this container to ELK. Use for graph-shaped things with no natural reading order. |
+| `<Graph id>` | `layout="auto"` - hands this container to ELK. **Last resort**, see below. |
 | `<Box id label>` | A leaf. `id` required. |
 | `<Note on>text</Note>` | Annotation. Text is children, not a prop. |
 | `<Sticky>text</Sticky>` | A real tldraw sticky note, fixed 200px wide. |
@@ -84,6 +84,43 @@ const Service = ({ ns, label }) => (
   </Frame>
 );
 ```
+
+## Nest `<Group>` - this is how you control layout
+
+**Reach for nested `<Group>` before anything else, including for graph-shaped
+subjects like state machines.** A group draws nothing; it only arranges. You
+name a concept, put the boxes in it, and give it a `layout` and a `gap`:
+
+```jsx
+<Group id="opening" layout="col" gap="90">
+  <Box id="closed" label="CLOSED" />
+  <Group id="handshake" layout="row" gap="260">
+    <Box id="syn_sent" label="SYN_SENT" />
+    <Box id="listen" label="LISTEN" />
+  </Group>
+  <Box id="syn_rcvd" label="SYN_RCVD" />
+</Group>
+```
+
+The nesting names the *concepts* - "opening", "handshake", "teardown" - not
+positions. An eleven-state machine laid out this way needs about five `gap`
+values and no coordinates. That is the whole trick: decompose the picture into
+groups until each group is a plain row or column.
+
+Two reasons this beats the alternatives:
+
+- **A wrong `gap` degrades gracefully.** Too loose or too tight still reads. A
+  wrong coordinate puts an arrowhead inside a box.
+- **It survives edits.** Add a state to a group and everything reflows. Add one
+  to a hand-positioned diagram and you re-tune its neighbours by hand.
+
+Almost every diagram that looks like it needs a graph layout decomposes into
+groups. Try that first.
+
+**`<Graph>` / `layout="auto"` is a last resort.** ELK is not yet told how big
+edge labels are, so it reserves no room for them: on a graph with labelled
+edges they pile up on each other and on the boxes. Use it only for a genuinely
+unstructured graph, and only when the edges are unlabelled or few.
 
 ## Layout
 
