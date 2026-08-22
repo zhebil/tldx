@@ -12,7 +12,7 @@
 
 import { writeFile } from "node:fs/promises";
 
-import type { Editor, TLShapeId } from "tldraw";
+import type { Box, Editor, TLShapeId } from "tldraw";
 
 export type RenderFormat = "png" | "svg" | "jpeg" | "webp";
 
@@ -105,11 +105,51 @@ export async function exportImage(url: string, outPath: string, opts: RenderOpti
           targetIds = allIds;
         }
 
+        // tldraw's own content-bounds pass (getSvgJsx, unexported) unions
+        // getShapeMaskedPageBounds over every shape. That bounds getter
+        // (Geometry2d.vertices, see primitives/geometry/Geometry2d.mjs) is
+        // built with Geometry2dFilters.EXCLUDE_LABELS baked in - it's meant
+        // for selection/hit-testing, where a label overhanging its arrow
+        // shouldn't grow the selection box. The same filtered bounds feed
+        // the export crop, though, so a label whose text runs past its
+        // arrow's line gets clipped. The label child itself still reports
+        // its own correct (unfiltered) bounds - walk each shape's geometry
+        // tree directly and union every label child back in, in page space.
+        let bounds: Box | undefined;
+        for (const id of editor.getShapeAndDescendantIds(targetIds)) {
+          const shapeBounds = editor.getShapeMaskedPageBounds(id);
+          if (shapeBounds) {
+            if (bounds) bounds.union(shapeBounds);
+            else bounds = shapeBounds.clone();
+          }
+          if (!bounds) continue;
+
+          const geom = editor.getShapeGeometry(id) as { children?: { isLabel: boolean; bounds: Box }[] };
+          if (!geom.children) continue;
+          const pageTransform = editor.getShapePageTransform(id);
+          for (const child of geom.children) {
+            if (!child.isLabel) continue;
+            const corners = pageTransform.applyToPoints(child.bounds.corners);
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            for (const p of corners) {
+              minX = Math.min(minX, p.x);
+              minY = Math.min(minY, p.y);
+              maxX = Math.max(maxX, p.x);
+              maxY = Math.max(maxY, p.y);
+            }
+            bounds.union({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
+          }
+        }
+
         const { blob } = await editor.toImage(targetIds, {
           format,
           darkMode: dark,
           background,
           pixelRatio,
+          ...(bounds === undefined ? {} : { bounds }),
           ...(padding === undefined ? {} : { padding }),
           ...(scale === undefined ? {} : { scale }),
         });
