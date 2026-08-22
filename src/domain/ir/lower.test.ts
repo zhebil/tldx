@@ -312,6 +312,17 @@ describe("lower: ir/unknown-prop", () => {
     const { codes } = lowerAst(ast);
     expect(codes).toEqual(["ir/unknown-prop"]);
   });
+
+  // D16: `maxW` is documented on <Note> (and <Sticky>, same IR kind); accept
+  // it and parse it as a number like every other note prop.
+  it("accepts maxW on <note> and parses it as a number", () => {
+    const ast = doc({}, [note({ id: "n", maxW: 160 }, "hi")]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const noteIr = ir!.children[0]!;
+    if (noteIr.kind !== "note") throw new Error("expected note");
+    expect(noteIr.maxW).toBe(160);
+  });
 });
 
 describe("lower: diagnostics name the authored component, not the IR kind (T44)", () => {
@@ -351,14 +362,15 @@ describe("lower: diagnostics name the authored component, not the IR kind (T44)"
   });
 
   // D16: `<Note>` and `<Sticky>` both lower to `kind: "note"`; the message
-  // must say which one the author wrote.
+  // must say which one the author wrote. `maxW` is now an allowed note prop
+  // (T45), so a genuinely unknown prop stands in as the test vehicle.
   it.each(["Note", "Sticky"] as const)("ir/unknown-prop on <%s> names itself, not '<note>'", (tag) => {
-    const ast = doc({}, [note({ id: "n", maxW: 160 }, "hi", tag === "Sticky", tag === "Note" ? undefined : tag)]);
+    const ast = doc({}, [note({ id: "n", bogus: "x" }, "hi", tag === "Sticky", tag === "Note" ? undefined : tag)]);
     const diagnostics = lowerDiagnostics(ast);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe("ir/unknown-prop");
     expect(diagnostics[0]!.message).toBe(
-      `'maxW' is not supported on '<${tag}>' (allowed: id, on, x, y, w, h, color, textAlign, verticalAlign, labelColor, font, size)`,
+      `'bogus' is not supported on '<${tag}>' (allowed: id, on, x, y, w, h, maxW, color, textAlign, verticalAlign, labelColor, font, size)`,
     );
   });
 });

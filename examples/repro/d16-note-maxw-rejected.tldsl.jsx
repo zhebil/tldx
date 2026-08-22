@@ -1,10 +1,8 @@
 import { Doc, Frame, Box, Note } from "tldsl";
 
-// D16: the skill documents `maxW` on <Note> and <Sticky>, and `check` rejects
-// it on both. Add `maxW="160"` to the note below to get
-// `ir/unknown-prop: 'maxW' is not supported on '<note>'`. The allowed set does
-// include `w`, so the capability exists under an undocumented name - swap the
-// prop for `w="200"` and it compiles, and the note grows tall instead of wide.
+// D16 (fixed): the skill documents `maxW` on <Note>, and it now caps a
+// non-sticky note's wrap width the same way it caps a <Box>'s - the note
+// below stays 160px wide instead of spreading across the whole row.
 
 export default function NoteMaxW() {
   return (
@@ -14,7 +12,7 @@ export default function NoteMaxW() {
         <Box id="b" label="payments.v1" />
         <Box id="c" label="shipments.v1" />
       </Frame>
-      <Note on="a">Checkout saga: orders, payments and shipping compensate back through orders.v1.</Note>
+      <Note on="a" maxW="160">Checkout saga: orders, payments and shipping compensate back through orders.v1.</Note>
     </Doc>
   );
 }

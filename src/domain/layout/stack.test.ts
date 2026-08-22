@@ -999,6 +999,14 @@ describe("note sizing: geo <Note> vs sticky <Sticky>", () => {
     expect(n.w).not.toBe(200);
   });
 
+  it("caps a standalone geo note's width at its own maxW (T45, D16)", async () => {
+    const text = "Checkout saga: orders, payments and shipping compensate back through orders.v1.";
+    const result = await layoutAst(doc({ layout: "col" }, [note({ id: "n", maxW: 160 }, text)]));
+    const n = noteById(result.children, "n");
+    expect(n.w).toBe(fitBoxWidth(text, 160));
+    expect(n.w).toBeLessThan(fitBoxWidth(text));
+  });
+
   it("a geo note in a grid takes the shared box width but not the shared box height", async () => {
     const longText =
       "A fairly long annotation that will wrap onto several lines once boxed at the shared width.";

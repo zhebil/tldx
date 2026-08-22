@@ -95,6 +95,10 @@ export type IRNote = IRBase & {
   y?: number;
   w?: number;
   h?: number;
+  /** Caps wrap width like `IRBox.maxW`. Only affects a non-sticky `<Note>` (a
+   * geo box, sized the same way a box is); a `<Sticky>`'s width is fixed by
+   * tldraw's `noteShape`, so this has no visual effect there (D16). */
+  maxW?: number;
   /** Pass-through tldraw style; does not affect layout. */
   color?: StyleColor;
   textAlign?: StyleTextAlign;
