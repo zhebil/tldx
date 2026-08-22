@@ -64,6 +64,31 @@ describe("estimatedBoxSize", () => {
     expect(capped.w).toBeLessThan(unbounded.w);
     expect(capped.h).toBeGreaterThan(unbounded.h);
   });
+
+  // D20/T47: geoScale inflates width and height together so a label fits
+  // inside a non-rect outline - that inflation used to run unchecked after
+  // fitBoxWidth had already respected maxW as a wrap budget, so a diamond's
+  // *scaled* width blew straight past its cap (492 against a 200 cap, 2.5x).
+  it("holds maxW on a diamond the same way it holds on a rectangle (regression: diamond used to ignore maxW entirely)", () => {
+    const label = "Health gate\nerror rate < 1% for 10 min";
+    const diamond = estimatedBoxSize(label, 200, { geo: "diamond" });
+    expect(diamond.w).toBeLessThanOrEqual(200);
+  });
+
+  it("shrinks the capped diamond's height along with its width, instead of inflating it further", () => {
+    const label = "Health gate\nerror rate < 1% for 10 min";
+    const uncappedDiamond = estimatedBoxSize(label, undefined, { geo: "diamond" });
+    const cappedDiamond = estimatedBoxSize(label, 200, { geo: "diamond" });
+    const cappedRect = estimatedBoxSize(label, 200, { geo: "rectangle" });
+
+    // Before the fix, capping only clipped the report's width and left the
+    // uncapped k applied to height, so the box got narrower AND taller
+    // (492x320 -> attempted fixes landed at 200x790). Capping should bring
+    // height down with width, landing close to the rectangle sibling's
+    // height rather than the diamond's own uncapped height.
+    expect(cappedDiamond.h).toBeLessThan(uncappedDiamond.h);
+    expect(cappedDiamond.h).toBeLessThan(cappedRect.h * 2);
+  });
 });
 
 describe("geo-aware sizing (T15)", () => {
