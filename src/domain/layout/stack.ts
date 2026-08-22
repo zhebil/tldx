@@ -39,6 +39,7 @@ import {
   estimatedNoteSize,
   fitBoxWidth,
   geoScale,
+  geoTargetHeight,
   FRAME_PAD_INNER,
   FRAME_TITLE_PX,
   NOTE_MEASURE_PX,
@@ -391,7 +392,9 @@ function applyContainerBoxSizing(
       if (box.w !== undefined) continue;
       const w = box.maxW === undefined ? sharedW : Math.min(sharedW, box.maxW);
       const k = geoScale(box.label, box.maxW, box);
-      const h = box.h ?? Math.ceil(boxHeightForWidth(box.label, w / k, box) * k);
+      const uw = w / k;
+      const rawH = boxHeightForWidth(box.label, uw, box);
+      const h = box.h ?? Math.ceil(geoTargetHeight(rawH, uw, box.geo) * k);
       sized[i] = { ...sized[i]!, w, h };
     }
     if (sharedW === 0) {
