@@ -589,7 +589,16 @@ blocker.
   by rendering a PNG and reading it with human eyes; `check` has never once
   been the thing that caught one. It validates the IR, not the diagram.
 - **Repro:** `examples/repro/d15-check-silent-on-occlusion.tldsl.jsx`
-- **Status:** open
+- **Status:** fixed in `380823a` (T41). `check` now runs two scene-JSON-computable
+  occlusion checks after layout and reports them as warnings (exit code
+  unchanged): a shape's rect covering another shape's, and a labelled edge's
+  placed label rect covering a shape it doesn't connect to. `check
+  examples/event-driven.tldsl.jsx` now names all four overlapping pairs (the
+  saga note over `bus`, `t-payments`, `t-inventory`, `t-shipments`) that
+  `layout-report`'s `overlapping shape pairs: 4` already knew about. The arrow
+  counters (`arrow-truth`, needs a real browser render) stay out of `check` -
+  the `8 arrow labels overprint each other` / `11 of 17 arrow paths cross a
+  shape` numbers are unchanged.
 
 ### D16. `maxW` is documented on `<Note>` and `<Sticky>` and rejected by `check`
 
