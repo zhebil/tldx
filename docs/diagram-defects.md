@@ -495,7 +495,10 @@ blocker.
   reported location is the only way to tell which element it means.
 - **Repro:** `examples/repro/d12-group-requires-id.tldsl.jsx` (compiles, as every
   repro here does; the comment in it says which line to delete to get the error)
-- **Status:** open
+- **Status:** diagnostic half fixed in `ee8ec31` (T44) - `ir/missing-id` now
+  names the JSX tag the author wrote (`<Group>`, `<Row>`, ..., all eight
+  aliases plus plain `<Frame>`) instead of `<frame>`. The skill half was
+  already fixed in T39; see "Also seen" below.
 - **Also seen:** T39 - the rule is not `<Group>`'s, it is every container's. All
   eight aliases (`<Row> <Col> <Grid> <Group> <Pipeline> <Layers> <Swimlanes>
   <Graph>`) reject a missing `id` with the identical `<frame>` message, and the
@@ -610,7 +613,10 @@ blocker.
   wrong, and an author cannot tell which without running `check`.
 - **Repro:** `examples/repro/d16-note-maxw-rejected.tldsl.jsx` (compiles, with
   the comment naming the prop to add back)
-- **Status:** open
+- **Status:** open. The naming half is fixed in `ee8ec31` (T44) - the
+  `ir/unknown-prop` message now says `<Note>` or `<Sticky>` (whichever the
+  author wrote) instead of `<note>`; whether `maxW` should be accepted at all
+  is untouched and stays open for T45.
 
 ### D17. A `<Frame>` cannot be a C4 boundary: no `dash`, and its name is the smallest text on the canvas
 
