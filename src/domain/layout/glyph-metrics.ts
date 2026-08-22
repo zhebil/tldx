@@ -106,8 +106,16 @@ const MAX_ADVANCE: Record<StyleFont, number> = Object.fromEntries(
   Object.entries(ADVANCE).map(([font, table]) => [font, Math.max(...Object.values(table))]),
 ) as Record<StyleFont, number>;
 
-/** tldraw's `LABEL_FONT_SIZES`, verified against `GeoShapeUtil`/`NoteShapeUtil`. Exported for the same test-coverage reason as `ADVANCE`. */
+/** tldraw's `LABEL_FONT_SIZES`, verified against `GeoShapeUtil`/`NoteShapeUtil` - a label drawn *inside* a geo box or note. Exported for the same test-coverage reason as `ADVANCE`. */
 export const LABEL_FONT_PX: Record<StyleFontSize, number> = { s: 18, m: 22, l: 26, xl: 32 };
+/**
+ * tldraw's `FONT_SIZES` (`default-shape-constants.ts`, verified against
+ * `TextShapeUtil.getTextSize`, which reads `FONT_SIZES[size]`) - the
+ * standalone `text` shape `<Text>` emits (`IRBox.text`), distinct from
+ * `LABEL_FONT_PX` the same way `ARROW_LABEL_FONT_PX` is: same idea, third
+ * table (D23, tldsl-pnq).
+ */
+export const TEXT_FONT_PX: Record<StyleFontSize, number> = { s: 18, m: 24, l: 36, xl: 44 };
 /** Every glyph table above was measured at this size; other sizes scale linearly off it. */
 const BASE_FONT_PX = LABEL_FONT_PX.m;
 
@@ -117,14 +125,26 @@ export const TEXT_SLACK_PX = 4;
 export interface TextStyle {
   font?: StyleFont;
   size?: StyleFontSize;
+  /**
+   * True for a standalone tldraw `text` shape (`IRBox.text`, `<Text>`) -
+   * sizes off `TEXT_FONT_PX` instead of `LABEL_FONT_PX`. Named `standalone`
+   * rather than `text` because `IRNote.text` is that element's string
+   * content, not a style flag; reusing the name would collide when a note
+   * is passed here as its own style (`domain/layout/stack.ts` does this).
+   */
+  standalone?: boolean;
 }
 
 export const DEFAULT_FONT: StyleFont = "draw";
 export const DEFAULT_FONT_SIZE: StyleFontSize = "m";
 
-/** `LABEL_FONT_PX[size] / BASE_FONT_PX` - the linear scale a size applies over the size-`m` tables. */
+function fontPxTable(ts?: TextStyle): Record<StyleFontSize, number> {
+  return ts?.standalone ? TEXT_FONT_PX : LABEL_FONT_PX;
+}
+
+/** `fontPxTable(ts)[size] / BASE_FONT_PX` - the linear scale a size applies over the size-`m` tables. */
 export function fontScale(ts?: TextStyle): number {
-  return LABEL_FONT_PX[ts?.size ?? DEFAULT_FONT_SIZE] / BASE_FONT_PX;
+  return fontPxTable(ts)[ts?.size ?? DEFAULT_FONT_SIZE] / BASE_FONT_PX;
 }
 
 function rawAdvance(s: string, font: StyleFont): number {
@@ -142,7 +162,7 @@ export function textWidth(s: string, ts?: TextStyle): number {
 
 /** tldraw's `TEXT_PROPS.lineHeight` is 1.35x the font size; rounded up for integer geometry. */
 export function lineHeightPx(ts?: TextStyle): number {
-  return Math.ceil(LABEL_FONT_PX[ts?.size ?? DEFAULT_FONT_SIZE] * 1.35);
+  return Math.ceil(fontPxTable(ts)[ts?.size ?? DEFAULT_FONT_SIZE] * 1.35);
 }
 
 /** tldraw's `ARROW_LABEL_FONT_SIZES` (`default-shape-constants.ts:37`) - distinct from `LABEL_FONT_PX`, which is box/note only. */

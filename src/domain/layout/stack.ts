@@ -126,6 +126,18 @@ function resolveMode(mode: LayoutMode | undefined): LayoutMode {
   return mode ?? "col";
 }
 
+/**
+ * `box` re-typed as the style/font-metrics argument every sizing helper in
+ * `defaults.ts`/`glyph-metrics.ts` takes: adds `standalone` so a `<Text>`
+ * (`IRBox.text`) sizes off `TEXT_FONT_PX` instead of `LABEL_FONT_PX`
+ * (D23, tldsl-pnq). Can't rename `IRBox.text` itself to line up for free -
+ * `IRNote.text` is that element's string content, and both kinds get passed
+ * here as their own style object.
+ */
+function boxStyle(box: IRBox): IRBox & { standalone?: boolean } {
+  return { ...box, ...(box.text === undefined ? {} : { standalone: box.text }) };
+}
+
 async function sizeElement(
   el: IRBox | IRNote | IRFrame,
   placeAuto: AutoPlacer,
@@ -133,7 +145,7 @@ async function sizeElement(
 ): Promise<IRBoxPositioned | IRNotePositioned | IRFramePositioned> {
   switch (el.kind) {
     case "box": {
-      const size = estimatedBoxSize(el.label, el.maxW, el);
+      const size = estimatedBoxSize(el.label, el.maxW, boxStyle(el));
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
     }
     case "note": {
@@ -384,16 +396,18 @@ function applyContainerBoxSizing(
     for (const i of boxIdx) {
       const box = children[i] as IRBox;
       if (box.w !== undefined) continue;
-      const k = geoScale(box.label, box.maxW, box);
-      sharedW = Math.max(sharedW, Math.ceil(fitBoxWidth(box.label, box.maxW, box) * k));
+      const style = boxStyle(box);
+      const k = geoScale(box.label, box.maxW, style);
+      sharedW = Math.max(sharedW, Math.ceil(fitBoxWidth(box.label, box.maxW, style) * k));
     }
     for (const i of boxIdx) {
       const box = children[i] as IRBox;
       if (box.w !== undefined) continue;
+      const style = boxStyle(box);
       const w = box.maxW === undefined ? sharedW : Math.min(sharedW, box.maxW);
-      const k = geoScale(box.label, box.maxW, box);
+      const k = geoScale(box.label, box.maxW, style);
       const uw = w / k;
-      const rawH = boxHeightForWidth(box.label, uw, box);
+      const rawH = boxHeightForWidth(box.label, uw, style);
       const h = box.h ?? Math.ceil(geoTargetHeight(rawH, uw, box.geo) * k);
       sized[i] = { ...sized[i]!, w, h };
     }
@@ -424,7 +438,8 @@ function applyContainerBoxSizing(
   let sharedH = 0;
   for (const i of boxIdx) {
     const box = children[i] as IRBox;
-    const naturalH = boxHeightForWidth(box.label, fitBoxWidth(box.label, box.maxW, box), box);
+    const style = boxStyle(box);
+    const naturalH = boxHeightForWidth(box.label, fitBoxWidth(box.label, box.maxW, style), style);
     sharedH = Math.max(sharedH, naturalH);
   }
   for (const i of boxIdx) {
