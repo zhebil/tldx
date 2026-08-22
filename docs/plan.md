@@ -1,4 +1,9 @@
-# tldsl plan - Phase 10: drain the defect ledger
+# tldsl plan
+
+Phase 10 (drain the defect ledger) is below; **Phase 11 is at the bottom of
+this file** and is where current work is ordered.
+
+# Phase 10: drain the defect ledger
 
 The ordered worklist for the layout loop. **This file is the only state that
 survives between sessions.**
@@ -384,3 +389,158 @@ rather than cosmetic and are repeated here so they are not lost:
 - **T25's overlay hook reports canvas changes nobody made.**
 
 New questions from this phase go below, in the shape the loop prompt gives.
+
+---
+
+# Phase 11: the layout is the product
+
+Phase 10 drained the ledger by rendering PNGs and looking at them. Phase 11's
+input is different and better: **three independent field reports** from agents
+who built real diagrams and wrote down what fought back. A TCP state machine
+benchmarked four ways, an absorb/round-trip audit of 25 canvas edits, and a
+15-diagram session across three rounds.
+
+They agree on the headline. **Node placement is solved.** Nested `<Group>` with
+zero coordinates matched a hand-pinned layout on the first pass and carried ten
+diagrams without a single hand-written number. Everything still broken is edges,
+labels, and the round-trip.
+
+They also agree on why it matters. The whole pitch is that layout, edge
+attachment and label placement are automatic - against a tool where the model
+writes 51 hand-computed elements, tldsl writes five `gap` values. Every defect
+below erodes exactly that advantage, which is why they outrank features.
+
+## What changed about how we know things
+
+Phase 10 trusted the ledger. Phase 11 starts by not trusting it: **three entries
+marked fixed reproduce on any diagram that is not their own repro.**
+
+| report | ledger entry | ledger claims |
+|---|---|---|
+| labels over shapes | D11 | "fixed in T37" |
+| edge label wrap | D9 | wrap half "fixed in T38" |
+| chords through boxes | D21 | "mostly fixed in T42" |
+
+The repros are one-shape-pair toys. A fix passes its repro and fails a real
+diagram. **A ledger entry closes against the corpus, not against its own
+fixture** - that is the rule change for this phase.
+
+## The constraint that shapes the edge work
+
+Checked in `@tldraw/tlschema`, not assumed. `TLArrowShapeProps` is two endpoints
+plus **exactly one scalar**: `bend` for an arc, `elbowMidPoint` for an elbow.
+There is no points array.
+
+**True waypoints are unrenderable on a tldraw arrow.** `TLLineShape` has
+`points`, but a line has no arrowhead, no binding and no label. So the routing
+work is *choose the best single bend*, not *emit a polyline* - and B8's
+"use ELK's routes" is bounded by the same fact before anyone starts it.
+
+## Two findings that shrank their own tasks
+
+- **`check` already detects label-over-shape.** `computeOcclusionDiagnostics`
+  (T41) emits `layout/label-overlap` naming the edge, the covered shape and the
+  source line. Verified live. The placer just never asks. B2 is wiring, not
+  detection.
+- **`text` and `highlight` are already registered** in `builders.ts`'s schema
+  versions. `<Text>` and a marker shape are additive - a builder, an emit
+  branch, a lower branch. No schema widening, no custom `ShapeUtil`.
+
+## The one that should worry us most
+
+**A1: labels clip silently.** A nine-line label rendered five. Hit three times in
+one session. It is the only known failure mode where `check` passes and the
+diagram is wrong - every other defect in every report announced itself. An agent
+following the skill's own advice ships missing content confidently.
+
+The measurement code already exists in `defaults.ts`. It needs a comparison and
+a diagnostic code. **A1 and G5 ship together** so the doc stops saying `check` is
+sufficient on the same day the diagnostic lands.
+
+## Tasks
+
+All 35 are filed in bd, tagged `[A1]`-`[H1]`. bd is the source of truth for
+status; this section is the source of truth for *order and parallelism*.
+
+Phase 10's open tasks are carried in, not dropped: **T51 → B3**, **T52 → B1**,
+**T53 → B7 + B8**. T50's regression gate becomes the phase-end gate below.
+
+### Wave 1 - parallel, no shared files
+
+| cluster | issues | files it owns |
+|---|---|---|
+| clipping | A1, A2 | `domain/layout/defaults.ts`, `domain/layout/occlusion.ts` |
+| reciprocal labels | B1 | `domain/layout/routing.ts` |
+| export bounds | B3 | `infra/render/export-image.ts` |
+| CLI honesty | E1, E2, F1 | `cli/render.ts`, `infra/serve-registry/` |
+| overlay safety | F2 | `domain/overlay/`, `app/absorb.ts` |
+| docs | G2, G3, G4, G5, G6, G7 | `skills/` |
+
+`routing.ts` is the contended file - **B1, B2, B5 and B6 must run serially**, in
+that order. Nothing else in wave 1 touches it.
+
+`cli/render.ts` is contended by E1, E2 and F1 - one agent takes all three.
+
+### Wave 2
+
+- **B2** - wire the placer to the diagnostic that already fires (after B1).
+- **C1, C2** - `<Text>`, and decide what `<Note>` should be. One agent: both
+  touch `builders.ts`, `emit.ts`, `lower.ts`.
+- **C5** - container opt-out from height equalisation (`stack.ts`).
+- **E3, E4, E5** - browser tab reuse, `tldsl measure`, stale `dist/`.
+- **F5** - the round-trip design doc. Blocks F4 and F6; start it early because
+  it is thinking, not typing.
+- **A3** - the numeric-prop repro. **Repro first**: the reported root cause is
+  unconfirmed and the likelier explanation is a component not forwarding the
+  prop, which is a different bug with a different fix.
+
+### Wave 3
+
+- **B5** - obstacle-aware routing, single best bend. The largest piece of work
+  in the phase.
+- **B4** - edge label wrap budget. Re-scoped: it does *not* break mid-word, I
+  rendered it. The defect is wrap width.
+- **B9** - edge side anchoring. Independent of B5; ships on its own.
+- **C4** - proportional non-rect geo.
+- **F4** - absorb handles moves (after F5).
+
+### Wave 4
+
+- **B6** - router picks arc vs elbow (after B5).
+- **B7, B8** - finish or retire ELK. **Last on purpose**: grouping makes
+  `<Graph>` unnecessary for anything with readable structure, and B5 is what
+  makes B8 possible at all. Doing ELK first is the intuitive call and the wrong
+  one.
+- **C3, D1, D2, D3** - marker shape, compact edge syntax, matrix swimlanes,
+  `justify`.
+- **G1** - restructure the skill into a referenced multi-file guide. Last so it
+  documents what shipped, not what was planned.
+- **H1** - pin the four undocumented capabilities with tests.
+
+### Phase-end gate (was T50)
+
+Every example and every repro through `check` and `render`. Counters re-measured
+**with every `*.overlay.json` deleted first** - stale sidecars made three
+readings wrong in Phase 10. Every PNG looked at. Every ledger entry either
+`fixed in <sha>` or carrying a written reason.
+
+Current clean baseline: **13 crossings / 1 crowded / 4 label-over-shape /
+4 label-over-label**, down from 43 / 2 / 7 / 7 at Phase 10's start.
+
+## Standing decisions added this phase
+
+- **Fix routing before shipping hand-geometry.** `bend` and waypoints on
+  `<Edge>` would let absorb capture curvature, but they also invite hand-drawn
+  geometry into a DSL whose pitch is that you do not do geometry by hand. Four
+  of five recorded curvature edits were spacing fixes - auto-routing's job. Fix
+  B5 first; ship the escape hatch second, as an escape hatch. (F6 is
+  deliberately blocked on B5 for this reason, not for a technical one.)
+
+- **`<Group>` is the recommended authoring mode.** Confirmed under load: ten
+  diagrams, zero coordinates. `<Graph>`/`layout="auto"` is a last resort and the
+  skill now says so. This is why the ELK work ranks last.
+
+- **A field report's root cause is a hypothesis.** Two of the three reports
+  named a cause that did not survive checking - the mid-word wrap that wraps at
+  token boundaries, and the numeric prop whose likelier explanation is a
+  component that never forwarded it. Reproduce before implementing.
