@@ -37,6 +37,14 @@
  * already clear is left alone, so short hops stay straight lines.
  * `growBendClear` is the one growth loop this module has - `placeLabels`'s
  * own last-resort label-driven growth reuses it too.
+ *
+ * Every one of those passes only ever grows a bend until its own predicate
+ * passes, then stops - none of them cost bend magnitude or re-minimise once
+ * every constraint is met, so the bend a route ends up with is the sum of
+ * whatever each pass independently decided it needed (B12). `minimizeBends`
+ * runs last and bisects each edge's committed bend back toward zero, keeping
+ * the smallest magnitude that still clears every real predicate the earlier
+ * passes were enforcing - see its own header for the exact list.
  */
 
 import type { IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
@@ -65,6 +73,43 @@ const CLEAR_MARGIN = 12;
  * by growing the edge's own bend instead (B4).
  */
 const SQUISH_MARGIN = 64 + 13.5;
+
+/**
+ * How much of an edge's own chord `growBendForLabelSquish` may spend trying
+ * to unsquish a label (B12). The pass exists for a genuine three-line wrap;
+ * it is not worth paying a near-semicircle to turn a two-line wrap into one
+ * line, so the budget is deliberately smaller than `clearObstaclesOnEveryRoute`'s
+ * full chord-length latitude. `LABEL_SQUISH_MIN_BUDGET` keeps a short chord
+ * from getting a budget too small to matter at all.
+ */
+const LABEL_SQUISH_BUDGET_FACTOR = 0.18;
+const LABEL_SQUISH_MIN_BUDGET = 32;
+
+/**
+ * Same crowding rule `tools/arrow-truth.mts` uses to flag two rendered arcs
+ * as one visual stroke (`CROWD_PX`/`CROWD_FRACTION` there) - reused by
+ * `minimizeBends` so shrinking one edge's bend can never quietly collide it
+ * with a sibling `fanSharedPairs` (or a lane) had already pulled apart.
+ */
+const PAIR_CLEARANCE_PX = 12;
+const PAIR_CLEARANCE_FRACTION = 1 / 3;
+
+/** Rounds of bisection `minimizeBends` runs per edge - the chord-scale search range needs nowhere near this many to reach sub-pixel precision. */
+const MINIMIZE_ROUNDS = 18;
+
+/** Below this, a shrink isn't worth committing - avoids replacing an already-minimal bend with a numerically-noisy near-duplicate. */
+const MINIMIZE_MEANINGFUL_PX = 1;
+
+/**
+ * Margin `minimizeBends` inflates a label box by before comparing it against
+ * another edge's label - larger than `CLEAR_MARGIN` because this pass
+ * bisects for the *tightest* passing value, and `approxLabelBox`'s parabola
+ * approximation of tldraw's real circular arc (see this module's own header)
+ * has more slop at a label's position than it does on the arc's own path.
+ * A margin sized for "don't graze a box" isn't enough headroom for "don't
+ * let two labels this model calls clear actually touch in the real render".
+ */
+const MINIMIZE_LABEL_MARGIN = 24;
 
 type ShapeKind = "frame" | "box" | "note";
 
@@ -181,6 +226,8 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
   growBendForLabelSquish(otherEdges, byId, shapes, routes);
 
   placeLabels(edges, byId, shapes, routes);
+
+  minimizeBends(otherEdges, byId, shapes, routes);
 
   return routes;
 }
@@ -629,13 +676,21 @@ function edgeBendClearsObstacles(
   return true;
 }
 
-/** Approximate label box at an edge's own midpoint for a given `bend` - `null` for an unlabelled or self edge. */
+/**
+ * Approximate label box at `t` along `edge`'s arc for a given `bend` -
+ * `null` for an unlabelled or self edge. `t` defaults to the arc's own
+ * midpoint (where the parabola's sag reduces to `bend` exactly) for every
+ * caller that reasons about the edge's default position; `minimizeBends`
+ * passes the edge's actual committed `labelPosition` so it tests the label
+ * where `placeLabels` really put it, not wherever the default would be.
+ */
 function approxLabelBox(
   edge: IREdge,
   byId: Map<string, AbsShape>,
   bend: number,
   startAnchor?: Point,
   endAnchor?: Point,
+  t = 0.5,
 ): LabelBox | null {
   if (!edge.label || edge.from === edge.to) return null;
   const from = byId.get(edge.from);
@@ -647,9 +702,9 @@ function approxLabelBox(
   const perp: Point = { x: -u.y, y: u.x };
   const w = arrowLabelWidth(edge.label, edge) + 2 * ARROW_LABEL_PADDING;
   const h = arrowLabelLineHeight(edge) + 2 * ARROW_LABEL_PADDING;
-  // At the arc's own midpoint (t=0.5) the parabola's sag reduces to `bend` exactly.
-  const cx = start.x + (end.x - start.x) * 0.5 + perp.x * bend;
-  const cy = start.y + (end.y - start.y) * 0.5 + perp.y * bend;
+  const bow = bend * 4 * t * (1 - t);
+  const cx = start.x + (end.x - start.x) * t + perp.x * bow;
+  const cy = start.y + (end.y - start.y) * t + perp.y * bow;
   return { x: cx - w / 2, y: cy - h / 2, w, h };
 }
 
@@ -777,10 +832,219 @@ function growBendForLabelSquish(
     const end = terminalPoint(to, endAnchor, from);
     if (squishFraction(arcPolyline(start, end, bend), edge) === 0) continue;
 
+    // The committed bend already crosses an obstacle `clearObstaclesOnEveryRoute`
+    // couldn't route around (an engulfing blocker, say) - the partial-credit
+    // bookkeeping below ranks by a combined score that also includes the
+    // soft squish term, and that term keeps shrinking as bend grows even
+    // while a hard path violation never clears, which would otherwise read
+    // as "progress" and move the bend for a reason this pass never earned.
+    // Giving up here, not growing at all, is the correct "no room" answer.
+    const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
+    if (blockers.some((b) => polylineHitsBox(arcPolyline(start, end, bend), b))) continue;
+
     const signs: (1 | -1)[] = bend !== 0 ? [Math.sign(bend) as 1 | -1] : [1, -1];
-    const grown = growBendClear(edge, bend, byId, blockerPool, [], signs, startAnchor, endAnchor);
+    const chord = Math.hypot(end.x - start.x, end.y - start.y);
+    const budget = Math.max(LABEL_SQUISH_MIN_BUDGET, LABEL_SQUISH_BUDGET_FACTOR * chord);
+    // A modest budget needs a proportionally finer step than the path case's
+    // fixed `GROW_STEP` - otherwise a short chord's whole budget is one or
+    // two samples wide and the search can miss the squish improvement
+    // entirely, not because the budget was too small but because nothing in
+    // it ever got tested.
+    const step = budget / GROW_MAX_ROUNDS;
+    const grown = growBendClear(edge, bend, byId, blockerPool, [], signs, startAnchor, endAnchor, false, budget, true, step);
     if (grown !== bend) routes.set(edge.id, { ...(route ?? { bend: 0 }), bend: grown });
   }
+}
+
+/**
+ * Fraction of `a`'s sample points that land within `px` of the nearest point
+ * on `b` - the same "read as one thick stroke" test `tools/arrow-truth.mts`
+ * applies to the actual render, just against this module's own polyline
+ * approximation so `minimizeBends` can check it before anything is committed.
+ */
+function arcsTooClose(a: Point[], b: Point[], px: number): boolean {
+  let close = 0;
+  for (const p of a) {
+    let nearest = Infinity;
+    for (const q of b) {
+      const d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < nearest) nearest = d;
+    }
+    if (nearest < px) close++;
+  }
+  return close / a.length > PAIR_CLEARANCE_FRACTION;
+}
+
+/**
+ * B12: every earlier pass in this module only ever grows a bend until its
+ * own predicate passes, then stops - so the bend a route ends up with is the
+ * sum of whatever each pass independently decided it needed, not the
+ * smallest bend that satisfies all of them at once. This runs last and
+ * bisects each edge's committed bend back toward zero, re-testing the same
+ * real clearance predicates those passes enforced at every candidate:
+ *
+ * - path clearance vs. every non-endpoint box/note (`clearObstaclesOnEveryRoute`'s
+ *   own check, `polylineHitsBox` against the real circular arc);
+ * - the label, at the exact `t` `placeLabels` committed it to, still clear of
+ *   every non-endpoint shape and every other edge's own placed label;
+ * - no *increase* in `growBendForLabelSquish`'s squish fraction - shrinking
+ *   can't be allowed to hand back a squish fix that pass already paid for,
+ *   mirroring the "never give back an obstacle clearance" rule that pass
+ *   itself already follows;
+ * - clear of every other edge's own arc by `arcsTooClose`'s margin, so
+ *   shrinking one half of a `fanSharedPairs` pair (or a lane-separated
+ *   sibling) can never re-collide it with the other.
+ *
+ * Bisection, not a closed form: the search only needs the invariant that
+ * `hi` always clears, so a non-monotonic clearance function (the same
+ * "can graze at one sag and clear again at a larger one" `growBendClear`
+ * already documents) is safe here too - it just may not land on the
+ * global minimum, only *a* bend no worse than what was committed. An edge
+ * whose committed bend does not actually pass every predicate (the
+ * fallback "closest attempt" path some earlier pass can leave behind) is
+ * left alone rather than bisected against a predicate it never satisfied.
+ */
+function minimizeBends(
+  edges: IREdge[],
+  byId: Map<string, AbsShape>,
+  shapes: AbsShape[],
+  routes: Map<string, EdgeRoute>,
+): void {
+  const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
+  const snapshot = new Map<string, { bend: number; labelBox?: LabelBox }>();
+  for (const edge of edges) {
+    const r = routes.get(edge.id);
+    snapshot.set(edge.id, { bend: r?.bend ?? 0, ...(r?.labelBox ? { labelBox: r.labelBox } : {}) });
+  }
+
+  for (const edge of edges) {
+    const route = routes.get(edge.id);
+    if (!route || route.bend === 0) continue;
+    // `placeLabels` slides a label off the arc's own midpoint only when the
+    // midpoint itself was not clear - `approxLabelBox` at that t is a
+    // parabola standing in for tldraw's real circular arc (this module's own
+    // header), and that approximation gets less trustworthy the further t
+    // sits from the midpoint it was validated at. Shrinking the bend on top
+    // of an already-slid label risks a false-clear this model can't see
+    // (confirmed against c4-container.tldsl.jsx's `staff -> mainframe`,
+    // labelPosition 0.2 - measured, not guessed), so leave those as the
+    // earlier passes committed them.
+    if (route.labelPosition !== undefined) continue;
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (!from || !to) continue;
+
+    const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
+    const startAnchor = route.startAnchor;
+    const endAnchor = route.endAnchor;
+    const start = terminalPoint(from, startAnchor, to);
+    const end = terminalPoint(to, endAnchor, from);
+    const t = 0.5;
+
+    const otherLabelBoxes: LabelBox[] = [];
+    const siblingArcs: Point[][] = [];
+    for (const other of edges) {
+      if (other.id === edge.id) continue;
+      const s = snapshot.get(other.id);
+      if (!s) continue;
+      if (s.labelBox) otherLabelBoxes.push(s.labelBox);
+      if (s.bend === 0) continue;
+      const oFrom = byId.get(other.from);
+      const oTo = byId.get(other.to);
+      if (!oFrom || !oTo) continue;
+      const oRoute = routes.get(other.id);
+      const oStart = terminalPoint(oFrom, oRoute?.startAnchor, oTo);
+      const oEnd = terminalPoint(oTo, oRoute?.endAnchor, oFrom);
+      siblingArcs.push(arcPolyline(oStart, oEnd, s.bend));
+    }
+
+    const marginBlockers = blockers.map((b) => inflateShape(b, CLEAR_MARGIN));
+    const committedSquish = squishFraction(arcPolyline(start, end, route.bend), edge);
+
+    // The same `CLEAR_MARGIN` the candidate/lane pass itself budgets for
+    // (see `requiredSag`) is applied on every check here too, not just the
+    // literal zero-margin hit test `clearObstaclesOnEveryRoute` uses to
+    // decide whether to grow at all - a bisection actively hunts for the
+    // tightest passing value, and without this margin it will happily land
+    // an arc or a label close enough to graze a shape at the render's own
+    // sampling/rounding, not just at this module's.
+    const clears = (bend: number): boolean => {
+      const path = arcPolyline(start, end, bend);
+      if (marginBlockers.some((b) => polylineHitsBox(path, b))) return false;
+      if (siblingArcs.some((sp) => arcsTooClose(path, sp, PAIR_CLEARANCE_PX))) return false;
+      if (edge.label !== undefined) {
+        if (squishFraction(path, edge) > committedSquish + 1e-6) return false;
+        const box = approxLabelBox(edge, byId, bend, startAnchor, endAnchor, t);
+        if (box !== null) {
+          const inflated = inflate(box, CLEAR_MARGIN);
+          if (blockers.some((b) => boxesOverlap(inflated, b))) return false;
+          const inflatedForLabels = inflate(box, MINIMIZE_LABEL_MARGIN);
+          if (otherLabelBoxes.some((o) => boxesOverlap(inflatedForLabels, o))) return false;
+        }
+      }
+      return true;
+    };
+
+    if (!clears(route.bend)) continue;
+
+    const sign = Math.sign(route.bend);
+    if (clears(0)) {
+      applyMinimizedBend(edge, byId, routes, snapshot, route, 0, t);
+      continue;
+    }
+
+    // Straight (bend 0) doesn't clear, and tldraw itself renders anything
+    // under MIN_BEND as straight - so the real floor here is MIN_BEND, not 0.
+    let lo = MIN_BEND;
+    let hi = Math.abs(route.bend);
+    for (let i = 0; i < MINIMIZE_ROUNDS; i++) {
+      const mid = (lo + hi) / 2;
+      if (clears(sign * mid)) hi = mid;
+      else lo = mid;
+    }
+    // `hi` is proven safe by the loop invariant above; rounding it to the
+    // module's usual one-decimal precision is not, since a bisection can
+    // land arbitrarily close to the true boundary - verify the rounded
+    // value and fall back to the unrounded (but proven-safe) `hi` if
+    // rounding happened to cross back over it.
+    const rounded = round1(sign * hi);
+    const newBend = clears(rounded) ? rounded : sign * hi;
+    if (Math.abs(route.bend) - Math.abs(newBend) >= MINIMIZE_MEANINGFUL_PX) {
+      applyMinimizedBend(edge, byId, routes, snapshot, route, newBend, t);
+    }
+  }
+}
+
+/** `s` grown by `margin` on every side - same Minkowski-sum idea `inflate` applies to a `LabelBox`, for the `AbsShape` blockers a path clearance check tests against. */
+function inflateShape(s: AbsShape, margin: number): AbsShape {
+  return { ...s, x: s.x - margin, y: s.y - margin, w: s.w + 2 * margin, h: s.h + 2 * margin };
+}
+
+/**
+ * Commits a `minimizeBends` result: the new bend, and the label box
+ * recomputed at the same `t` `placeLabels` had already chosen. Also updates
+ * `snapshot` - the same source `otherLabelBoxes`/`siblingArcs` read for every
+ * edge processed after this one - so two edges sharing a pair (or just
+ * sitting close together) shrink against each other's *actual* new position,
+ * not the one both started the pass at. Processing edges against a frozen
+ * snapshot for the whole pass would let two labels that were fine at their
+ * starting bends both independently shrink toward the same shrunk-arc
+ * midpoint and land on each other, since neither one's own check ever sees
+ * the other's move.
+ */
+function applyMinimizedBend(
+  edge: IREdge,
+  byId: Map<string, AbsShape>,
+  routes: Map<string, EdgeRoute>,
+  snapshot: Map<string, { bend: number; labelBox?: LabelBox }>,
+  route: EdgeRoute,
+  bend: number,
+  t: number,
+): void {
+  const box =
+    edge.label !== undefined ? approxLabelBox(edge, byId, bend, route.startAnchor, route.endAnchor, t) : null;
+  routes.set(edge.id, { ...route, bend, ...(box ? { labelBox: box } : {}) });
+  snapshot.set(edge.id, { bend, ...(box ? { labelBox: box } : {}) });
 }
 
 /**
@@ -819,6 +1083,12 @@ function growBendClear(
   startAnchor?: Point,
   endAnchor?: Point,
   useAnalyticJump = true,
+  /** Overrides the chord-length/no-cap default - `growBendForLabelSquish` passes a modest fraction of the chord so unsquishing a label can never buy a near-semicircle (B12). */
+  sagCap?: number,
+  /** Track the closest attempt instead of only a full clear, independent of `useAnalyticJump`'s step size - `growBendForLabelSquish` opts in (see its own call) so a capped search still keeps whatever partial squish relief it found; the other two callers keep their documented all-or-nothing/analytic behaviour. */
+  partialCredit = useAnalyticJump,
+  /** Overrides `GROW_STEP` for the fixed-step crawl - a modest `sagCap` needs a proportionally finer step so a short budget still gets several samples instead of one or two. */
+  stepOverride?: number,
 ): number {
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
@@ -841,7 +1111,7 @@ function growBendClear(
   // shapes close enough together that this chord is short can still
   // truncate the search before the label actually clears, which is exactly
   // why this branch has no cap at all.
-  const cap = useAnalyticJump ? Math.hypot(end.x - start.x, end.y - start.y) : Infinity;
+  const cap = sagCap ?? (useAnalyticJump ? Math.hypot(end.x - start.x, end.y - start.y) : Infinity);
   if (cap < 1) return initialBend;
 
   for (const sign of signs) {
@@ -856,7 +1126,7 @@ function growBendClear(
         const need = boxHits.length > 0 ? requiredDetourSag(start, end, sign, boxHits) : 0;
         sag = Math.max(need, sag + GROW_STEP);
       } else {
-        sag += GROW_STEP;
+        sag += stepOverride ?? GROW_STEP;
       }
       if (sag > cap) break;
 
@@ -873,7 +1143,7 @@ function growBendClear(
       // clear, which no bend fixes - and a partial credit there would
       // relocate the label on the strength of a path hit `placeLabels`
       // never asked it to fix, not real label progress.
-      if (useAnalyticJump) {
+      if (partialCredit) {
         if (hits < bestHits || (hits === bestHits && Math.abs(bend) < Math.abs(best))) {
           bestHits = hits;
           best = bend;
