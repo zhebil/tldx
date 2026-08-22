@@ -87,9 +87,8 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
   const mode = resolveMode(ir.layout);
   const gap = ir.gap ?? DEFAULT_GAP;
   const mayAutoGrid = ir.layout === undefined && ir.cols === undefined;
-  const allEdges: AutoEdge[] = [];
-  collectEdgesDeep(ir.children, allEdges);
-  const docLabeledEdges = allEdges.filter((e) => e.label !== undefined);
+  const docEdges: AutoEdge[] = [];
+  collectEdgesDeep(ir.children, docEdges);
   const { children, mode: usedMode, cols: usedCols } = await layoutContainer(
     ir.children,
     mode,
@@ -100,7 +99,7 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
     ir.align ?? DEFAULT_ALIGN,
     placeAuto,
     mayAutoGrid,
-    docLabeledEdges,
+    docEdges,
   );
   return attachNotes({
     ...ir,
@@ -117,7 +116,7 @@ function resolveMode(mode: LayoutMode | undefined): LayoutMode {
 async function sizeElement(
   el: IRBox | IRNote | IRFrame,
   placeAuto: AutoPlacer,
-  docLabeledEdges: readonly AutoEdge[],
+  docEdges: readonly AutoEdge[],
 ): Promise<IRBoxPositioned | IRNotePositioned | IRFramePositioned> {
   switch (el.kind) {
     case "box": {
@@ -134,14 +133,14 @@ async function sizeElement(
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w, h };
     }
     case "frame":
-      return sizeFrame(el, placeAuto, docLabeledEdges);
+      return sizeFrame(el, placeAuto, docEdges);
   }
 }
 
 async function sizeFrame(
   frame: IRFrame,
   placeAuto: AutoPlacer,
-  docLabeledEdges: readonly AutoEdge[],
+  docEdges: readonly AutoEdge[],
 ): Promise<IRFramePositioned> {
   const mode = resolveMode(frame.layout);
   const gap = frame.gap ?? DEFAULT_GAP;
@@ -158,7 +157,7 @@ async function sizeFrame(
     frame.align ?? DEFAULT_ALIGN,
     placeAuto,
     false,
-    docLabeledEdges,
+    docEdges,
   );
   const w = frame.w ?? contentW;
   const h = frame.h ?? contentH;
@@ -183,7 +182,7 @@ async function layoutContainer(
   align: Align,
   placeAuto: AutoPlacer,
   mayAutoGrid: boolean,
-  docLabeledEdges: readonly AutoEdge[],
+  docEdges: readonly AutoEdge[],
 ): Promise<{
   children: IRElementPositioned[];
   w: number;
@@ -195,7 +194,7 @@ async function layoutContainer(
     children.map(async (c) => {
       if (c.kind === "edge") return null;
       if (c.kind === "doc") throw new Error("layout: nested <doc> is not permitted");
-      return sizeElement(c, placeAuto, docLabeledEdges);
+      return sizeElement(c, placeAuto, docEdges);
     }),
   );
 
@@ -224,7 +223,9 @@ async function layoutContainer(
     });
     const result = await placeAuto({
       nodes,
-      edges: collectAutoEdges(children),
+      // Doc-wide, not this subtree: `<Edge>` is conventionally a sibling of the
+      // container it connects, and ELK with no edges silently packs components.
+      edges: resolveEdgeOwners(children, docEdges),
       direction,
       gap,
       padLeft: pad.left,
@@ -272,7 +273,10 @@ async function layoutContainer(
         flowCols = bestGridCols(collapsedEls, gap, TARGET_ASPECT, preGap, serpentine);
       }
     }
-    const clearanceEdges = resolveEdgeOwners(children, docLabeledEdges);
+    const clearanceEdges = resolveEdgeOwners(
+      children,
+      docEdges.filter((e) => e.label !== undefined),
+    );
     const effectiveGap = labelClearanceGap(flowMode, flowCols, collapsedIds, clearanceEdges, gap);
     const rowGaps =
       flowMode === "grid"

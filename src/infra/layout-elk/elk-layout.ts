@@ -73,6 +73,7 @@ export class ElkLayoutAdapter implements LayoutPort {
       "elk.edgeRouting": "ORTHOGONAL",
       "elk.direction": req.direction ?? DEFAULT_DIRECTION,
       "elk.spacing.nodeNode": String(req.gap),
+      "elk.spacing.componentComponent": String(req.gap),
       "elk.layered.spacing.nodeNodeBetweenLayers": String(Math.round(req.gap * 1.5)),
       "elk.padding": `[top=${req.padTop},left=${req.padLeft},bottom=${req.padBottom},right=${req.padRight}]`,
     };

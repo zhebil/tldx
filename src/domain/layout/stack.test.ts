@@ -370,6 +370,25 @@ describe("hybridLayout", () => {
     expect(b.x).toBe(sizeA.w + 10);
     expect(b.y).toBe(0);
   });
+
+  it("passes edges declared outside the auto container to the placer (D7)", async () => {
+    let seen: readonly { from: string; to: string }[] = [];
+    const spy: AutoPlacer = async (req) => {
+      if (req.nodes.length > 1) seen = req.edges;
+      return stubPlaceAuto(req);
+    };
+    await layoutAst(
+      doc({ layout: "col" }, [
+        frame({ id: "g", layout: "auto" }, [
+          box({ id: "a", label: "A" }),
+          box({ id: "b", label: "B" }),
+        ]),
+        edge({ id: "e", from: "a", to: "b" }),
+      ]),
+      spy,
+    );
+    expect(seen.map((e) => `${e.from}->${e.to}`)).toEqual(["a->b"]);
+  });
 });
 
 describe("hybridLayout: labeled-edge gap clearance (T12)", () => {
