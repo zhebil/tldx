@@ -157,7 +157,7 @@ entry. If a task needs an essay, it belongs in the ledger or in
   **Acceptance:** both repros compile in their documented form; the skill shows
   the multiline form; `check` warns on the literal one.
 
-- [ ] **T46. An unnamed container is unnamed.** *(D2)*
+- [x] **T46. An unnamed container is unnamed.** *(D2)*
   A `<Row>` / `<Col>` / `<Grid>` / `<Graph>` with no `name` draws a border and captions
   itself with the literal word "Frame", so `tcp-lifecycle` carried three
   captions its author never wrote and `tcp-states` still ships one. `<Group>` is
@@ -165,6 +165,14 @@ entry. If a task needs an essay, it belongs in the ledger or in
   Do not invent a placeholder for a container whose author declined to name it.
   **Acceptance:** `d2-unnamed-frame-caption` renders with no captions and no
   borders; `tcp-states` loses its stray "Frame"; a *named* frame is unchanged.
+  **Done in `b52ee44`.** One predicate, `drawsChrome(frame) = !group && name !== undefined`,
+  replaces the `group !== true` test at both places that decide chrome - `emit`
+  (no frame shape) and `stack`'s `hasFrameChild` (no reserved title clearance,
+  which is what would otherwise have left a gap where the caption was). Being a
+  property of the frame rather than of the component, it covers `<Graph>`, which
+  had no chrome-free alternative at all. Three existing tests were built on
+  unnamed non-group frames - the bug baked into the fixtures - and got names so
+  they keep testing what they meant to.
 
 - [x] **T47. `maxW` holds on every geo, not just rectangles.** *(D20)*
   The same label with the same `maxW="200"` renders 188x152 as a rectangle and
