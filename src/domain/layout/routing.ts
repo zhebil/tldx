@@ -174,6 +174,8 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
 
   fanSharedPairs(otherEdges, byId, shapes, routes);
 
+  attachFacingProximity(otherEdges, byId, routes);
+
   clearObstaclesOnEveryRoute(otherEdges, byId, shapes, routes);
 
   growBendForLabelSquish(otherEdges, byId, shapes, routes);
@@ -432,6 +434,89 @@ function fanSharedPairs(
       routes.set(edge.id, { bend });
     });
   }
+}
+
+/**
+ * B13: the nearest-facing-edge attach point for every edge the candidate/
+ * lane pass and `fanSharedPairs` left untouched - no crossing to bow
+ * around, no shared pair to fan, straight chord, still at the ray-toward-
+ * the-other-centre default `terminalPoint` falls back to. That ray only
+ * lands on the right face when both terminals are roughly centred on each
+ * other; once one is much wider or taller than the other (a source box
+ * sitting above one end of a wide bar, say), the ray toward the wide
+ * shape's centre cuts in diagonally and can exit through the wrong side
+ * entirely, which is what B12's bend-growth then bows even further around.
+ * Mutates `routes` in place; `edges` here already excludes self-edges.
+ */
+function attachFacingProximity(edges: IREdge[], byId: Map<string, AbsShape>, routes: Map<string, EdgeRoute>): void {
+  for (const edge of edges) {
+    if (routes.has(edge.id)) continue;
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (!from || !to) continue;
+    const anchors = facingAnchors(from, to);
+    if (anchors === null) continue;
+    routes.set(edge.id, { bend: 0, startAnchor: anchors.from, endAnchor: anchors.to });
+  }
+}
+
+/**
+ * `null` unless `from`/`to` are unambiguously stacked (no y-overlap, some
+ * x-overlap) or side by side (no x-overlap, some y-overlap) - the diagonal
+ * case (neither axis overlaps) has no single pair of faces that "faces"
+ * the other, so it's left alone the same way `deriveAxis` leaves it alone.
+ * Both anchors share one coordinate along the facing edges (one shared x
+ * for a stacked pair, one shared y for a side-by-side pair) so the chord
+ * is a straight drop, not just two independently-nudged points that still
+ * cut diagonally. That shared coordinate starts from the *narrower* (for a
+ * stacked pair) or *shorter* (side by side) shape's own centre - the more
+ * specific, already-well-placed terminal - clamped into the strip where
+ * both extents overlap, so it never asks either shape to attach past its
+ * own edge. When the shapes are already comparably sized and aligned this
+ * reduces to the old centred point, which is why no separate size-ratio
+ * threshold is needed on top of it.
+ */
+function facingAnchors(from: AbsShape, to: AbsShape): { from: Point; to: Point } | null {
+  const yOverlap = rangesOverlap(from.y, from.y + from.h, to.y, to.y + to.h);
+  const xOverlap = rangesOverlap(from.x, from.x + from.w, to.x, to.x + to.w);
+
+  if (!yOverlap && xOverlap) {
+    const overlapMin = Math.max(from.x, to.x);
+    const overlapMax = Math.min(from.x + from.w, to.x + to.w);
+    const preferred = from.w <= to.w ? centreX(from) : centreX(to);
+    const sharedX = clampTo(preferred, overlapMin, overlapMax);
+    const fromFace: 0 | 1 = from.y < to.y ? 1 : 0;
+    const toFace: 0 | 1 = fromFace === 1 ? 0 : 1;
+    return {
+      from: { x: (sharedX - from.x) / from.w, y: fromFace },
+      to: { x: (sharedX - to.x) / to.w, y: toFace },
+    };
+  }
+  if (!xOverlap && yOverlap) {
+    const overlapMin = Math.max(from.y, to.y);
+    const overlapMax = Math.min(from.y + from.h, to.y + to.h);
+    const preferred = from.h <= to.h ? centreY(from) : centreY(to);
+    const sharedY = clampTo(preferred, overlapMin, overlapMax);
+    const fromFace: 0 | 1 = from.x < to.x ? 1 : 0;
+    const toFace: 0 | 1 = fromFace === 1 ? 0 : 1;
+    return {
+      from: { x: fromFace, y: (sharedY - from.y) / from.h },
+      to: { x: toFace, y: (sharedY - to.y) / to.h },
+    };
+  }
+  return null;
+}
+
+function centreX(s: AbsShape): number {
+  return s.x + s.w / 2;
+}
+
+function centreY(s: AbsShape): number {
+  return s.y + s.h / 2;
+}
+
+function clampTo(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, v));
 }
 
 /**
