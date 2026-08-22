@@ -28,7 +28,7 @@ import {
   type AutoPlacer,
 } from "./stack.js";
 
-const { box, doc, edge, frame, note } = astBuilders();
+const { box, doc, edge, frame, note, text } = astBuilders();
 
 /**
  * Trivial deterministic stub placer: lays nodes out in a row (source order)
@@ -1205,6 +1205,59 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     const small = boxById(zones.children, "small");
     const big = boxById(zones.children, "big");
     expect(small.h).toBeLessThan(big.h);
+  });
+});
+
+describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX (D23, tldsl-pnq)", () => {
+  it("sizes a lone <Text size=xl> to exactly what estimatedBoxSize(..., { standalone: true }) predicts", async () => {
+    const label = "Phase 1 (non collaborative)";
+    const result = await layoutAst(
+      doc({ layout: "col" }, [text({ id: "heading", font: "sans", size: "xl" }, label)]),
+    );
+    const heading = boxById(result.children, "heading");
+    const expected = estimatedBoxSize(label, undefined, { font: "sans", size: "xl", standalone: true });
+    expect(heading.w).toBe(expected.w);
+    expect(heading.h).toBe(expected.h);
+
+    // The bug this pins: at this same width, the label table (what <Text>
+    // used to size off) reserves less height than tldraw's real `text`
+    // shape needs - that shortfall is what let a wrapped line spill onto
+    // whatever sat below it.
+    const labelTableH = boxHeightForWidth(label, heading.w, { font: "sans", size: "xl" });
+    expect(labelTableH).toBeLessThan(heading.h);
+  });
+
+  it("threads standalone sizing through a <Col>'s shared-width/height vote alongside <Box> siblings (D23 repro)", async () => {
+    const label = "Phase 1 (non collaborative)";
+    const result = await layoutAst(
+      doc({ layout: "col", gap: 16 }, [
+        text({ id: "heading", font: "sans", size: "xl" }, label),
+        box({ id: "a", label: "Client" }),
+        box({ id: "b", label: "Server" }),
+      ]),
+    );
+    const heading = boxById(result.children, "heading");
+    const a = boxById(result.children, "a");
+
+    // The heading sets the col's shared width (it's the widest natural
+    // sibling), so this pins the shared-width *vote* itself - a call site
+    // in `applyContainerBoxSizing` that measured with the wrong table would
+    // vote a narrower width in here.
+    const expectedW = estimatedBoxSize(label, undefined, { font: "sans", size: "xl", standalone: true }).w;
+    expect(heading.w).toBe(expectedW);
+
+    // The heading's own final w/h - post shared-width vote, post
+    // equalize-height vote - must still reserve at least as much as its
+    // standalone table demands, never the (shorter) label-table height a
+    // missed call site in the shared-size vote would silently fall back to.
+    const labelTableH = boxHeightForWidth(label, heading.w, { font: "sans", size: "xl" });
+    expect(heading.h).toBeGreaterThanOrEqual(
+      boxHeightForWidth(label, heading.w, { font: "sans", size: "xl", standalone: true }),
+    );
+    expect(heading.h).toBeGreaterThan(labelTableH);
+
+    // No overlap: the box below starts at or past the heading's real bottom edge.
+    expect(a.y).toBeGreaterThanOrEqual(heading.y + heading.h);
   });
 });
 
