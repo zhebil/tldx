@@ -10,7 +10,13 @@ import type {
 import type { AstNode } from "../parser/ast.js";
 import { astBuilders } from "../parser/ast.fixture.js";
 
-import { BOX_ASPECT_TARGET, boxHeightForWidth, estimatedBoxSize, fitBoxWidth } from "./defaults.js";
+import {
+  BOX_ASPECT_TARGET,
+  boxHeightForWidth,
+  estimatedBoxSize,
+  fitBoxWidth,
+  NOTE_MEASURE_PX,
+} from "./defaults.js";
 import { arrowLabelLineHeight, arrowLabelWidth } from "./glyph-metrics.js";
 import {
   bestGridCols,
@@ -988,15 +994,16 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
 });
 
 describe("note sizing: geo <Note> vs sticky <Sticky>", () => {
-  it("a geo note sizes like a box - wraps to a readable width, not a 200px sticky column", async () => {
+  it("a geo note sizes like a box - wraps to a readable measure, not a 200px sticky column or a banner-wide single line", async () => {
     const text =
       "Two sentences of context about this diagram. It should read like an annotation, not a filing cabinet.";
     const result = await layoutAst(doc({ layout: "col" }, [note({ id: "n" }, text)]));
     const n = noteById(result.children, "n");
-    const expectedW = fitBoxWidth(text);
+    const expectedW = fitBoxWidth(text, NOTE_MEASURE_PX);
     expect(n.w).toBe(expectedW);
     expect(n.h).toBe(boxHeightForWidth(text, expectedW));
     expect(n.w).not.toBe(200);
+    expect(n.w).toBeLessThanOrEqual(NOTE_MEASURE_PX);
   });
 
   it("a geo note in a grid takes the shared box width but not the shared box height", async () => {

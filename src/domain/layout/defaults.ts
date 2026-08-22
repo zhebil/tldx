@@ -39,6 +39,18 @@ const NOTE_CHAR_PX = 15;
 const NOTE_LINE_H = 30;
 
 /**
+ * Default reading measure for an attached `<Note>` (not `<Sticky>`), in px.
+ * A note is placed beside a single target after layout, not shared across a
+ * row/col like a box - `fitBoxWidth`'s `BOX_ASPECT_TARGET` (6:1) is tuned for
+ * that flow case and given a free line budget produces a near-unwrapped
+ * single line (D3: 549px for one sentence), which is both unreadable and too
+ * wide to park next to anything. This caps the same wrap algorithm at a
+ * paragraph-ish measure instead, same order as `NOTE_SIZE` so a plain note
+ * reads like an annotation, not a banner.
+ */
+export const NOTE_MEASURE_PX = 260;
+
+/**
  * Tldraw draws the frame heading rect at y in [-30, -6] relative to the
  * frame's own top edge - outside the frame, not inside it. So this is the
  * clearance a frame needs *above* it, reserved only by a frame that contains

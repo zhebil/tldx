@@ -117,7 +117,7 @@ describe("attachNotes", () => {
     expect(n.y).toBe(110);
   });
 
-  it("falls back to below when right is blocked", async () => {
+  it("pushes past a single blocker on the right side instead of switching sides", async () => {
     const ast = doc({ layout: "free" }, [
       box({ id: "a", x: 100, y: 100, w: 80, h: 40 }),
       box({ id: "block-right", x: 204, y: 110, w: 30, h: 20 }),
@@ -125,35 +125,37 @@ describe("attachNotes", () => {
     ]);
     const result = await layoutAst(ast);
     const n = noteById(result.children, "n");
-    expect(n.x).toBe(125);
-    expect(n.y).toBe(164);
-  });
-
-  it("falls back to left when right and below are blocked", async () => {
-    const ast = doc({ layout: "free" }, [
-      box({ id: "a", x: 100, y: 100, w: 80, h: 40 }),
-      box({ id: "block-right", x: 204, y: 110, w: 30, h: 20 }),
-      box({ id: "block-below", x: 125, y: 164, w: 30, h: 20 }),
-      note({ id: "n", on: "a", w: 30, h: 20 }, "x"),
-    ]);
-    const result = await layoutAst(ast);
-    const n = noteById(result.children, "n");
-    expect(n.x).toBe(46);
+    // Room is 24px past `block-right`, not the next side over - a note
+    // stays beside its target rather than hopping around it.
+    expect(n.x).toBe(234 + 24);
     expect(n.y).toBe(110);
   });
 
-  it("falls back to above when right, below, and left are all blocked", async () => {
+  it("pushes past multiple stacked blockers on the right side", async () => {
     const ast = doc({ layout: "free" }, [
       box({ id: "a", x: 100, y: 100, w: 80, h: 40 }),
-      box({ id: "block-right", x: 204, y: 110, w: 30, h: 20 }),
-      box({ id: "block-below", x: 125, y: 164, w: 30, h: 20 }),
-      box({ id: "block-left", x: 46, y: 110, w: 30, h: 20 }),
+      box({ id: "block-1", x: 204, y: 110, w: 30, h: 20 }),
+      box({ id: "block-2", x: 258, y: 110, w: 30, h: 20 }),
       note({ id: "n", on: "a", w: 30, h: 20 }, "x"),
     ]);
     const result = await layoutAst(ast);
     const n = noteById(result.children, "n");
-    expect(n.x).toBe(125);
-    expect(n.y).toBe(56);
+    expect(n.x).toBe(288 + 24);
+    expect(n.y).toBe(110);
+  });
+
+  it("falls back to below when the right candidate's centred y is negative", async () => {
+    // A note much taller than its target, near the top edge: centring it on
+    // `a` for a right-side placement would put it above y=0. Nothing can
+    // push a negative y back into range, so this falls back to below.
+    const ast = doc({ layout: "free" }, [
+      box({ id: "a", x: 100, y: 0, w: 80, h: 20 }),
+      note({ id: "n", on: "a", w: 10, h: 200 }, "x"),
+    ]);
+    const result = await layoutAst(ast);
+    const n = noteById(result.children, "n");
+    expect(n.x).toBe(135);
+    expect(n.y).toBe(44);
   });
 
   it("attaches to an edge's chord midpoint", async () => {
