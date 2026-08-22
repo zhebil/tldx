@@ -3,9 +3,10 @@
 The ordered worklist for the layout loop. **This file is the only state that
 survives between sessions.**
 
-Phases 1-9 are done and archived in `docs/plan-archive-phase1-9.md` - along with
-their Discovered work and their Questions for the human, both of which are
-parked, not lost. Do not read the archive unless a task sends you there.
+Phases 1-9 are done. Their history (Discovered work, Questions for the human)
+lived in `docs/plan-archive-phase1-9.md`, deleted as finished work now
+recoverable from git history (`git log -- docs/plan-archive-phase1-9.md`) -
+the two load-bearing items are repeated below so they are not lost.
 
 ## Where this phase starts
 
@@ -375,8 +376,8 @@ own entry into the task list; the human does that.
   dashed external systems around a hairline boundary - and actors and datastores
   that look identical.
 
-Parked from Phases 1-9, unread, in `docs/plan-archive-phase1-9.md`. Two are
-load-bearing rather than cosmetic and are repeated here so they are not lost:
+Parked from Phases 1-9 (history in git, see above). Two are load-bearing
+rather than cosmetic and are repeated here so they are not lost:
 
 - **T22 shipped `absorb` as deterministic, not model-driven.** A departure from
   the agreed round-trip design.

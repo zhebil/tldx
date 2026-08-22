@@ -2,17 +2,18 @@
 
 Taken at commit `148e306` ("layout: containers pick one box size, from measured
 glyph widths (T0)"), on branch `ralph/jsx-layout`. This is the first baseline
-measured against correct box geometry - everything in `docs/layout-champion.md`
-and `docs/layout-hypotheses.md` predates the box-sizing fix (`2484ffa`) and the
-container box-sizing work (`148e306`), and describes geometry that no longer
-exists.
+measured against correct box geometry - the layout-hypotheses and
+layout-champion ledgers that preceded it (deleted, in git history) predate the
+box-sizing fix (`2484ffa`) and the container box-sizing work (`148e306`), and
+described geometry that no longer exists.
 
-Regenerate with:
+Regenerate with (renders are scratch, not committed - point `$OUT` at a temp
+dir, e.g. `OUT=$(mktemp -d)`):
 
 ```bash
 for f in tests/corpus/*.tldsl.jsx; do
   n=$(basename "$f" .tldsl.jsx)
-  npx tsx tools/screenshot.mts "$f" "docs/renders/$n.png"
+  npx tsx tools/screenshot.mts "$f" "$OUT/$n.png"
   npx tsx tools/layout-report.mts "$f"
 done
 npx tsx tools/arrow-truth.mts tests/corpus/*.tldsl.jsx
@@ -132,7 +133,8 @@ added into the sum:
 
 ## Renders
 
-One PNG per corpus file in `docs/renders/`, named after the fixture.
+One PNG per corpus file, named after the fixture. Renders are debugging
+scratch, regenerated on demand (see above) - never committed.
 
 ---
 

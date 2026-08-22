@@ -15,3 +15,6 @@ build/
 .beads-credential-key
 .claude
 .playwright-mcp/
+
+# overlay sidecars are generated, never source
+*.overlay.json

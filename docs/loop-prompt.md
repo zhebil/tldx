@@ -11,7 +11,9 @@ prompt each time. `docs/plan.md` is the only state that carries between wakes.
    it is deferred; the reason is already written under it.
 4. Build it. Check its acceptance criterion with the tool the task names.
 5. `npm run check` must be green.
-6. If geometry moved, re-render `docs/renders/` and update `docs/baseline.md`.
+6. If geometry moved, re-render the corpus to a temp dir (e.g. `mktemp -d`) and
+   update `docs/baseline.md`. Rendered PNGs are debugging scratch - never
+   commit them.
 7. Tick the box and write two or three sentences under the task: what was built,
    and what the numbers did. Append anything you noticed but did not act on to
    **Discovered work**.
@@ -165,10 +167,4 @@ You are an orchestrator. Delegate the doing; keep decomposition and review.
   never gets written down. Log it and move on.
 - If `npm run check` cannot be made green within the wake, revert the change,
   record the failure under the task, and commit that record alone.
-- **`docs/layout-hypotheses.md` and `docs/layout-champion.md` are historical.**
-  Read the hypotheses ledger before building anything - it records what has
-  already failed and why - but every number in both predates the box-sizing fix
-  in commit `2484ffa` and describes geometry that no longer exists. Never append
-  to them. The `docs/baselines/` epochs they refer to have been deleted; those
-  references are history, not a missing directory to recreate.
 - No `Claude-Session:` trailer and no co-author lines in commit messages.
