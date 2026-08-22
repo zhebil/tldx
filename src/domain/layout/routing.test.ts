@@ -42,7 +42,7 @@ function edge(input: {
 }
 
 describe("computeEdgeRoutes", () => {
-  it("leaves an adjacent hop in a row straight (no shape crossed)", () => {
+  it("leaves an adjacent hop in a row straight (no shape crossed), attached face to face (B13)", () => {
     const ir = doc("root", [
       box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
       box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
@@ -50,7 +50,15 @@ describe("computeEdgeRoutes", () => {
       edge({ id: "ab", from: "a", to: "b" }),
     ]);
     const routes = computeEdgeRoutes(ir);
-    expect(routes.get("ab")).toBeUndefined();
+    const route = routes.get("ab");
+    expect(route).toBeDefined();
+    expect(route!.bend).toBe(0);
+    // Same height, side by side (no y-overlap check applies - they share the
+    // full row): right face of a, left face of b, both vertically centred -
+    // the same point `bodyExitPoint`'s centre-to-centre ray already landed
+    // on for two equal-height neighbours, just made explicit.
+    expect(route!.startAnchor).toEqual({ x: 1, y: 0.5 });
+    expect(route!.endAnchor).toEqual({ x: 0, y: 0.5 });
   });
 
   it("bows a chord over two boxes in a row upward, exiting the top edge of both terminals", () => {
