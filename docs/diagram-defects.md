@@ -284,7 +284,14 @@ blocker.
   it means the grid primitive is unusable for any grid whose two axes want
   different spacing.
 - **Repro:** `examples/repro/d4-single-axis-gap.tldsl.jsx`
-- **Status:** open
+- **Status:** fixed in `8866180` (T48). `<doc>`/`<frame>` now take `rowGap`
+  and `colGap`, each overriding `gap` on its own axis (`rowGap ?? gap` for
+  vertical spacing, `colGap ?? gap` for horizontal) - `gap` alone still sets
+  both, unchanged, so every existing diagram renders byte-identical. Applying
+  `rowGap="16"` to the repro's `<Grid cols="2" gap="300">` keeps the 300px
+  client/server columns and tightens every row to 16px - confirmed by
+  screenshot, not just the number. The workaround this entry describes (nest
+  two `<Col>`s in a `<Row>`) still works but is no longer necessary.
 
 ### D5. An edge from a shape to itself draws no loop
 
@@ -466,7 +473,21 @@ blocker.
   `<Layers>` nor `<Swimlanes>` is documented as changing this, and the skill has
   no other lever - `maxW` caps a label, not a frame.
 - **Repro:** `examples/repro/d10-tiers-not-stretched.tldsl.jsx`
-- **Status:** open
+- **Status:** fixed in `8866180` (T48). `align` accepts a fourth value,
+  `stretch`, on `row`/`col` containers (`grid`/`auto`/`free` untouched): every
+  flowed child - box, note, or frame alike, not just boxes as the existing
+  box-width-sharing pass does - grows to the container's cross-axis extent (the
+  widest child in `col`, the tallest in `row`); a child with an explicit `w`/`h`
+  opts out. Still opt-in - `align` defaults to `center` as before, so
+  `examples/kernel.tldsl.jsx` (a column of deliberately different-width named
+  frames) renders byte-identical, confirmed by screenshot. Measured on
+  `web-architecture` with `align="stretch"` added to the `system` frame: `edge`
+  553.5 -> 1609.2px, `app-tier` 520 -> 1609.2px, `data` 1609.2px (unchanged, the
+  widest), `async` 629.7 -> 1609.2px - all four tiers now share `data`'s width
+  and left edge, reading as aligned horizontal bands. The system boundary's own
+  width (1673.2px) is unaffected, since it was already sized to the widest
+  tier's content. Not applied to the shipped `web-architecture.tldsl.jsx` -
+  that edit is left to whoever adopts the lever.
 
 ### D11. A cross-tier edge's label is stamped at the midpoint, on top of whatever is there
 

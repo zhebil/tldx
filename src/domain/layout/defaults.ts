@@ -79,8 +79,8 @@ export function isLayoutMode(s: string): s is LayoutMode {
   return (LAYOUT_MODES as readonly string[]).includes(s);
 }
 
-export type Align = "start" | "center" | "end";
-export const ALIGNS: readonly Align[] = ["start", "center", "end"];
+export type Align = "start" | "center" | "end" | "stretch";
+export const ALIGNS: readonly Align[] = ["start", "center", "end", "stretch"];
 export const DEFAULT_ALIGN: Align = "center";
 
 export function isAlign(s: string): s is Align {

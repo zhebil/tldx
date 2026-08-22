@@ -74,13 +74,15 @@ import type {
 import { contentHash, SyntheticIdAllocator } from "./synthetic-id.js";
 
 const ALLOWED_PROPS = {
-  doc: ["id", "direction", "layout", "gap", "pad", "cols", "align"],
+  doc: ["id", "direction", "layout", "gap", "rowGap", "colGap", "pad", "cols", "align"],
   frame: [
     "id",
     "name",
     "direction",
     "layout",
     "gap",
+    "rowGap",
+    "colGap",
     "pad",
     "cols",
     "align",
@@ -254,7 +256,7 @@ export function lower(ast: AstNode | null): LowerResult {
     ...(direction === undefined ? {} : { direction }),
     ...(layout === undefined ? {} : { layout }),
     ...(align === undefined ? {} : { align }),
-    ...numericAttrs(ast.attrs, ctx, ["gap", "pad", "cols"] as const),
+    ...numericAttrs(ast.attrs, ctx, ["gap", "rowGap", "colGap", "pad", "cols"] as const),
   };
   for (const child of ast.children) {
     const lowered = lowerNode(child, ctx);
@@ -322,7 +324,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
     ...(layout === undefined ? {} : { layout }),
     ...(align === undefined ? {} : { align }),
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
-    ...numericAttrs(node.attrs, ctx, ["gap", "pad", "cols"] as const),
+    ...numericAttrs(node.attrs, ctx, ["gap", "rowGap", "colGap", "pad", "cols"] as const),
     ...(color === undefined ? {} : { color }),
     ...(node.group === true ? { group: true } : {}),
   };

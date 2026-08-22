@@ -93,6 +93,8 @@ export type AutoPlacer = (req: AutoPlaceRequest) => Promise<AutoPlaceResult>;
 export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IRDocPositioned> {
   const mode = resolveMode(ir.layout);
   const gap = ir.gap ?? DEFAULT_GAP;
+  const hGap = ir.colGap ?? gap;
+  const vGap = ir.rowGap ?? gap;
   const mayAutoGrid = ir.layout === undefined && ir.cols === undefined;
   const docEdges: AutoEdge[] = [];
   collectEdgesDeep(ir.children, docEdges);
@@ -101,6 +103,8 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
     mode,
     ir.cols,
     gap,
+    hGap,
+    vGap,
     { left: 0, top: 0, right: 0, bottom: 0 },
     ir.direction,
     ir.align ?? DEFAULT_ALIGN,
@@ -151,6 +155,8 @@ async function sizeFrame(
 ): Promise<IRFramePositioned> {
   const mode = resolveMode(frame.layout);
   const gap = frame.gap ?? DEFAULT_GAP;
+  const hGap = frame.colGap ?? gap;
+  const vGap = frame.rowGap ?? gap;
   const pad = frame.pad ?? FRAME_PAD_INNER;
   const hasFrameChild = frame.children.some((c) => c.kind === "frame" && drawsChrome(c));
   const padTop = pad + (hasFrameChild ? FRAME_TITLE_PX : 0);
@@ -159,6 +165,8 @@ async function sizeFrame(
     mode,
     frame.cols,
     gap,
+    hGap,
+    vGap,
     { left: pad, top: padTop, right: pad, bottom: pad },
     frame.direction,
     frame.align ?? DEFAULT_ALIGN,
@@ -184,6 +192,10 @@ async function layoutContainer(
   mode: LayoutMode,
   cols: number | undefined,
   gap: number,
+  /** Effective horizontal (column-axis) gap; `colGap ?? gap`. Used by `row`/`grid`. */
+  hGap: number,
+  /** Effective vertical (row-axis) gap; `rowGap ?? gap`. Used by `col`/`grid`. */
+  vGap: number,
   pad: Pad,
   direction: Direction | undefined,
   align: Align,
@@ -216,6 +228,9 @@ async function layoutContainer(
 
   if (mode === "row" || mode === "col" || mode === "grid") {
     applyContainerBoxSizing(children, sized, flowedIndices, mode);
+  }
+  if (mode === "row" || mode === "col") {
+    applyStretchAlign(children, sized, flowedIndices, mode, align);
   }
 
   let w: number;
@@ -284,16 +299,30 @@ async function layoutContainer(
       children,
       docEdges.filter((e) => e.label !== undefined),
     );
-    const effectiveGap = labelClearanceGap(flowMode, flowCols, collapsedIds, clearanceEdges, gap);
+    // col's main axis is vertical (rowGap axis); row's and grid's column
+    // spacing is horizontal (colGap axis) - label clearance widens whichever
+    // axis is the flow's main one.
+    const effectiveGap = labelClearanceGap(
+      flowMode,
+      flowCols,
+      collapsedIds,
+      clearanceEdges,
+      flowMode === "col" ? vGap : hGap,
+    );
+    // Grid's row axis is independent of its column axis - no label-clearance
+    // widening runs against it (D9's clearance is a same-row, horizontal
+    // concern), only the skip-row crossing widening below.
+    const effectiveRowGap = vGap;
     const rowGaps =
       flowMode === "grid"
-        ? skipRowGaps(collapsedIds, edges, resolveCols(flowCols, collapsedEls.length), effectiveGap)
+        ? skipRowGaps(collapsedIds, edges, resolveCols(flowCols, collapsedEls.length), effectiveRowGap)
         : [];
     const positions = computeFlowPositions(
       collapsedEls,
       flowMode,
       flowCols,
       effectiveGap,
+      effectiveRowGap,
       rowGaps,
       pad.left,
       pad.top,
@@ -385,6 +414,32 @@ function applyContainerBoxSizing(
   for (const i of boxIdx) {
     const box = children[i] as IRBox;
     if (box.h === undefined) sized[i] = { ...sized[i]!, h: Math.max(sharedH, sized[i]!.h) };
+  }
+}
+
+/**
+ * `align="stretch"` on a `row`/`col` container (D10): every flowed child - box,
+ * note, or frame alike, unlike `applyContainerBoxSizing` above which only
+ * votes boxes - grows to the container's cross-axis extent (the widest child
+ * in `col`, the tallest in `row`). A child with an explicit `w`/`h` opts out,
+ * same as the box-sharing pass. Opt-in only: `align` defaults to `center`,
+ * so a container that never asks for `stretch` is untouched.
+ */
+function applyStretchAlign(
+  children: readonly IRElement[],
+  sized: (IRBoxPositioned | IRNotePositioned | IRFramePositioned | null)[],
+  flowedIndices: readonly number[],
+  mode: "row" | "col",
+  align: Align,
+): void {
+  if (align !== "stretch" || flowedIndices.length === 0) return;
+  const dim: "w" | "h" = mode === "col" ? "w" : "h";
+  let cross = 0;
+  for (const i of flowedIndices) cross = Math.max(cross, sized[i]![dim]);
+  for (const i of flowedIndices) {
+    const el = children[i] as IRBox | IRNote | IRFrame;
+    if (el[dim] !== undefined) continue;
+    sized[i] = { ...sized[i]!, [dim]: cross };
   }
 }
 
@@ -714,6 +769,10 @@ function crossAxisPos(align: Align, pad: number, cross: number, size: number): n
   switch (align) {
     case "start":
       return pad;
+    case "stretch":
+      // Already grown to `cross` by `applyStretchAlign`; a child that opted
+      // out (explicit w/h) falls back to start.
+      return pad;
     case "center":
       return pad + Math.round((cross - size) / 2);
     case "end":
@@ -726,6 +785,8 @@ function computeFlowPositions(
   mode: FlowMode,
   cols: number | undefined,
   gap: number,
+  /** Grid-only: the row-axis gap default (row/col ignore this - see call site). */
+  rowGapBase: number,
   rowGaps: readonly number[],
   padLeft: number,
   padTop: number,
@@ -744,7 +805,7 @@ function computeFlowPositions(
   }
   if (mode === "grid") {
     const n = resolveCols(cols, els.length);
-    return gridPositions(els, n, gap, rowGaps, padLeft, padTop, serpentine);
+    return gridPositions(els, n, gap, rowGapBase, rowGaps, padLeft, padTop, serpentine);
   }
   const maxW = els.reduce((m, el) => Math.max(m, el.w), 0);
   const out: { x: number; y: number }[] = [];
@@ -765,6 +826,7 @@ function gridPositions(
   els: readonly Rect[],
   cols: number,
   gap: number,
+  rowGapBase: number,
   rowGaps: readonly number[],
   padLeft: number,
   padTop: number,
@@ -789,7 +851,7 @@ function gridPositions(
   let y = padTop;
   for (let r = 0; r < rows; r++) {
     rowY.push(y);
-    y += rowHeights[r]! + (rowGaps[r] ?? gap);
+    y += rowHeights[r]! + (rowGaps[r] ?? rowGapBase);
   }
   return els.map((_, i) => ({
     x: colX[serpentineCol(i, cols, serpentine)]!,
