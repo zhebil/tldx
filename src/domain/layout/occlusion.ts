@@ -5,10 +5,11 @@
  * said nothing about the picture, so a `<Note>` could cover three of four
  * topics and `check` stayed silent.
  *
- * Two checks, both warnings (a deliberate overlap must still compile):
+ * Three checks, all warnings (a deliberate overlap must still compile):
  * - a shape's rect covers another shape's rect, neither containing the other.
  * - a labelled edge's placed label rect (`routing.ts`'s `EdgeRoute.labelBox`,
  *   the same geometry `emit` uses) covers a shape the edge doesn't connect to.
+ * - a box's label doesn't fit the box's own final size (D22).
  *
  * `walkShapes`/`isAncestor`/`overlapArea` are the geometry `tools/layout-report.mts`
  * already used to compute "overlapping shape pairs" - moved here so `check`
@@ -17,8 +18,9 @@
 
 import { warning } from "../diagnostics/index.js";
 import type { Diagnostic, SourceSpan } from "../diagnostics/index.js";
-import type { IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
+import type { IRBoxPositioned, IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
 
+import { labelOverflow } from "./defaults.js";
 import { computeEdgeRoutes } from "./routing.js";
 import type { LabelBox } from "./routing.js";
 
@@ -174,7 +176,49 @@ function labelOverlapDiagnostics(doc: IRDocPositioned, shapes: AbsShape[]): Diag
   return diagnostics;
 }
 
+function collectBoxes(doc: IRDocPositioned): IRBoxPositioned[] {
+  const boxes: IRBoxPositioned[] = [];
+  function visit(children: IRElementPositioned[]): void {
+    for (const child of children) {
+      if (child.kind === "frame") visit(child.children);
+      else if (child.kind === "box") boxes.push(child);
+    }
+  }
+  visit(doc.children);
+  return boxes;
+}
+
+/**
+ * D22: a box's label can silently clip - `check` validates the IR, not the
+ * rendered picture, and nothing before this re-measured a label against the
+ * box's *final* size once something else (an explicit `w`/`h`, a container's
+ * shared-size vote) had already decided it. `labelOverflow` is the same
+ * containment math `estimatedBoxSize` uses to size a box from scratch, run
+ * in reverse against a box that already has a size.
+ */
+function labelOverflowDiagnostics(boxes: readonly IRBoxPositioned[]): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const box of boxes) {
+    if (!box.label) continue;
+    const overflow = labelOverflow(box.label, box.w, box.h, box);
+    if (!overflow) continue;
+    diagnostics.push(
+      warning(
+        "layout/label-overflow",
+        `"${box.label}" (${box.id}) does not fit its box - needs ${overflow.neededW}x${overflow.neededH}px, box is ${box.w}x${box.h}px`,
+        box.span,
+      ),
+    );
+  }
+  return diagnostics;
+}
+
 export function computeOcclusionDiagnostics(doc: IRDocPositioned): Diagnostic[] {
   const shapes = walkShapes(doc);
-  return [...shapeOverlapDiagnostics(shapes), ...labelOverlapDiagnostics(doc, shapes)];
+  const boxes = collectBoxes(doc);
+  return [
+    ...shapeOverlapDiagnostics(shapes),
+    ...labelOverlapDiagnostics(doc, shapes),
+    ...labelOverflowDiagnostics(boxes),
+  ];
 }
