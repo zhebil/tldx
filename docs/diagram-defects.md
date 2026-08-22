@@ -711,7 +711,40 @@ blocker.
   row from 152 to 320px tall, which is why `Commit` is a 310px-tall rectangle
   holding four words.
 - **Repro:** `examples/repro/d20-maxw-ignored-on-diamond.tldsl.jsx`
-- **Status:** open
+- **Status:** fixed in `3fa4a77` + `fc0f1c1`/`96a34b5` + T47 follow-up, three
+  passes because the first two each traded one bug for another. Root cause
+  stands as diagnosed: `geoScale` inflates a box's width *and* height
+  together, uniformly, so the label still fits the outline once the box is
+  scaled up - and that inflation ran after `fitBoxWidth` had already
+  respected `maxW` as a wrap budget, so the *scaled* width (`rw * k`) blew
+  straight past the cap with nothing to catch it. Pass one (`3fa4a77`) scaled
+  the whole box - width *and* height - down by the same factor to meet the
+  cap, which undid exactly the inflation that kept the label inside the
+  outline: rendered, the label crossed the diamond's sloped sides and the
+  ellipse's curve - containment broke. Pass two (`fc0f1c1`/`96a34b5`) fixed
+  that: `maxW` now caps the *shape's* outer width only, and the label is
+  re-wrapped to the room actually available inside the outline at that
+  width, growing height (never shrinking it) until the label fits again. A
+  capped diamond or ellipse is legitimately taller than an equivalently
+  capped rectangle holding the same label - `health-gate` (diamond, 2-line
+  label) renders 200x403, `quality-gate` (diamond, 3-line label) 200x465 -
+  and every label stays inside its outline. But that pass left the inflated
+  height set the *row's* shared height: `applyContainerBoxSizing` gave every
+  flowed box in a row the tallest sibling's `h`, and an outline's inflation
+  is not a measure of what its neighbors need, so `Commit` - four words in a
+  plain rectangle - was pulled to 159x465, 50% taller than the 310px-tall
+  box D20 originally complained about. Pass three (T47) has a row vote its
+  shared height with each box's natural, uninflated content height (the
+  rectangle `fitBoxWidth`/`boxHeightForWidth` would give it before
+  `geoScale`'s `k`), so a diamond's outline-driven height no longer sets the
+  row. A box's own final height still never drops below what containment
+  requires, so `quality-gate` and `health-gate` are unchanged at 200x465 and
+  200x403; `Commit` and its rectangle siblings are back to their natural
+  159x182, vertically centered against the taller diamond by the row/col
+  cross-axis alignment already in place. Same shape in the repro:
+  `examples/repro/d20-maxw-ignored-on-diamond.tldsl.jsx`'s rectangle `c` sits
+  at its natural 186x152 beside the diamond `d` at 200x403, centered, not
+  stretched to match it.
 
 ### D21. A cross-container edge is a straight chord, and a backwards one is the worst case
 

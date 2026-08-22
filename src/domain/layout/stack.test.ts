@@ -985,6 +985,37 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     const capped = boxById(result.children, "capped");
     expect(capped.w).toBe(100);
   });
+
+  it("does not let a capped diamond's outline-inflated height drag a rect row sibling up to match it (D20 follow-up)", async () => {
+    const cLabel = "Deploy to staging";
+    const dLabel = "Quality gate coverage check";
+    const result = await layoutAst(
+      doc({ layout: "row" }, [
+        box({ id: "c", label: cLabel }),
+        box({ id: "d", label: dLabel, geo: "diamond", maxW: 200 }),
+      ]),
+    );
+    const c = boxById(result.children, "c");
+    const d = boxById(result.children, "d");
+
+    // d is capped at maxW and legitimately taller than its own natural
+    // content height because of the diamond's outline (containment, T47's
+    // predecessor) - that stays.
+    const dNatural = boxHeightForWidth(dLabel, fitBoxWidth(dLabel, 200));
+    expect(d.w).toBe(200);
+    expect(d.h).toBeGreaterThan(dNatural);
+
+    // c still gets a uniform row height (voted from natural content heights,
+    // d's included) but must not be stretched all the way to d's inflated,
+    // outline-driven height.
+    const sharedNatural = Math.max(boxHeightForWidth(cLabel, fitBoxWidth(cLabel)), dNatural);
+    expect(c.h).toBe(sharedNatural);
+    expect(c.h).toBeLessThan(d.h);
+
+    // centred against the taller diamond by the row's existing cross-axis
+    // alignment, not pinned to its top.
+    expect(c.y).toBeGreaterThan(d.y);
+  });
 });
 
 describe("note sizing: geo <Note> vs sticky <Sticky>", () => {
