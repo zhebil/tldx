@@ -1149,6 +1149,63 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     // alignment, not pinned to its top.
     expect(c.y).toBeGreaterThan(d.y);
   });
+
+  it("equalize=false lets col box heights track their own natural content instead of the tallest sibling", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col", equalize: false }, [
+        box({ id: "small", label: "5%" }),
+        box({ id: "mid", label: "A moderately longer label for the middle zone" }),
+        box({
+          id: "big",
+          label:
+            "A much, much longer label describing the largest zone in the diagram, spanning several lines of wrapped text",
+        }),
+      ]),
+    );
+    const small = boxById(result.children, "small");
+    const mid = boxById(result.children, "mid");
+    const big = boxById(result.children, "big");
+    expect(small.h).toBeLessThan(mid.h);
+    expect(mid.h).toBeLessThan(big.h);
+    // width sharing is unaffected by equalize=false
+    expect(mid.w).toBe(small.w);
+    expect(big.w).toBe(small.w);
+  });
+
+  it("equalize defaults to true (unset behaves like the pre-existing equalized col)", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        box({ id: "small", label: "5%" }),
+        box({
+          id: "big",
+          label:
+            "A much, much longer label describing the largest zone in the diagram, spanning several lines of wrapped text",
+        }),
+      ]),
+    );
+    const small = boxById(result.children, "small");
+    const big = boxById(result.children, "big");
+    expect(small.h).toBe(big.h);
+  });
+
+  it("equalize=false on a frame also opts its col out, independent of its parent", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [
+        frame({ id: "zones", layout: "col", equalize: false, pad: 0 }, [
+          box({ id: "small", label: "5%" }),
+          box({
+            id: "big",
+            label:
+              "A much, much longer label describing the largest zone in the diagram, spanning several lines of wrapped text",
+          }),
+        ]),
+      ]),
+    );
+    const zones = result.children.find((c) => c.id === "zones") as IRFramePositioned;
+    const small = boxById(zones.children, "small");
+    const big = boxById(zones.children, "big");
+    expect(small.h).toBeLessThan(big.h);
+  });
 });
 
 describe("note sizing: geo <Note> vs sticky <Sticky>", () => {

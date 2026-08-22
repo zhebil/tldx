@@ -74,7 +74,7 @@ import type {
 import { contentHash, SyntheticIdAllocator } from "./synthetic-id.js";
 
 const ALLOWED_PROPS = {
-  doc: ["id", "direction", "layout", "gap", "rowGap", "colGap", "pad", "cols", "align"],
+  doc: ["id", "direction", "layout", "gap", "rowGap", "colGap", "pad", "cols", "align", "equalize"],
   frame: [
     "id",
     "name",
@@ -86,6 +86,7 @@ const ALLOWED_PROPS = {
     "pad",
     "cols",
     "align",
+    "equalize",
     "x",
     "y",
     "w",
@@ -248,6 +249,7 @@ export function lower(ast: AstNode | null): LowerResult {
   const direction = readDirection(ast.attrs, ctx);
   const layout = readLayoutMode(ast.attrs, ctx);
   const align = readAlign(ast.attrs, ctx);
+  const equalize = readBoolean(ast.attrs, "equalize", ctx);
   const doc: IRDoc = {
     kind: "doc",
     ...idHeader,
@@ -256,6 +258,7 @@ export function lower(ast: AstNode | null): LowerResult {
     ...(direction === undefined ? {} : { direction }),
     ...(layout === undefined ? {} : { layout }),
     ...(align === undefined ? {} : { align }),
+    ...(equalize === undefined ? {} : { equalize }),
     ...numericAttrs(ast.attrs, ctx, ["gap", "rowGap", "colGap", "pad", "cols"] as const),
   };
   for (const child of ast.children) {
@@ -308,6 +311,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
   const direction = readDirection(node.attrs, ctx);
   const layout = readLayoutMode(node.attrs, ctx);
   const align = readAlign(node.attrs, ctx);
+  const equalize = readBoolean(node.attrs, "equalize", ctx);
   const color = readEnum(node.attrs, "color", COLORS, ctx);
   const frame: IRFrame = {
     kind: "frame",
@@ -323,6 +327,7 @@ function lowerFrame(node: AstFrame, ctx: Ctx): IRFrame {
     ...(direction === undefined ? {} : { direction }),
     ...(layout === undefined ? {} : { layout }),
     ...(align === undefined ? {} : { align }),
+    ...(equalize === undefined ? {} : { equalize }),
     ...numericAttrs(node.attrs, ctx, ["x", "y", "w", "h"] as const),
     ...numericAttrs(node.attrs, ctx, ["gap", "rowGap", "colGap", "pad", "cols"] as const),
     ...(color === undefined ? {} : { color }),
@@ -686,6 +691,22 @@ function readAlign(attrs: Attrs, ctx: Ctx): Align | undefined {
     error(
       "ir/bad-align",
       `'align' must be one of ${ALIGNS.join(", ")} (got '${raw}')`,
+      attr.span,
+    ),
+  );
+  return undefined;
+}
+
+function readBoolean(attrs: Attrs, name: string, ctx: Ctx): boolean | undefined {
+  const attr = attrs[name];
+  if (attr === undefined) return undefined;
+  const raw = attr.value;
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  ctx.diagnostics.push(
+    error(
+      "ir/invalid-boolean-attr",
+      `'${name}' must be 'true' or 'false' (got '${raw}')`,
       attr.span,
     ),
   );
