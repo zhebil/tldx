@@ -205,6 +205,7 @@ function emitEdge(edge: IREdge, out: TLRecord[], route: EdgeRoute | undefined): 
       ...(edge.labelColor === undefined ? {} : { labelColor: edge.labelColor }),
       ...(edge.font === undefined ? {} : { font: edge.font }),
       ...(edge.size === undefined ? {} : { size: edge.size }),
+      ...(route?.labelPosition === undefined ? {} : { labelPosition: route.labelPosition }),
     }),
   );
   out.push(

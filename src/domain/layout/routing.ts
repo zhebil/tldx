@@ -22,6 +22,7 @@
  */
 
 import type { IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
+import { ARROW_LABEL_PADDING, arrowLabelLineHeight, arrowLabelWidth } from "./glyph-metrics.js";
 
 /** tldraw's own MIN_ARROW_BEND: anything smaller renders as a straight line, so round down to 0. */
 const MIN_BEND = 8;
@@ -43,7 +44,7 @@ type Axis = "horizontal" | "vertical";
 type Side = "neg" | "pos";
 type Point = { x: number; y: number };
 
-export type EdgeRoute = { bend: number; startAnchor?: Point; endAnchor?: Point };
+export type EdgeRoute = { bend: number; startAnchor?: Point; endAnchor?: Point; labelPosition?: number };
 
 /** Extra sag, in px, per lane a skip edge is pushed out from its innermost sibling. */
 const LANE_STEP = 20;
@@ -104,7 +105,121 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
 
   fanSharedPairs(otherEdges, byId, routes);
 
+  placeLabels(edges, byId, shapes, routes);
+
   return routes;
+}
+
+/** Candidate `t` positions along an arrow, ordered nearest-to-midpoint first (first-wins tie-break). */
+const LABEL_CANDIDATE_TS = [0.5, 0.38, 0.62, 0.28, 0.72, 0.2, 0.8];
+
+type LabelBox = { x: number; y: number; w: number; h: number };
+
+type LabelSlot = {
+  edge: IREdge;
+  start: Point;
+  end: Point;
+  perp: Point;
+  bend: number;
+  w: number;
+  h: number;
+  box: LabelBox;
+};
+
+/**
+ * Slides each labelled edge's label along its own arrow (via `labelPosition`)
+ * to the nearest-to-midpoint spot clear of the other edge labels and of any
+ * non-endpoint box/note. Every label starts at its own midpoint and every
+ * label is a blocker for every other, so an edge moved off a shape does not
+ * land on a label that has not been placed yet; mutates `routes` in place.
+ */
+function placeLabels(
+  edges: IREdge[],
+  byId: Map<string, AbsShape>,
+  shapes: AbsShape[],
+  routes: Map<string, EdgeRoute>,
+): void {
+  const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
+
+  const slots: LabelSlot[] = [];
+  for (const edge of edges) {
+    if (!edge.label || edge.from === edge.to) continue;
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (!from || !to) continue;
+
+    const start = bodyExitPoint(from, to);
+    const end = bodyExitPoint(to, from);
+    const u = unit(start, end);
+    const slot: LabelSlot = {
+      edge,
+      start,
+      end,
+      perp: { x: -u.y, y: u.x },
+      bend: routes.get(edge.id)?.bend ?? 0,
+      w: arrowLabelWidth(edge.label, edge) + 2 * ARROW_LABEL_PADDING,
+      h: arrowLabelLineHeight(edge) + 2 * ARROW_LABEL_PADDING,
+      box: { x: 0, y: 0, w: 0, h: 0 },
+    };
+    slot.box = boxAt(slot, 0.5);
+    slots.push(slot);
+  }
+
+  for (const slot of slots) {
+    const blockers = blockerPool.filter((s) => s.id !== slot.edge.from && s.id !== slot.edge.to);
+    const others = slots.filter((o) => o !== slot);
+
+    let bestT = 0.5;
+    let bestScore = Infinity;
+    let bestBox = slot.box;
+
+    for (const t of LABEL_CANDIDATE_TS) {
+      const box = boxAt(slot, t);
+      let score = 0;
+      for (const s of blockers) if (boxesOverlap(box, s)) score++;
+      for (const o of others) if (boxesOverlap(box, o.box)) score++;
+      if (score < bestScore) {
+        bestScore = score;
+        bestT = t;
+        bestBox = box;
+      }
+      if (score === 0) break;
+    }
+
+    slot.box = bestBox;
+    if (bestT !== 0.5) {
+      const existing = routes.get(slot.edge.id);
+      routes.set(
+        slot.edge.id,
+        existing === undefined ? { bend: 0, labelPosition: bestT } : { ...existing, labelPosition: bestT },
+      );
+    }
+  }
+}
+
+/** Point on the parabola approximating the arc at `t`, per `finalizeRoute`'s bend/perp convention. */
+function boxAt({ start, end, perp, bend, w, h }: LabelSlot, t: number): LabelBox {
+  const bow = bend * 4 * t * (1 - t);
+  const cx = start.x + (end.x - start.x) * t + perp.x * bow;
+  const cy = start.y + (end.y - start.y) * t + perp.y * bow;
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
+/** Where the chord from `s`'s centre toward `other`'s centre exits `s`'s rectangle - tldraw's actual arrow terminal. */
+function bodyExitPoint(s: AbsShape, other: AbsShape): Point {
+  const centre: Point = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
+  const otherCentre: Point = { x: other.x + other.w / 2, y: other.y + other.h / 2 };
+  const dx = otherCentre.x - centre.x;
+  const dy = otherCentre.y - centre.y;
+  let t = Infinity;
+  if (dx !== 0) t = Math.min(t, ((dx > 0 ? s.x + s.w : s.x) - centre.x) / dx);
+  if (dy !== 0) t = Math.min(t, ((dy > 0 ? s.y + s.h : s.y) - centre.y) / dy);
+  if (!Number.isFinite(t)) return centre;
+  return { x: centre.x + t * dx, y: centre.y + t * dy };
+}
+
+function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
 function fanSharedPairs(

@@ -38,6 +38,8 @@ export type CrossingPair = { arrowId: string; from: string; to: string; crossedI
 
 export type LabelOverlapPair = { arrowId: string; crossedId: string };
 
+export type LabelCollisionPair = { arrowIdA: string; arrowIdB: string };
+
 export type CrowdedPair = { a: string; b: string; fraction: number };
 
 /** Two paths this close, for this much of one of them, read as a single stroke. */
@@ -88,6 +90,12 @@ async function reportFile(file: string): Promise<void> {
     process.stdout.write(`  label-overlap: ${arrowId} over ${crossedId}\n`);
   }
   process.stdout.write(`arrow labels overlapping a non-endpoint shape: ${labelOverlaps.length}\n`);
+
+  const labelCollisions = labelCollisionPairs(sortedArrows);
+  for (const { arrowIdA, arrowIdB } of labelCollisions) {
+    process.stdout.write(`  label-collision: ${arrowIdA} / ${arrowIdB}\n`);
+  }
+  process.stdout.write(`arrow labels overlapping another label: ${labelCollisions.length}\n`);
 }
 
 function formatPath(points: Pt[]): string {
@@ -184,6 +192,26 @@ export function labelOverlapPairs(
       if (s.id === from || s.id === to) continue;
       const rect = { x: s.x + 0.5, y: s.y + 0.5, w: s.w - 1, h: s.h - 1 };
       if (rectsOverlap(labelBox, rect)) pairs.push({ arrowId, crossedId: s.id });
+    }
+  }
+  return pairs;
+}
+
+/**
+ * One row per pair of labeled arrows whose label bounding boxes (page space)
+ * intersect each other. Each unordered pair counted once.
+ */
+export function labelCollisionPairs(arrows: ArrowTruth[]): LabelCollisionPair[] {
+  const pairs: LabelCollisionPair[] = [];
+  for (let i = 0; i < arrows.length; i++) {
+    const a = arrows[i]!;
+    if (!a.labelBox) continue;
+    for (let j = i + 1; j < arrows.length; j++) {
+      const b = arrows[j]!;
+      if (!b.labelBox) continue;
+      if (rectsOverlap(a.labelBox, b.labelBox)) {
+        pairs.push({ arrowIdA: a.arrowId, arrowIdB: b.arrowId });
+      }
     }
   }
   return pairs;

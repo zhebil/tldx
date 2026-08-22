@@ -45,7 +45,7 @@ import {
   type LayoutMode,
 } from "./defaults.js";
 import { attachNotes } from "./attach.js";
-import { arrowLabelLineHeight, arrowLabelWidth } from "./glyph-metrics.js";
+import { ARROW_LABEL_PADDING, arrowLabelLineHeight, arrowLabelWidth } from "./glyph-metrics.js";
 
 const DEFAULT_GAP = 40;
 const SKIP_ROW_GAP_FACTOR = 2;
@@ -53,8 +53,6 @@ const SKIP_ROW_GAP_MAX = 4;
 const TARGET_ASPECT = 16 / 9;
 /** tldraw `arrowLabel.ts`'s squish margin: a straight arrow's body must be at least `label width + 64` before its label renders unsquished. */
 const ARROW_LABEL_MARGIN = 64;
-/** tldraw `ARROW_LABEL_PADDING` (`default-shape-constants.ts:55`), added on every side of the label box. */
-const ARROW_LABEL_PADDING = 4.25;
 
 type Rect = { x: number; y: number; w: number; h: number };
 type FlowMode = "row" | "col" | "grid";

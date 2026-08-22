@@ -148,6 +148,9 @@ export function lineHeightPx(ts?: TextStyle): number {
 /** tldraw's `ARROW_LABEL_FONT_SIZES` (`default-shape-constants.ts:37`) - distinct from `LABEL_FONT_PX`, which is box/note only. */
 export const ARROW_LABEL_FONT_PX: Record<StyleFontSize, number> = { s: 18, m: 20, l: 24, xl: 28 };
 
+/** tldraw `ARROW_LABEL_PADDING` (`default-shape-constants.ts:55`), added on every side of the label box. */
+export const ARROW_LABEL_PADDING = 4.25;
+
 /** Same measurement as `textWidth`, scaled by the arrow label's own font-size table instead of `LABEL_FONT_PX`. */
 export function arrowLabelWidth(s: string, ts?: TextStyle): number {
   if (s.length === 0) return 0;

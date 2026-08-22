@@ -25,7 +25,7 @@ function frame(input: {
   return { kind: "frame", idExplicit: true, span: SPAN, ...input };
 }
 
-function edge(input: { id: string; from: string; to: string }): IREdge {
+function edge(input: { id: string; from: string; to: string; label?: string }): IREdge {
   return { kind: "edge", idExplicit: true, span: SPAN, ...input };
 }
 
@@ -319,5 +319,46 @@ describe("computeEdgeRoutes", () => {
     ]);
     const routes = computeEdgeRoutes(ir);
     expect(routes.get("ab")).toBeUndefined();
+  });
+
+  describe("label placement", () => {
+    it("slides two labels spanning the same gap apart when their midpoint boxes would overlap", () => {
+      const ir = doc("root", [
+        box({ id: "a1", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "a2", x: 0, y: 300, w: 100, h: 50 }),
+        box({ id: "b1", x: 10, y: 0, w: 100, h: 50 }),
+        box({ id: "b2", x: 10, y: 300, w: 100, h: 50 }),
+        edge({ id: "a1a2", from: "a1", to: "a2", label: "loading" }),
+        edge({ id: "b1b2", from: "b1", to: "b2", label: "saving" }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      const posA = routes.get("a1a2")?.labelPosition ?? 0.5;
+      const posB = routes.get("b1b2")?.labelPosition ?? 0.5;
+      expect(posA).not.toBe(posB);
+    });
+
+    it("slides a label off a foreign box sitting at its geometric midpoint", () => {
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "d", x: 300, y: 300, w: 100, h: 50 }),
+        box({ id: "obstacle", x: 150, y: 125, w: 100, h: 100 }),
+        edge({ id: "ad", from: "a", to: "d", label: "build" }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      const route = routes.get("ad");
+      expect(route?.labelPosition).toBeDefined();
+      expect(route?.labelPosition).not.toBe(0.5);
+    });
+
+    it("keeps a short label at the default midpoint when nothing crowds it", () => {
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 300, y: 0, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b", label: "ok" }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      const route = routes.get("ab");
+      expect(route === undefined || route.labelPosition === undefined || route.labelPosition === 0.5).toBe(true);
+    });
   });
 });

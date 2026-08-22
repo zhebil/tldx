@@ -248,6 +248,7 @@ export function arrowShape(
     labelColor?: string;
     font?: string;
     size?: string;
+    labelPosition?: number;
   },
 ): TLRecord {
   return {
@@ -267,7 +268,7 @@ export function arrowShape(
       arrowheadStart: input.arrowheadStart ?? "none",
       arrowheadEnd: input.arrowheadEnd ?? "arrow",
       text: input.text ?? "",
-      labelPosition: 0.5,
+      labelPosition: input.labelPosition ?? 0.5,
       scale: 1,
       elbowMidPoint: 0.5,
     },
