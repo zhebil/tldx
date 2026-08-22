@@ -106,7 +106,7 @@ entry. If a task needs an essay, it belongs in the ledger or in
   overlapping shape pairs; the `tcp-lifecycle` render shows the server reaching
   `CLOSED`; T41's new warning fires on neither.
 
-- [ ] **T44. A diagnostic names the component the author wrote.** *(D12, half of
+- [x] **T44. A diagnostic names the component the author wrote.** *(D12, half of
   D16)*
   All eight container aliases report themselves as `<frame>` and both note kinds
   as `<note>`, so the error names an element that does not appear in the file.
@@ -115,6 +115,12 @@ entry. If a task needs an essay, it belongs in the ledger or in
   **Acceptance:** `d12-group-requires-id` errors say `<Group>`;
   `d16-note-maxw-rejected` says `<Sticky>` for a `<Sticky>`; every alias is
   covered by a test, not just the two in the repros.
+  **Done in `ee8ec31`.** An optional `tag` on `AstFrame`/`AstNote` records the
+  alias the runtime component was, and `displayTag` resolves it for the message;
+  the IR `kind` still drives the allowlist and the synthetic-id hash, so nothing
+  structural moved. All eight aliases plus both note kinds are pinned by a
+  table-driven test. `<box>` became `<Box>` in the bargain - same principle,
+  name what the author typed.
 
 - [ ] **T45. `maxW` and multiline labels: make the prop tables true.** *(D16,
   D19)*
