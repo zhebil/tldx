@@ -7,7 +7,7 @@ the same IR/layout/emit pipeline the old text format used. See
 accept today.
 
 ```jsx
-import { Doc, Frame, Box, Note, Edge, flow } from "tldsl";
+import { Doc, Frame, Box, Edge, flow } from "tldsl";
 
 export default function Diagram() {
   return <Doc>...</Doc>;
@@ -130,19 +130,22 @@ line number and the allowed list.
 | `<Doc>` | `id`, `direction`, `layout`, `gap`, `pad`, `cols` |
 | `<Frame>` | `id`, `name`, `direction`, `layout`, `gap`, `pad`, `cols`, `x`, `y`, `w`, `h`, `color` |
 | `<Box>` | `id`, `label`, `x`, `y`, `w`, `h`, `maxW`, `color`, `fill`, `dash`, `geo`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
-| `<Note>` / `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `color`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
+| `<Text>` | `id`, `x`, `y`, `w`, `maxW`, `color`, `textAlign`, `font`, `size` |
+| `<Sticky>` | `id`, `on`, `x`, `y`, `w`, `h`, `maxW`, `color`, `textAlign`, `verticalAlign`, `labelColor`, `font`, `size` |
 | `<Edge>` | `id`, `from`, `to`, `color`, `dash`, `arrowheadStart`, `arrowheadEnd`, `label`, `labelColor`, `font`, `size` |
 
 `x`/`y`/`w`/`h`/`gap`/`pad`/`cols`/`maxW` are numbers written as strings
 (`w="200"`), like any other JSX attribute value. A non-numeric value is
-`ir/invalid-numeric-attr`. `maxW` on `<Box>` caps the char budget a label
-wraps against, without pinning `w` itself; explicit `w`/`h` still win over
-any computed size.
+`ir/invalid-numeric-attr`. `maxW` on `<Box>`, `<Sticky>`, or `<Text>` caps
+the char budget a label or text wraps against, without pinning `w` itself;
+an explicit `w` (and `h`, on the elements that accept one - `<Text>` has no
+`h` at all, its height is always derived from wrapped content) still wins
+over any computed size.
 
 `id` is required on `<Box>` and `<Frame>` (`ir/missing-id`) since edges
-address them by id. `<Doc>`, `<Note>`, and `<Edge>` get a synthesized id when
-omitted. Duplicate explicit ids are `ir/duplicate-id`, reported at the
-*second* occurrence, naming the first definition's line.
+address them by id. `<Doc>`, `<Sticky>`, `<Text>`, and `<Edge>` get a
+synthesized id when omitted. Duplicate explicit ids are `ir/duplicate-id`,
+reported at the *second* occurrence, naming the first definition's line.
 
 `color`/`fill`/`dash`/`arrowheadStart`/`arrowheadEnd` are raw tldraw style
 enums, pass-through only - they never affect layout geometry. `color` is one
@@ -159,28 +162,43 @@ prop today - `className` or `style` are `ir/unknown-prop` just like a typo
 would be.
 
 `textAlign`/`verticalAlign`/`labelColor` (T10) are raw tldraw text-style
-enums on `<Box>` and `<Note>`/`<Sticky>` only, pass-through only (no effect
-on layout geometry). `textAlign` and `verticalAlign` are each `start |
-middle | end`; `labelColor` reuses the same 13-value palette as `color`. An
-unrecognized value is `ir/invalid-style-value`, same as the other style
-props. Named `textAlign`, not `align`: `align` is already the container
-cross-axis alignment prop on `<Doc>`/`<Frame>` (see B1) and reusing it here
-would make the same prop name mean two different things depending on which
-component reads it. `<Edge>` also accepts `labelColor` (T12, see Edges
-below) - it's a pass-through only there too. `<Frame>` has none of these
-three - tldraw's frame shape props are exactly `{ w, h, name, color }`.
-`<Edge>` has no `textAlign`/`verticalAlign` - an arrow label is always
-center-anchored on its own bounding box, so alignment doesn't apply.
+enums, pass-through only (no effect on layout geometry). `<Box>` and
+`<Sticky>` accept all three; `<Text>` accepts only `textAlign` - tldraw's
+`text` shape has no `verticalAlign` or `labelColor` (no border to align a
+label inside of, and no separate label color from the text color; see
+`ALLOWED_PROPS.text` in `domain/ir/lower.ts`). `textAlign` and
+`verticalAlign` are each `start | middle | end`; `labelColor` reuses the
+same 13-value palette as `color`. An unrecognized value is
+`ir/invalid-style-value`, same as the other style props. Named `textAlign`,
+not `align`: `align` is already the container cross-axis alignment prop on
+`<Doc>`/`<Frame>` (see B1) and reusing it here would make the same prop name
+mean two different things depending on which component reads it. `<Edge>`
+also accepts `labelColor` (T12, see Edges below) - it's a pass-through only
+there too. `<Frame>` has none of these three - tldraw's frame shape props
+are exactly `{ w, h, name, color }`. `<Edge>` has no
+`textAlign`/`verticalAlign` - an arrow label is always center-anchored on
+its own bounding box, so alignment doesn't apply.
 
-`font`/`size` (T11) are raw tldraw text-style enums on `<Box>`,
-`<Note>`/`<Sticky>`, and `<Edge>` (T12). On `<Box>`/`<Note>` they *do* affect
-layout: label wrapping and box/note sizing key off tldraw's real per-glyph
-metrics for the chosen (font, size) pair (`domain/layout/glyph-metrics.ts`).
-`font` is `draw | sans | serif | mono`; `size` is `s | m | l | xl`, tldraw's
-`LABEL_FONT_SIZES` (18/22/26/32px) on `<Box>`/`<Note>`, or
-`ARROW_LABEL_FONT_SIZES` on `<Edge>` (`size` there also sets the arrow's
-stroke weight, same as `<Box>`/`<Note>` size sets border weight). An
-unrecognized value is `ir/invalid-style-value`, same as the other style
+`font`/`size` (T11) are raw tldraw text-style enums on `<Box>`, `<Sticky>`,
+`<Text>`, and `<Edge>` (T12). On all four they *do* affect layout: label/text
+wrapping and box/sticky/text sizing key off tldraw's real per-glyph metrics
+for the chosen (font, size) pair (`domain/layout/glyph-metrics.ts`). `font`
+is `draw | sans | serif | mono`; `size` is `s | m | l | xl`, mapped through
+one of three separate tldraw font-size tables depending on which shape it
+lands on (`domain/layout/glyph-metrics.ts`'s `LABEL_FONT_PX` /
+`TEXT_FONT_PX` / `ARROW_LABEL_FONT_PX`):
+
+- `<Box>` and `<Sticky>` - tldraw's `LABEL_FONT_SIZES` (18/22/26/32px), the
+  size of a label drawn *inside* a geo box or a sticky note (`size` also
+  sets the box's border weight on `<Box>`).
+- `<Text>` - tldraw's `FONT_SIZES` (18/24/36/44px), the size tldraw's
+  standalone `text` shape uses - visibly larger than a same-`size` box
+  label, since there's no border eating into the available room (D23).
+- `<Edge>` - tldraw's `ARROW_LABEL_FONT_SIZES` (18/20/24/28px); `size` there
+  also sets the arrow's stroke weight, the same way `<Box>`/`<Sticky>` size
+  sets border weight.
+
+An unrecognized value is `ir/invalid-style-value`, same as the other style
 props. Default is `draw`/`m`. `<Frame>` has neither - a frame title doesn't
 wrap through this path.
 
@@ -281,33 +299,38 @@ empty is an unlabeled arrow (tldraw's default empty text):
 <Edge id="e2" from="api" to="db" label="reads" />
 ```
 
-## Attaching a note
+## Attaching a sticky note
 
-`on` pins a `<Note>` (or `<Sticky>`) to whatever it's annotating instead of
-leaving it to flow in source order:
+`on` pins a `<Sticky>` to whatever it's annotating instead of leaving it to
+flow in source order. It is the only attach-capable annotation - `<Text>`
+has no `on` prop (see the Props table above):
 
 ```jsx
-<Note on="api-gateway">Only the gateway terminates TLS.</Note>
-<Note on="e-orders-payments">Retries are idempotent here.</Note>
+<Sticky on="api-gateway">Only the gateway terminates TLS.</Sticky>
+<Sticky on="e-orders-payments">Retries are idempotent here.</Sticky>
 ```
 
-`on` names any box, frame, note, or edge id in the document (not just
-siblings). An id that doesn't resolve is `ir/note-target-not-found`; the
-note falls back to normal flow placement rather than being dropped.
+`on` names any box, frame, sticky, or edge id in the document (not just
+siblings). An id that doesn't resolve is `ir/note-target-not-found` (the
+diagnostic code kept its pre-`<Sticky>` name; internally the IR/AST kind is
+still `"note"` - `domain/ir/lower.ts`'s `resolveNoteTargets` - and `<Sticky>`
+is the only surface element that lowers to it); the sticky falls back to
+normal flow placement rather than being dropped.
 
-A note attached to an **edge** is placed at the midpoint of the edge's two
+A sticky attached to an **edge** is placed at the midpoint of the edge's two
 endpoint shapes' centres - a straight-chord approximation that ignores any
-bow a same-axis skip edge is drawn with, since the note only needs to land
+bow a same-axis skip edge is drawn with, since the sticky only needs to land
 near the edge, not trace its curve.
 
-An attached note does not participate in layout: it never resizes a row/
+An attached sticky does not participate in layout: it never resizes a row/
 column/grid, and it never pushes a sibling. After the rest of the document
 is placed, it's parked 24px off one side of its target (right, then below,
 then left, then above - whichever is clear of every other shape, or least
 overlapping if none is fully clear), centred on the target on the other
 axis. It is also **re-parented to the document root** regardless of where
-it was declared - tldraw frames clip their children, so a note left parented
-to a frame and placed outside that frame's bounds would be invisible.
+it was declared - tldraw frames clip their children, so a sticky left
+parented to a frame and placed outside that frame's bounds would be
+invisible.
 
 ## Reuse
 
@@ -348,10 +371,12 @@ nothing consumes it.
 ## Comments
 
 `{/* ... */}` is a JS comment - esbuild strips it before it ever reaches the
-runtime, so it does **not** become a sticky. Use `<Note>` to annotate:
+runtime, so it does **not** become a sticky or a text annotation. Use
+`<Sticky>` (a real tldraw sticky note, optionally attached with `on`) or
+`<Text>` (borderless, no chrome) to annotate:
 
 ```jsx
-<Note id="n1">Token store is the only writer of session tokens.</Note>
+<Text id="n1">Token store is the only writer of session tokens.</Text>
 ```
 
 ## Execution model
@@ -372,7 +397,7 @@ Diagnostics an author will hit:
 | `ir/missing-id` | an addressable element (`<Box>`, `<Frame>`) has no `id` |
 | `ir/duplicate-id` | two elements claim the same `id` |
 | `ir/unknown-reference` | an edge's `from`/`to` doesn't resolve to any id |
-| `ir/note-target-not-found` | a `<Note>`/`<Sticky>` `on` doesn't resolve to any id |
+| `ir/note-target-not-found` | a `<Sticky>` `on` doesn't resolve to any id |
 | `ir/missing-edge-endpoint` | `<Edge>` is missing `from` or `to` |
 | `ir/unknown-prop` | an attribute isn't in the allowed set for that element |
 | `ir/bad-layout-mode` | `layout` isn't `row`/`col`/`grid`/`auto`/`free` |
@@ -386,7 +411,7 @@ Diagnostics an author will hit:
 ## Full example
 
 ```jsx
-import { Doc, Frame, Box, Note, Edge, flow } from "tldsl";
+import { Doc, Frame, Box, Text, Edge, flow } from "tldsl";
 
 function Service({ ns, name }) {
   return (
@@ -409,7 +434,7 @@ export default function Diagram() {
 
         {flow("user", "login", "auth", "tokens")}
 
-        <Note id="n-design">Token store is the only writer of session tokens.</Note>
+        <Text id="n-design">Token store is the only writer of session tokens.</Text>
       </Frame>
 
       <Service ns="billing" name="Billing" />
@@ -440,7 +465,7 @@ rejected or unavailable at lowering:
   enums - are implemented; see the Props table above.)
 - Edge decoration (`type`, `route`, `head-start`, `head-end`) - not a
   recognized `<Edge>` prop at all.
-- Comments-as-stickies - dead; use `<Note>`.
+- Comments-as-stickies - dead; use `<Sticky>` or `<Text>`.
 - Automatic id namespacing for reused components - use the `ns`-prop
   convention.
 - `.tsx` / TypeScript on the authoring path.

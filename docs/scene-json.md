@@ -67,7 +67,7 @@ At least one. MVP emits a single `page:main`.
 `index` is a fractional index (jaredhecht/fractional-indexing semantics);
 ordering of pages is by sorted index, not by object key.
 
-### `shape` record (`<box>` and `<note>` map here)
+### `shape` record (`<box>`, `<note>`, and `<text>` map here)
 
 Common base fields are `TLBaseShape`:
 
@@ -86,7 +86,8 @@ Common base fields are `TLBaseShape`:
 | `meta`     | `JsonObject`  | host-defined; we stash the source span here            |
 | `props`    | `object`      | shape-type-specific (see below)                        |
 
-MVP shape-type → tldraw `type`:
+MVP shape-type → tldraw `type` (plus `<text>`, a later non-MVP addition -
+`<Text>`, D23 - included here since it's the same shape-record family):
 
 | tldsl       | tldraw `type` | reason                                                 |
 |-------------|---------------|--------------------------------------------------------|
@@ -94,18 +95,32 @@ MVP shape-type → tldraw `type`:
 | `<note>`    | `"note"`      | tldraw has a first-class sticky-note shape            |
 | `<frame>`   | `"frame"`     | tldraw has a first-class frame container              |
 | `<edge>`    | `"arrow"`     | only edge shape we support for MVP                    |
+| `<text>`    | `"text"`      | tldraw's borderless text shape - what `<Text>` emits  |
 
-`props` for the four:
+The `<note>` row predates `<Sticky>`/`<Text>`: the plain, non-sticky
+`<Note>` this table originally described is gone (see `docs/decisions.md`
+ADR-11's update note) - `<Sticky>` is now the only surface element that
+lowers to the IR/AST `"note"` kind and emits this shape.
+
+`props` for the five:
 
 - **geo** - `{ w: number; h: number; geo: "rectangle"; color: string; fill: string; richText: TLRichText }`.
   MVP fixes `geo: "rectangle"`, `color: "black"`, `fill: "none"`. Text is
   rendered through `toRichText(...)` at consumer time but on the wire it's
   the serialized rich-text shape.
-- **note** - `{ color: string; size: string; richText: TLRichText }`.
-  Note shapes don't carry `w`/`h` - tldraw fits them.
+- **note** - `{ color: string; labelColor: string; size: string; font: string;
+  align: string; verticalAlign: string; growY: number; richText: TLRichText }`.
+  Note shapes don't carry `w`/`h` - tldraw fits them. Wire field is `align`
+  (not `textAlign` - same as geo, unlike text below); see `noteShape` in
+  `src/contracts/builders.ts`.
 - **frame** - `{ w: number; h: number; name: string }`. Frames host children
   by setting their `parentId` to the frame's id.
 - **arrow** - covered in the next section.
+- **text** - `{ w: number; color: string; textAlign: string; richText: TLRichText }`.
+  No `h` at all - height is always derived from wrapped content, never sent
+  on the wire (`autoSize: false`, `w` is the fixed wrap budget layout already
+  computed). Wire field is `textAlign`, not `align` (unlike geo/note) -
+  see `textShape` in `src/contracts/builders.ts`.
 
 ### `binding` record (`<edge>` endpoints)
 
@@ -188,9 +203,9 @@ tldraw will migrate on load.
 
 The authoritative way to build a SceneJSON for tests is `src/contracts/builders.ts`
 (`sceneJson`, `documentRecord`, `pageRecord`, `boxShape`, `noteShape`,
-`frameShape`, `arrowShape`, `arrowBinding`, `richText`). Defaults in those
-factories are the tldraw-pin defaults documented above; if the pin moves,
-update both the factories and this doc in lockstep.
+`textShape`, `frameShape`, `arrowShape`, `arrowBinding`, `richText`).
+Defaults in those factories are the tldraw-pin defaults documented above; if
+the pin moves, update both the factories and this doc in lockstep.
 
 Static JSON fixtures aren't kept under `tests/e2e/fixtures/scene-json/`:
 hand-rolled examples drift from the factories and from real tldraw output.

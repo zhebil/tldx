@@ -2,7 +2,7 @@
 
 A JSX authoring surface for [tldraw](https://tldraw.dev) scenes, designed so AI agents (Claude Code et al.) can drive a live canvas by editing plain files.
 
-The agent edits a `.tldsl.jsx` file with normal `Edit` / `Write` tools, importing `Doc`, `Frame`, `Box`, `Note`, `Edge`, and `flow` from the `"tldsl"` module. The CLI executes the file in a Node worker, lowers the resulting AST through layout, and pushes tldraw scene JSON to a browser viewer. No MCP, no special API - just files, a watcher, and a CLI.
+The agent edits a `.tldsl.jsx` file with normal `Edit` / `Write` tools, importing `Doc`, `Frame`, `Box`, `Text`, `Edge`, and `flow` from the `"tldsl"` module. The CLI executes the file in a Node worker, lowers the resulting AST through layout, and pushes tldraw scene JSON to a browser viewer. No MCP, no special API - just files, a watcher, and a CLI.
 
 **Accepted cost**: unlike a plain-text DSL, a `.tldsl.jsx` file needs the CLI to run - it isn't self-contained portable text. See `docs/jsx-pivot.md` for the trade-off this bought (JSX composition, props, `.map()`) and the full reasoning.
 
@@ -44,7 +44,7 @@ npm run dev:cli -- serve tests/e2e/fixtures/auth.tldsl.jsx
 ## What a diagram looks like
 
 ```jsx
-import { Doc, Frame, Box, Edge, Note } from "tldsl";
+import { Doc, Frame, Box, Edge, Text } from "tldsl";
 
 export default function Diagram() {
   return (
@@ -57,7 +57,7 @@ export default function Diagram() {
         <Edge id="e-user-login" from="user" to="login" />
         <Edge id="e-login-auth" from="login" to="auth" />
 
-        <Note id="n-design">Token store is the only writer of session tokens.</Note>
+        <Text id="n-design">Token store is the only writer of session tokens.</Text>
       </Frame>
     </Doc>
   );
