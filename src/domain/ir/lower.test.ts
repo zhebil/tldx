@@ -146,6 +146,31 @@ describe("lower: diagnostics", () => {
     const { codes } = lowerAst(doc({ align: "middle" }));
     expect(codes).toEqual(["ir/bad-align"]);
   });
+
+  it("accepts align='stretch' on <doc> and <frame> (D10)", () => {
+    const ast = doc({ align: "stretch" }, [frame({ id: "f", align: "stretch" })]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    expect(ir?.align).toBe("stretch");
+    const f = ir!.children[0]!;
+    if (f.kind !== "frame") throw new Error("expected frame");
+    expect(f.align).toBe("stretch");
+  });
+
+  it("accepts rowGap and colGap on <doc> and <frame>, independent of gap (D4)", () => {
+    const ast = doc({ layout: "grid", cols: 2, gap: 200, rowGap: 16 }, [
+      frame({ id: "f", layout: "grid", cols: 2, colGap: 300, rowGap: 8 }),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    expect(ir?.gap).toBe(200);
+    expect(ir?.rowGap).toBe(16);
+    expect(ir?.colGap).toBeUndefined();
+    const f = ir!.children[0]!;
+    if (f.kind !== "frame") throw new Error("expected frame");
+    expect(f.colGap).toBe(300);
+    expect(f.rowGap).toBe(8);
+  });
 });
 
 describe("lower: direction", () => {

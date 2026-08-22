@@ -35,6 +35,10 @@ export type IRDoc = IRBase & {
   /** Optional deterministic-layout mode (spike; ELK adapter ignores this). */
   layout?: LayoutMode;
   gap?: number;
+  /** Row-axis (vertical) gap override on `grid`; falls back to `gap`. */
+  rowGap?: number;
+  /** Column-axis (horizontal) gap override on `grid`; falls back to `gap`. */
+  colGap?: number;
   pad?: number;
   cols?: number;
   align?: Align;
@@ -49,6 +53,10 @@ export type IRFrame = IRBase & {
   /** Optional deterministic-layout mode (spike; ELK adapter ignores this). */
   layout?: LayoutMode;
   gap?: number;
+  /** Row-axis (vertical) gap override on `grid`; falls back to `gap`. */
+  rowGap?: number;
+  /** Column-axis (horizontal) gap override on `grid`; falls back to `gap`. */
+  colGap?: number;
   pad?: number;
   cols?: number;
   align?: Align;

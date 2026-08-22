@@ -161,6 +161,40 @@ describe("hybridLayout", () => {
     expect(d.x).toBe(a.x);
   });
 
+  it("sets rowGap and colGap independently on a grid (D4)", async () => {
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2, gap: 200, rowGap: 16 }, [
+        box({ id: "a", label: "A", w: 40, h: 20 }),
+        box({ id: "b", label: "B", w: 40, h: 20 }),
+        box({ id: "c", label: "C", w: 40, h: 20 }),
+        box({ id: "d", label: "D", w: 40, h: 20 }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    const c = boxById(result.children, "c");
+    // colGap is absent, so column spacing falls back to gap (200).
+    expect(b.x - (a.x + a.w)).toBe(200);
+    // rowGap (16) overrides gap for row spacing - not 200.
+    expect(c.y - (a.y + a.h)).toBe(16);
+  });
+
+  it("colGap overrides gap for column spacing, independent of rowGap", async () => {
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2, gap: 40, colGap: 300, rowGap: 10 }, [
+        box({ id: "a", label: "A", w: 40, h: 20 }),
+        box({ id: "b", label: "B", w: 40, h: 20 }),
+        box({ id: "c", label: "C", w: 40, h: 20 }),
+        box({ id: "d", label: "D", w: 40, h: 20 }),
+      ]),
+    );
+    const a = boxById(result.children, "a");
+    const b = boxById(result.children, "b");
+    const c = boxById(result.children, "c");
+    expect(b.x - (a.x + a.w)).toBe(300);
+    expect(c.y - (a.y + a.h)).toBe(10);
+  });
+
   it("sizes a nested frame to its content bounding box", async () => {
     const result = await layoutAst(
       doc({ layout: "col" }, [
@@ -369,6 +403,67 @@ describe("hybridLayout", () => {
     );
     expect(boxById(result.children, "a").x).toBe(0);
     expect(boxById(result.children, "b").x).toBe(20);
+  });
+
+  it("stretches ragged tiers to equal width with align=stretch (D10)", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col", align: "stretch" }, [
+        frame({ id: "narrow", layout: "row", pad: 0 }, [box({ id: "a", label: "A", w: 100, h: 20 })]),
+        frame({ id: "wide", layout: "row", pad: 0 }, [box({ id: "b", label: "B", w: 400, h: 20 })]),
+      ]),
+    );
+    const narrow = frameById(result.children, "narrow");
+    const wide = frameById(result.children, "wide");
+    expect(narrow.w).toBe(wide.w);
+    expect(narrow.w).toBe(400);
+    expect(narrow.x).toBe(0);
+    expect(wide.x).toBe(0);
+  });
+
+  it("leaves an explicit w out of the stretch (opt-out, like box width sharing)", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col", align: "stretch" }, [
+        frame({ id: "pinned", layout: "row", pad: 0, w: 50 }, [
+          box({ id: "a", label: "A", w: 40, h: 20 }),
+        ]),
+        frame({ id: "wide", layout: "row", pad: 0 }, [box({ id: "b", label: "B", w: 400, h: 20 })]),
+      ]),
+    );
+    const pinned = frameById(result.children, "pinned");
+    const wide = frameById(result.children, "wide");
+    expect(pinned.w).toBe(50);
+    expect(wide.w).toBe(400);
+  });
+
+  it("stretches cross-axis height on a row container", async () => {
+    const result = await layoutAst(
+      doc({ layout: "row", align: "stretch" }, [
+        frame({ id: "short", layout: "col", pad: 0 }, [box({ id: "a", label: "A", w: 40, h: 20 })]),
+        frame({ id: "tall", layout: "col", pad: 0 }, [box({ id: "b", label: "B", w: 40, h: 200 })]),
+      ]),
+    );
+    const short = frameById(result.children, "short");
+    const tall = frameById(result.children, "tall");
+    expect(short.h).toBe(tall.h);
+    expect(short.h).toBe(200);
+    expect(short.y).toBe(0);
+  });
+
+  it("leaves grid untouched by align=stretch - only row/col get the lever", async () => {
+    const result = await layoutAst(
+      doc({ layout: "grid", cols: 2, align: "stretch" }, [
+        frame({ id: "narrow", layout: "row", pad: 0 }, [
+          box({ id: "a", label: "A", w: 40, h: 20 }),
+        ]),
+        frame({ id: "wide", layout: "row", pad: 0 }, [
+          box({ id: "b", label: "B", w: 400, h: 20 }),
+        ]),
+      ]),
+    );
+    const narrow = frameById(result.children, "narrow");
+    const wide = frameById(result.children, "wide");
+    expect(narrow.w).toBe(40);
+    expect(wide.w).toBe(400);
   });
 
   it("delegates an auto container to the injected placer and applies its positions/size", async () => {
