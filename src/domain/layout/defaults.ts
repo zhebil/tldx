@@ -196,6 +196,68 @@ const GEO_MODEL: Record<StyleGeo, GeoModel> = {
 };
 
 /**
+ * Target w:h ratio a non-rect geo's *natural* (unpinned) box is pulled
+ * toward - a short label on a diamond/ellipse/hexagon otherwise inherits
+ * `fitBoxWidth`'s rectangle-tuned `BOX_ASPECT_TARGET` (6:1) and comes out a
+ * flat lozenge instead of reading as the shape it claims to be (C4). Tighter
+ * for the pointier outlines (diamond, triangle - narrow tips eat more of a
+ * tall box than a wide one), roomier for the ellipse family. Approximations,
+ * same spirit as `GEO_MODEL`'s comment above; arrows and rectangles are
+ * absent on purpose (`geoNaturalSize` falls back to `BOX_ASPECT_TARGET`,
+ * i.e. unchanged - arrows are directional by design, not "square-ish").
+ */
+const GEO_ASPECT_TARGET: Partial<Record<StyleGeo, number>> = {
+  diamond: 1.6,
+  rhombus: 1.6,
+  "rhombus-2": 1.6,
+  trapezoid: 1.8,
+  star: 1.4,
+  ellipse: 2.2,
+  oval: 2.2,
+  hexagon: 1.8,
+  octagon: 1.4,
+  pentagon: 1.4,
+  heart: 1.2,
+  triangle: 1.8,
+};
+
+/**
+ * `rawH` (a label wrapped to some width `w`), grown - never shrunk, so this
+ * can't clip a label that already wraps onto several lines - toward
+ * `GEO_ASPECT_TARGET` for `geo`. Exported so `stack.ts`'s shared-width vote
+ * (a `col`/`grid` box re-wrapped to the container's shared width, not its
+ * own natural one) can apply the same target `geoNaturalSize` below does for
+ * the natural-width case - without this, a non-rect box's height and its
+ * `geoScale` factor `k` (which also moved once `geoNaturalSize` changed)
+ * drift out of sync by rounding, and the label spills past its outline by a
+ * pixel or two (regression caught by `tests/corpus/multi-file.test.ts`).
+ */
+export function geoTargetHeight(rawH: number, w: number, geo: StyleGeo | undefined): number {
+  const target = GEO_ASPECT_TARGET[geo ?? "rectangle"] ?? BOX_ASPECT_TARGET;
+  return Math.max(rawH, w / target);
+}
+
+/**
+ * The natural (pre-`geoScale`) box for a label: `fitBoxWidth`'s width, and a
+ * height grown - never shrunk, so this can't clip a label that already wraps
+ * onto several lines - toward `GEO_ASPECT_TARGET`. `geoScale` then scales
+ * this pair uniformly by `k`, so whatever `rw`:`rh` ratio comes out of here
+ * *is* the final box's ratio; a long label's own `rw` (already wide because
+ * `fitBoxWidth` capped how many lines its word count can wrap onto) still
+ * wins over the target, which is the point - the target is a floor on
+ * height, not a ceiling on width.
+ */
+function geoNaturalSize(
+  label: string | undefined,
+  maxW: number | undefined,
+  style: BoxStyle | undefined,
+): { rw: number; rh: number } {
+  const rw = fitBoxWidth(label, maxW, style);
+  const rawRh = boxHeightForWidth(label, rw, style);
+  return { rw, rh: geoTargetHeight(rawRh, rw, style?.geo) };
+}
+
+/**
  * How far the label overflows the outline, as a multiplier on the box: `1`
  * means it exactly fits. `a`/`b` are the label's width and height as
  * fractions of the box's.
@@ -267,8 +329,7 @@ export function geoScale(label: string | undefined, maxW: number | undefined, st
   const model = GEO_MODEL[style?.geo ?? "rectangle"];
   if (model === "rect") return 1;
 
-  const rw = fitBoxWidth(label, maxW, style);
-  const rh = boxHeightForWidth(label, rw, style);
+  const { rw, rh } = geoNaturalSize(label, maxW, style);
   const fit = GEO_FIT[model];
 
   let k = 1;
@@ -290,9 +351,9 @@ export function estimatedBoxSize(
   h: number;
 } {
   const k = geoScale(label, maxW, style);
-  const rw = fitBoxWidth(label, maxW, style);
+  const { rw, rh } = geoNaturalSize(label, maxW, style);
   const naturalW = Math.ceil(rw * k);
-  const naturalH = Math.ceil(boxHeightForWidth(label, rw, style) * k);
+  const naturalH = Math.ceil(rh * k);
   if (maxW === undefined || naturalW <= maxW) return { w: naturalW, h: naturalH };
 
   // geoScale's k inflates width and height together so the label fits inside

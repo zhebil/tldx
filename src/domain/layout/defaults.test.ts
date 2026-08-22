@@ -161,6 +161,48 @@ describe("geo-aware sizing (T15)", () => {
   });
 });
 
+describe("geo aspect ratio (C4)", () => {
+  it("a short diamond label reads closer to square than the rectangle aspect target allows", () => {
+    const { w, h } = estimatedBoxSize("Health gate", undefined, { geo: "diamond" });
+    expect(w / h).toBeLessThan(BOX_ASPECT_TARGET);
+    expect(w / h).toBeLessThan(2);
+  });
+
+  it("diamond and ellipse pull toward different target ratios for the same label (not one hard-coded ratio for every geo)", () => {
+    const diamond = estimatedBoxSize("Payments API", undefined, { geo: "diamond" });
+    const ellipse = estimatedBoxSize("Payments API", undefined, { geo: "ellipse" });
+    expect(diamond.w / diamond.h).toBeLessThan(ellipse.w / ellipse.h);
+  });
+
+  it("still grows, never shrinks, so the label keeps fitting the outline", () => {
+    const label = "Payments API";
+    for (const geo of ["diamond", "ellipse", "hexagon"] as const) {
+      const { w, h } = estimatedBoxSize(label, undefined, { geo });
+      expect(labelOverflow(label, w, h, { geo })).toBeUndefined();
+    }
+  });
+
+  it("a long label still ends up wider than a short one on the same geo (the target is a floor on height, not a ceiling on width)", () => {
+    const short = estimatedBoxSize("OK", undefined, { geo: "diamond" });
+    const long = estimatedBoxSize(
+      "error rate below 1 percent for 10 minutes straight",
+      undefined,
+      { geo: "diamond" },
+    );
+    expect(long.w).toBeGreaterThan(short.w);
+  });
+
+  it("a rectangle's sizing is unaffected - the aspect target only pulls non-rect geos", () => {
+    const label = "Some medium length label here";
+    expect(estimatedBoxSize(label)).toEqual(estimatedBoxSize(label, undefined, { geo: "rectangle" }));
+  });
+
+  it("D20 regression: a maxW-capped diamond's proportions are unchanged by the aspect-ratio fix", () => {
+    const label = "Health gate\nerror rate < 1% for 10 min";
+    expect(estimatedBoxSize(label, 200, { geo: "diamond" })).toEqual({ w: 200, h: 403 });
+  });
+});
+
 describe("labelOverflow (D22)", () => {
   it("is undefined for a box sized by estimatedBoxSize itself (the box always fits its own natural size)", () => {
     const label = "a much longer label that wraps onto more than one line";
