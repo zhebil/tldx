@@ -53,7 +53,7 @@ async function main(): Promise<void> {
 
   const reused = findServe(file);
   if (reused !== undefined) {
-    await exportImage(reused, out, opts);
+    await exportImage(reused.url, out, opts);
     return;
   }
 

@@ -25,6 +25,16 @@
  * disables the overlay round-trip entirely for this server - `render`'s
  * ephemeral boot does this so a read-only export never writes a
  * `*.tldsl.overlay.json` sidecar. `tldsl serve` always wires a real one.
+ *
+ * Compile tracking (tldsl-usr, tldsl-46n): every successful compile re-hashes
+ * the source and records it via `infra/serve-registry`'s `touchServeCompile`,
+ * so a later `tldsl render` that reuses this server can tell whether it's
+ * still serving what's on disk. `ServeHandle.compile` carries the same
+ * hash/timestamp from the initial compile so the CLI can seed the registry
+ * record atomically at boot (no window where a reuser sees a hash-less
+ * record). Both are no-ops if this file was never registered - `render`'s
+ * own ephemeral servers never call `recordServe`, so the touch harmlessly
+ * finds no record to update.
  */
 
 import { watchAndServe, type WatchAndServeHandle } from "../app/watch-and-serve.js";
@@ -35,6 +45,7 @@ import type { LogPort } from "../app/ports/log.js";
 import type { WatchPort } from "../app/ports/watch.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 import { startDevServer } from "../infra/devserver/dev-server.js";
+import { hashSource, touchServeCompile } from "../infra/serve-registry/serve-registry.js";
 import { createSseTransport } from "../infra/transport/sse-transport.js";
 
 export type ServeIo = {
@@ -77,11 +88,25 @@ export type ServeHandle = {
   /** Resolved TCP port the dev server bound. */
   readonly port: number;
   /**
+   * Source hash/timestamp as of the initial compile - `undefined` hash if
+   * the initial read/compile failed. Lets the caller seed the serve-registry
+   * record with a compile hash at boot, atomically (see module docs).
+   */
+  readonly compile: { hash: string | undefined; at: number };
+  /**
    * Tear down watcher, transport, and dev server. Idempotent - subsequent
    * calls return the original outcome.
    */
   close(): Promise<void>;
 };
+
+async function readHashSafe(fs: FsReadPort, path: string): Promise<string | undefined> {
+  try {
+    return hashSource(await fs.read(path));
+  } catch {
+    return undefined;
+  }
+}
 
 export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
   const { path, deps, io } = args;
@@ -110,6 +135,21 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     throw err;
   }
 
+  // Re-hashes and records the source on every successful compile (not just
+  // the initial one) so a `tldsl render` reusing this server later can
+  // detect staleness. Harmless no-op when `path` was never registered
+  // (`recordServe` not called - e.g. render's own ephemeral boot).
+  const log: LogPort = {
+    log: (event) => {
+      deps.log.log(event);
+      if (event.code === "watch/recompile-ok") {
+        void readHashSafe(deps.fs, path).then((hash) => {
+          if (hash !== undefined) touchServeCompile(path, hash, deps.clock.now());
+        });
+      }
+    },
+  };
+
   const watch = watchAndServe(path, {
     fs: deps.fs,
     ...(deps.fsWrite !== undefined ? { fsWrite: deps.fsWrite } : {}),
@@ -117,7 +157,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     layout: deps.layout,
     execute: deps.execute,
     transport,
-    log: deps.log,
+    log,
   });
   watchBox.current = watch;
 
@@ -130,6 +170,8 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     throw err;
   }
 
+  const compile = { hash: await readHashSafe(deps.fs, path), at: deps.clock.now() };
+
   io.writeStdout(`tldsl serving ${path} on ${server.url}\n`);
 
   if (deps.openBrowser !== undefined) {
@@ -140,6 +182,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
   return {
     url: server.url,
     port: server.port,
+    compile,
     close(): Promise<void> {
       return (closing ??= (async () => {
         await watch.close();

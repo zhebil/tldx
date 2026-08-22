@@ -165,7 +165,7 @@ const commands: readonly Command[] = [
           },
           io,
         });
-        const forgetServe = recordServe(path, handle.url);
+        const forgetServe = recordServe(path, handle.url, handle.compile);
         return await awaitShutdown(async () => {
           await handle.close();
           forgetServe();

@@ -1,7 +1,7 @@
 /**
  * Unit test for `runServe`. The composition is thin (transport +
  * dev-server + watchAndServe) and the e2e suite already exercises the
- * happy path end-to-end; this file pins the two behaviours that are easy
+ * happy path end-to-end; this file pins the behaviours that are easy
  * to break and not directly observable in the e2e:
  *
  * 1. `close()` is idempotent - calling it twice must not throw or
@@ -12,6 +12,12 @@
  *    before rethrowing); a behavioural assertion would require exposing
  *    the internal transport, which would leak abstraction. Catching the
  *    propagated error here at least guarantees the error path is wired.
+ * 3. `ServeHandle.compile` carries the initial compile's source hash
+ *    (tldsl-usr/tldsl-46n).
+ * 4. Omitting `fsWrite` disables the overlay round-trip entirely (tldsl-jwh:
+ *    `render`'s read-only ephemeral server must never write a sidecar).
+ * 5. A registered server's serve-registry record picks up the new hash
+ *    after a recompile (tldsl-46n's staleness detection depends on this).
  *
  * Real adapters are used for the dev server + SSE transport (port 0 keeps
  * the bind ephemeral); domain ports are stubbed via the colocated fakes.
@@ -28,7 +34,9 @@ import { FakeExecute } from "../app/ports/execute.fake.js";
 import { InMemoryFs } from "../app/ports/fs.fake.js";
 import { CaptureLog } from "../app/ports/log.fake.js";
 import { FakeWatch } from "../app/ports/watch.fake.js";
+import { overlayPathFor } from "../domain/overlay/index.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
+import { findServe, hashSource, recordServe } from "../infra/serve-registry/serve-registry.js";
 
 import { runServe, type ServeDeps, type ServeHandle, type ServeIo } from "./serve.js";
 
@@ -101,6 +109,52 @@ describe("runServe", () => {
       }
     } finally {
       controller.abort();
+    }
+  });
+
+  it("exposes the source hash of the initial compile on the handle", async () => {
+    started = await runServe({ path: "doc.tldsl.jsx", deps: makeDeps(), io: makeIo() });
+    expect(started.compile.hash).toBe(hashSource(SRC));
+  });
+
+  it("omitting fsWrite disables the overlay round-trip - PUT /overlay is accepted but writes nothing", async () => {
+    const deps = makeDeps();
+    delete deps.fsWrite;
+    started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+
+    const res = await fetch(`${started.url}overlay`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ store: {}, schema: {} }),
+    });
+    expect(res.status).toBe(204);
+
+    const fs = deps.fs as InMemoryFs;
+    expect(fs.has(overlayPathFor("doc.tldsl.jsx"))).toBe(false);
+  });
+
+  it("touches the serve registry's compile hash after a recompile, for a registered file", async () => {
+    const deps = makeDeps();
+    const watch = deps.watch as FakeWatch;
+    const path = "doc.tldsl.jsx";
+    started = await runServe({ path, deps, io: makeIo() });
+    const forget = recordServe(path, started.url, started.compile);
+
+    try {
+      const fs = deps.fs as InMemoryFs;
+      const nextSrc = `${SRC}\n// v2`;
+      fs.setFile(path, nextSrc);
+      watch.emitChange(path);
+
+      const wantHash = hashSource(nextSrc);
+      let record = findServe(path);
+      for (let i = 0; i < 50 && record?.hash !== wantHash; i++) {
+        await new Promise((r) => setTimeout(r, 10));
+        record = findServe(path);
+      }
+      expect(record?.hash).toBe(wantHash);
+    } finally {
+      forget();
     }
   });
 
