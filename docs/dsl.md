@@ -40,7 +40,7 @@ dropped.
 ## Components
 
 This is the entire surface exported from `"tldsl"`. There is no `<Shape>`,
-`<Text>`, `<Line>`, `<Import>`, or `<Use>`.
+`<Line>`, `<Import>`, or `<Use>`.
 
 | element | kind | purpose |
 |---|---|---|
@@ -55,9 +55,10 @@ This is the entire surface exported from `"tldsl"`. There is no `<Shape>`,
 | `<Swimlanes>` | container | col of lanes - each lane coerced to `layout="row"`, lanes keep their chrome |
 | `<Graph>` | container | `<Frame layout="auto">` - relationships with no natural order |
 | `<Box />` | leaf | labelled box |
-| `<Note>text</Note>` | leaf | warm-filled geo box annotation; text is the **children**, not a prop |
-| `<Sticky>text</Sticky>` | leaf | real tldraw sticky note (fixed 200px width); same props as `<Note>` |
+| `<Text>text</Text>` | leaf | borderless text - titles, captions, annotations; text is the **children**, not a prop |
+| `<Sticky>text</Sticky>` | leaf | real tldraw sticky note (fixed 200px width) |
 | `<Edge />` | leaf | arrow between two ids |
+| `<Edges>{`a -> b: label`}</Edges>` | leaf | a block of edges, one per line - the common-case form |
 | `flow("a", "b", "c")` | function | returns `[Edge a->b, Edge b->c, ...]`; splice with `{flow(...)}` |
 
 `<Doc>` may only appear at the top level - a nested `<Doc>` is
@@ -238,8 +239,40 @@ just strings) but are rejected at lowering, not supported:
 <Edge from="x:100,y:200" to="db" />      // ir/free-endpoint-not-supported
 ```
 
-`flow("a", "b", "c")` is sugar for consecutive edges - use it for a simple
-chain, use explicit `<Edge>`s for anything non-linear.
+### `<Edges>` - the compact form
+
+Twenty transitions as twenty `<Edge>` tags drowns the structure they annotate.
+`<Edges>` takes a template-literal child, one edge per non-blank line:
+
+```jsx
+<Edges color="red" font="sans" size="s">{`
+  fin_wait_1 -> closing: recv FIN / ACK
+  closing -> time_wait: recv ACK / -
+`}</Edges>
+```
+
+The grammar per line is `id ("->" id)+ (":" label)?`. A chain of N ids expands
+to N-1 edges, so `a -> b -> c` is two edges; an optional label after `:`
+applies to all of them.
+
+It covers `from`, `to` and `label` per line. The style props go on the
+`<Edges>` block itself and apply to every edge it produces - the same set
+`<Edge>` accepts (`color`, `dash`, `arrowheadStart`, `arrowheadEnd`,
+`labelColor`, `font`, `size`). What it does **not** cover: an explicit `id`,
+or a style that differs edge-by-edge inside one block. Drop to a hand-written
+`<Edge>` for those - that is what it's for.
+
+Ids stay checkable and spans stay real: a typo inside the block reports
+`ir/unknown-reference` at that exact source line, the same as a typo in an
+`<Edge>` tag. The child has to be a `{`...`}` template literal rather than
+bare JSX text, because esbuild's JSX transform collapses newlines in text
+children and warns on a literal `>` - both of which would destroy the
+one-line-one-edge grammar.
+
+`flow("a", "b", "c")` is the older sugar for a consecutive chain. It still
+works, but it produces edges with no source span (`tldsl-7kx`), so a
+diagnostic about a `flow()` edge can't point at a line. Prefer `<Edges>` in
+new code.
 
 `label` (T12) sets the arrow's text, matching `<Box label=...>`. Omitted or
 empty is an unlabeled arrow (tldraw's default empty text):
