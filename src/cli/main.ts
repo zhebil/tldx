@@ -40,6 +40,7 @@ import { recordServe } from "../infra/serve-registry/serve-registry.js";
 
 import { runAbsorbCli } from "./absorb.js";
 import { runCheck, type CheckIo } from "./check.js";
+import { runMeasure } from "./measure.js";
 import { runOverlayCli } from "./overlay.js";
 import { runRender } from "./render.js";
 import { runServe } from "./serve.js";
@@ -227,6 +228,21 @@ const commands: readonly Command[] = [
     description: "report what's pending in a diagram's overlay",
     run: (rest, io) =>
       runOverlayCli({
+        argv: rest,
+        deps: {
+          fs: createNodeFsRead(),
+          layout: new ElkLayoutAdapter(),
+          execute: createJsxExecute(),
+        },
+        io,
+      }),
+  },
+  {
+    name: "measure",
+    args: "<file> [--frame <id>]",
+    description: "print each shape's id, size, and position",
+    run: (rest, io) =>
+      runMeasure({
         argv: rest,
         deps: {
           fs: createNodeFsRead(),
