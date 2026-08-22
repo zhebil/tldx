@@ -176,6 +176,23 @@ Put these on `<Doc>`, `<Frame>` and its aliases:
 Every container lays out independently of its parent's axis. Nest freely -
 that is how you get structure, and nesting is cheaper than positioning.
 
+### Size and position
+
+`w`, `h`, `x`, `y` are valid on `<Box>`, `<Frame>`, and `<Note>` - numeric
+strings, same as `gap`. They are the escape hatch flagged at the top of this
+doc.
+
+- `w` / `h` pin a box's size instead of deriving it from the label. Use for a
+  percentage bar or a tall lane box, where the size is the content.
+- `h` appears to need `w` alongside it to be reliable. Reported: `h` alone
+  applied in a multi-child row, was silently ignored on a lone child, and
+  adding an explicit `w` fixed it every time. Root cause is open and tracked
+  separately, not a documentation problem - if a lone `h` doesn't seem to
+  take, add a `w`.
+- `x` / `y` pin an absolute position and take the element out of flow
+  layout - it stops reflowing with its siblings, and they stop making room
+  for it.
+
 ## Style
 
 On `<Box>` / `<Note>` / `<Sticky>`:
