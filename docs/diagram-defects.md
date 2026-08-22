@@ -691,7 +691,8 @@ blocker.
 - **Repro:** `examples/repro/d17-frame-boundary-undashed.tldsl.jsx` (compiles;
   the comment says which prop to add to get the error, and rendering it shows
   the dashed external box beside the hairline boundary)
-- **Status:** struck (investigated for T49, both halves). tldraw's frame shape
+- **Status:** struck - C4's notation is declared out of scope (see the
+  skill's "C4 notation" section); investigated for T49, both halves. tldraw's frame shape
   (pinned `tldraw@3.15.6`) has no `dash` field to plumb into: `TLFrameShapeProps`
   (`@tldraw/tlschema/src/shapes/TLFrameShape.ts:8-13`) is exactly
   `{ w, h, name, color }`, its validator `frameShapeProps` (same file, 19-28)
@@ -738,7 +739,8 @@ blocker.
   to `geo="ellipse"` plus a colour, so in the render a person and a database are
   the same shape as each other, distinguished only by blue versus green.
 - **Repro:** `examples/repro/d18-no-person-or-cylinder-geo.tldsl.jsx`
-- **Status:** struck (investigated for T49). tldraw's `geo` enum,
+- **Status:** struck - C4's notation is declared out of scope (see the
+  skill's "C4 notation" section); investigated for T49. tldraw's `geo` enum,
   `GeoShapeGeoStyle` (`@tldraw/tlschema/src/shapes/TLGeoShape.ts:26-50`), is 20
   values on the installed `tldraw@3.15.6`; `person` and `cylinder` are not
   among them, and `domain/ir/styles.ts`'s `GEOS` already mirrors that list

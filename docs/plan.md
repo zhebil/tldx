@@ -544,3 +544,16 @@ Current clean baseline: **13 crossings / 1 crowded / 4 label-over-shape /
   named a cause that did not survive checking - the mid-word wrap that wraps at
   token boundaries, and the numeric prop whose likelier explanation is a
   component that never forwarded it. Reproduce before implementing.
+
+- **Non-sticky `<Note>` is dropped once `<Text>` ships (C1/C2).** `<Note>`
+  today fakes a note with a `fill: "semi"` box; once `<Text>` exists the
+  vocabulary is `<Sticky>` for a real note, `<Text>` for a borderless
+  annotation, `<Box>` when a border is wanted. Not removed yet - `<Text>`
+  hasn't shipped.
+
+- **An explicit `h` is obeyed, not overridden (A2).** If a label doesn't fit a
+  pinned `h`, the box stays pinned and `check` warns
+  (`layout/label-overflow`); an authored size is a statement of intent, not a
+  bug to silently correct. Growth still applies to the *unpinned* case - an
+  auto-sized box whose label doesn't fit should grow instead of clipping -
+  which remains open.

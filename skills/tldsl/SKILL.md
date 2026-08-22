@@ -226,6 +226,17 @@ label, use the expression form: `label={"a\nb"}`. `check` warns
 (`ir/literal-newline-in-label`) if it sees a literal `\n` in a string-literal
 label.
 
+## C4 notation
+
+C4 is out of scope. `<Frame>` takes no `dash` - tldraw's frame shape is
+`{ w, h, name, color }`, nothing else - so a boundary can't be dashed, and the
+title is drawn at a hardcoded 12px, the smallest text on the canvas. `geo` has
+no `person` and no `cylinder` - tldraw's geo enum is a fixed 20 values,
+neither is in it. Either would need a custom `ShapeUtil`, the same cost that
+blocks real multi-point edge routing; if that ever gets paid, it goes to
+edges, not one notation. Draw C4 anyway: a plain `<Frame>` for the boundary, a
+labelled `<Box>` for an actor or a datastore.
+
 ## Edges
 
 `from` and `to` are ids, resolved across the whole document - a frame does not
@@ -311,3 +322,9 @@ In this repo, unbuilt: `npm run dev:cli -- serve diagram.tldsl.jsx`.
 4. `ir/unknown-prop` - there is no `className`, `style` or `variant`. The message
    lists what is allowed.
 5. `ir/invalid-style-value` - a colour or `geo` outside the sets above.
+
+`check` also warns without rejecting: `layout/label-overflow` fires when a
+box's label doesn't fit the size it ended up with, naming the shape, the text,
+and the size it needed versus the size it got. It's a warning, not an
+error - `check` still exits clean, so this is one more reason a clean `check`
+is not a finished diagram. Render and look.
