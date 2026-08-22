@@ -144,25 +144,48 @@ edge id. A note on an edge sits at that edge's midpoint. Without `on`, a note
 flows like a normal child.
 
 Because an attached note is outside layout, it can land on top of something.
-Keep the text to a sentence, and check the render if a diagram is note-heavy.
+Keep the text to a sentence, and watch the live viewer if a diagram is
+note-heavy.
 
 ## Workflow
 
+**Start `serve` first, keep it open for the whole session.** The browser is the
+user's view of the diagram - they watch it change as you edit, and they should
+never have to wait on you for a picture.
+
+```bash
+tldsl serve diagram.tldsl.jsx    # opens a browser tab, reloads on every save
+```
+
+Run it in the background before you write the first `<Box>`, on a new file or an
+existing one. It creates the file's viewer tab and then rebuilds on save, so
+every edit you make is on screen within a second. Do not stop it between edits
+and do not restart it per change - one server per file, running until the work is
+done. `--no-open` suppresses the tab; use it only when the user already has one.
+
 ```bash
 tldsl check  diagram.tldsl.jsx          # parse + validate. Fast, no browser.
-tldsl serve  diagram.tldsl.jsx          # live viewer, reloads on save
 tldsl render diagram.tldsl.jsx out.png  # export, cropped to content
 ```
 
 - **`check` before you claim it is done.** Every diagnostic carries a code and a
   source location.
-- **`serve` while iterating** - it watches the file.
-- **`render` when you need to actually look at it.** Then Read the PNG. A
-  diagram that validates can still read badly; the pixels are the only real
-  test. `--frame <id>` exports one region, `--scale`, `--dark`,
-  `--format png|svg|jpeg|webp`.
+- **`render` is your debugging tool, not a deliverable.** A diagram that
+  validates can still read badly, and you cannot see the browser tab - so export
+  a PNG and Read it when you need to judge the pixels yourself. `--frame <id>`
+  exports one region, `--scale`, `--dark`, `--format png|svg|jpeg|webp`.
+- **Write those PNGs to a temp dir, never into the repo.** `/tmp/foo.png`, not
+  `docs/renders/foo.png`. They are scratch output of your own verification loop
+  and committing them bloats the repo with files nobody reads. The only time a
+  PNG belongs in the project is when the user explicitly asks for an exported
+  image - then put it where they ask.
+- **Do not offer the user a screenshot.** They have the live diagram. Describe
+  what changed and let them look.
 
-In this repo, unbuilt: `npm run dev:cli -- check diagram.tldsl.jsx`.
+`render` writes a `*.tldsl.overlay.json` sidecar next to the diagram. A stale one
+silently changes later renders. Delete sidecars before measuring anything.
+
+In this repo, unbuilt: `npm run dev:cli -- serve diagram.tldsl.jsx`.
 
 ## What `check` will reject
 
