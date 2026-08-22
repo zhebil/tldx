@@ -112,13 +112,21 @@ On `<Box>` / `<Note>` / `<Sticky>`:
 - `geo` (Box only) - `rectangle` (default) `ellipse oval diamond rhombus
   hexagon octagon pentagon triangle trapezoid star cloud heart check-box x-box
   arrow-up arrow-down arrow-left arrow-right`
-- `maxW` - caps how wide a label may run before wrapping
+- `maxW` - caps how wide a label may run before wrapping. Works on `<Box>`
+  and `<Note>`; a `<Sticky>`'s width is fixed by tldraw at 200px, so `maxW`
+  has no effect there.
 
 On `<Edge>`: `color`, `dash`, `label`, `labelColor`, `font`, `size`,
 `arrowheadStart` / `arrowheadEnd` (`arrow triangle square dot pipe diamond
 inverted bar none`).
 
 `<Frame>` only supports `color` - tldraw's frame shape has nothing else.
+
+A `label` written as a plain string attribute is raw JSX text - `label="a\nb"`
+renders the two characters `\` and `n`, not a line break. For a multiline
+label, use the expression form: `label={"a\nb"}`. `check` warns
+(`ir/literal-newline-in-label`) if it sees a literal `\n` in a string-literal
+label.
 
 ## Edges
 

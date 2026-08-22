@@ -134,7 +134,7 @@ async function sizeElement(
         const size = estimatedNoteSize(el.text, el);
         return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
       }
-      const w = el.w ?? fitBoxWidth(el.text, undefined, el);
+      const w = el.w ?? fitBoxWidth(el.text, el.maxW, el);
       const h = el.h ?? boxHeightForWidth(el.text, w, el);
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w, h };
     }
