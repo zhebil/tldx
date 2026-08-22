@@ -2415,7 +2415,43 @@ only test it gets against material T24 did not choose.
   turned out to be a design decision. No code, no `src/` touched;
   `npm run check` green.
 
-- [ ] **T35. Fix the top defect.**
+- [x] **T35. Fix the top defect.**
+  Took group 1 of the triage - D1, D5 and D14 - as one mechanism, in
+  `computeEdgeRoutes`. A self edge (`from === to`) now routes to a loop over the
+  shape's top edge: precise anchors at `0.75/0` and `0.25/0` with a bend scaled
+  off the shape width. tldraw honours `normalizedAnchor` on both terminals of a
+  double-bound arrow, so this needed no new primitive - checked in
+  `node_modules/tldraw/dist-cjs/lib/shapes/arrow/shared.js` before building, not
+  from memory. Separately, edges that share an unordered endpoint pair **and get
+  no obstacle route** are fanned into perpendicular lanes `(i - (n-1)/2) * step`
+  apart, `step` scaled off the chord and clamped to 36..72px, signed against the
+  pair's canonical direction so antiparallel edges land on opposite sides.
+  `EdgeRoute`'s anchors became optional so a fanned edge keeps tldraw's default
+  binding and stays clipped to the shape outline.
+
+  Crowded arrow pairs (`arrow-truth`): `d1-repeated-edges` **3 -> 0**,
+  `d14-antiparallel-bow` **1 -> 0**, `tests/corpus/order-states` **1 -> 0**,
+  `examples/event-driven` **1 -> 0**. `order-states` is the only corpus render
+  that moved, and it moved the right way - `retry` and `declined` between
+  *Awaiting payment* and *On hold* were one stroke with two overprinted labels
+  and are now two separate arcs with separate labels; its crossings (3) and label
+  overlaps (1) are unchanged. `d1`'s three labels read `SYN` / `SYN-ACK` / `ACK`
+  instead of `SSYNACK`, and `d5` draws a real arch with its arrowhead back on the
+  box. `tcp-lifecycle` did not move (its ten-row workaround has no shared pairs).
+
+  **`examples/tcp-states` got worse by the counters** - crossings 12 -> 13,
+  crowded pairs 4 -> 5, label overlaps 28 -> 31 - and this is kept, not reverted.
+  Three arrows that were previously invisible (one self-loop, two collapsed
+  antiparallel pairs) now draw, in a diagram whose layout D7 has already
+  destroyed. Making a hidden arrow visible raises every counter that measures
+  visible arrows. The render looks the same amount of unreadable before and
+  after; T36 owns why.
+
+  D14 is only **half** fixed and that is deliberate: the fan fires only for edges
+  the obstacle pass declined, so the distant `a` / `b` pair - whose ~165px bow is
+  an obstacle-clearance requirement, not a separation artefact - is untouched.
+  That half is D21's, which the triage already deferred. `npm run check` green
+  (661 tests); four new unit tests in `src/domain/layout/routing.test.ts`.
 - [ ] **T36. Fix the next defect.**
 - [ ] **T37. Fix the next defect.**
 - [ ] **T38. Fix the next defect.**
@@ -2535,6 +2571,23 @@ tasks above by the human, not by the loop.
 Defaults were taken so the loop could continue; nothing here is blocking. Each
 entry is a decision a human may want to revisit, with what it costs to leave it
 as-is.
+
+- **T35 - the fan skips any edge the obstacle pass already routed.** T35 asked
+  for separation between edges on a shared pair. Shipped that, but only for edges
+  with no obstacle route, which is why D14's distant `a` / `b` pair still bows
+  ~165px out of its frame while its adjacent `c` / `d` pair is fixed.
+  **Default taken:** fan only the unrouted edges. It changes least - every
+  existing route keeps the geometry every earlier measurement was taken against,
+  and exactly one corpus render moved.
+  **Alternatives:** (2) fan *all* edges on a shared pair, adding the lane offset
+  on top of the obstacle sag - one line, but it re-bends edges across the corpus
+  and invalidates the T5/T6b lane numbers; (3) merge the fan into `assignLanes`
+  so shared-pair and obstacle separation are one ranking, which is the honest
+  design and a much larger change; (4) leave it and let D21 own all of it.
+  **What the default costs:** a pair with one obstacle-routed edge and one
+  straight edge gets no separation at all - the straight one is a singleton in
+  the fan's eyes. Nothing in the corpus hits that today, so it is unmeasured
+  rather than known-good.
 
 - **T25 - the overlay hook reports canvas changes nobody made.** The task asks
   `UserPromptSubmit` to flag a non-empty `*.tldsl.overlay.json` as "source and
@@ -2824,6 +2877,33 @@ as-is.
   would have been a program.
 
 ## Discovered work
+
+- **T35: four corpus renders had already drifted from their committed PNGs
+  before this wake touched anything.** Re-rendering `tests/corpus/` produced a
+  different file for `c4-context`, `checkout-services`, `request-lifecycle` and
+  `swimlanes-release` - and all four still differ with T35's change stashed, so
+  the drift is older than T35 and nothing in `routing.ts` can explain it
+  (`request-lifecycle` has no shared pair and no self edge at all). Only
+  `order-states` moved because of this wake, and only that one was re-rendered;
+  folding somebody else's drift into a fix commit would hide it. Whoever picks
+  this up should bisect what moved them - the diffs look like small label-position
+  shifts, so a font-metrics or tldraw-version change is the first suspect.
+- **T35: `tools/arrow-truth.mts` was hanging on every input.** `page.goto(url, {
+  waitUntil: "networkidle" })` never resolves, because the viewer holds an SSE
+  connection open for the life of the page, so every invocation died on the 30s
+  timeout. Changed to `domcontentloaded`; the `waitForSelector("[data-shape-id]")`
+  that follows was already the real gate. Worth checking whether
+  `tools/screenshot.mts` and anything else that drives playwright has the same
+  latent wait.
+- **T35: the fan has a 36px floor and no obstacle awareness.** On a very short
+  pair the floor is a large fraction of the chord, which is why `d14`'s `c` / `d`
+  arcs bulge as much as they do; and a fanned lane can bow straight through a
+  third shape, because the fan runs after the obstacle pass and never re-checks.
+  Both are cheap to see and neither showed up in the corpus.
+- **T35: a self-loop always goes above its shape and nothing reserves room.**
+  The loop is placed on the top edge unconditionally - no side is chosen, no gap
+  is widened. A state with a self-transition directly under another shape will
+  draw its loop through that shape.
 
 - **A render wrote an overlay file I never asked for, once.** The first
   `tools/screenshot.mts` run over `examples/tcp-lifecycle.tldsl.jsx` left an

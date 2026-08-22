@@ -18,7 +18,7 @@ decision.
 
 | # | Group | Entries | Severity | Diagrams | Consumed by |
 |---|---|---|---|---|---|
-| 1 | **An edge is a straight segment between two shape centres, and that is the whole path model** | D1, D5, D14 (+ D21, D8 routing half) | blocker | 6 / 6 | **T35** |
+| 1 | **An edge is a straight segment between two shape centres, and that is the whole path model** | D1, D5, D14 (+ D21, D8 routing half) | blocker | 6 / 6 | **T35** - D1 and D5 fixed, D14 half fixed in `729f3bd` |
 | 2 | **`layout="auto"` reaches ELK with none of its inputs** | D7 | blocker | 1 / 6 | **T36** |
 | 3 | **An edge label is stamped at the geometric midpoint and nothing reserves room for it** | D13, D11, D8 (label half), D9 (clearance half) | wrong | 5 / 6 | **T37** |
 | 4 | **Arrow label text is measured and wrapped by a different path than box label text** | D6, D9 (wrap half) | wrong | 3 / 6 | **T38** |
@@ -173,7 +173,14 @@ blocker.
   them `97% within 8px` of each other. See D14 - the separation mechanism that
   should have caught this fires far too hard on distant pairs and not at all on
   near ones.
-- **Status:** open
+- **Status:** fixed in `729f3bd` (T35). Edges sharing an unordered endpoint pair
+  that get no obstacle route are fanned into distinct perpendicular lanes.
+  `arrow-truth` on the repro: crowded arrow pairs 3 -> 0, and the three labels
+  render as `SYN` / `SYN-ACK` / `ACK` instead of one `SSYNACK` smear. The same
+  fan takes `event-driven`'s `t-orders` / `payments` pair from `97% within 8px`
+  to crowded pairs 0.
+  **Not fixed:** ordering. An arrow still has no rank, so the fan reads 1..n
+  only by geometry.
 
 ### D2. An unnamed `<Row>` / `<Col>` / `<Grid>` draws a border and captions itself "Frame"
 
@@ -260,7 +267,14 @@ blocker.
   over the drawing, not a transition. There is no `bend`, `loop` or anchor prop
   in the skill that would let an author draw one by hand either.
 - **Repro:** `examples/repro/d5-self-transition.tldsl.jsx`
-- **Status:** open
+- **Status:** fixed in `729f3bd` (T35). `from === to` now routes to a loop over
+  the shape's top edge - precise anchors at `0.75/0` and `0.25/0`, bend scaled
+  off the shape width - so the repro draws a real arch with its arrowhead landing
+  back on the box, and the label sits above the shape instead of across its own
+  text. tldraw honours `normalizedAnchor` on both terminals of a double-bound
+  arrow, so no new primitive was needed. The loop always goes above the shape and
+  nothing reserves room for it; in `tcp-states` it lands in the pile D7 makes of
+  that diagram.
 
 ### D6. Arrow labels lose their spaces in the default `draw` font
 
@@ -460,7 +474,13 @@ blocker.
   distant pairs are flung into a neighbour's frame, adjacent pairs get nothing.
 - **Repro:** `examples/repro/d14-antiparallel-bow.tldsl.jsx` (both cases in one
   file)
-- **Status:** open
+- **Status:** half fixed in `729f3bd` (T35). The adjacent case (`c` / `d`) is
+  fixed: the shared-pair fan gives it two visibly separate arcs, crowded pairs
+  1 -> 0 on the repro. **The distant case (`a` / `b`) is unchanged** - both arcs
+  still bow ~165px out of the frame, because that bow is the obstacle-clearance
+  requirement of a box wider than its own frame, not a separation artefact. The
+  fan only fires for edges the obstacle pass declined, so it never sees that
+  pair. That half belongs to D21.
 
 ### D15. `check` is clean on a diagram that has lost three of its shapes
 

@@ -546,6 +546,14 @@ when asking "is this good".
 | request-lifecycle | 934 x 642 | 12 | 2 | 8 | 0 | 0 | 1996 x 1412 |
 | order-states | 532 x 1644 | 12 | 1 | 12 | 3 | 1 | 1192 x 3416 |
 
+**T35 (`729f3bd`) moved `order-states` and nothing else in the corpus.** The
+shared-pair fan separated `retry` / `declined` between *Awaiting payment* and
+*On hold*, which had been one stroke with two overprinted labels: `arrow pairs
+crowding each other` went **1 -> 0**, while `crossings` (3) and `label overlaps`
+(1) held. `docs/renders/order-states.png` is re-rendered; canvas, shape and
+arrow counts are unchanged, so the row above still stands. Every other corpus
+file's route map is byte-identical.
+
 `overlapping shape pairs` is 0 on all three. `checkout-services` is a four-tier
 service architecture (Edge / Core / Data / Payments) with coloured traffic;
 `request-lifecycle` is one `col` chain with two short-circuit branches;
