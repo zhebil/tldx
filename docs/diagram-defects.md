@@ -392,9 +392,11 @@ blocker.
 - **Status:** label half fixed in T37 (repro 2 label-over-shape pairs -> 1,
   `examples/tcp-states` 4 -> 2 and its 2 label-label collisions -> 0). An auto
   container still reserves no space for a label; what changed is that the label
-  moves to where the space already is. The routing half - the adapter discards
-  ELK's routed geometry, so a transition still crosses whatever is between its
-  endpoints - stays open with D21.
+  moves to where the space already is. The routing half moved in T42 with D21:
+  the repro's `a -> d` goes 2 crossings / 2 crowded pairs -> 0 / 0 and
+  `examples/tcp-states` 5 crossings -> 4. Nothing new is asked of ELK - the
+  arrow keeps the face anchors the obstacle pass already computed instead of
+  dropping them whenever the sag rounded below tldraw's minimum bend.
 
 ### D9. An edge label wraps mid-word, and the row's label clearance is short by ~50px
 
@@ -723,4 +725,19 @@ blocker.
   survivable while it runs with the layout axis over a short span, and a
   backwards edge is simply the reliable way to produce a long one.
 - **Repro:** `examples/repro/d21-backward-edge-is-a-chord.tldsl.jsx`
-- **Status:** open
+- **Status:** mostly fixed in T42. An edge whose endpoints share no layout axis
+  now gets a detour pass: grow a bend on each side until the arc tldraw would
+  actually draw clears every box and note between the two endpoints, keep the
+  smaller. `notify -> commit` crosses nothing (it rises out of `notify` and
+  slips through the 64px gap between `Staging smoke tests` and `Deploy to
+  production` instead of driving through the former), the repro
+  goes 1 crossing -> 0, and across the 23 measured files crossings go 43 -> 29
+  with no file rising on any counter. The correction in this entry drives the
+  trigger: an edge whose straight chord is already clear gets nothing, so
+  `rollback -> deploy-prod` is still a 159px straight hop. What is left is the
+  case an arc cannot express: `quality-gate -> notify` and `approval -> notify`
+  cross the full-width `cd` row at a slant, so no single arc stays inside a
+  64px gap for the row's whole 320px height the way the near-vertical
+  `notify -> commit` does, and swinging round either end of the row needs a
+  sagitta 2-4x the chord - a swoop far worse to look at than the chord. Those
+  4 crossings stay; they are a placement problem, not a routing one.
