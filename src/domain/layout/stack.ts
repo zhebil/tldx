@@ -367,11 +367,22 @@ function applyContainerBoxSizing(
     }
   }
 
+  // A non-rect geo's sized `h` includes geoScale's inflation - grown so its
+  // label fits inside a diamond/ellipse outline, not a measure of how tall
+  // its content actually needs to be. Voting that inflated number into the
+  // shared height drags every rect sibling up to match a shape that is only
+  // tall because of its outline. Vote with the natural, uninflated content
+  // height instead; a box's own final height still never drops below what
+  // containment already required (max, not overwrite).
   let sharedH = 0;
-  for (const i of boxIdx) sharedH = Math.max(sharedH, sized[i]!.h);
   for (const i of boxIdx) {
     const box = children[i] as IRBox;
-    if (box.h === undefined) sized[i] = { ...sized[i]!, h: sharedH };
+    const naturalH = boxHeightForWidth(box.label, fitBoxWidth(box.label, box.maxW, box), box);
+    sharedH = Math.max(sharedH, naturalH);
+  }
+  for (const i of boxIdx) {
+    const box = children[i] as IRBox;
+    if (box.h === undefined) sized[i] = { ...sized[i]!, h: Math.max(sharedH, sized[i]!.h) };
   }
 }
 
