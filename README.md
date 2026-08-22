@@ -71,8 +71,7 @@ Based on `tests/e2e/fixtures/auth.tldsl.jsx`. Edges reference other elements by 
 - [`docs/architecture.md`](docs/architecture.md) - components and data flow
 - [`docs/dsl.md`](docs/dsl.md) - syntax, elements, full example
 - [`docs/jsx-pivot.md`](docs/jsx-pivot.md) - the JSX pivot: why the text DSL was replaced with JSX, decision-by-decision
-- [`docs/layout-and-edges.md`](docs/layout-and-edges.md) - group/frame split, layout modes, anchors, edge styling
-- [`docs/roadmap.md`](docs/roadmap.md) - phase 1 scope, phase 2, rejected, open questions
+- [`docs/roadmap.md`](docs/roadmap.md) - what shipped, what's in flight, what was rejected and why
 - [`docs/decisions.md`](docs/decisions.md) - key design decisions and rationale (ADR-ish)
 
 ## Naming

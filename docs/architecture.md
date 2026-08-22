@@ -106,8 +106,11 @@ of stacking; edges that share an endpoint pair fan out perpendicular to
 their chord; a cross-container edge with no shared axis is routed by
 `detourAroundObstacles`, which grows a bend until the arc clears every
 box/note between its endpoints. None of this is anchor addressing - it's
-route computation on top of center-to-center attachment, bounded by what a
-tldraw arrow can actually express (`bend` for an arc, `elbowMidPoint` for an
+route computation on top of center attachment. The router does emit a
+non-center `normalizedAnchor` in two narrow cases (a self-loop, and the
+shared-pair fan at `routing.ts:637`), which `emit.ts` passes through with
+`isPrecise`/`isExact`; that is a routing detail, not an author-facing
+surface. It is all bounded by what a tldraw arrow can actually express (`bend` for an arc, `elbowMidPoint` for an
 elbow, no points array - see `docs/round-trip-scope.md` section 6). This
 machinery, and the label/occlusion work layered on it, is the active surface:
 `docs/plan.md`'s Phase 11 is entirely about edges, labels, and the
