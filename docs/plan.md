@@ -211,7 +211,7 @@ entry. If a task needs an essay, it belongs in the ledger or in
   **Both rejections were caught by looking at the render, not the report** - each
   attempt's numbers were defensible and each render was wrong.
 
-- [ ] **T48. Per-axis gap, and a tier that fills its parent.** *(D4, D10)*
+- [x] **T48. Per-axis gap, and a tier that fills its parent.** *(D4, D10)*
   Two missing levers on containers, both worked around today by restructuring
   the diagram. `<Grid>` has one `gap` for both axes, so a ladder wanting 200px
   between columns and 16px between rows rendered 7,193px tall - `rowGap` and
@@ -223,6 +223,18 @@ entry. If a task needs an essay, it belongs in the ledger or in
   **Acceptance:** `d4-single-axis-gap` sets its two axes independently;
   `d10-tiers-not-stretched` renders four tiers of equal width;
   `web-architecture` re-renders with aligned bands.
+  **Done in `8866180`.** `rowGap` / `colGap` each override `gap` on their own
+  axis; `align` gains `stretch` on `row`/`col`, growing every flowed child to the
+  container's cross-axis extent, with an explicit `w`/`h` opting out.
+  **The acceptance as written was self-contradictory** - it asked the repros to
+  *render* the fix while the rules forbade editing any diagram, and a repro for a
+  missing prop can only demonstrate it by adopting it. The agent flagged that
+  rather than quietly editing or quietly failing. Both repros and
+  `web-architecture` now adopt the levers; `web-architecture`'s four tiers are
+  1609px each, left edges aligned, and it reads as bands at last.
+  **The trade, recorded:** stretching those tiers took `web-architecture` from 1
+  crossing to 0, and from 0 to 1 label-over-shape and 0 to 1 label-over-label.
+  Wider bands mean longer edges. Kept, because ragged bands were the defect.
 
 - [x] **T49. The two notation gaps C4 exposed.** *(D17, D18)*
   A `<Frame>` takes `color` and nothing else, so a C4 system boundary cannot be
@@ -322,6 +334,16 @@ own entry into the task list; the human does that.
   T44's `tag` on the AST now makes it possible to warn on that tag specifically.
 - A flowed (non-`on`) `<Note maxW>` inside a `col`/`grid` is still overridden to
   the container's shared width by `applyContainerBoxSizing`. T45 left it to T43.
+- **The overlay footgun bit the measurements, not just the renders.** Two stale
+  `*.overlay.json` files sat in `examples/` from before the phase began, and
+  because `render = apply(overlay, compile(jsx))` they silently altered
+  `c4-container` and `tcp-lifecycle` in every `arrow-truth` run. Three
+  intermediate counter readings this phase were wrong because of it - one by 4
+  crossings. **Delete every sidecar before measuring, not after.** A real fix
+  belongs in `render`: do not write an index-only overlay at all.
+- **`align="stretch"` has no main-axis twin.** A stretched tier is full width but
+  its children stay packed at the start, so `web-architecture`'s bands carry a
+  lot of dead space on the right. There is no `justify` lever.
 - **`tldsl render` writes a `*.tldsl.overlay.json` next to every diagram it
   renders**, from z-index noise plus a few `parentId`/`y` deltas. Since
   `render = apply(overlay, compile(jsx))`, a stale one silently changes a later

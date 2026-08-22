@@ -13,7 +13,7 @@ export default function WebArchitecture() {
         <Box id="payments" label="Payments API" color="light-red" dash="dashed" />
       </Group>
 
-      <Frame id="system" name="acme.com production" layout="col" gap="64">
+      <Frame id="system" name="acme.com production" layout="col" gap="64" align="stretch">
         <Frame id="edge" name="Edge" layout="row" gap="96">
           <Box id="cdn" label="CDN" color="light-blue" />
           <Box id="lb" label="Load balancer" color="light-blue" />
