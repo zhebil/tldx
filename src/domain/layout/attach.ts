@@ -16,10 +16,13 @@
  *     re-parents it to the document root. Deliberate, not a bug: tldraw
  *     frames clip their children, so a note parented to a frame and placed
  *     beside that frame (outside its bounds) would be invisible.
- *  3. Picks a side (right/below/left/above, in that preference order) 24px
- *     off the target, centred on the target on the other axis, rejecting
- *     any candidate with a negative x or y and preferring the first
- *     zero-overlap candidate against every other absolute rect in the
+ *  3. Picks a side (right/below/left/above, in that preference order),
+ *     starting 24px off the target and centred on the target on the other
+ *     axis, then slides that candidate further along the side's axis past
+ *     any obstacle still in its way (`pushClear`) - a tightly-wrapped
+ *     container is not "room" just because it's the nearest 24px gap.
+ *     Rejects any pushed candidate with a negative x or y and prefers the
+ *     first zero-overlap one against every other absolute rect in the
  *     document (excluding the note itself and its target).
  *
  * `on` naming an `<edge>` resolves to a degenerate 1x1 rect at the midpoint
@@ -150,6 +153,56 @@ function candidateRects(note: { w: number; h: number }, target: Rect): Record<Si
   };
 }
 
+function rectsOverlap(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+/**
+ * A note's initial candidate (24px off the target, centred on the other
+ * axis) is only "room" if the target happens to be isolated. When the
+ * target sits inside a container sized tightly around it (a row's frame,
+ * a stack of siblings), the immediate spot is inside that container's own
+ * footprint too. Rather than accept the first obstacle in the way, slide
+ * the candidate further along the side's axis - past whichever obstacles
+ * it's still touching - until nothing's left in its way or it runs out of
+ * obstacles to clear. Bounded by `obstacles.size` pushes: each push clears
+ * at least the obstacle that triggered it, so it can't cycle.
+ */
+function pushClear(
+  side: Side,
+  initial: Rect,
+  obstacles: ReadonlyMap<string, Rect>,
+  exclude: ReadonlySet<string>,
+): Rect {
+  let rect = initial;
+  const maxPushes = obstacles.size + 1;
+  for (let i = 0; i < maxPushes; i++) {
+    const blockers = [...obstacles.entries()]
+      .filter(([id]) => !exclude.has(id))
+      .map(([, r]) => r)
+      .filter((r) => rectsOverlap(rect, r));
+    if (blockers.length === 0) break;
+    if (side === "right") {
+      const x = Math.max(...blockers.map((r) => r.x + r.w + GAP));
+      if (x <= rect.x) break;
+      rect = { ...rect, x };
+    } else if (side === "left") {
+      const x = Math.min(...blockers.map((r) => r.x - GAP - rect.w));
+      if (x >= rect.x) break;
+      rect = { ...rect, x };
+    } else if (side === "below") {
+      const y = Math.max(...blockers.map((r) => r.y + r.h + GAP));
+      if (y <= rect.y) break;
+      rect = { ...rect, y };
+    } else {
+      const y = Math.min(...blockers.map((r) => r.y - GAP - rect.h));
+      if (y >= rect.y) break;
+      rect = { ...rect, y };
+    }
+  }
+  return rect;
+}
+
 function pickPlacement(
   note: { id: string; w: number; h: number },
   target: Rect,
@@ -159,7 +212,8 @@ function pickPlacement(
   const candidates = candidateRects(note, target);
   const exclude = new Set<string>([note.id, ...(targetId !== undefined ? [targetId] : [])]);
 
-  const viable = SIDES.map((side) => candidates[side]).filter((r) => r.x >= 0 && r.y >= 0);
+  const pushed = SIDES.map((side) => pushClear(side, candidates[side], obstacles, exclude));
+  const viable = pushed.filter((r) => r.x >= 0 && r.y >= 0);
   let best: { rect: Rect; overlap: number } | undefined;
   for (const rect of viable) {
     const overlap = overlapArea(rect, obstacles, exclude);
@@ -171,7 +225,7 @@ function pickPlacement(
   // Every candidate had a negative coordinate (a small target near the
   // origin with a note taller/wider than it). `right`'s x is always >= 0
   // when target.x/w are, so clamp its y instead of inventing a new side.
-  const right = candidates.right;
+  const right = pushed[0]!;
   return { ...right, y: Math.max(0, right.y) };
 }
 

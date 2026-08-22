@@ -41,6 +41,7 @@ import {
   geoScale,
   FRAME_PAD_INNER,
   FRAME_TITLE_PX,
+  NOTE_MEASURE_PX,
   type Align,
   type Direction,
   type LayoutMode,
@@ -134,7 +135,7 @@ async function sizeElement(
         const size = estimatedNoteSize(el.text, el);
         return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
       }
-      const w = el.w ?? fitBoxWidth(el.text, el.maxW, el);
+      const w = el.w ?? fitBoxWidth(el.text, el.maxW ?? NOTE_MEASURE_PX, el);
       const h = el.h ?? boxHeightForWidth(el.text, w, el);
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w, h };
     }

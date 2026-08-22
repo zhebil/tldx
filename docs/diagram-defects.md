@@ -254,7 +254,18 @@ blocker.
   rotates the problem: the same sentence at `w="200"` becomes 242px tall and
   covers its neighbour vertically instead of horizontally, still 3 overlapping
   pairs. The documented cap, `maxW`, is rejected outright - see D16.
-- **Status:** open
+- **Status:** fixed (T43) - two changes, neither a hand-tuned coordinate. A
+  default measure: a plain `<Note>`'s own width now wraps to a fixed 260px
+  reading measure instead of the same unbounded, aspect-6 box-fitting used for
+  shape labels in a shared-width row/column (`NOTE_MEASURE_PX` in
+  `layout/defaults.ts`). A placement rule: `attach.ts`'s side-picker now
+  slides ("pushes") a candidate further along its chosen side past whichever
+  obstacle is still in its way, instead of rejecting the whole side on the
+  first thing it touches - a note beside a tightly-wrapped row now clears the
+  row's own frame, not just its immediate neighbour. `d3-note-covers-shape`
+  and `event-driven` both drop to 0 `layout/shape-overlap` and
+  `layout/label-overlap` warnings; `tcp-lifecycle`'s render shows the server
+  reaching `CLOSED`.
 
 ### D4. `layout="grid"` has one `gap` for both axes
 
