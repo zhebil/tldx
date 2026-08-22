@@ -114,8 +114,10 @@ type OpenTag = { tagEnd: number; selfClosing: boolean };
 
 /** Scans forward from `<Doc` to the end of its opening tag (`>` or `/>`),
  *  tracking quotes and `{}` expression depth so a `>` inside an attribute
- *  value or expression doesn't end the tag early. */
-function scanOpenTag(source: string, start: number): OpenTag | null {
+ *  value or expression doesn't end the tag early. Exported for
+ *  `domain/absorb/moves.ts`'s reorder/gap splicing, which locates elements
+ *  by JSX source span rather than by scanning for `<Doc`. */
+export function scanOpenTag(source: string, start: number): OpenTag | null {
   let i = start;
   let depth = 0;
   let quote: string | null = null;
@@ -155,6 +157,167 @@ function scanOpenTag(source: string, start: number): OpenTag | null {
 function indentOfLineAt(source: string, offset: number): string {
   const lineStart = source.lastIndexOf("\n", offset - 1) + 1;
   return source.slice(lineStart, offset).match(/^\s*/)?.[0] ?? "";
+}
+
+/** 1-based line/column (code points) -> 0-based char offset. Mirrors how
+ *  `jsxDEV`'s dev-source (`runtime/components.ts`'s `JsxSource`) numbers a
+ *  JSX element's position: it points at the element's own `<`. */
+export function offsetAt(source: string, line: number, column: number): number {
+  const lines = source.split("\n");
+  let offset = 0;
+  for (let l = 1; l < line; l++) offset += (lines[l - 1]?.length ?? 0) + 1;
+  return offset + (column - 1);
+}
+
+/**
+ * A JSX element's full source span, starting at `start` (its `<`). Scans the
+ * open tag via `scanOpenTag`; a self-closing tag ends there, otherwise scans
+ * forward tracking element-nesting depth (any open/close tag, not just this
+ * one's name - JSX guarantees proper nesting so a plain depth counter is
+ * enough) and `{}` expression children (which may contain nested braces and
+ * quoted strings) until the depth returns to 0.
+ */
+export function scanElement(source: string, start: number): { start: number; end: number } | null {
+  const open = scanOpenTag(source, start);
+  if (open === null) return null;
+  if (open.selfClosing) return { start, end: open.tagEnd };
+
+  let i = open.tagEnd;
+  let depth = 1;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === "{") {
+      const end = skipBraceExpr(source, i);
+      if (end === null) return null;
+      i = end;
+      continue;
+    }
+    if (ch === "<") {
+      if (source[i + 1] === "/") {
+        const gt = source.indexOf(">", i);
+        if (gt === -1) return null;
+        depth -= 1;
+        i = gt + 1;
+        if (depth === 0) return { start, end: i };
+        continue;
+      }
+      const childOpen = scanOpenTag(source, i);
+      if (childOpen === null) return null;
+      if (!childOpen.selfClosing) depth += 1;
+      i = childOpen.tagEnd;
+      continue;
+    }
+    i += 1;
+  }
+  return null;
+}
+
+/** `{` at `start` -> index just past its matching `}`, tracking quotes/backticks
+ *  and nested braces so a `}` inside a string or a nested object literal
+ *  doesn't end the expression early. */
+function skipBraceExpr(source: string, start: number): number | null {
+  let i = start;
+  let depth = 0;
+  let quote: string | null = null;
+  while (i < source.length) {
+    const ch = source[i];
+    if (quote !== null) {
+      if (ch === "\\") {
+        i += 2;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      i += 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+      i += 1;
+      continue;
+    }
+    if (ch === "{") {
+      depth += 1;
+      i += 1;
+      continue;
+    }
+    if (ch === "}") {
+      depth -= 1;
+      i += 1;
+      if (depth === 0) return i;
+      continue;
+    }
+    i += 1;
+  }
+  return null;
+}
+
+/**
+ * Rewrites a `row`/`col` container's flowed children into a new order
+ * (`domain/absorb/moves.ts`'s reorder rung). `siblingSpans` are the
+ * children's JSX spans in *current* source order; `draggedIndex` moves to
+ * `toIndex`, keeping every other sibling's relative order. Assumes each
+ * sibling starts its own line (the authoring style every corpus fixture
+ * uses) - if that's not true the diff still round-trips through a normal
+ * JSX formatter, but this function returns `error` rather than guess at
+ * where a same-line sibling's block boundary is.
+ */
+export function spliceReorder(
+  source: string,
+  siblingSpans: readonly { line: number; column: number }[],
+  draggedIndex: number,
+  toIndex: number,
+): { source: string } | { error: string } {
+  const spans = siblingSpans.map((s) => {
+    const offset = offsetAt(source, s.line, s.column);
+    return scanElement(source, offset);
+  });
+  if (spans.some((s) => s === null)) {
+    return { error: "could not locate a sibling element's source span for reorder" };
+  }
+  const resolved = spans as { start: number; end: number }[];
+  for (let i = 1; i < resolved.length; i++) {
+    if (resolved[i]!.start <= resolved[i - 1]!.end) {
+      return { error: "sibling elements are not on separate lines - can't reorder safely" };
+    }
+  }
+
+  const texts = resolved.map((sp) => source.slice(sp.start, sp.end));
+  const indent = indentOfLineAt(source, resolved[0]!.start);
+
+  const rest = texts.map((_, i) => i).filter((i) => i !== draggedIndex);
+  const newOrder: number[] = [];
+  for (const i of rest) {
+    if (newOrder.length === toIndex) newOrder.push(draggedIndex);
+    newOrder.push(i);
+  }
+  if (newOrder.length === toIndex) newOrder.push(draggedIndex);
+
+  const blockStart = source.lastIndexOf("\n", resolved[0]!.start - 1) + 1;
+  const blockEnd = resolved[resolved.length - 1]!.end;
+  const newBlock = newOrder.map((i) => `${indent}${texts[i]}`).join("\n");
+  return { source: source.slice(0, blockStart) + newBlock + source.slice(blockEnd) };
+}
+
+/**
+ * Sets (or adds) a `gap`/`colGap`/`rowGap` attribute on a container's
+ * opening tag (`domain/absorb/moves.ts`'s gap rung). `containerSpan` points
+ * at the container's own `<` (its IR span).
+ */
+export function patchGapAttr(
+  source: string,
+  containerSpan: { line: number; column: number },
+  attr: "gap" | "colGap" | "rowGap",
+  value: number,
+): { source: string } | { error: string } {
+  const start = offsetAt(source, containerSpan.line, containerSpan.column);
+  const tag = scanOpenTag(source, start);
+  if (tag === null) return { error: "could not find the end of the container's opening tag" };
+  const innerEnd = tag.selfClosing ? tag.tagEnd - 2 : tag.tagEnd - 1;
+  const inner = source.slice(start, innerEnd);
+  const attrRe = new RegExp(`\\b${attr}=(?:"[^"]*"|\\{[^}]*\\})`);
+  const formatted = `${attr}="${value}"`;
+  const patched = attrRe.test(inner) ? inner.replace(attrRe, formatted) : `${inner.replace(/\s+$/, "")} ${formatted}`;
+  return { source: source.slice(0, start) + patched + source.slice(innerEnd) };
 }
 
 const TLDSL_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["']tldsl["']/;
@@ -198,6 +361,12 @@ export function absorbAdded(
   source: string,
   records: readonly TLRecord[],
 ): { source: string } | { error: string } {
+  // Nothing to splice - and the splice logic below always rewrites
+  // *something* around `</Doc>` (an empty block, a stray blank line) even
+  // for an empty list, which would touch a source that has nothing to
+  // absorb (D5: never touch what didn't need touching).
+  if (records.length === 0) return { source };
+
   const sorted = [...records].sort((a, b) => {
     const ai = typeof a.index === "string" ? a.index : "";
     const bi = typeof b.index === "string" ? b.index : "";
