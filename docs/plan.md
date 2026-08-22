@@ -483,26 +483,36 @@ that order. Nothing else in wave 1 touches it.
 
 ### Wave 2
 
+- **R1** - done. Promoted to P0 and run alone: `emit.ts` never passed `index`,
+  so every shape defaulted to `"a1"` and every arrow parented to the page.
+  tldraw's `ArrowBindingUtil.reparentArrow` rewrote both on first touch and
+  `diffScenes` logged the rewrite as a user edit. That is the source of the
+  113-of-113 phantom overlay entries, and it is why F4 was blocked on it.
 - **B2** - wire the placer to the diagnostic that already fires (after B1).
-- **C1, C2** - `<Text>`, and decide what `<Note>` should be. One agent: both
-  touch `builders.ts`, `emit.ts`, `lower.ts`.
-- **C5** - container opt-out from height equalisation (`stack.ts`).
-- **E3, E4, E5** - browser tab reuse, `tldsl measure`, stale `dist/`.
-- **F5** - the round-trip design doc. Blocks F4 and F6; start it early because
-  it is thinking, not typing.
-- **A3** - the numeric-prop repro. **Repro first**: the reported root cause is
-  unconfirmed and the likelier explanation is a component not forwarding the
-  prop, which is a different bug with a different fix.
+- **C5** - done. `equalize="false"` opts a container out of the shared-height
+  vote; width sharing on `col`/`grid` is untouched.
+- **E3, E4, E5** - done. Tab reuse, `tldsl measure`, stale-`dist/` hint.
+- **A3** - done in wave 1. The reported root cause was refuted; the real one
+  was the `col`/`grid` width pass at `stack.ts:383` clobbering an authored `h`.
+- **C1, C2** - moved to wave 3. Both want `builders.ts`/`emit.ts`, which R1
+  needed exclusively.
 
 ### Wave 3
 
+- **C1, C2** - `<Text>` ships, non-sticky `<Note>` dies. Leads the wave: it
+  waited on R1 and it gates the `<Note>` standing decision below.
+- **C4** - proportional non-rect geo. Unblocked by C5 releasing `stack.ts`.
+- **F4** - absorb handles moves. Unblocked by F5 (design) and R1 (without a
+  stable `index`, "what did the user change" was unanswerable).
 - **B5** - obstacle-aware routing, single best bend. The largest piece of work
-  in the phase.
+  in the phase. Waits on B2 releasing `routing.ts`.
 - **B4** - edge label wrap budget. Re-scoped: it does *not* break mid-word, I
   rendered it. The defect is wrap width.
 - **B9** - edge side anchoring. Independent of B5; ships on its own.
-- **C4** - proportional non-rect geo.
-- **F4** - absorb handles moves (after F5).
+- **Reference docs** - done. `architecture.md` and `roadmap.md` rewritten
+  against the code; `layout-and-edges.md` deleted (its premise, "ELK not
+  Dagre", was backwards - `hybridLayout` is the engine, ELK is opt-in for
+  `layout="auto"`).
 
 ### Wave 4
 
@@ -524,8 +534,15 @@ Every example and every repro through `check` and `render`. Counters re-measured
 readings wrong in Phase 10. Every PNG looked at. Every ledger entry either
 `fixed in <sha>` or carrying a written reason.
 
-Current clean baseline: **13 crossings / 1 crowded / 4 label-over-shape /
-4 label-over-label**, down from 43 / 2 / 7 / 7 at Phase 10's start.
+Current clean baseline over `examples/*.tldsl.jsx`: **10 crossings / 1 crowded
+/ 6 label-over-shape / 3 label-over-label** (8 label-over-shape if
+`examples/repro/` is included).
+
+This is *not* a regression from the 13 / 1 / 4 / 4 quoted earlier in this
+phase. That figure was measured before `tcp-groups.tldsl.jsx` and
+`examples/board/` were adopted into `examples/`. The corpus grew, so the
+counters did. **A counter is only comparable against the same file set** -
+quote the glob with the number or the number means nothing.
 
 ## Standing decisions added this phase
 
@@ -539,6 +556,11 @@ Current clean baseline: **13 crossings / 1 crowded / 4 label-over-shape /
 - **`<Group>` is the recommended authoring mode.** Confirmed under load: ten
   diagrams, zero coordinates. `<Graph>`/`layout="auto"` is a last resort and the
   skill now says so. This is why the ELK work ranks last.
+
+- **A counter is meaningless without its file set.** Two readings this phase
+  looked like regressions and were corpus growth. Always re-measure the
+  baseline in the same command as the after-measurement, and never compare
+  against a number quoted from an earlier message.
 
 - **A field report's root cause is a hypothesis.** Two of the three reports
   named a cause that did not survive checking - the mid-word wrap that wraps at
