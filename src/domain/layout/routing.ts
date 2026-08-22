@@ -77,6 +77,10 @@ const FAN_STEP_CHORD_FACTOR = 0.3;
 /** Ceiling on the wider, label-aware fan step - see `labelAwareFanStep`. */
 const FAN_STEP_LABEL_MAX = 160;
 
+/** `placeLabels`'s last-resort bend growth: step size and step count - see its own comment. */
+const LABEL_GROW_STEP = 20;
+const LABEL_GROW_MAX_STEPS = 12;
+
 type RouteCandidate = {
   edgeId: string;
   axis: Axis;
@@ -149,6 +153,16 @@ type LabelSlot = {
  * non-endpoint box/note. Every label starts at its own midpoint and every
  * label is a blocker for every other, so an edge moved off a shape does not
  * land on a label that has not been placed yet; mutates `routes` in place.
+ *
+ * Sliding along the arc isn't always enough - a label wider than the arc's
+ * whole clearance band can overlap a shape at every candidate `t` (the same
+ * arc-vs-label mismatch `labelAwareFanStep` documents, but here there's no
+ * reciprocal sibling to fan against). When that happens, this grows the
+ * edge's own `bend` a step at a time - the lever `fanSharedPairs` already
+ * established - re-testing the label at the arc's own midpoint each step,
+ * and keeps the smallest step that clears. See the `if (best.shapeScore > 0)`
+ * block below for why growth checks only the midpoint and never an offset
+ * `t` on top of it.
  */
 function placeLabels(
   edges: IREdge[],
@@ -186,29 +200,86 @@ function placeLabels(
     const blockers = blockerPool.filter((s) => s.id !== slot.edge.from && s.id !== slot.edge.to);
     const others = slots.filter((o) => o !== slot);
 
-    let bestT = 0.5;
-    let bestScore = Infinity;
-    let bestBox = slot.box;
-
-    for (const t of LABEL_CANDIDATE_TS) {
-      const box = boxAt(slot, t);
-      let score = 0;
-      for (const s of blockers) if (boxesOverlap(box, s)) score++;
+    const scoreAt = (box: LabelBox): { score: number; shapeScore: number } => {
+      let shapeScore = 0;
+      for (const s of blockers) if (boxesOverlap(box, s)) shapeScore++;
+      let score = shapeScore;
       for (const o of others) if (boxesOverlap(box, o.box)) score++;
-      if (score < bestScore) {
-        bestScore = score;
-        bestT = t;
-        bestBox = box;
+      return { score, shapeScore };
+    };
+
+    const search = (bend: number): { t: number; box: LabelBox; score: number; shapeScore: number } => {
+      const probe = { ...slot, bend };
+      let bestT = 0.5;
+      let bestScore = Infinity;
+      let bestShapeScore = Infinity;
+      let bestBox = boxAt(probe, 0.5);
+      for (const t of LABEL_CANDIDATE_TS) {
+        const box = boxAt(probe, t);
+        const { score, shapeScore } = scoreAt(box);
+        if (score < bestScore) {
+          bestScore = score;
+          bestShapeScore = shapeScore;
+          bestT = t;
+          bestBox = box;
+        }
+        if (score === 0) break;
       }
-      if (score === 0) break;
+      return { t: bestT, box: bestBox, score: bestScore, shapeScore: bestShapeScore };
+    };
+
+    let best = search(slot.bend);
+    let bestBend = slot.bend;
+
+    // A label wider than the arc's own clearance band can cover a shape at
+    // every `t` `search` tries - sliding along the arc can't fix that, only
+    // moving the arc can. Scoped to an actual shape blocker (`shapeScore`),
+    // not a label-vs-label clash: those already have their own established
+    // fix (`fanSharedPairs`/`labelAwareFanStep`), and growing the bend here
+    // for a clash `search`'s `t` already resolved (`shapeScore === 0`) would
+    // just add an unforced detour. Growth only widens `bend`'s existing side
+    // (or, for a currently-straight edge, tries both) so it never undoes a
+    // side a candidate/detour pass already chose to avoid crossing a shape,
+    // and it only ever tests the arc's own midpoint (`t = 0.5`, no
+    // `labelPosition` offset): combining a widened bend with an offset `t`
+    // measurably reintroduces a label/label collision `search`'s own
+    // approximation misses (confirmed against `tools/arrow-truth.mts`'s
+    // rendered ground truth) - the same tldraw own-midpoint clamp this
+    // module's header already warns about, just triggered by the interaction
+    // rather than the offset alone.
+    if (best.shapeScore > 0) {
+      const otherLabelBoxes = others
+        .map((o) => approxLabelBox(o.edge, byId, routes.get(o.edge.id)?.bend ?? 0))
+        .filter((b): b is LabelBox => b !== null);
+      const signs: (1 | -1)[] = slot.bend !== 0 ? [Math.sign(slot.bend) as 1 | -1] : [1, -1];
+
+      growth: for (const sign of signs) {
+        for (let step = 1; step <= LABEL_GROW_MAX_STEPS; step++) {
+          const candidateBend = slot.bend + sign * LABEL_GROW_STEP * step;
+          // Not monotone: the circular arc `edgeBendClearsObstacles` tests
+          // against can graze an obstacle at one sag and clear it again at a
+          // larger one, so a step that fails doesn't end the search - only
+          // the step cap does.
+          if (!edgeBendClearsObstacles(slot.edge, candidateBend, byId, blockerPool, otherLabelBoxes)) continue;
+          const box = boxAt({ ...slot, bend: candidateBend }, 0.5);
+          const { score, shapeScore } = scoreAt(box);
+          if (shapeScore < best.shapeScore || (shapeScore === best.shapeScore && score < best.score)) {
+            best = { t: 0.5, box, score, shapeScore };
+            bestBend = candidateBend;
+          }
+          if (shapeScore === 0 && score === 0) break growth;
+        }
+      }
     }
 
-    slot.box = bestBox;
+    slot.bend = bestBend;
+    slot.box = best.box;
     const existing = routes.get(slot.edge.id);
     routes.set(slot.edge.id, {
       ...(existing ?? { bend: 0 }),
-      labelBox: bestBox,
-      ...(bestT === 0.5 ? {} : { labelPosition: bestT }),
+      bend: bestBend,
+      labelBox: best.box,
+      ...(best.t === 0.5 ? {} : { labelPosition: best.t }),
     });
   }
 }
@@ -357,22 +428,41 @@ function fanStepClearsObstacles(
     const offset = (i - (n - 1) / 2) * step;
     const bend = offset * (edge.from === loId ? 1 : -1);
     if (Math.abs(bend) < MIN_BEND) continue;
-    const from = byId.get(edge.from);
-    const to = byId.get(edge.to);
-    if (!from || !to) continue;
-    const start = bodyExitPoint(from, to);
-    const end = bodyExitPoint(to, from);
-    const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
-    const path = arcPolyline(start, end, bend);
-    if (blockers.some((b) => polylineHitsBox(path, b))) return false;
+    if (!edgeBendClearsObstacles(edge, bend, byId, blockerPool, otherLabelBoxes)) return false;
+  }
+  return true;
+}
 
-    if (edge.label !== undefined) {
-      const box = approxLabelBox(edge, byId, bend);
-      // Inflated by `CLEAR_MARGIN`: the model this checks against is the same
-      // approximation that missed the original overprint, so a near-miss here
-      // is treated as a miss and this step is rejected in favour of a smaller one.
-      if (box !== null && otherLabelBoxes.some((o) => boxesOverlap(inflate(box, CLEAR_MARGIN), o))) return false;
-    }
+/**
+ * Whether `edge`, bowed to `bend`, keeps its line clear of every box/note it
+ * doesn't connect and - if labelled - keeps its own approximate midpoint
+ * label clear of `otherLabelBoxes`. The single-edge check both
+ * `fanStepClearsObstacles` (fanning a whole shared-pair group) and
+ * `placeLabels` (growing one edge's bend to clear a label off a shape) build
+ * on, so a candidate bend is judged the same way in both places.
+ */
+function edgeBendClearsObstacles(
+  edge: IREdge,
+  bend: number,
+  byId: Map<string, AbsShape>,
+  blockerPool: AbsShape[],
+  otherLabelBoxes: LabelBox[],
+): boolean {
+  const from = byId.get(edge.from);
+  const to = byId.get(edge.to);
+  if (!from || !to) return true;
+  const start = bodyExitPoint(from, to);
+  const end = bodyExitPoint(to, from);
+  const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
+  const path = arcPolyline(start, end, bend);
+  if (blockers.some((b) => polylineHitsBox(path, b))) return false;
+
+  if (edge.label !== undefined) {
+    const box = approxLabelBox(edge, byId, bend);
+    // Inflated by `CLEAR_MARGIN`: the model this checks against is the same
+    // approximation that missed the original overprint, so a near-miss here
+    // is treated as a miss and this step is rejected in favour of a smaller one.
+    if (box !== null && otherLabelBoxes.some((o) => boxesOverlap(inflate(box, CLEAR_MARGIN), o))) return false;
   }
   return true;
 }
