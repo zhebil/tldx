@@ -74,6 +74,8 @@ const LOOP_SHAPE_FACTOR = 0.6;
 const FAN_STEP_MIN = 36;
 const FAN_STEP_MAX = 72;
 const FAN_STEP_CHORD_FACTOR = 0.3;
+/** Ceiling on the wider, label-aware fan step - see `labelAwareFanStep`. */
+const FAN_STEP_LABEL_MAX = 160;
 
 type RouteCandidate = {
   edgeId: string;
@@ -118,7 +120,7 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
     routes.set(candidate.edgeId, finalizeRoute(candidate, rankOf.get(candidate.edgeId) ?? 0));
   }
 
-  fanSharedPairs(otherEdges, byId, routes);
+  fanSharedPairs(otherEdges, byId, shapes, routes);
 
   detourAroundObstacles(otherEdges, byId, shapes, routes);
 
@@ -236,9 +238,14 @@ function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
+function inflate(box: LabelBox, margin: number): LabelBox {
+  return { x: box.x - margin, y: box.y - margin, w: box.w + 2 * margin, h: box.h + 2 * margin };
+}
+
 function fanSharedPairs(
   edges: IREdge[],
   byId: Map<string, AbsShape>,
+  shapes: AbsShape[],
   routes: Map<string, EdgeRoute>,
 ): void {
   const groups = new Map<string, { loId: string; lo: AbsShape; hi: AbsShape; edges: IREdge[] }>();
@@ -269,7 +276,8 @@ function fanSharedPairs(
       axisCentre("horizontal", lo) - axisCentre("horizontal", hi),
       axisCentre("vertical", lo) - axisCentre("vertical", hi),
     );
-    const step = Math.min(FAN_STEP_MAX, Math.max(FAN_STEP_MIN, FAN_STEP_CHORD_FACTOR * chord));
+    const baseStep = Math.min(FAN_STEP_MAX, Math.max(FAN_STEP_MIN, FAN_STEP_CHORD_FACTOR * chord));
+    const step = labelAwareFanStep(group, loId, baseStep, byId, shapes, edges, routes);
     const n = group.length;
     group.forEach((edge, i) => {
       const offset = (i - (n - 1) / 2) * step;
@@ -278,6 +286,113 @@ function fanSharedPairs(
       routes.set(edge.id, { bend });
     });
   }
+}
+
+/**
+ * `FAN_STEP_MAX` bows two antiparallel arcs far enough apart to read as
+ * distinct strokes, but their labels - each much wider than the line is
+ * thick, and each still anchored near the arc's own midpoint - can stay
+ * close enough to overprint (D14 "half fixed": the arc separation landed,
+ * the label separation didn't; `placeLabels`'s own fix for this, biasing
+ * `labelPosition` towards one end, is a no-op here - tldraw clamps a
+ * label's position range to the arc's own midpoint once the label is wider
+ * than the arc has room for, which a short reciprocal pair with a long
+ * label routinely is). Widening the fan step is the only remaining lever,
+ * but it moves the arc itself, so it's only taken as far as it stays clear
+ * of every obstacle the narrower, unchecked step was already clear of.
+ */
+function labelAwareFanStep(
+  group: IREdge[],
+  loId: string,
+  baseStep: number,
+  byId: Map<string, AbsShape>,
+  shapes: AbsShape[],
+  allEdges: IREdge[],
+  routes: Map<string, EdgeRoute>,
+): number {
+  const labelled = group.filter((e) => e.label !== undefined);
+  if (labelled.length === 0) return baseStep;
+
+  const labelClearance = labelled.reduce((max, e) => {
+    const w = arrowLabelWidth(e.label!, e) + 2 * ARROW_LABEL_PADDING;
+    const h = arrowLabelLineHeight(e) + 2 * ARROW_LABEL_PADDING;
+    return Math.max(max, Math.hypot(w, h) * 0.7);
+  }, 0);
+  const wanted = Math.min(FAN_STEP_LABEL_MAX, Math.max(baseStep, labelClearance));
+  if (wanted <= baseStep) return baseStep;
+
+  const groupIds = new Set(group.map((e) => e.id));
+  const otherLabels = allEdges.filter((e) => e.label !== undefined && !groupIds.has(e.id));
+
+  for (const step of [wanted, baseStep + (wanted - baseStep) * 0.66, baseStep + (wanted - baseStep) * 0.33]) {
+    if (fanStepClearsObstacles(group, loId, step, byId, shapes, otherLabels, routes)) return step;
+  }
+  return baseStep;
+}
+
+/**
+ * Whether every edge in `group`, fanned at `step`, clears every box/note it
+ * doesn't itself connect, and doesn't land its own label on top of another
+ * edge's - `otherLabels` is every other labelled edge in the diagram (not
+ * just this pair), approximated at its own already-committed bend (or
+ * straight, if it hasn't been routed yet), so widening one reciprocal pair
+ * can't quietly stamp its label onto an unrelated sibling's.
+ */
+function fanStepClearsObstacles(
+  group: IREdge[],
+  loId: string,
+  step: number,
+  byId: Map<string, AbsShape>,
+  shapes: AbsShape[],
+  otherLabels: IREdge[],
+  routes: Map<string, EdgeRoute>,
+): boolean {
+  const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
+  const otherLabelBoxes = otherLabels
+    .map((e) => approxLabelBox(e, byId, routes.get(e.id)?.bend ?? 0))
+    .filter((b): b is LabelBox => b !== null);
+  const n = group.length;
+  for (let i = 0; i < n; i++) {
+    const edge = group[i]!;
+    const offset = (i - (n - 1) / 2) * step;
+    const bend = offset * (edge.from === loId ? 1 : -1);
+    if (Math.abs(bend) < MIN_BEND) continue;
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (!from || !to) continue;
+    const start = bodyExitPoint(from, to);
+    const end = bodyExitPoint(to, from);
+    const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
+    const path = arcPolyline(start, end, bend);
+    if (blockers.some((b) => polylineHitsBox(path, b))) return false;
+
+    if (edge.label !== undefined) {
+      const box = approxLabelBox(edge, byId, bend);
+      // Inflated by `CLEAR_MARGIN`: the model this checks against is the same
+      // approximation that missed the original overprint, so a near-miss here
+      // is treated as a miss and this step is rejected in favour of a smaller one.
+      if (box !== null && otherLabelBoxes.some((o) => boxesOverlap(inflate(box, CLEAR_MARGIN), o))) return false;
+    }
+  }
+  return true;
+}
+
+/** Approximate label box at an edge's own midpoint for a given `bend` - `null` for an unlabelled or self edge. */
+function approxLabelBox(edge: IREdge, byId: Map<string, AbsShape>, bend: number): LabelBox | null {
+  if (!edge.label || edge.from === edge.to) return null;
+  const from = byId.get(edge.from);
+  const to = byId.get(edge.to);
+  if (!from || !to) return null;
+  const start = bodyExitPoint(from, to);
+  const end = bodyExitPoint(to, from);
+  const u = unit(start, end);
+  const perp: Point = { x: -u.y, y: u.x };
+  const w = arrowLabelWidth(edge.label, edge) + 2 * ARROW_LABEL_PADDING;
+  const h = arrowLabelLineHeight(edge) + 2 * ARROW_LABEL_PADDING;
+  // At the arc's own midpoint (t=0.5) the parabola's sag reduces to `bend` exactly.
+  const cx = start.x + (end.x - start.x) * 0.5 + perp.x * bend;
+  const cy = start.y + (end.y - start.y) * 0.5 + perp.y * bend;
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
 }
 
 /** Clearance an obstacle-avoiding detour keeps between the arc and the box it swings around. */
