@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { findServe, hashSource, recordServe, touchServeCompile } from "./serve-registry.js";
+import { codeFingerprint, findServe, hashSource, newestMtimeMs, recordServe, touchServeCompile } from "./serve-registry.js";
 
 // A pid this large is guaranteed unassigned (well past any real OS pid
 // range), so `process.kill(pid, 0)` reliably reports "no such process".
@@ -55,6 +55,22 @@ describe("recordServe / findServe", () => {
       file,
       hash: "abcd1234",
       compiledAt: 42,
+    });
+
+    forget();
+  });
+
+  it("records a codeFingerprint up front when given one (tldsl-rab)", () => {
+    const file = tempFile();
+    const forget = recordServe(file, "http://127.0.0.1:4000", { hash: "abcd1234", at: 42, codeFingerprint: 999 });
+
+    expect(findServe(file)).toEqual({
+      pid: process.pid,
+      url: "http://127.0.0.1:4000",
+      file,
+      hash: "abcd1234",
+      compiledAt: 42,
+      codeFingerprint: 999,
     });
 
     forget();
@@ -126,5 +142,74 @@ describe("hashSource", () => {
     expect(hashSource("a")).toBe(hashSource("a"));
     expect(hashSource("a")).not.toBe(hashSource("b"));
     expect(hashSource("a")).toHaveLength(8);
+  });
+});
+
+describe("newestMtimeMs", () => {
+  it("returns the newest mtime among files, recursing into subdirectories", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tldsl-mtime-test-"));
+    dirs.push(dir);
+    writeFileSync(join(dir, "old.txt"), "old");
+    utimesSync(join(dir, "old.txt"), new Date(1000), new Date(1000));
+    mkdirSync(join(dir, "nested"));
+    writeFileSync(join(dir, "nested", "new.txt"), "new");
+    utimesSync(join(dir, "nested", "new.txt"), new Date(2000), new Date(2000));
+
+    expect(newestMtimeMs(dir)).toBeCloseTo(2000, -1);
+  });
+
+  it("skips node_modules", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tldsl-mtime-test-"));
+    dirs.push(dir);
+    writeFileSync(join(dir, "old.txt"), "old");
+    utimesSync(join(dir, "old.txt"), new Date(1000), new Date(1000));
+    mkdirSync(join(dir, "node_modules"));
+    writeFileSync(join(dir, "node_modules", "pkg.js"), "pkg");
+    utimesSync(join(dir, "node_modules", "pkg.js"), new Date(9999), new Date(9999));
+
+    expect(newestMtimeMs(dir)).toBeCloseTo(1000, -1);
+  });
+
+  it("returns 0 for a directory that doesn't exist", () => {
+    expect(newestMtimeMs(join(tmpdir(), "tldsl-does-not-exist-xyz"))).toBe(0);
+  });
+});
+
+describe("codeFingerprint (tldsl-rab)", () => {
+  function makeCheckout(): { root: string; distCli: string; srcCli: string } {
+    const root = mkdtempSync(join(tmpdir(), "tldsl-codefp-test-"));
+    dirs.push(root);
+    const distCli = join(root, "dist", "cli");
+    const srcCli = join(root, "src", "cli");
+    mkdirSync(distCli, { recursive: true });
+    mkdirSync(srcCli, { recursive: true });
+    writeFileSync(join(distCli, "serve.js"), "// built");
+    writeFileSync(join(srcCli, "serve.ts"), "// source");
+    return { root, distCli, srcCli };
+  }
+
+  it("running from src/cli (dev via tsx) fingerprints the whole src/ tree", () => {
+    const { srcCli } = makeCheckout();
+    utimesSync(join(srcCli, "serve.ts"), new Date(1234), new Date(1234));
+
+    expect(codeFingerprint(srcCli)).toBeCloseTo(1234, -1);
+  });
+
+  it("running from dist/cli fingerprints the sibling src/ tree, not dist/ itself", () => {
+    const { distCli, srcCli } = makeCheckout();
+    utimesSync(join(distCli, "serve.js"), new Date(1), new Date(1));
+    utimesSync(join(srcCli, "serve.ts"), new Date(5678), new Date(5678));
+
+    expect(codeFingerprint(distCli)).toBeCloseTo(5678, -1);
+  });
+
+  it("is 0 when running from dist/cli with no sibling src/ (installed package)", () => {
+    const root = mkdtempSync(join(tmpdir(), "tldsl-codefp-test-"));
+    dirs.push(root);
+    const distCli = join(root, "dist", "cli");
+    mkdirSync(distCli, { recursive: true });
+    writeFileSync(join(distCli, "serve.js"), "// built");
+
+    expect(codeFingerprint(distCli)).toBe(0);
   });
 });

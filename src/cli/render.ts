@@ -26,13 +26,24 @@
  * mismatch against the current on-disk hash is treated as stale and
  * triggers a rebuild (or a refusal under `--reuse-only`, since that flag
  * exists specifically to avoid booting a browser).
+ *
+ * Code staleness (tldsl-rab): the fixture hash above only covers the
+ * `.tldsl.jsx` entry, not the compiler code that ran it. `isCodeStale`
+ * compares the reused server's boot-time `codeFingerprint` (a newest-mtime
+ * reading over the compiler source tree, set once in `cli/serve.ts`) against
+ * the current tree - a mismatch means `src/domain`, `src/app`, etc. changed
+ * after that server booted, so its scene reflects code that no longer
+ * exists on disk. `staleReason` combines both checks into the single
+ * verdict `runRender` acts on, so a reuse is refused/rebuilt for either
+ * reason and the message says which.
  */
 
 import { existsSync } from "node:fs";
-import { extname, resolve, basename } from "node:path";
+import { extname, resolve, basename, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { exportImage, type RenderFormat, type RenderOptions } from "../infra/render/export-image.js";
-import { findServe, hashSource, type ServeRecord } from "../infra/serve-registry/serve-registry.js";
+import { codeFingerprint, findServe, hashSource, type ServeRecord } from "../infra/serve-registry/serve-registry.js";
 
 import { runServe, type ServeDeps, type ServeIo } from "./serve.js";
 
@@ -132,6 +143,25 @@ export function isStale(currentHash: string, reused: ServeRecord): boolean {
   return reused.hash !== undefined && reused.hash !== currentHash;
 }
 
+/** The compiler source tree has a file newer than what the reused server's boot fingerprint saw. `undefined` fingerprint = unknown, treated as fresh. */
+export function isCodeStale(currentCodeFingerprint: number, reused: ServeRecord): boolean {
+  return reused.codeFingerprint !== undefined && currentCodeFingerprint > reused.codeFingerprint;
+}
+
+/** Combined verdict `runRender` acts on: `undefined` means fresh, otherwise the reason to report. */
+export function staleReason(
+  currentHash: string,
+  currentCodeFingerprint: number,
+  reused: ServeRecord,
+): string | undefined {
+  const sourceStale = isStale(currentHash, reused);
+  const codeStale = isCodeStale(currentCodeFingerprint, reused);
+  if (sourceStale && codeStale) return "source and the code that compiled it have both changed since that compile";
+  if (sourceStale) return "source has changed since that compile";
+  if (codeStale) return "the code that compiled it (src/domain, src/app, ...) has changed since that server started";
+  return undefined;
+}
+
 /**
  * `export-image.ts`'s "unknown --frame/--shapes id" error is easy to
  * mistake for a compiler bug when it's really a stale reused server (tldsl-usr).
@@ -168,7 +198,10 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
     }
 
     const reused = findServe(file);
-    const stale = reused !== undefined && isStale(hashSource(await deps.fs.read(file)), reused);
+    const currentCodeFingerprint = codeFingerprint(dirname(fileURLToPath(import.meta.url)));
+    const reason =
+      reused !== undefined ? staleReason(hashSource(await deps.fs.read(file)), currentCodeFingerprint, reused) : undefined;
+    const stale = reason !== undefined;
 
     if (reused !== undefined && !stale) {
       io.writeStdout(`tldsl render: reusing serve on ${describeReused(file, reused)}\n`);
@@ -180,13 +213,11 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
     } else {
       if (reuseOnly) {
         throw stale && reused !== undefined
-          ? new Error(
-              `reused serve on ${describeReused(file, reused)} is stale (source has changed since that compile); refusing under --reuse-only`,
-            )
+          ? new Error(`reused serve on ${describeReused(file, reused)} is stale (${reason}); refusing under --reuse-only`)
           : new Error(`no running \`tldsl serve\` for ${file}; start one, or drop --reuse-only to boot a browser`);
       }
       if (stale && reused !== undefined) {
-        io.writeStdout(`tldsl render: reused serve on ${describeReused(file, reused)} is stale, rebuilding\n`);
+        io.writeStdout(`tldsl render: reused serve on ${describeReused(file, reused)} is stale (${reason}), rebuilding\n`);
       }
       const handle = await runServe({ path: file, deps: withoutFsWrite(deps), io });
       try {

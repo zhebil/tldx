@@ -12,7 +12,7 @@ import { FakeWatch } from "../app/ports/watch.fake.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
 import { hashSource, recordServe, type ServeRecord } from "../infra/serve-registry/serve-registry.js";
 
-import { describeReused, isStale, parseArgs, runRender, withCompiledContext, withoutFsWrite } from "./render.js";
+import { describeReused, isCodeStale, isStale, parseArgs, runRender, staleReason, withCompiledContext, withoutFsWrite } from "./render.js";
 import type { ServeDeps, ServeIo } from "./serve.js";
 
 describe("parseArgs", () => {
@@ -118,6 +118,50 @@ describe("isStale", () => {
   });
 });
 
+describe("isCodeStale (tldsl-rab)", () => {
+  it("is stale when the current code fingerprint is newer than the reused server's boot fingerprint", () => {
+    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", codeFingerprint: 1000 };
+    expect(isCodeStale(2000, reused)).toBe(true);
+  });
+
+  it("is fresh when the current code fingerprint matches or predates the boot fingerprint", () => {
+    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", codeFingerprint: 1000 };
+    expect(isCodeStale(1000, reused)).toBe(false);
+    expect(isCodeStale(500, reused)).toBe(false);
+  });
+
+  it("treats an unknown recorded codeFingerprint as fresh, not stale", () => {
+    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f" };
+    expect(isCodeStale(2000, reused)).toBe(false);
+  });
+});
+
+describe("staleReason (tldsl-rab)", () => {
+  it("is undefined when neither source nor code has changed", () => {
+    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
+    expect(staleReason("aaaaaaaa", 1000, reused)).toBeUndefined();
+  });
+
+  it("reports source staleness alone", () => {
+    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
+    expect(staleReason("bbbbbbbb", 1000, reused)).toBe("source has changed since that compile");
+  });
+
+  it("reports code staleness alone", () => {
+    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
+    expect(staleReason("aaaaaaaa", 2000, reused)).toBe(
+      "the code that compiled it (src/domain, src/app, ...) has changed since that server started",
+    );
+  });
+
+  it("reports both when source and code have both changed", () => {
+    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
+    expect(staleReason("bbbbbbbb", 2000, reused)).toBe(
+      "source and the code that compiled it have both changed since that compile",
+    );
+  });
+});
+
 describe("withCompiledContext", () => {
   it("annotates an unknown --frame error with when the reused scene was compiled", () => {
     const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", compiledAt: 0 };
@@ -217,6 +261,31 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
       expect(stderr).toMatch(/is stale/);
       expect(stderr).toMatch(/--reuse-only/);
       expect(stderr).not.toMatch(/no running `tldsl serve`/);
+    } finally {
+      forget();
+    }
+  });
+
+  it("refuses with a stale message when the registered server's code fingerprint predates the current tree, even though the source hash matches (tldsl-rab)", async () => {
+    const content = "export default function Diagram() { return null; }";
+    const file = tempFile(content);
+    // codeFingerprint: 0 is older than any real file's mtime in this
+    // checkout, so isCodeStale trips regardless of the actual current value.
+    const forget = recordServe(file, "http://127.0.0.1:9999", { hash: hashSource(content), at: 0, codeFingerprint: 0 });
+    const io = makeIo();
+
+    try {
+      const code = await runRender({
+        argv: [file, `${file}.png`, "--reuse-only"],
+        deps: makeDeps(file, content),
+        io,
+      });
+
+      expect(code).toBe(1);
+      const stderr = io.stderr.join("");
+      expect(stderr).toMatch(/is stale/);
+      expect(stderr).toMatch(/code that compiled it/);
+      expect(stderr).toMatch(/--reuse-only/);
     } finally {
       forget();
     }
