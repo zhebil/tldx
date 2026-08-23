@@ -72,8 +72,10 @@ export function ViewerApp(): JSX.Element {
   );
 }
 
-function pushScene(editor: Editor, scene: SceneJSON): void {
-  editor.loadSnapshot(scene as unknown as TLStoreSnapshot);
+export function pushScene(editor: Editor, scene: SceneJSON): void {
+  editor.store.mergeRemoteChanges(() => {
+    editor.loadSnapshot(scene as unknown as TLStoreSnapshot);
+  });
 }
 
 function currentDocumentSnapshot(editor: Editor): SceneJSON {
