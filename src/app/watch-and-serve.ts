@@ -39,8 +39,14 @@
  *   compiles, so a recompile landing mid-write can't interleave with it.
  * - `putOverlay` merges the fresh browser diff onto the on-disk overlay
  *   (`mergeOverlayEntries`) rather than overwriting it - a source edit that
- *   invalidates an entry's id must not delete it just because the browser's
- *   next snapshot no longer mentions that id (tldsl-j3q).
+ *   invalidates an entry's id must not delete it just because the fresh
+ *   diff has nothing to say about it (tldsl-j3q). But an id the browser's
+ *   snapshot *does* still have, whose canvas value is simply back to
+ *   matching base, is not that case - `mergeOverlayEntries` is given the
+ *   snapshot's id set precisely so it can tell the two apart and let a
+ *   canvas edit that undoes an entry back to its source value actually
+ *   remove it (tldsl-z2j half 2), instead of leaving a stale entry the
+ *   server keeps re-applying.
  */
 
 import { sceneMessage } from "../contracts/builders.js";
@@ -186,12 +192,20 @@ export function watchAndServe(
           // The fresh diff only knows the two scenes it was given - an id a
           // source edit invalidated (its record no longer exists in
           // `lastCompiled`) is silently absent from it, not marked
-          // `deleted`. Merging onto the on-disk overlay rather than
-          // overwriting it keeps that entry instead of losing it
-          // (tldsl-j3q; round-trip.md D2's "never silently drops an entry"
-          // extended to the write path).
+          // `deleted`, exactly like an id the user undid back to its base
+          // value. `snapshotIds` is what tells those two apart: merging
+          // onto the on-disk overlay keeps a previous entry only when its
+          // id is absent from the snapshot entirely (tldsl-j3q); an id
+          // still present in the snapshot but unchanged from base has its
+          // entry dropped (tldsl-z2j half 2), so undoing a canvas edit back
+          // to the source position actually clears the overlay for it.
           const previous = await readOverlay(deps.fs, overlayPath);
-          const { entries, preserved } = mergeOverlayEntries(previous?.entries ?? {}, fresh);
+          const snapshotIds = new Set(Object.keys(snapshot.store));
+          const { entries, preserved } = mergeOverlayEntries(
+            previous?.entries ?? {},
+            fresh,
+            snapshotIds,
+          );
           if (preserved.length > 0) {
             deps.log.log({
               level: "warn",

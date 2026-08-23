@@ -299,6 +299,60 @@ describe("watchAndServe", () => {
     });
   });
 
+  describe("putOverlay clears a stale entry (tldsl-z2j)", () => {
+    it("drops an entry when the snapshot's record matches the compiled base again", async () => {
+      const execute = new FakeExecute();
+      execute.setResult(VALID_SRC, { ast: VALID_AST, inputs: [AUTH_PATH] });
+      const fs = new InMemoryFs({ [AUTH_PATH]: VALID_SRC });
+      const watch = new FakeWatch();
+      const transport = new InMemoryTransport();
+      const log = new CaptureLog();
+      const deps: WatchAndServeDeps = {
+        fs,
+        fsWrite: fs,
+        watch,
+        transport,
+        log,
+        layout: new StubLayout(),
+        execute,
+      };
+      const overlayPath = "auth.tldsl.overlay.json";
+
+      const handle = watchAndServe(AUTH_PATH, deps);
+      await handle.ready;
+
+      const initial = transport.pushed[0]!;
+      if (!isScene(initial)) throw new Error("expected initial push to be a scene");
+      const dashRecord = initial.payload.store["shape:dash"]!;
+
+      // The user drags "dash"; putOverlay records the moved entry.
+      await handle.putOverlay({
+        schema: initial.payload.schema,
+        store: {
+          ...initial.payload.store,
+          "shape:dash": { ...dashRecord, x: 999, y: 999 },
+        },
+      });
+      const afterDrag = JSON.parse(await fs.read(overlayPath)) as { entries: Record<string, unknown> };
+      expect(afterDrag.entries["shape:dash"]).toBeDefined();
+
+      // Undo: the browser's next snapshot has "dash" back at its compiled
+      // (base) position - present in the snapshot, but the diff against
+      // `lastCompiled` is now empty for that id.
+      await handle.putOverlay({
+        schema: initial.payload.schema,
+        store: initial.payload.store,
+      });
+
+      const afterUndo = JSON.parse(await fs.read(overlayPath)) as { entries: Record<string, unknown> };
+      expect(afterUndo.entries["shape:dash"]).toBeUndefined();
+      // Not the j3q "invalidated id" path - nothing should be preserved.
+      expect(log.byCode("overlay/preserved")).toHaveLength(0);
+
+      await handle.close();
+    });
+  });
+
   describe("module graph re-subscription", () => {
     const ENTRY = "a.tldsl.jsx";
     const SRC_OK = "ok-source";
