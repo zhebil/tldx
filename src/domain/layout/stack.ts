@@ -70,7 +70,23 @@ type Pad = { left: number; top: number; right: number; bottom: number };
 type FlowEl = IRBoxPositioned | IRNotePositioned | IRFramePositioned;
 type FanGroup = { sourceId: string; targetIds: string[] };
 type FanBlock = { source: FlowEl; targets: FlowEl[]; w: number; h: number; rowH: number };
-type AutoEdge = { from: string; to: string; label?: string; font?: StyleFont; size?: StyleFontSize };
+type AutoEdge = {
+  from: string;
+  to: string;
+  label?: string;
+  font?: StyleFont;
+  size?: StyleFontSize;
+  /**
+   * Set by `resolveEdgeOwners`, only on the side(s) it actually remapped -
+   * the pre-resolution endpoint id, when that endpoint was a descendant
+   * resolved up to its direct-child owner rather than being the owner
+   * itself. Lets `labelClearanceGaps` find the edge's *real* anchor inside
+   * the owner's already-positioned subtree instead of assuming it sits at
+   * the owner's center (B14).
+   */
+  origFrom?: string;
+  origTo?: string;
+};
 
 export type AutoPlaceRequest = {
   nodes: readonly { id: string; w: number; h: number }[];
@@ -289,6 +305,7 @@ async function layoutContainer(
   } else {
     const flowedEls = flowedIndices.map((i) => sized[i]!);
     const flowedIds = flowedEls.map((el) => el.id);
+    const elementById = new Map(flowedEls.map((el) => [el.id, el]));
     let flowMode: FlowMode = mode as FlowMode;
     let flowCols = cols;
     let serpentine = false;
@@ -319,13 +336,11 @@ async function layoutContainer(
     // col's main axis is vertical (rowGap axis); row's and grid's column
     // spacing is horizontal (colGap axis) - label clearance widens whichever
     // axis is the flow's main one.
-    const effectiveGap = labelClearanceGap(
-      flowMode,
-      flowCols,
-      collapsedIds,
-      clearanceEdges,
-      flowMode === "col" ? vGap : hGap,
-    );
+    const baseMainGap = flowMode === "col" ? vGap : hGap;
+    const effectiveGap =
+      flowMode === "grid"
+        ? labelClearanceGap(flowMode, flowCols, collapsedIds, clearanceEdges, baseMainGap)
+        : baseMainGap;
     // Grid's row axis is independent of its column axis - no label-clearance
     // widening runs against it (D9's clearance is a same-row, horizontal
     // concern), only the skip-row crossing widening below.
@@ -333,7 +348,10 @@ async function layoutContainer(
     const rowGaps =
       flowMode === "grid"
         ? skipRowGaps(collapsedIds, edges, resolveCols(flowCols, collapsedEls.length), effectiveRowGap)
-        : [];
+        : // `row`/`col`: starts at the same uniform gap as before B14, then
+          // escalates only the specific boundary a cross-container edge
+          // needs beyond that baseline (B14) - not the whole container's gap.
+          labelClearanceGaps(flowMode, flowCols, collapsedIds, clearanceEdges, baseMainGap, elementById);
     const positions = computeFlowPositions(
       collapsedEls,
       flowMode,
@@ -524,17 +542,27 @@ function resolveEdgeOwners(
   for (const e of edges) {
     const from = owner.get(e.from);
     const to = owner.get(e.to);
-    if (from !== undefined && to !== undefined && from !== to) out.push({ ...e, from, to });
+    if (from !== undefined && to !== undefined && from !== to) {
+      out.push({
+        ...e,
+        from,
+        to,
+        ...(from !== e.from ? { origFrom: e.from } : {}),
+        ...(to !== e.to ? { origTo: e.to } : {}),
+      });
+    }
   }
   return out;
 }
 
 /**
- * A container's gap must clear any labeled edge between two consecutive
- * flowed siblings along the main axis (`grid`: consecutive within the same
- * row) - the space tldraw needs to render the label unsquished (T12). One
- * uniform gap per container: the declared gap, or the widest clearance any
- * qualifying edge needs, whichever is larger.
+ * The container's one declared gap, or the widest clearance any qualifying
+ * same-axis adjacent pair needs, whichever is larger - unchanged from
+ * before B14. Still exactly right for `grid` (one uniform gap across the
+ * whole column axis - `gridPositions` has no per-column-boundary mechanism)
+ * and serves as the *starting* per-boundary value for `row`/`col` in
+ * `labelClearanceGaps` below, which then escalates only the specific
+ * boundary a cross-container edge needs beyond this baseline.
  */
 function labelClearanceGap(
   flowMode: FlowMode,
@@ -561,6 +589,157 @@ function labelClearanceGap(
     effective = Math.max(effective, clearance);
   }
   return effective;
+}
+
+/**
+ * The center of `targetId` within `el`'s own local coordinate frame -
+ * children's `x`/`y` are already relative to their parent, final by the
+ * time the bottom-up sizing pass returns `el`, so this needs no layout
+ * state beyond `el` itself. `el.id` resolves to `el`'s own center.
+ * `undefined` if `targetId` is neither `el` nor a descendant of it.
+ */
+function localCenter(el: FlowEl, targetId: string): { x: number; y: number } | undefined {
+  if (el.id === targetId) return { x: el.w / 2, y: el.h / 2 };
+  if (el.kind !== "frame") return undefined;
+  for (const c of el.children) {
+    if (c.kind === "edge" || c.kind === "doc") continue;
+    const hit = localCenter(c, targetId);
+    if (hit !== undefined) return { x: c.x + hit.x, y: c.y + hit.y };
+  }
+  return undefined;
+}
+
+/**
+ * Per-boundary clearance for `row`/`col`. Starts every boundary at
+ * `labelClearanceGap`'s ordinary uniform result (bit-identical to pre-B14
+ * behavior when nothing below fires - no diagram without a cross-container
+ * edge should see so much as a rounding difference), then escalates only
+ * the specific boundary a cross-container edge needs beyond that baseline.
+ *
+ * The plain formula (line-height for `col`, label width for `row`) assumes
+ * a flowed sibling's anchor sits centred on the container's cross axis, so
+ * the chord runs along the main axis. That assumption can break when an
+ * edge's endpoint was resolved up from a descendant nested in a *different*
+ * sibling container (B14, e.g. a box inside a sibling `row` group) - it can
+ * sit far off that sibling's center, so a `col` chord that's "supposed" to
+ * be near-vertical ends up wider than it is tall, and tldraw squishes the
+ * label on the axis this container never reserved space on (`arrowLabel.ts`
+ * squishes based on the arrow's actual bounding-box orientation, not the
+ * container's flow direction).
+ *
+ * Rather than guess, `elementById` (this container's flowed siblings, with
+ * their own already-positioned subtrees) lets us reconstruct the two real
+ * anchors' offsets from their owning sibling's center and estimate the
+ * actual chord's width/height - the same comparison `arrowLabel.ts` makes.
+ * Only escalate when that estimate says the chord would actually come out
+ * width-dominant *and* squish (see `minGapToFlipDominance`); otherwise the
+ * baseline is already correct and widening further would only move boxes
+ * for no reason. `row` doesn't get this treatment: its plain formula
+ * already reserves width, the axis a `row` chord is presumed to run along,
+ * so a cross-container offset there doesn't undermine that assumption.
+ */
+function labelClearanceGaps(
+  flowMode: "row" | "col",
+  cols: number | undefined,
+  ids: readonly string[],
+  edges: readonly AutoEdge[],
+  gap: number,
+  elementById: ReadonlyMap<string, FlowEl>,
+): number[] {
+  const baseline = labelClearanceGap(flowMode, cols, ids, edges, gap);
+  const boundaryGaps = new Array<number>(Math.max(0, ids.length - 1)).fill(baseline);
+  if (flowMode !== "col" || ids.length < 2) return boundaryGaps;
+  const pos = new Map<string, number>();
+  ids.forEach((id, i) => pos.set(id, i));
+  for (const e of edges) {
+    if (e.label === undefined) continue;
+    if (e.origFrom === undefined && e.origTo === undefined) continue;
+    const from = pos.get(e.from);
+    const to = pos.get(e.to);
+    if (from === undefined || to === undefined || Math.abs(from - to) !== 1) continue;
+    const boundary = Math.min(from, to);
+    const heightClearance = arrowLabelLineHeight(e) + 2 * ARROW_LABEL_PADDING;
+    const widthClearance = arrowLabelWidth(e.label, e) + ARROW_LABEL_MARGIN;
+    const [topOwnerId, topTargetId, bottomOwnerId, bottomTargetId] =
+      from < to
+        ? [e.from, e.origFrom ?? e.from, e.to, e.origTo ?? e.to]
+        : [e.to, e.origTo ?? e.to, e.from, e.origFrom ?? e.from];
+    const flipGap = minGapToFlipDominance(
+      elementById,
+      topOwnerId,
+      topTargetId,
+      bottomOwnerId,
+      bottomTargetId,
+      widthClearance,
+    );
+    if (flipGap === undefined) continue;
+    boundaryGaps[boundary] = Math.max(boundaryGaps[boundary]!, heightClearance, flipGap);
+  }
+  return boundaryGaps;
+}
+
+/**
+ * A small buffer over the exact flip point (see `minGapToFlipDominance`) to
+ * absorb the gap between our center-to-center chord estimate and tldraw's
+ * real anchor, which intersects the *bound shape's edge* along the line to
+ * the other endpoint's center - always a little short of full center-to-
+ * center distance. Kept to tldraw's own `MIN_ARROW_BEND` (8, see
+ * `routing.ts`'s `MIN_BEND`) rather than something closer to
+ * `ARROW_LABEL_MARGIN` (77.5): the estimate is symmetric per boundary (it
+ * cannot tell a boundary whose only qualifying edges the router will
+ * actually bend away from squish from one it won't - both feed it identical
+ * numbers), so every extra pixel here is spent on *every* qualifying
+ * boundary in a container, not just the one that needs it. A bigger buffer
+ * bought a cleaner flip for this fix's own edges but pushed an unrelated
+ * sibling boundary far enough to crowd two of *its* labels together
+ * (verified against `tools/arrow-truth.mts` on `tcp-groups`) - 8 still
+ * clears the intended flip with room to spare and leaves that boundary
+ * alone.
+ */
+const CHORD_FLIP_BUFFER = 8;
+
+/**
+ * The minimum `gap` between `topOwnerId` (earlier in flow order) and
+ * `bottomOwnerId` at which the estimated chord between `topTargetId`
+ * (inside/at `topOwnerId`) and `bottomTargetId` (inside/at `bottomOwnerId`)
+ * stops coming out wider than tall - `arrowLabel.ts` only squishes on
+ * `bodyBounds.width > bodyBounds.height`, so once the chord is at least as
+ * tall as it is wide, this container's normal line-height reservation is
+ * all a `col` edge ever needed.
+ *
+ * `undefined` (no escalation needed) when: the chord is already
+ * height-dominant at width 0 (impossible: `dx` doesn't shrink, so it can
+ * only ever need *more* gap, never a change in verdict); either owner is
+ * missing from `elementById` (conservative: skip the extra reservation
+ * rather than guess); or `dx` already clears `widthClearance` on its own -
+ * even a width-dominant chord doesn't actually squish once its width alone
+ * is enough for the label (`arrowLabel.ts`'s squish math is a no-op once
+ * `bodyBounds.width - margin >= naturalWidth`), and `dx` is fixed by the
+ * *other* container's own layout, not by this boundary's gap, so growing
+ * this gap can never buy back a `dx` shortfall anyway.
+ */
+function minGapToFlipDominance(
+  elementById: ReadonlyMap<string, FlowEl>,
+  topOwnerId: string,
+  topTargetId: string,
+  bottomOwnerId: string,
+  bottomTargetId: string,
+  widthClearance: number,
+): number | undefined {
+  const topOwner = elementById.get(topOwnerId);
+  const bottomOwner = elementById.get(bottomOwnerId);
+  if (topOwner === undefined || bottomOwner === undefined) return undefined;
+  const topCenter = localCenter(topOwner, topTargetId) ?? { x: topOwner.w / 2, y: topOwner.h / 2 };
+  const bottomCenter =
+    localCenter(bottomOwner, bottomTargetId) ?? { x: bottomOwner.w / 2, y: bottomOwner.h / 2 };
+  const offsetXTop = topCenter.x - topOwner.w / 2;
+  const offsetXBottom = bottomCenter.x - bottomOwner.w / 2;
+  const dx = Math.abs(offsetXTop - offsetXBottom);
+  if (dx >= widthClearance) return undefined;
+  const topRemaining = topOwner.h - topCenter.y;
+  // dy(gap) = topRemaining + gap + bottomCenter.y; solve dy(gap) > dx for gap.
+  const gapAtParity = dx - topRemaining - bottomCenter.y;
+  return gapAtParity <= 0 ? undefined : gapAtParity + CHORD_FLIP_BUFFER;
 }
 
 /**
@@ -818,6 +997,12 @@ function computeFlowPositions(
   gap: number,
   /** Grid-only: the row-axis gap default (row/col ignore this - see call site). */
   rowGapBase: number,
+  /**
+   * Grid: one entry per row boundary (skip-row widening). Row/col: one entry
+   * per boundary between consecutive flowed elements - `labelClearanceGaps`
+   * widens only the boundary a qualifying labeled edge actually straddles
+   * (B14); a missing/undefined entry falls back to `gap`.
+   */
   rowGaps: readonly number[],
   padLeft: number,
   padTop: number,
@@ -828,10 +1013,10 @@ function computeFlowPositions(
     const maxH = els.reduce((m, el) => Math.max(m, el.h), 0);
     const out: { x: number; y: number }[] = [];
     let cursor = padLeft;
-    for (const el of els) {
+    els.forEach((el, i) => {
       out.push({ x: cursor, y: crossAxisPos(align, padTop, maxH, el.h) });
-      cursor += el.w + gap;
-    }
+      cursor += el.w + (rowGaps[i] ?? gap);
+    });
     return out;
   }
   if (mode === "grid") {
@@ -841,10 +1026,10 @@ function computeFlowPositions(
   const maxW = els.reduce((m, el) => Math.max(m, el.w), 0);
   const out: { x: number; y: number }[] = [];
   let cursor = padTop;
-  for (const el of els) {
+  els.forEach((el, i) => {
     out.push({ x: crossAxisPos(align, padLeft, maxW, el.w), y: cursor });
-    cursor += el.h + gap;
-  }
+    cursor += el.h + (rowGaps[i] ?? gap);
+  });
   return out;
 }
 

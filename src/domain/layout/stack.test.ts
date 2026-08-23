@@ -600,6 +600,47 @@ describe("hybridLayout: labeled-edge gap clearance (T12)", () => {
   });
 });
 
+describe("hybridLayout: cross-container labeled-edge gap clearance (B14)", () => {
+  it("widens only the col boundary a labeled edge crossing a <Group> actually spans", async () => {
+    const LABEL = "reads from cache";
+    const result = await layoutAst(
+      doc({ layout: "col", gap: 10 }, [
+        box({ id: "top", label: "TOP", w: 50, h: 50 }),
+        frame(
+          { id: "g", layout: "row", gap: 200, pad: 0 },
+          [box({ id: "left", label: "L", w: 50, h: 50 }), box({ id: "right", label: "R", w: 50, h: 50 })],
+          true,
+        ),
+        box({ id: "bottom", label: "BOTTOM", w: 50, h: 50 }),
+        edge({ id: "e1", from: "right", to: "bottom", label: LABEL }),
+      ]),
+    );
+
+    const top = boxById(result.children, "top");
+    const g = frameById(result.children, "g");
+    const bottom = boxById(result.children, "bottom");
+
+    // "right" (the edge's real, off-center anchor inside "g") sits 125px off
+    // "g"'s own center: row width 50 + 200 + 50 = 300, "right"'s own center
+    // at local x=275, "g"'s center at 150. A uniform gap has no way to see
+    // this - it only ever measured same-container siblings (T12) - so
+    // without B14 this boundary gets the same baseline as every other gap
+    // in the container and the label above squishes into a multi-line wrap.
+    const dx = 125;
+    const widthClearance = arrowLabelWidth(LABEL) + 77.5;
+    const baseline = Math.max(10, arrowLabelLineHeight() + 2 * 4.25);
+    expect(dx).toBeLessThan(widthClearance);
+    const flipGap = dx - 25 /* top's own remaining half-height inside "g" */ - 25 /* bottom's own half-height */ + 8;
+    expect(flipGap).toBeGreaterThan(baseline);
+
+    // top -> g: no qualifying edge crosses this boundary, so it stays at
+    // the plain uniform baseline - untouched by the escalation below.
+    expect(g.y).toBe(top.y + top.h + baseline);
+    // g -> bottom: the boundary the edge actually spans widens to clear it.
+    expect(bottom.y).toBe(g.y + g.h + flipGap);
+  });
+});
+
 describe("bestGridCols", () => {
   it("picks a sane column count for a set of equal boxes", () => {
     const els = Array.from({ length: 6 }, () => ({ x: 0, y: 0, w: 100, h: 100 }));
