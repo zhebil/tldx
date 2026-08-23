@@ -63,6 +63,24 @@ const MIN_BEND = 8;
 const CLEAR_MARGIN = 12;
 
 /**
+ * Every bend this module produces, however it got there (the analytic
+ * candidate/lane pass, `growBendClear`'s own search loop), is capped at this
+ * multiple of the edge's own chord length (B11). An obstacle can demand an
+ * arbitrarily large detour to fully clear it - a tall enough box straddling
+ * the chord has no bend that both clears it and stays a reasonable multiple
+ * of the diagram's own scale - and a bend many times the chord reads as the
+ * arc leaving the canvas, not as clearing the obstacle. 1 is already clear of
+ * the largest legitimate bend/chord ratio seen in the example corpus (~0.45),
+ * so this only ever bites the genuinely absurd case, not a normal detour.
+ */
+const MAX_BEND_CHORD_RATIO = 1;
+
+/** `sag`, capped to `MAX_BEND_CHORD_RATIO` times the distance between `start` and `end`. */
+function capSagToChord(sag: number, start: Point, end: Point): number {
+  return Math.min(sag, MAX_BEND_CHORD_RATIO * Math.hypot(end.x - start.x, end.y - start.y));
+}
+
+/**
  * tldraw `arrowLabel.ts`'s own squish margin (64: a horizontal-ish arrow's
  * body must be at least `label width + 64` wide before its label renders on
  * one line, else it's re-measured at the squished width and wraps) plus the
@@ -1139,17 +1157,15 @@ function growBendClear(
 
   const start = terminalPoint(from, startAnchor, to);
   const end = terminalPoint(to, endAnchor, from);
-  // The chord-length cap only means something for the path-clearance case,
-  // where `start`/`end` are the edge's real terminals: a detour bigger than
-  // the chord itself has swung past pointless. `placeLabels`'s call has no
-  // such cap (its original fixed-step loop never had one either) - `start`/
-  // `end` there now come from the edge's own real anchor (or the same
-  // ray-toward-the-other-centre fallback every unrouted edge gets) the same
-  // way every other caller's do (B5's flagged bug, fixed for B9): a pair of
-  // shapes close enough together that this chord is short can still
-  // truncate the search before the label actually clears, which is exactly
-  // why this branch has no cap at all.
-  const cap = sagCap ?? (useAnalyticJump ? Math.hypot(end.x - start.x, end.y - start.y) : Infinity);
+  // A detour bigger than the chord itself has swung past pointless for the
+  // path-clearance case; `placeLabels`'s call used to leave this cap off
+  // entirely (B5) on the theory that a short chord could truncate the search
+  // before a label actually clears - but an uncapped label search can grow
+  // just as absurdly oversized as the path case (B11), and `MAX_BEND_CHORD_RATIO`
+  // is generous enough (1x the chord, well clear of the corpus's largest
+  // legitimate bend/chord ratio) that a genuine short-chord label clear still
+  // has room; only the truly unbounded case now gives up instead.
+  const cap = sagCap ?? MAX_BEND_CHORD_RATIO * Math.hypot(end.x - start.x, end.y - start.y);
   if (cap < 1) return initialBend;
 
   for (const sign of signs) {
@@ -1440,7 +1456,15 @@ function finalizeRoute(candidate: RouteCandidate, assignedRank: number): EdgeRou
   while (rank > 0 && gap < Math.max(0, baseSag + rank * LANE_STEP - slack)) {
     rank--;
   }
-  const sag = baseSag + rank * LANE_STEP;
+  // `baseSag` is a closed-form solve for "clear this obstacle" (`requiredSag`)
+  // with no upper bound of its own - a tall enough obstacle straddling the
+  // chord can demand a sag many times the chord itself (B11). Capping it here,
+  // before it ever becomes a committed route, keeps `clearObstaclesOnEveryRoute`
+  // in charge of what happens when a bend this size still doesn't clear (it
+  // grows further within its own matching cap, then gives up and keeps the
+  // closest attempt) instead of that decision being made implicitly by
+  // whatever `requiredSag` happened to compute.
+  const sag = capSagToChord(baseSag + rank * LANE_STEP, startPoint, endPoint);
 
   const u = unit(startPoint, endPoint);
   const p: Point = { x: -u.y, y: u.x };
