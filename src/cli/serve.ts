@@ -35,8 +35,22 @@
  * record). Both are no-ops if this file was never registered - `render`'s
  * own ephemeral servers never call `recordServe`, so the touch harmlessly
  * finds no record to update.
+ *
+ * Idle-TTL reaper (tldsl-kts): `deps.ttlMinutes` (default 60; `0` disables)
+ * feeds `app/idle-reaper.ts`'s `createIdleReaper`, which owns the "no
+ * activity for N minutes" timer via `deps.clock`. This is the one place
+ * every activity signal converges - dev-server HTTP requests (any page
+ * load, asset, overlay `PUT`, SSE connect, or viewer heartbeat, all behind
+ * `onActivity`) and file-change-triggered recompiles (the `watch/recompile-ok`
+ * log tap below, gated to `trigger === "change"` so the initial boot compile
+ * doesn't itself count as "activity") - so this is where the reaper is wired
+ * rather than in `app/` (which never sees HTTP) or `infra/devserver`
+ * (which never sees compiles). On expiry it logs one line and resolves
+ * `ServeHandle.idleExpired`; `cli/main.ts` races that against SIGINT/SIGTERM
+ * and closes the handle the same way either way.
  */
 
+import { createIdleReaper } from "../app/idle-reaper.js";
 import { watchAndServe, type WatchAndServeHandle } from "../app/watch-and-serve.js";
 import type { ClockPort } from "../app/ports/clock.js";
 import type { ExecutePort } from "../app/ports/execute.js";
@@ -47,6 +61,8 @@ import type { LayoutPort } from "../domain/ports/layout.js";
 import { startDevServer } from "../infra/devserver/dev-server.js";
 import { hashSource, touchServeCompile } from "../infra/serve-registry/serve-registry.js";
 import { createSseTransport } from "../infra/transport/sse-transport.js";
+
+const DEFAULT_TTL_MINUTES = 60;
 
 export type ServeIo = {
   writeStdout: (chunk: string) => void;
@@ -74,6 +90,11 @@ export type ServeDeps = {
   host?: string;
   /** Bind port. `0` (default) lets the OS pick an ephemeral port. */
   port?: number;
+  /**
+   * Idle-TTL in minutes before the server exits itself (tldsl-kts).
+   * Defaults to 60. `0` disables the reaper - the server runs until killed.
+   */
+  ttlMinutes?: number;
 };
 
 export type RunServeArgs = {
@@ -94,6 +115,13 @@ export type ServeHandle = {
    */
   readonly compile: { hash: string | undefined; at: number };
   /**
+   * Resolves once the idle-TTL reaper fires (tldsl-kts) - never, if
+   * `ttlMinutes` is `0`. The reaper has already logged the reason by the
+   * time this resolves; the caller (`cli/main.ts`) just needs to close the
+   * handle, same as on SIGINT/SIGTERM.
+   */
+  readonly idleExpired: Promise<void>;
+  /**
    * Tear down watcher, transport, and dev server. Idempotent - subsequent
    * calls return the original outcome.
    */
@@ -113,6 +141,25 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
 
   const transport = createSseTransport({ clock: deps.clock });
 
+  const ttlMinutes = deps.ttlMinutes ?? DEFAULT_TTL_MINUTES;
+  let resolveIdleExpired: () => void;
+  const idleExpired = new Promise<void>((resolve) => {
+    resolveIdleExpired = resolve;
+  });
+  const reaper = createIdleReaper({
+    clock: deps.clock,
+    ttlMs: ttlMinutes * 60_000,
+    onExpire: () => {
+      deps.log.log({
+        level: "info",
+        code: "serve/idle-timeout",
+        msg: `no activity for ${ttlMinutes}m; exiting`,
+        fields: { ttlMinutes },
+      });
+      resolveIdleExpired();
+    },
+  });
+
   // `startDevServer` is created before `watchAndServe`, but its
   // `onOverlayPut` callback needs the watch handle - hold a mutable box the
   // route handler closes over rather than reordering the two (the dev
@@ -129,8 +176,10 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
       onOverlayPut: async (snapshot) => {
         await watchBox.current?.putOverlay(snapshot);
       },
+      onActivity: () => reaper.bump(),
     });
   } catch (err) {
+    reaper.stop();
     await transport.close();
     throw err;
   }
@@ -143,6 +192,9 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     log: (event) => {
       deps.log.log(event);
       if (event.code === "watch/recompile-ok") {
+        // Only a file-change-triggered recompile counts as activity - the
+        // initial boot compile isn't "someone doing something" (tldsl-kts).
+        if (event.fields?.trigger === "change") reaper.bump();
         void readHashSafe(deps.fs, path).then((hash) => {
           if (hash !== undefined) touchServeCompile(path, hash, deps.clock.now());
         });
@@ -164,6 +216,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
   try {
     await watch.ready;
   } catch (err) {
+    reaper.stop();
     await watch.close();
     await transport.close();
     await server.close();
@@ -183,8 +236,10 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     url: server.url,
     port: server.port,
     compile,
+    idleExpired,
     close(): Promise<void> {
       return (closing ??= (async () => {
+        reaper.stop();
         await watch.close();
         await transport.close();
         await server.close();

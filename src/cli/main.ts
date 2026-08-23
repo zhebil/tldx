@@ -133,23 +133,60 @@ export function distStalenessHint(
 
 /**
  * Parked-process resolver. `runServe` returns a handle but the CLI must
- * stay alive until the user signals shutdown. We attach SIGINT and SIGTERM
- * handlers that tear the handle down and resolve `main`'s exit code.
+ * stay alive until the user signals shutdown, OR (tldsl-kts) the handle's
+ * idle-TTL reaper decides no one's home. Either way the outcome is the
+ * same: close the handle and exit 0 - the reaper has already logged its
+ * own reason by the time `idleExpired` resolves.
  */
-async function awaitShutdown(close: () => Promise<void>): Promise<number> {
+async function awaitShutdown(handle: { close(): Promise<void>; idleExpired: Promise<void> }): Promise<number> {
   return new Promise<number>((resolveCode) => {
     let resolving = false;
-    const onSignal = (): void => {
+    const finish = (code: number): void => {
       if (resolving) return;
       resolving = true;
-      close().then(
-        () => resolveCode(0),
+      handle.close().then(
+        () => resolveCode(code),
         () => resolveCode(1),
       );
     };
-    process.once("SIGINT", onSignal);
-    process.once("SIGTERM", onSignal);
+    process.once("SIGINT", () => finish(0));
+    process.once("SIGTERM", () => finish(0));
+    void handle.idleExpired.then(() => finish(0));
   });
+}
+
+/**
+ * Parse `tldsl serve`'s args: `<file> [--no-open] [--ttl <minutes>]`.
+ * `--ttl` takes its value from the following token so the plain positional
+ * scan for `path` (any non-`--` token) must skip it explicitly.
+ */
+export function parseServeArgs(rest: readonly string[]): {
+  path: string | undefined;
+  noOpen: boolean;
+  ttlMinutes: number | undefined;
+  error: string | undefined;
+} {
+  const noOpen = rest.includes("--no-open");
+  let ttlMinutes: number | undefined;
+  let path: string | undefined;
+  let error: string | undefined;
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i];
+    if (arg === "--ttl") {
+      const raw = rest[i + 1];
+      i++;
+      const n = raw === undefined ? NaN : Number(raw);
+      if (!Number.isFinite(n) || n < 0) {
+        error = "tldsl serve: --ttl requires a non-negative number of minutes";
+      } else {
+        ttlMinutes = n;
+      }
+      continue;
+    }
+    if (arg?.startsWith("--")) continue;
+    if (path === undefined) path = arg;
+  }
+  return { path, noOpen, ttlMinutes, error };
 }
 
 const commands: readonly Command[] = [
@@ -201,11 +238,14 @@ const commands: readonly Command[] = [
   },
   {
     name: "serve",
-    args: "<file> [--no-open]",
-    description: "watch a .tldsl or .tldsl.jsx file and serve the live viewer locally",
+    args: "<file> [--no-open] [--ttl <minutes>]",
+    description: "watch a .tldsl or .tldsl.jsx file and serve the live viewer locally (default --ttl 60; 0 disables)",
     run: async (rest, io) => {
-      const noOpen = rest.includes("--no-open");
-      const path = rest.find((arg) => !arg.startsWith("--"));
+      const { path, noOpen, ttlMinutes, error } = parseServeArgs(rest);
+      if (error !== undefined) {
+        io.writeStderr(`${error}\n`);
+        return 1;
+      }
       if (path === undefined) {
         io.writeStderr("tldsl serve: missing <file> argument\n");
         return 1;
@@ -228,13 +268,17 @@ const commands: readonly Command[] = [
             clock: createSystemClock(),
             viewerBundleDir: defaultViewerBundleDir(),
             ...(openThisTime ? { openBrowser } : {}),
+            ...(ttlMinutes !== undefined ? { ttlMinutes } : {}),
           },
           io,
         });
         const forgetServe = recordServe(path, handle.url, handle.compile);
-        return await awaitShutdown(async () => {
-          await handle.close();
-          forgetServe();
+        return await awaitShutdown({
+          close: async () => {
+            await handle.close();
+            forgetServe();
+          },
+          idleExpired: handle.idleExpired,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

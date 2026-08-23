@@ -53,6 +53,7 @@ async function closeFetch(
 async function bootWithBundle(
   files: Record<string, string>,
   onOverlayPut?: (snapshot: SceneJSON) => Promise<void>,
+  onActivity?: () => void,
 ): Promise<Booted> {
   const bundleDir = await mkdtemp(join(tmpdir(), "tldsl-devserver-"));
   for (const [name, body] of Object.entries(files)) {
@@ -66,6 +67,7 @@ async function bootWithBundle(
     viewerBundleDir: bundleDir,
     transport,
     ...(onOverlayPut !== undefined ? { onOverlayPut } : {}),
+    ...(onActivity !== undefined ? { onActivity } : {}),
   });
   return { server, transport, bundleDir };
 }
@@ -226,6 +228,30 @@ describe("startDevServer", () => {
     });
 
     expect(res.status).toBe(405);
+  });
+
+  it("fires onActivity for a static asset, an /events connect, and a /heartbeat ping", async () => {
+    let activity = 0;
+    booted = await bootWithBundle(
+      { "index.html": "<!doctype html>" },
+      undefined,
+      () => activity++,
+    );
+
+    await closeFetch(`${booted.server.url}index.html`);
+    expect(activity).toBe(1);
+
+    const heartbeatRes = await closeFetch(`${booted.server.url}heartbeat`);
+    expect(heartbeatRes.status).toBe(204);
+    expect(activity).toBe(2);
+
+    const controller = new AbortController();
+    try {
+      await fetch(`${booted.server.url}events`, { signal: controller.signal });
+      expect(activity).toBe(3);
+    } finally {
+      controller.abort();
+    }
   });
 
   describe("PUT /overlay", () => {

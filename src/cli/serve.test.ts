@@ -158,6 +158,102 @@ describe("runServe", () => {
     }
   });
 
+  describe("idle-TTL reaper (tldsl-kts)", () => {
+    // FakeClock.advance() drives every TTL scenario below - never a real
+    // elapsed-time wait.
+
+    it("exits (resolves idleExpired) after ttlMinutes with no activity", async () => {
+      const deps = makeDeps();
+      deps.ttlMinutes = 1;
+      const clock = deps.clock as FakeClock;
+      const log = deps.log as CaptureLog;
+      started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+
+      clock.advance(59_000);
+      expect(log.byCode("serve/idle-timeout")).toHaveLength(0);
+
+      clock.advance(1_000);
+      await started.idleExpired;
+      expect(log.byCode("serve/idle-timeout")).toHaveLength(1);
+    });
+
+    it("an HTTP request defers expiry", async () => {
+      const deps = makeDeps();
+      deps.ttlMinutes = 1;
+      const clock = deps.clock as FakeClock;
+      started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+
+      clock.advance(59_000);
+      await fetch(started.url);
+      clock.advance(59_000);
+
+      let idleFired = false;
+      void started.idleExpired.then(() => {
+        idleFired = true;
+      });
+      await Promise.resolve();
+      expect(idleFired).toBe(false);
+
+      clock.advance(1_000);
+      await started.idleExpired;
+    });
+
+    it("a file-change-triggered recompile defers expiry; the initial compile does not double-arm it", async () => {
+      const deps = makeDeps();
+      deps.ttlMinutes = 1;
+      const clock = deps.clock as FakeClock;
+      const watch = deps.watch as FakeWatch;
+      const log = deps.log as CaptureLog;
+      started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+
+      // The initial compile already logged one "watch/recompile-ok" during
+      // boot (trigger: "initial") - it must not itself re-arm the reaper a
+      // second time on top of its construction-time arm.
+      expect(log.byCode("watch/recompile-ok")).toHaveLength(1);
+
+      clock.advance(59_000);
+      watch.emitChange("doc.tldsl.jsx");
+
+      // Wait for the async recompile pipeline (real timers - FakeExecute
+      // resolves on a microtask/macrotask, not on the fake clock) to log
+      // the second "watch/recompile-ok" before advancing past the original
+      // deadline.
+      for (let i = 0; i < 50 && log.byCode("watch/recompile-ok").length < 2; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      expect(log.byCode("watch/recompile-ok")).toHaveLength(2);
+
+      // Without the bump this would already be past the original 60s
+      // deadline (59s + 59s = 118s > 60s).
+      clock.advance(59_000);
+      let idleFired = false;
+      void started.idleExpired.then(() => {
+        idleFired = true;
+      });
+      await Promise.resolve();
+      expect(idleFired).toBe(false);
+
+      clock.advance(1_000);
+      await started.idleExpired;
+    });
+
+    it("--ttl 0 (ttlMinutes: 0) never exits, even after a very long idle", async () => {
+      const deps = makeDeps();
+      deps.ttlMinutes = 0;
+      const clock = deps.clock as FakeClock;
+      started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+
+      clock.advance(1_000 * 60 * 60 * 24 * 365);
+
+      const sentinel = Symbol("not-yet");
+      const outcome = await Promise.race([
+        started.idleExpired.then(() => "expired" as const),
+        Promise.resolve(sentinel),
+      ]);
+      expect(outcome).toBe(sentinel);
+    });
+  });
+
   it("propagates dev-server boot failure (port collision)", async () => {
     // Bind a real listener on 127.0.0.1 to grab a port; runServe targeting
     // the same port hits EADDRINUSE inside startDevServer, which rejects.

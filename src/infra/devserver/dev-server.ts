@@ -79,6 +79,15 @@ export interface StartDevServerOptions {
    * (e.g. `tldsl check` never boots a dev server that needs this).
    */
   onOverlayPut?: (snapshot: SceneJSON) => Promise<void>;
+  /**
+   * Called once per incoming request, before routing - page loads, static
+   * assets, `PUT /overlay`, `/events` SSE connects, and `/heartbeat` pings
+   * all go through here. Feeds `tldsl-kts`'s idle-TTL reaper (`cli/serve.ts`):
+   * "any HTTP request" is one of the activity kinds that defers server
+   * exit. Omit to skip activity tracking entirely (e.g. `tldsl render`'s
+   * ephemeral server, which has no reaper).
+   */
+  onActivity?: () => void;
 }
 
 export interface DevServerHandle {
@@ -131,6 +140,12 @@ function buildApp(
 
   // Registered before the blanket 405 guard below - Hono matches routes in
   // registration order, and that guard returns without calling `next()`.
+  // The heartbeat itself is just an HTTP request, so `onActivity` (wired in
+  // `makeRootListener`, below) already covers it - this route only needs to
+  // exist so the viewer's periodic ping gets a cheap 204 instead of the SPA
+  // fallback's full `index.html`.
+  app.get("/heartbeat", (c) => c.body(null, 204));
+
   app.put("/overlay", async (c) => {
     if (onOverlayPut === undefined) return c.body(null, 404);
     let body: unknown;
@@ -197,8 +212,10 @@ function buildApp(
 function makeRootListener(
   honoListener: RequestListener,
   transport: DevServerTransportHandler,
+  onActivity: (() => void) | undefined,
 ): RequestListener {
   return (req, res) => {
+    onActivity?.();
     const url = req.url ?? "/";
     // Strip query/hash before comparing.
     const pathOnly = url.split(/[?#]/, 1)[0] ?? "/";
@@ -236,7 +253,7 @@ export async function startDevServer(
           _serverOptions: ServerOptions,
           listener: RequestListener,
         ): Server => {
-          const wrapped = makeRootListener(listener, options.transport);
+          const wrapped = makeRootListener(listener, options.transport, options.onActivity);
           return createHttpServer(wrapped);
         }) as unknown as typeof createHttpServer,
       },

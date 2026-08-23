@@ -135,9 +135,14 @@ Six subcommands, wired in `src/cli/main.ts`:
   not ending in `.tldsl.jsx` are accepted silently with exit 0 (so the
   PostToolUse hook, which fires on every `Edit`/`Write`, stays quiet on
   unrelated files).
-- `tldsl serve <file> [--no-open]` - watches the file and every file it
-  imports (esbuild's `metafile.inputs`, re-subscribed after every compile),
-  recompiles on save, pushes scene JSON to the bundled viewer over SSE.
+- `tldsl serve <file> [--no-open] [--ttl <minutes>]` - watches the file and
+  every file it imports (esbuild's `metafile.inputs`, re-subscribed after
+  every compile), recompiles on save, pushes scene JSON to the bundled
+  viewer over SSE. Exits itself after `--ttl` minutes with no activity
+  (default 60; `0` disables) - an HTTP request, a file-change-triggered
+  recompile, or a visible-tab heartbeat from the viewer all count as
+  activity, but an abandoned tab's idle SSE connection does not
+  (tldsl-kts).
 - `tldsl render <file> <out.png> [options]` - exports the compiled diagram
   as a cropped PNG. Reuses a running `tldsl serve` for the file if one is
   recorded in `infra/serve-registry/`, otherwise boots an ephemeral one.

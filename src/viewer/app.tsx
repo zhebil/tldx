@@ -5,6 +5,7 @@ import "tldraw/tldraw.css";
 import type { Diagnostic } from "../contracts/diagnostic.js";
 import type { SceneJSON } from "../contracts/scene-json.js";
 
+import { createHeartbeat } from "./heartbeat.js";
 import { createOverlayWriter, type OverlayWriter } from "./overlay-writer.js";
 import { createSseClient } from "./sse-client.js";
 import { applyMessage, initialViewerState } from "./state.js";
@@ -24,6 +25,16 @@ export function ViewerApp(): JSX.Element {
     });
     return () => {
       client.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    // Keeps `tldsl serve`'s idle-TTL reaper (tldsl-kts) from reaping a
+    // server someone is actually looking at - see `heartbeat.ts` for why
+    // this has to be visibility-gated rather than just "connected".
+    const heartbeat = createHeartbeat();
+    return () => {
+      heartbeat.close();
     };
   }, []);
 
