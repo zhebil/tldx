@@ -48,6 +48,8 @@
  */
 
 import type { IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
+import type { StyleGeo } from "../ir/styles.js";
+
 import {
   ARROW_LABEL_FONT_PX,
   ARROW_LABEL_PADDING,
@@ -121,6 +123,8 @@ type AbsShape = {
   y: number;
   w: number;
   h: number;
+  /** Only set for `kind: "box"` - a diamond/ellipse's real outline sits inside its bounding box (B10). */
+  geo?: StyleGeo;
 };
 
 type Axis = "horizontal" | "vertical";
@@ -406,11 +410,45 @@ function boxAt({ start, end, perp, bend, w, h }: LabelSlot, t: number): LabelBox
 }
 
 /** Where the chord from `s`'s centre toward `other`'s centre exits `s`'s rectangle - tldraw's actual arrow terminal. */
+/**
+ * `diamond`'s outline (tldraw `getGeoShapePath.ts`) is the 4-point polygon
+ * top/right/bottom/left-mid of the box - the L1 ("taxicab") unit ball scaled
+ * by the box's half-extents. A ray from centre in direction `(dx, dy)` hits
+ * it at `t = 1 / (|dx|/rx + |dy|/ry)`.
+ */
+function diamondExitT(dx: number, dy: number, rx: number, ry: number): number {
+  return 1 / (Math.abs(dx) / rx + Math.abs(dy) / ry);
+}
+
+/** `ellipse`'s outline is the standard ellipse inscribed in the box; ray-ellipse intersection from the centre. */
+function ellipseExitT(dx: number, dy: number, rx: number, ry: number): number {
+  return 1 / Math.sqrt((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry));
+}
+
+/**
+ * Where the ray from `s`'s centre toward `other`'s centre exits `s`'s real
+ * outline - tldraw's actual arrow terminal (`straight-arrow.ts`'s
+ * `updateArrowheadPointWithBoundShape` intersects against the bound shape's
+ * own geometry, not its bounding box). `diamond`/`ellipse` get their real
+ * outline; every other `geo` (most of them concave or many-sided - star,
+ * cloud, hexagon, ...) falls back to the bounding box, same as an unset
+ * `geo` (plain rectangle) - none of those appear in a routing-sensitive
+ * position in the corpus this was measured against (B10).
+ */
 function bodyExitPoint(s: AbsShape, other: AbsShape): Point {
   const centre: Point = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
   const otherCentre: Point = { x: other.x + other.w / 2, y: other.y + other.h / 2 };
   const dx = otherCentre.x - centre.x;
   const dy = otherCentre.y - centre.y;
+  if (dx === 0 && dy === 0) return centre;
+
+  if (s.geo === "diamond" || s.geo === "ellipse") {
+    const rx = s.w / 2;
+    const ry = s.h / 2;
+    const t = s.geo === "diamond" ? diamondExitT(dx, dy, rx, ry) : ellipseExitT(dx, dy, rx, ry);
+    return { x: centre.x + t * dx, y: centre.y + t * dy };
+  }
+
   let t = Infinity;
   if (dx !== 0) t = Math.min(t, ((dx > 0 ? s.x + s.w : s.x) - centre.x) / dx);
   if (dy !== 0) t = Math.min(t, ((dy > 0 ? s.y + s.h : s.y) - centre.y) / dy);
@@ -1429,7 +1467,16 @@ function collect(ir: IRDocPositioned): { shapes: AbsShape[]; edges: IREdge[] } {
       if (child.kind === "doc") continue;
       const absX = offX + child.x;
       const absY = offY + child.y;
-      shapes.push({ id: child.id, kind: child.kind, parentId, x: absX, y: absY, w: child.w, h: child.h });
+      shapes.push({
+        id: child.id,
+        kind: child.kind,
+        parentId,
+        x: absX,
+        y: absY,
+        w: child.w,
+        h: child.h,
+        ...(child.kind === "box" && child.geo !== undefined ? { geo: child.geo } : {}),
+      });
       if (child.kind === "frame") {
         visit(child.id, child.children, absX, absY);
       }

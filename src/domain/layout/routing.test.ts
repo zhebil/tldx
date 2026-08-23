@@ -15,8 +15,16 @@ function doc(id: string, children: IRElementPositioned[]): IRDocPositioned {
   return { kind: "doc", id, idExplicit: false, span: SPAN, children };
 }
 
-function box(input: { id: string; x: number; y: number; w: number; h: number }): IRBoxPositioned {
-  return { kind: "box", idExplicit: true, span: SPAN, ...input };
+function box(input: {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  geo?: NonNullable<IRBoxPositioned["geo"]>;
+}): IRBoxPositioned {
+  const { geo, ...rest } = input;
+  return { kind: "box", idExplicit: true, span: SPAN, ...rest, ...(geo === undefined ? {} : { geo }) };
 }
 
 function frame(input: {
@@ -523,6 +531,33 @@ describe("computeEdgeRoutes", () => {
       const routes = computeEdgeRoutes(ir);
       const route = routes.get("ab");
       expect(route === undefined || route.labelPosition === undefined || route.labelPosition === 0.5).toBe(true);
+    });
+
+    it("places a diagonal edge's label using a diamond terminal's real outline, not its bounding box (B10)", () => {
+      // Diagonal enough that neither `deriveAxis` nor `facingAnchors` finds a
+      // shared axis, so the route falls through to the bare centre-to-centre
+      // ray (`bodyExitPoint`) on both ends - the one path a `geo` shape's
+      // real outline (inset from its bounding box on a diagonal) can still
+      // silently diverge from the render `tldsl check` is validating against
+      // (cicd-pipeline.tldsl.jsx's `approval -> notify` "rejected" label).
+      const ir = doc("root", [
+        box({ id: "d", x: 0, y: 0, w: 200, h: 200, geo: "diamond" }),
+        box({ id: "n", x: 500, y: 350, w: 100, h: 100 }),
+        edge({ id: "dn", from: "d", to: "n", label: "x" }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      const route = routes.get("dn");
+      expect(route?.bend).toBe(0);
+      expect(route?.startAnchor).toBeUndefined();
+      const box_ = route?.labelBox;
+      expect(box_).toBeDefined();
+      const centre = { x: box_!.x + box_!.w / 2, y: box_!.y + box_!.h / 2 };
+      // Diamond exit point toward n's centre is (160, 140), not the
+      // bounding-box ray's (200, 166.67); n's own (rectangular) exit is
+      // (500, 366.67) either way. Midpoint with the correct diamond exit is
+      // (330, 253.33) - the bounding-box version would land at (350, 266.67).
+      expect(centre.x).toBeCloseTo(330, 0);
+      expect(centre.y).toBeCloseTo(253.33, 0);
     });
 
     it("grows the bend to pull a label off a shape no candidate `t` clears (B2/D11)", () => {
