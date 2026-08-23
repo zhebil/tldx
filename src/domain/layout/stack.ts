@@ -161,7 +161,7 @@ async function sizeElement(
 ): Promise<IRBoxPositioned | IRNotePositioned | IRFramePositioned> {
   switch (el.kind) {
     case "box": {
-      const size = estimatedBoxSize(el.label, el.maxW, boxStyle(el));
+      const size = estimatedBoxSize(el.label, el.w ?? el.maxW, boxStyle(el));
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
     }
     case "note": {
@@ -423,6 +423,13 @@ function applyContainerBoxSizing(
       if (box.w !== undefined) continue;
       const style = boxStyle(box);
       const w = box.maxW === undefined ? sharedW : Math.min(sharedW, box.maxW);
+      if (w < sharedW) {
+        // geoScale's k was solved for this box's uncapped natural size, so it
+        // no longer holds once maxW pins w below that - re-solve h at the forced w.
+        const capped = estimatedBoxSize(box.label, w, style);
+        sized[i] = { ...sized[i]!, w, h: box.h ?? capped.h };
+        continue;
+      }
       const k = geoScale(box.label, box.maxW, style);
       const uw = w / k;
       const rawH = boxHeightForWidth(box.label, uw, style);

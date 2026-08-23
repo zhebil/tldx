@@ -15,6 +15,7 @@ import {
   boxHeightForWidth,
   estimatedBoxSize,
   fitBoxWidth,
+  labelOverflow,
   NOTE_MEASURE_PX,
 } from "./defaults.js";
 import { arrowLabelLineHeight, arrowLabelWidth } from "./glyph-metrics.js";
@@ -1189,6 +1190,39 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     // centred against the taller diamond by the row's existing cross-axis
     // alignment, not pinned to its top.
     expect(c.y).toBeGreaterThan(d.y);
+  });
+
+  it("grows an explicit-w box's height to fit a label measured at that width, not its natural unconstrained width (A2)", async () => {
+    const label = "A genuinely long label that will wrap onto many more lines once pinned to a narrow width";
+    const result = await layoutAst(doc({ layout: "col" }, [box({ id: "narrow", label, w: 160 })]));
+    const narrow = boxById(result.children, "narrow");
+
+    // w is an explicit statement of intent and stays put; h is unset, so it
+    // must grow enough to contain the label re-wrapped at that width - not
+    // the height a wider, unconstrained wrap would have implied.
+    expect(narrow.w).toBe(160);
+    expect(labelOverflow(label, narrow.w, narrow.h)).toBeUndefined();
+  });
+
+  it("grows a maxW-capped diamond's height instead of clipping when the shared-width vote's k no longer applies at the capped width (A2)", async () => {
+    const label = "Manual approval\nrelease manager signs off";
+    const style = { geo: "diamond" as const };
+    const result = await layoutAst(
+      doc({ layout: "col" }, [box({ id: "approval", label, geo: "diamond", maxW: 220 })]),
+    );
+    const approval = boxById(result.children, "approval");
+
+    expect(approval.w).toBe(220);
+    expect(labelOverflow(label, approval.w, approval.h, style)).toBeUndefined();
+  });
+
+  it("keeps an author-pinned h even when the label needs more room, so check can still warn (A2 standing decision, tldsl-4hz)", async () => {
+    const label = "This label will not fit no matter what, because the box height is explicitly pinned far too small for it";
+    const result = await layoutAst(doc({ layout: "col" }, [box({ id: "pinned", label, w: 160, h: 40 })]));
+    const pinned = boxById(result.children, "pinned");
+
+    expect(pinned.h).toBe(40);
+    expect(labelOverflow(label, pinned.w, pinned.h)).toBeDefined();
   });
 
   it("equalize=false lets col box heights track their own natural content instead of the tallest sibling", async () => {
