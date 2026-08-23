@@ -491,6 +491,35 @@ describe("computeEdgeRoutes", () => {
     });
   });
 
+  describe("bend growth is capped by chord length, not obstacle size (B11)", () => {
+    // Two 120x62 boxes 280px apart, straddled by a tall obstacle - the
+    // router's own analytic sag formula has no upper bound of its own and
+    // used to grow past the chord itself (bend -1036 for a 2000px obstacle,
+    // -2036 for 4000px). The cap is a function of the endpoints' own
+    // separation, so both heights must land on the exact same bend.
+    function repro(obstacleHeight: number) {
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 120, h: 62 }),
+        box({ id: "b", x: 400, y: 0, w: 120, h: 62 }),
+        box({ id: "obstacle", x: 260, y: -obstacleHeight / 2 + 31, w: 40, h: obstacleHeight }),
+        edge({ id: "ab", from: "a", to: "b" }),
+      ]);
+      return computeEdgeRoutes(ir).get("ab");
+    }
+
+    it("caps the bend the same way for a 2000px obstacle", () => {
+      const route = repro(2000);
+      expect(route).toBeDefined();
+      expect(Math.abs(route!.bend)).toBeLessThanOrEqual(400);
+    });
+
+    it("caps the bend identically for a 4000px obstacle - the cap tracks the chord, not the obstacle", () => {
+      const route2000 = repro(2000);
+      const route4000 = repro(4000);
+      expect(route4000!.bend).toBe(route2000!.bend);
+    });
+  });
+
   describe("label placement", () => {
     it("slides two labels spanning the same gap apart when their midpoint boxes would overlap", () => {
       const ir = doc("root", [
