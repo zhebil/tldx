@@ -48,7 +48,29 @@
  * (which never sees compiles). On expiry it logs one line and resolves
  * `ServeHandle.idleExpired`; `cli/main.ts` races that against SIGINT/SIGTERM
  * and closes the handle the same way either way.
+ *
+ * Code staleness (tldsl-rab): loading the router/layout modules happens once
+ * at process start, and the watcher only watches the `.tldsl.jsx` entry - an
+ * edit to `src/domain/**` (or anywhere else in the compiler) is invisible to
+ * an already-running process. `ServeHandle.compile.codeFingerprint` is a
+ * newest-mtime reading over the compiler source tree taken at boot
+ * (`infra/serve-registry`'s `codeFingerprint`); `cli/main.ts` seeds the
+ * registry record with it so a later `tldsl render` can tell a server apart
+ * from the code it actually booted with (`cli/render.ts`'s `isCodeStale`).
+ * The `watch/recompile-ok` log tap below also re-checks it on every
+ * recompile and warns once, loudly, if the tree has moved since boot - this
+ * is a notice, not a hot-reload: the fix is to restart `tldsl serve`.
+ *
+ * Viewer staleness (tldsl-rab): `deps.viewerBundleDir` is a prebuilt static
+ * bundle; `src/viewer/**` edits need `npm run build:viewer` before they show
+ * up. `viewerStalenessWarning` below is `cli/main.ts`'s `distStalenessHint`
+ * pattern applied to `dist/viewer` vs. its `src/viewer` sibling - a one-shot
+ * warning at boot, not a rebuild.
  */
+
+import { existsSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { createIdleReaper } from "../app/idle-reaper.js";
 import { watchAndServe, type WatchAndServeHandle } from "../app/watch-and-serve.js";
@@ -59,7 +81,7 @@ import type { LogPort } from "../app/ports/log.js";
 import type { WatchPort } from "../app/ports/watch.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 import { startDevServer } from "../infra/devserver/dev-server.js";
-import { hashSource, touchServeCompile } from "../infra/serve-registry/serve-registry.js";
+import { codeFingerprint, hashSource, newestMtimeMs, touchServeCompile } from "../infra/serve-registry/serve-registry.js";
 import { createSseTransport } from "../infra/transport/sse-transport.js";
 
 const DEFAULT_TTL_MINUTES = 60;
@@ -110,10 +132,11 @@ export type ServeHandle = {
   readonly port: number;
   /**
    * Source hash/timestamp as of the initial compile - `undefined` hash if
-   * the initial read/compile failed. Lets the caller seed the serve-registry
-   * record with a compile hash at boot, atomically (see module docs).
+   * the initial read/compile failed - plus the compiler code's fingerprint
+   * at boot. Lets the caller seed the serve-registry record with a compile
+   * hash and code fingerprint at boot, atomically (see module docs).
    */
-  readonly compile: { hash: string | undefined; at: number };
+  readonly compile: { hash: string | undefined; at: number; codeFingerprint: number };
   /**
    * Resolves once the idle-TTL reaper fires (tldsl-kts) - never, if
    * `ttlMinutes` is `0`. The reaper has already logged the reason by the
@@ -136,8 +159,21 @@ async function readHashSafe(fs: FsReadPort, path: string): Promise<string | unde
   }
 }
 
+/** `dist/viewer` predates its `src/viewer` sibling - `undefined` when there's nothing to compare (installed package, or a custom bundle dir with no such sibling). */
+export function viewerStalenessWarning(viewerBundleDir: string): string | undefined {
+  const distDir = resolve(viewerBundleDir, "..");
+  if (basename(distDir) !== "dist") return undefined;
+  const srcViewerDir = resolve(distDir, "..", "src", "viewer");
+  if (!existsSync(srcViewerDir)) return undefined;
+  if (newestMtimeMs(srcViewerDir) > newestMtimeMs(viewerBundleDir)) {
+    return "dist/viewer looks stale (src/viewer has changed since the last build) - run `npm run build:viewer`";
+  }
+  return undefined;
+}
+
 export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
   const { path, deps, io } = args;
+  const bootCodeFingerprint = codeFingerprint(dirname(fileURLToPath(import.meta.url)));
 
   const transport = createSseTransport({ clock: deps.clock });
 
@@ -188,6 +224,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
   // the initial one) so a `tldsl render` reusing this server later can
   // detect staleness. Harmless no-op when `path` was never registered
   // (`recordServe` not called - e.g. render's own ephemeral boot).
+  let warnedCodeStale = false;
   const log: LogPort = {
     log: (event) => {
       deps.log.log(event);
@@ -198,6 +235,18 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
         void readHashSafe(deps.fs, path).then((hash) => {
           if (hash !== undefined) touchServeCompile(path, hash, deps.clock.now());
         });
+        // The compiler code isn't watched - this recompile is the cheapest
+        // existing hook to notice it moved since boot. One warning per
+        // process is enough; the fix is a restart, not a re-warn.
+        if (!warnedCodeStale && codeFingerprint(dirname(fileURLToPath(import.meta.url))) > bootCodeFingerprint) {
+          warnedCodeStale = true;
+          deps.log.log({
+            level: "warn",
+            code: "serve/code-stale",
+            msg: "the code that compiled this scene (src/domain, src/app, ...) has changed since this server started - restart `tldsl serve` to pick it up",
+            fields: { bootCodeFingerprint },
+          });
+        }
       }
     },
   };
@@ -223,9 +272,14 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     throw err;
   }
 
-  const compile = { hash: await readHashSafe(deps.fs, path), at: deps.clock.now() };
+  const compile = { hash: await readHashSafe(deps.fs, path), at: deps.clock.now(), codeFingerprint: bootCodeFingerprint };
 
   io.writeStdout(`tldsl serving ${path} on ${server.url}\n`);
+
+  const viewerWarning = viewerStalenessWarning(deps.viewerBundleDir);
+  if (viewerWarning !== undefined) {
+    deps.log.log({ level: "warn", code: "serve/viewer-stale", msg: viewerWarning, fields: {} });
+  }
 
   if (deps.openBrowser !== undefined) {
     deps.openBrowser(server.url);

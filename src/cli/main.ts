@@ -23,7 +23,7 @@
  *                        overlay.
  */
 
-import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,7 +36,7 @@ import { gitStatus } from "../infra/git/git-status.js";
 import { ElkLayoutAdapter } from "../infra/layout-elk/elk-layout.js";
 import { createStderrLog } from "../infra/log/stderr-log.js";
 import { openBrowser } from "../infra/open-browser/open-browser.js";
-import { findServe, recordServe } from "../infra/serve-registry/serve-registry.js";
+import { findServe, newestMtimeMs, recordServe } from "../infra/serve-registry/serve-registry.js";
 
 import { runAbsorbCli } from "./absorb.js";
 import { runCheck, type CheckIo } from "./check.js";
@@ -79,26 +79,6 @@ function defaultViewerBundleDir(): string {
  */
 export function shouldOpenBrowser(noOpen: boolean, live: { readonly pid: number } | undefined): boolean {
   return !noOpen && live === undefined;
-}
-
-function newestMtimeMs(dir: string): number {
-  let newest = 0;
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return newest;
-  }
-  for (const entry of entries) {
-    if (entry.name === "node_modules") continue;
-    const full = resolve(dir, entry.name);
-    try {
-      newest = Math.max(newest, entry.isDirectory() ? newestMtimeMs(full) : statSync(full).mtimeMs);
-    } catch {
-      // best-effort; a raced-away file must not crash the CLI
-    }
-  }
-  return newest;
 }
 
 /**

@@ -24,8 +24,10 @@
  */
 
 import { createServer as createHttpServer } from "node:http";
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -38,7 +40,7 @@ import { overlayPathFor } from "../domain/overlay/index.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
 import { findServe, hashSource, recordServe } from "../infra/serve-registry/serve-registry.js";
 
-import { runServe, type ServeDeps, type ServeHandle, type ServeIo } from "./serve.js";
+import { runServe, viewerStalenessWarning, type ServeDeps, type ServeHandle, type ServeIo } from "./serve.js";
 
 // FakeExecute has no result programmed for this source, so it falls back to
 // its default empty-doc AST - real content doesn't matter for these tests.
@@ -115,6 +117,11 @@ describe("runServe", () => {
   it("exposes the source hash of the initial compile on the handle", async () => {
     started = await runServe({ path: "doc.tldsl.jsx", deps: makeDeps(), io: makeIo() });
     expect(started.compile.hash).toBe(hashSource(SRC));
+  });
+
+  it("exposes a non-zero code fingerprint on the handle (tldsl-rab: this checkout has a real src/ tree)", async () => {
+    started = await runServe({ path: "doc.tldsl.jsx", deps: makeDeps(), io: makeIo() });
+    expect(started.compile.codeFingerprint).toBeGreaterThan(0);
   });
 
   it("omitting fsWrite disables the overlay round-trip - PUT /overlay is accepted but writes nothing", async () => {
@@ -279,5 +286,60 @@ describe("runServe", () => {
         });
       });
     }
+  });
+});
+
+describe("viewerStalenessWarning (tldsl-rab)", () => {
+  const dirs: string[] = [];
+
+  afterEach(() => {
+    while (dirs.length > 0) rmSync(dirs.pop()!, { recursive: true, force: true });
+  });
+
+  function makeCheckout(): { distViewer: string; srcViewer: string } {
+    const root = mkdtempSync(join(tmpdir(), "tldsl-viewer-staleness-test-"));
+    dirs.push(root);
+    const distViewer = join(root, "dist", "viewer");
+    const srcViewer = join(root, "src", "viewer");
+    mkdirSync(distViewer, { recursive: true });
+    mkdirSync(srcViewer, { recursive: true });
+    writeFileSync(join(distViewer, "index.html"), "<!-- built -->");
+    writeFileSync(join(srcViewer, "app.tsx"), "// source");
+    return { distViewer, srcViewer };
+  }
+
+  it("is silent when dist/viewer is newer than every file in src/viewer", () => {
+    const { distViewer, srcViewer } = makeCheckout();
+    utimesSync(join(srcViewer, "app.tsx"), new Date(1000), new Date(1000));
+    utimesSync(join(distViewer, "index.html"), new Date(2000), new Date(2000));
+
+    expect(viewerStalenessWarning(distViewer)).toBeUndefined();
+  });
+
+  it("flags dist/viewer as stale when src/viewer has a file newer than the build", () => {
+    const { distViewer, srcViewer } = makeCheckout();
+    utimesSync(join(distViewer, "index.html"), new Date(1000), new Date(1000));
+    utimesSync(join(srcViewer, "app.tsx"), new Date(2000), new Date(2000));
+
+    expect(viewerStalenessWarning(distViewer)).toMatch(/dist\/viewer looks stale.*npm run build:viewer/);
+  });
+
+  it("is silent when src/viewer doesn't exist next to dist/ (an installed package)", () => {
+    const root = mkdtempSync(join(tmpdir(), "tldsl-viewer-staleness-test-"));
+    dirs.push(root);
+    const distViewer = join(root, "dist", "viewer");
+    mkdirSync(distViewer, { recursive: true });
+    writeFileSync(join(distViewer, "index.html"), "<!-- built -->");
+
+    expect(viewerStalenessWarning(distViewer)).toBeUndefined();
+  });
+
+  it("is silent when the bundle dir isn't inside a dist/ directory (custom bundle dir)", () => {
+    const root = mkdtempSync(join(tmpdir(), "tldsl-viewer-staleness-test-"));
+    dirs.push(root);
+    const customDir = join(root, "custom", "viewer");
+    mkdirSync(customDir, { recursive: true });
+
+    expect(viewerStalenessWarning(customDir)).toBeUndefined();
   });
 });

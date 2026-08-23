@@ -10,12 +10,18 @@
  * render`) tell a live, up-to-date server apart from an orphaned one still
  * serving a stale compile (tldsl-usr, tldsl-46n) - printing "reusing serve
  * on :port (file @ hash)" and detecting staleness both read this field.
+ *
+ * `codeFingerprint` (tldsl-rab) covers a different staleness: not the
+ * `.tldsl.jsx` fixture, but the compiler code (`src/domain`, `src/app`, ...)
+ * that ran when this server booted. It is a newest-mtime reading over the
+ * source tree, fixed once at boot - the running process's code cannot change
+ * out from under it, so unlike `hash` it is never re-touched on recompile.
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 export type ServeRecord = {
   pid: number;
@@ -25,6 +31,8 @@ export type ServeRecord = {
   hash?: string;
   /** `ClockPort.now()` reading at that same compile. */
   compiledAt?: number;
+  /** Newest mtime (ms) across the compiler source tree as of this server's boot. */
+  codeFingerprint?: number;
 };
 
 function recordPath(file: string): string {
@@ -52,10 +60,48 @@ export function hashSource(source: string): string {
   return createHash("sha256").update(source).digest("hex").slice(0, 8);
 }
 
+/** Newest mtime (ms) of any file under `dir`, recursing but skipping `node_modules`. `0` if `dir` doesn't exist or is empty. */
+export function newestMtimeMs(dir: string): number {
+  let newest = 0;
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return newest;
+  }
+  for (const entry of entries) {
+    if (entry.name === "node_modules") continue;
+    const full = resolve(dir, entry.name);
+    try {
+      newest = Math.max(newest, entry.isDirectory() ? newestMtimeMs(full) : statSync(full).mtimeMs);
+    } catch {
+      // best-effort; a raced-away file must not crash the caller
+    }
+  }
+  return newest;
+}
+
+/**
+ * Newest mtime (ms) across the compiler's own source tree, given the
+ * directory of a currently-running module one level under `cli/` (e.g.
+ * `dirname(fileURLToPath(import.meta.url))` from `cli/serve.ts` or
+ * `cli/render.ts`). Mirrors `cli/main.ts`'s `distStalenessHint` dist/src
+ * sibling convention: running from `dist/cli` resolves to the sibling
+ * `src/` (dev checkout); running from `src/cli` (via `tsx`) resolves to
+ * `src/` directly. `0` when there is no `src/` to check (installed package),
+ * which makes a later comparison against this fingerprint never register as
+ * stale.
+ */
+export function codeFingerprint(here: string): number {
+  const parent = resolve(here, "..");
+  const root = basename(parent) === "dist" ? resolve(parent, "..", "src") : parent;
+  return existsSync(root) ? newestMtimeMs(root) : 0;
+}
+
 export function recordServe(
   file: string,
   url: string,
-  compile?: { hash: string | undefined; at: number },
+  compile?: { hash: string | undefined; at: number; codeFingerprint?: number },
 ): () => void {
   const path = recordPath(file);
   try {
@@ -64,6 +110,9 @@ export function recordServe(
     if (compile?.hash !== undefined) {
       record.hash = compile.hash;
       record.compiledAt = compile.at;
+    }
+    if (compile?.codeFingerprint !== undefined) {
+      record.codeFingerprint = compile.codeFingerprint;
     }
     writeFileSync(path, JSON.stringify(record));
   } catch {
@@ -111,6 +160,7 @@ export function findServe(file: string): ServeRecord | undefined {
       const result: ServeRecord = { pid: record.pid, url: record.url, file: record.file ?? file };
       if (typeof record.hash === "string") result.hash = record.hash;
       if (typeof record.compiledAt === "number") result.compiledAt = record.compiledAt;
+      if (typeof record.codeFingerprint === "number") result.codeFingerprint = record.codeFingerprint;
       return result;
     }
   } catch {
