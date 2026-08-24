@@ -166,6 +166,29 @@ describe("lower: diagnostics", () => {
     expect(codes).toEqual(["ir/anchor-not-supported"]);
   });
 
+  it("bend lowers to a signed number", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      box({ id: "b" }),
+      edge({ from: "a", to: "b", bend: "-105" }),
+    ]);
+    const { ir, codes } = lowerAst(ast);
+    expect(codes).toEqual([]);
+    const edgeIr = ir!.children[2]!;
+    if (edgeIr.kind !== "edge") throw new Error("expected edge");
+    expect(edgeIr.bend).toBe(-105);
+  });
+
+  it("ir/invalid-numeric-attr for a non-numeric bend", () => {
+    const ast = doc({}, [
+      box({ id: "a" }),
+      box({ id: "b" }),
+      edge({ from: "a", to: "b", bend: "left" }),
+    ]);
+    const { codes } = lowerAst(ast);
+    expect(codes).toEqual(["ir/invalid-numeric-attr"]);
+  });
+
   it("ir/invalid-anchor-side for an unrecognized fromSide value", () => {
     const ast = doc({}, [
       box({ id: "a" }),
