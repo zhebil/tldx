@@ -5,8 +5,10 @@ context: |
   Stack: TypeScript (ESM, strict), React 19 + tldraw 5 in the viewer, esbuild,
   elkjs for layout, hono for the dev server, vitest for tests.
 
-  Layered architecture, enforced by dependency-cruiser (`npm run lint:deps`):
-  runtime -> domain (ir, layout, emit, overlay) -> app -> infra/cli/viewer.
+  Layered architecture, enforced by oxlint's no-restricted-imports rules in
+  `.oxlintrc.json` and proved by tests/tools/lint-boundaries.test.ts:
+  runtime -> domain (ir, layout, emit, overlay) -> app -> infra/cli/viewer,
+  with contracts/ as the dependency-free wire surface the viewer may import.
   Domain is pure; adapters live in infra behind ports. Read docs/architecture.md
   before proposing anything that crosses a layer.
 
@@ -15,7 +17,7 @@ context: |
   in the port's `.contract.ts` suite, end to end under tests/e2e/.
   Fakes are canonical - the contract suite runs against fake and adapter both.
 
-  `npm run check` (typecheck + lint + dep-lint + vitest) must pass.
+  `npm run check` (typecheck + oxfmt + oxlint + knip + vitest) must pass.
   `main` is protected; changes land through a PR.
   Prose uses hyphens, never em dashes.
 
