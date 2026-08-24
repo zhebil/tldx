@@ -15,8 +15,6 @@ esac
 
 if [ -n "${TLDX_BIN:-}" ]; then
   set -- $TLDX_BIN
-elif [ -f "${CLAUDE_PLUGIN_ROOT:-}/dist/cli/main.js" ]; then
-  set -- node "${CLAUDE_PLUGIN_ROOT:-}/dist/cli/main.js"
 elif command -v tldx >/dev/null 2>&1; then
   set -- tldx
 else

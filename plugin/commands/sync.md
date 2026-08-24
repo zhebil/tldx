@@ -12,8 +12,8 @@ allowed-tools: Bash(tldx:*), Bash(node:*), Bash(git diff:*), Bash(git status:*),
 The diagram is `$1`. If that is empty, use the `.tldx.jsx` file this session
 has been working on; if there is more than one candidate, ask which.
 
-Everything below is a `tldx` CLI call. `tldx` means the binary on `PATH`; if it
-is not installed, use `node ${CLAUDE_PLUGIN_ROOT}/dist/cli/main.js` instead.
+Everything below is a `tldx` CLI call, using the binary on `PATH`. If `tldx` is
+not installed, say so and stop - `npm i -g tldx` installs it.
 
 ## 1. Look at what is pending
 
