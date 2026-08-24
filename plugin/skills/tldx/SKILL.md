@@ -61,7 +61,7 @@ All from `"tldx"`.
 
 | | |
 |---|---|
-| `<Doc>` | Root. One per file, top level only. |
+| `<Doc title>` | Root. One per file, top level only. `title` names the page and the browser tab. |
 | `<Frame id name>` | Visual container - border and a title. `id` required. |
 | `<Row id> <Col id> <Grid id>` | `<Frame>` with `layout` preset. `<Grid cols="3">`. |
 | `<Group id>` | Container that draws no chrome - pure layout. **The main tool for controlling layout.** Never point an edge at a `<Group>` id. |
@@ -327,6 +327,18 @@ than overriding it. Separate props, not `id.anchor` dotted syntax - `from`/
 rule above. `<Edges>` doesn't have a per-line spelling for this yet - drop
 to a hand-written `<Edge>` when a side needs pinning, the same escape hatch
 as an explicit `id` or a one-off style.
+
+## Title
+
+`<Doc title="Auth flow">` names the diagram: it becomes the tldraw page name
+and the browser tab title in `tldx serve`. Leave it off and the page is named
+after the file, so a diagram is never called "tldx" in the user's tab strip.
+
+`title` also works on `<Frame>` and its aliases, so an imported component can
+name the sub-diagram it draws. The shallowest title wins - a `<Doc title>`
+always beats one further down, and the component's own title only shows when
+nothing above it set one. It draws nothing on the canvas; use `<Frame name>` or
+`<Text>` for a visible heading.
 
 ## Notes and captions
 

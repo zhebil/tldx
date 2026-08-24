@@ -34,6 +34,9 @@ and this file must not disagree.
 
 - Never `git add .` / `git add -A`; stage hunks, one concern per commit.
 - Don't commit before the user has reviewed the diff, unless asked.
+- Opening a PR means filling in `.github/pull_request_template.md`, not writing
+  a body from scratch: same headings, same order, and tick the checklist for
+  real. Read it first - `gh pr create --body-file` bypasses it silently.
 - Reports, baselines and scratch notes do not belong in `docs/`. Write them to
   a temp dir.
 - Debug PNGs go to a temp dir, never the repo.

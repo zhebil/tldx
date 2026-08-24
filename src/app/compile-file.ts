@@ -8,7 +8,7 @@
  * on error.
  */
 
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { hasErrors, type Diagnostic, type SourceSpan, error } from "../domain/diagnostics/index.js";
 import { emit } from "../domain/emit/index.js";
@@ -71,8 +71,13 @@ export async function compileFile(
 
   const positioned = await deps.layout.layout(ir);
   diagnostics.push(...normaliseSpans(path, computeOcclusionDiagnostics(positioned)));
-  const sceneJson = emit(positioned);
+  const sceneJson = emit(positioned, docName(path));
   return { sceneJson, diagnostics, inputs };
+}
+
+/** `dir/kernel.tldx.jsx` -> `kernel`: the page name when nothing sets `title`. */
+function docName(path: string): string {
+  return basename(path).replace(/\.tldx\.jsx$/, "");
 }
 
 function readErrorDiag(path: string, err: unknown): Diagnostic {

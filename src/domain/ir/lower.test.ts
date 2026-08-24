@@ -308,6 +308,36 @@ describe("lower: direction", () => {
   });
 });
 
+describe("lower: title", () => {
+  it("takes title from <doc>", () => {
+    const { ir, codes } = lowerAst(doc({ title: "Kernel" }));
+    expect(codes).toEqual([]);
+    expect(ir?.title).toBe("Kernel");
+  });
+
+  it("omits title when nothing declares one", () => {
+    expect(lowerAst(doc({})).ir?.title).toBeUndefined();
+  });
+
+  it("falls through to a frame's title when <doc> has none", () => {
+    const ast = doc({}, [frame({ id: "f", title: "Sub" })]);
+    expect(lowerAst(ast).ir?.title).toBe("Sub");
+  });
+
+  it("prefers the shallowest title, not the first in source order", () => {
+    const ast = doc({}, [
+      frame({ id: "a" }, [frame({ id: "a1", title: "Deep" })]),
+      frame({ id: "b", title: "Shallow" }),
+    ]);
+    expect(lowerAst(ast).ir?.title).toBe("Shallow");
+  });
+
+  it("ignores a blank title and keeps looking", () => {
+    const ast = doc({ title: "  " }, [frame({ id: "f", title: "Real" })]);
+    expect(lowerAst(ast).ir?.title).toBe("Real");
+  });
+});
+
 describe("lower: synthetic ids", () => {
   it("assigns deterministic ids: same source → same ids", () => {
     const ast = () => doc({}, [note({}, "hello"), note({}, "world")]);

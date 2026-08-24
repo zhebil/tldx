@@ -66,6 +66,10 @@ failure there is a failure you could have seen locally in a few seconds.
 Keep the PR to one topic. A dependency bump, a refactor and a feature are three
 PRs; splitting them costs you a few minutes and saves the reviewer an hour.
 
+Fill in the PR template rather than replacing it. The web UI loads it for you;
+`gh pr create --body-file` does not, so pass
+`.github/pull_request_template.md` and edit that.
+
 ## Dependencies
 
 Adding one is a decision, not a detail - say in the PR what it buys that the
