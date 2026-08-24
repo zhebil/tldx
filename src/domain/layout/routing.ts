@@ -141,22 +141,37 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
   const { shapes, edges } = collect(ir);
   const byId = new Map(shapes.map((s) => [s.id, s]));
 
+  // Edges the router must leave alone: self-loops, whose arc is the loop
+  // itself, and anything carrying an authored `bend`.
   const routes = new Map<string, EdgeRoute>();
-  const selfEdges = new Set<string>();
+  const pinned = new Set<string>();
   for (const edge of edges) {
     if (edge.from !== edge.to) continue;
-    selfEdges.add(edge.id);
+    pinned.add(edge.id);
     const shape = byId.get(edge.from);
     if (!shape) continue;
     const loop = Math.max(LOOP_MIN, Math.min(LOOP_SHAPE_FACTOR * shape.w, LOOP_MAX));
     routes.set(edge.id, {
-      bend: loop,
+      bend: edge.bend ?? loop,
       startAnchor: edge.fromAnchor ?? { x: 0.75, y: 0 },
       endAnchor: edge.toAnchor ?? { x: 0.25, y: 0 },
     });
   }
 
-  const otherEdges = edges.filter((edge) => !selfEdges.has(edge.id));
+  // An authored `bend` wins outright, so the edge joins the self-edges in
+  // sitting out every pass below - each of those grows or shrinks a bend, and
+  // any one of them running would silently overwrite the author's number.
+  for (const edge of edges) {
+    if (edge.bend === undefined || pinned.has(edge.id)) continue;
+    pinned.add(edge.id);
+    routes.set(edge.id, {
+      bend: edge.bend,
+      ...(edge.fromAnchor === undefined ? {} : { startAnchor: edge.fromAnchor }),
+      ...(edge.toAnchor === undefined ? {} : { endAnchor: edge.toAnchor }),
+    });
+  }
+
+  const otherEdges = edges.filter((edge) => !pinned.has(edge.id));
 
   // An authored `fromSide`/`toSide` wins over anything the router computes.
   // Seeded before every other pass so each treats the author's choice as a
@@ -301,7 +316,9 @@ function placeLabels(
     // only `bend`'s existing side, and tests only the arc's midpoint - a
     // widened bend combined with an offset `t` measurably reintroduces
     // label/label collisions this approximation misses.
-    if (best.shapeScore > 0) {
+    // An authored `bend` is exempt: the label slides along the arc the author
+    // asked for, it never moves the arc.
+    if (best.shapeScore > 0 && slot.edge.bend === undefined) {
       const otherLabelBoxes = others
         .map((o) => {
           const r = routes.get(o.edge.id);

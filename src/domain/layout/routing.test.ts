@@ -57,6 +57,7 @@ function edge(input: {
   label?: string;
   fromAnchor?: { x: number; y: number };
   toAnchor?: { x: number; y: number };
+  bend?: number;
 }): IREdge {
   return { kind: "edge", idExplicit: true, span: SPAN, ...input };
 }
@@ -717,6 +718,67 @@ describe("computeEdgeRoutes", () => {
       // A blind correction pass would leave this identical to `bareBend`,
       // since t-orders is invisible to the candidate/lane pass either way.
       expect(Math.sign(correctedBend)).not.toBe(Math.sign(bareBend));
+    });
+  });
+
+  describe("an authored bend wins over the router", () => {
+    const row = [
+      box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+      box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+      box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
+      box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
+    ];
+
+    it("replaces the bend the router would have computed for itself", () => {
+      // a -> d skips b and c, so left alone the router bows it clear.
+      const routed = computeEdgeRoutes(
+        doc("root", [...row, edge({ id: "ad", from: "a", to: "d" })]),
+      ).get("ad");
+      expect(Math.abs(routed?.bend ?? 0)).toBeGreaterThan(0);
+
+      const authored = computeEdgeRoutes(
+        doc("root", [...row, edge({ id: "ad", from: "a", to: "d", bend: -43 })]),
+      ).get("ad");
+      expect(authored?.bend).toBe(-43);
+    });
+
+    it('bend="0" pins an edge straight through an obstacle', () => {
+      const authored = computeEdgeRoutes(
+        doc("root", [...row, edge({ id: "ad", from: "a", to: "d", bend: 0 })]),
+      ).get("ad");
+      expect(authored?.bend).toBe(0);
+    });
+
+    it("survives the chord-ratio cap that clamps a computed bend", () => {
+      // -289 is over 5x this chord, well past MAX_BEND_CHORD_RATIO.
+      const authored = computeEdgeRoutes(
+        doc("root", [
+          box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+          box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
+          edge({ id: "ab", from: "a", to: "b", bend: -289 }),
+        ]),
+      ).get("ab");
+      expect(authored?.bend).toBe(-289);
+    });
+
+    it("survives label placement, which otherwise grows a bend off a blocker", () => {
+      const authored = computeEdgeRoutes(
+        doc("root", [
+          ...row,
+          edge({ id: "ad", from: "a", to: "d", bend: 12, label: "a fairly long edge label" }),
+        ]),
+      ).get("ad");
+      expect(authored?.bend).toBe(12);
+    });
+
+    it("overrides a self-loop's default loop bend", () => {
+      const authored = computeEdgeRoutes(
+        doc("root", [
+          box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+          edge({ id: "loop", from: "a", to: "a", bend: -60 }),
+        ]),
+      ).get("loop");
+      expect(authored?.bend).toBe(-60);
     });
   });
 
