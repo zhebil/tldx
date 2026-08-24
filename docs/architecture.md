@@ -57,7 +57,7 @@ runtime/    the "tldx" module authors import.
 viewer/     the browser bundle. Imports contracts/ only.
 ```
 
-The dependency rules are enforced mechanically by `.eslintrc.cjs` and
+The dependency rules are enforced mechanically by `eslint.config.js` and
 `.dependency-cruiser.cjs` — `npm run check` fails on a violation, so you don't
 have to remember them. The one that bites most often: `domain/` may not import
 from `infra/` or `app/`.

@@ -23,7 +23,7 @@ npm i -g playwright && npx playwright install chromium
 
 Read [`docs/architecture.md`](docs/architecture.md) - the pipeline, the layers,
 and which layer may import which. Those import rules are enforced by
-`.eslintrc.cjs` and `.dependency-cruiser.cjs`, so a violation fails
+`eslint.config.js` and `.dependency-cruiser.cjs`, so a violation fails
 `npm run check` rather than review. The one that catches people out:
 `domain/` may not import from `infra/` or `app/`.
 
