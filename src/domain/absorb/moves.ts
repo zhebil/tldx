@@ -142,7 +142,7 @@ export function planMoveCandidates(
   const targetId = stripShapePrefix(targetShapeId);
 
   if (placement.rotation !== undefined) {
-    return unabsorbable('rotation has no JSX equivalent (docs/round-trip-scope.md §1)');
+    return unabsorbable('rotation has no JSX equivalent');
   }
   if (placement.parentId !== undefined) {
     return unabsorbable("shape was reparented into a different container - F4 doesn't absorb cross-container moves");
