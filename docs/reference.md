@@ -36,7 +36,7 @@ An unnamed container that isn't a `<Group>` also draws no chrome.
 
 | element | props |
 |---|---|
-| `<Doc>` | `id direction layout gap rowGap colGap pad cols align equalize` |
+| `<Doc>` | `id title direction layout gap rowGap colGap pad cols align equalize` |
 | `<Frame>` and aliases | all of `<Doc>`'s, plus `name x y w h color` |
 | `<Box>` | `id label x y w h maxW color fill dash geo textAlign verticalAlign labelColor font size` |
 | `<Text>` | `id x y w maxW color textAlign font size` |
@@ -50,6 +50,23 @@ All numbers are strings: `gap="48"`, not `gap={48}`.
 
 `id` is required on `<Box>` and every container. It is synthesized for `<Doc>`,
 `<Text>`, `<Sticky>` and `<Edge>` when you leave it off.
+
+## Title
+
+`title` names the diagram: it becomes the tldraw page name and the browser tab
+title in `tldx serve`. With no `title` anywhere, the page is named after the
+file: `auth.tldx.jsx` becomes `auth`.
+
+```jsx
+<Doc title="Auth flow">…</Doc>
+```
+
+`title` is also allowed on `<Frame>` and its aliases, so an imported component
+can name the sub-diagram it draws. Only one title reaches the page: the
+shallowest one wins, ties within a level going to source order. A `<Doc title>`
+therefore always beats a title further down, and a component's own title only
+surfaces when nothing above it declared one. Nothing is drawn on the canvas for
+a `title` - use `<Frame name>` or `<Text>` for a visible heading.
 
 ## Values
 

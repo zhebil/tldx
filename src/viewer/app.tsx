@@ -8,7 +8,7 @@ import type { SceneJSON } from "../contracts/scene-json.js";
 import { createHeartbeat } from "./heartbeat.js";
 import { createOverlayWriter, type OverlayWriter } from "./overlay-writer.js";
 import { createSseClient } from "./sse-client.js";
-import { applyMessage, initialViewerState } from "./state.js";
+import { applyMessage, initialViewerState, sceneTitle } from "./state.js";
 
 const EVENTS_URL = "/events";
 
@@ -47,6 +47,11 @@ export function ViewerApp(): JSX.Element {
       writerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const title = sceneTitle(state.scene);
+    if (title !== null) document.title = `${title} - tldx`;
+  }, [state.scene]);
 
   useEffect(() => {
     const editor = editorRef.current;

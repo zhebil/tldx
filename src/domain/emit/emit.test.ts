@@ -21,6 +21,12 @@ describe("domain/emit", () => {
     expect(scene.store["page:main"]?.typeName).toBe("page");
   });
 
+  it("names the page after the doc title, else the fallback, else tldx", () => {
+    expect(emit({ ...doc([]), title: "Kernel" }, "kernel").store["page:main"]?.name).toBe("Kernel");
+    expect(emit(doc([]), "kernel").store["page:main"]?.name).toBe("kernel");
+    expect(emit(doc([])).store["page:main"]?.name).toBe("tldx");
+  });
+
   it("uses the pinned schema from contracts/builders", () => {
     // The schema is opaque here; this only asserts emit doesn't synthesize
     // one off-band.

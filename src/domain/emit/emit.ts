@@ -80,10 +80,16 @@ function nextIndex(ctx: EmitContext, parentId: string): string {
   return indexAt(2 * slot + 1);
 }
 
-export function emit(ir: IRDocPositioned): SceneJSON {
+/**
+ * `fallbackName` names the page when the document declares no `title` - the
+ * CLI passes the file name. The page name is what tldraw's page menu shows and
+ * what the viewer puts in the browser tab.
+ */
+export function emit(ir: IRDocPositioned, fallbackName?: string): SceneJSON {
+  const name = ir.title ?? fallbackName;
   const records: TLRecord[] = [
     documentRecord(),
-    pageRecord({ id: PAGE_ID }),
+    pageRecord({ id: PAGE_ID, ...(name === undefined ? {} : { name }) }),
   ];
   const routes = computeEdgeRoutes(ir);
   const ctx: EmitContext = {
