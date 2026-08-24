@@ -12,6 +12,7 @@
 
 import { richText } from "../../contracts/builders.js";
 import { RESTYLE_RECORD_FIELDS } from "../../contracts/overlay.js";
+import { isDocumentRecord } from "../../contracts/page-scope.js";
 import type { Overlay, OverlayEntry, OverlayPlacement } from "../../contracts/overlay.js";
 import type { SceneJSON, TLRecord, TLRecordId } from "../../contracts/scene-json.js";
 import { warning } from "../diagnostics/index.js";
@@ -31,6 +32,18 @@ export function applyOverlay(
 
   for (const [id, entry] of Object.entries(overlay.entries)) {
     if (entry.added === undefined) continue;
+    if (!isDocumentRecord(entry.added)) {
+      // An older viewer diffed whole store snapshots, so some sidecars carry a
+      // session record. Applying one puts a record in the scene that no
+      // document store will accept.
+      diagnostics.push(
+        warning(
+          "overlay/not-a-document-record",
+          `ignoring "${id}": ${entry.added.typeName} records belong to a browser session, not to the diagram`,
+        ),
+      );
+      continue;
+    }
     if (id in store) {
       diagnostics.push(
         warning(
