@@ -6,6 +6,7 @@ import type { SceneJSON } from "../contracts/scene-json.js";
 import {
   applyMessage,
   initialViewerState,
+  sceneTitle,
   type ViewerState,
 } from "./state.js";
 
@@ -22,6 +23,24 @@ const DIAG: Diagnostic = {
   code: "parser/unexpected-token",
   message: "boom",
 };
+
+describe("sceneTitle", () => {
+  it("reads the page record's name", () => {
+    const scene: SceneJSON = {
+      ...SCENE_A,
+      store: {
+        "document:document": { id: "document:document", typeName: "document" },
+        "page:main": { id: "page:main", typeName: "page", name: "Auth flow" },
+      },
+    };
+    expect(sceneTitle(scene)).toBe("Auth flow");
+  });
+
+  it("is null with no scene and with no page record", () => {
+    expect(sceneTitle(null)).toBeNull();
+    expect(sceneTitle(SCENE_A)).toBeNull();
+  });
+});
 
 describe("applyMessage", () => {
   it("scene message adopts the new scene and clears stale diagnostics", () => {
