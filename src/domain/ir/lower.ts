@@ -57,9 +57,10 @@ import type {
 import { contentHash, SyntheticIdAllocator } from "./synthetic-id.js";
 
 const ALLOWED_PROPS = {
-  doc: ["id", "direction", "layout", "gap", "rowGap", "colGap", "pad", "cols", "align", "equalize"],
+  doc: ["id", "title", "direction", "layout", "gap", "rowGap", "colGap", "pad", "cols", "align", "equalize"],
   frame: [
     "id",
+    "title",
     "name",
     "direction",
     "layout",
@@ -226,11 +227,13 @@ export function lower(ast: AstNode | null): LowerResult {
   const layout = readLayoutMode(ast.attrs, ctx);
   const align = readAlign(ast.attrs, ctx);
   const equalize = readBoolean(ast.attrs, "equalize", ctx);
+  const title = pickTitle(ast);
   const doc: IRDoc = {
     kind: "doc",
     ...idHeader,
     span: ast.span,
     children: [],
+    ...(title === undefined ? {} : { title }),
     ...(direction === undefined ? {} : { direction }),
     ...(layout === undefined ? {} : { layout }),
     ...(align === undefined ? {} : { align }),
@@ -248,6 +251,25 @@ export function lower(ast: AstNode | null): LowerResult {
   resolveNoteTargets(doc, ctx);
 
   return { ir: doc, diagnostics };
+}
+
+/**
+ * The document title: the shallowest `title` prop, breadth-first from `<Doc>`.
+ * A component that titles its own sub-diagram therefore loses to the title of
+ * whatever composes it. Ties within a level go to source order.
+ */
+function pickTitle(root: AstNode): string | undefined {
+  let level: AstNode[] = [root];
+  while (level.length > 0) {
+    const next: AstNode[] = [];
+    for (const node of level) {
+      const title = node.attrs.title?.value.trim();
+      if (title) return title;
+      if (node.kind === "doc" || node.kind === "frame") next.push(...node.children);
+    }
+    level = next;
+  }
+  return undefined;
 }
 
 type Ctx = {

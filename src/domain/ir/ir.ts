@@ -28,6 +28,9 @@ type IRBase = {
 
 export type IRDoc = IRBase & {
   kind: "doc";
+  /** Page/tab title. The shallowest `title` in the document wins - see
+   * `pickTitle` in `lower.ts`; callers fall back to the file name. */
+  title?: string;
   /** Optional layout flow direction; layout port defaults when absent. */
   direction?: Direction;
   /** Deterministic-layout mode; the ELK adapter ignores it. */
