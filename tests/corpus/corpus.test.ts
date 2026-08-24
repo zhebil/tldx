@@ -33,22 +33,18 @@ describe("corpus: layout bench fixtures compile clean", () => {
   });
 
   for (const name of fixtures) {
-    it(
-      `${name} compiles with no errors`,
-      async () => {
-        const path = join(HERE, name);
-        const result = await compileFile(path, {
-          fs: createNodeFsRead(),
-          layout: new ElkLayoutAdapter(),
-          execute: createJsxExecute(),
-        });
+    it(`${name} compiles with no errors`, async () => {
+      const path = join(HERE, name);
+      const result = await compileFile(path, {
+        fs: createNodeFsRead(),
+        layout: new ElkLayoutAdapter(),
+        execute: createJsxExecute(),
+      });
 
-        // Occlusion warnings are a legitimate finding on a bench fixture,
-        // not a compile failure, so only errors count here.
-        expect(hasErrors(result.diagnostics)).toBe(false);
-        expect(result.sceneJson).not.toBeNull();
-      },
-      30_000,
-    );
+      // Occlusion warnings are a legitimate finding on a bench fixture,
+      // not a compile failure, so only errors count here.
+      expect(hasErrors(result.diagnostics)).toBe(false);
+      expect(result.sceneJson).not.toBeNull();
+    }, 30_000);
   }
 });

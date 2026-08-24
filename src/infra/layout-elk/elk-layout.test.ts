@@ -245,18 +245,14 @@ describe("ElkLayoutAdapter: hierarchical input + cross-frame edges", () => {
           id: "f1",
           idExplicit: true,
           span: span(),
-          children: [
-            { kind: "box", id: "a", idExplicit: true, span: span() },
-          ],
+          children: [{ kind: "box", id: "a", idExplicit: true, span: span() }],
         },
         {
           kind: "frame",
           id: "f2",
           idExplicit: true,
           span: span(),
-          children: [
-            { kind: "box", id: "b", idExplicit: true, span: span() },
-          ],
+          children: [{ kind: "box", id: "b", idExplicit: true, span: span() }],
         },
         {
           kind: "edge",
@@ -310,10 +306,8 @@ describe("ElkLayoutAdapter: direction", () => {
     const br = right.children[1]!;
     const ad = down.children[0]!;
     const bd = down.children[1]!;
-    if (
-      ar.kind !== "box" || br.kind !== "box" ||
-      ad.kind !== "box" || bd.kind !== "box"
-    ) throw new Error("box");
+    if (ar.kind !== "box" || br.kind !== "box" || ad.kind !== "box" || bd.kind !== "box")
+      throw new Error("box");
     // RIGHT: b is to the right of a (different x, same y); DOWN: b is below a.
     expect(br.x).toBeGreaterThan(ar.x);
     expect(bd.y).toBeGreaterThan(ad.y);
@@ -322,12 +316,7 @@ describe("ElkLayoutAdapter: direction", () => {
 
 function positionedRectFinite(el: IRElementPositioned): boolean {
   if (el.kind === "edge" || el.kind === "doc") return true;
-  return (
-    Number.isFinite(el.x) &&
-    Number.isFinite(el.y) &&
-    el.w > 0 &&
-    el.h > 0
-  );
+  return Number.isFinite(el.x) && Number.isFinite(el.y) && el.w > 0 && el.h > 0;
 }
 
 function span() {

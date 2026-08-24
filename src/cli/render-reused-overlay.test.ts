@@ -66,7 +66,10 @@ describe("runRender - reusing a serve that has fsWrite never writes an overlay",
       clock: new FakeClock(),
       viewerBundleDir: tmpdir(),
     };
-    const forget = recordServe(file, "http://127.0.0.1:9999", { hash: hashSource(content), at: Date.now() });
+    const forget = recordServe(file, "http://127.0.0.1:9999", {
+      hash: hashSource(content),
+      at: Date.now(),
+    });
 
     try {
       const io = makeIo();

@@ -51,12 +51,38 @@ export default function EventDriven() {
 
       <Edge from="t-payments" to="dlq" label="3 failed retries" color="red" font="sans" size="s" />
       <Edge from="dlq" to="dlq-monitor" label="alert" color="red" font="sans" size="s" />
-      <Edge from="dlq" to="t-payments" label="redrive" color="red" dash="dotted" font="sans" size="s" />
+      <Edge
+        from="dlq"
+        to="t-payments"
+        label="redrive"
+        color="red"
+        dash="dotted"
+        font="sans"
+        size="s"
+      />
 
-      <Edge from="shipping" to="t-orders" label="ShipmentFailed" color="light-red" dash="dashed" font="sans" size="s" />
-      <Edge from="payments" to="t-orders" label="PaymentRefunded" color="light-red" dash="dashed" font="sans" size="s" />
+      <Edge
+        from="shipping"
+        to="t-orders"
+        label="ShipmentFailed"
+        color="light-red"
+        dash="dashed"
+        font="sans"
+        size="s"
+      />
+      <Edge
+        from="payments"
+        to="t-orders"
+        label="PaymentRefunded"
+        color="light-red"
+        dash="dashed"
+        font="sans"
+        size="s"
+      />
 
-      <Sticky on="t-orders">Checkout saga: orders, payments and shipping compensate back through orders.v1.</Sticky>
+      <Sticky on="t-orders">
+        Checkout saga: orders, payments and shipping compensate back through orders.v1.
+      </Sticky>
     </Doc>
   );
 }

@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { sceneJson, sceneMessage } from "../../contracts/builders.js";
 
-import {
-  runTransportContract,
-  type TransportHarness,
-} from "./transport.contract.js";
+import { runTransportContract, type TransportHarness } from "./transport.contract.js";
 import { InMemoryTransport } from "./transport.fake.js";
 
 runTransportContract("InMemoryTransport", async (): Promise<TransportHarness> => {

@@ -1,13 +1,32 @@
 import { Doc, Frame, Box, Edge, Text, Sticky } from "tldx";
 
 const COLORS = [
-  "black", "grey", "light-violet", "violet", "blue", "light-blue", "yellow",
-  "orange", "green", "light-green", "light-red", "red", "white",
+  "black",
+  "grey",
+  "light-violet",
+  "violet",
+  "blue",
+  "light-blue",
+  "yellow",
+  "orange",
+  "green",
+  "light-green",
+  "light-red",
+  "red",
+  "white",
 ];
 const FILLS = ["none", "semi", "solid", "pattern", "fill"];
 const DASHES = ["draw", "solid", "dashed", "dotted"];
 const ARROWHEADS = [
-  "arrow", "triangle", "square", "dot", "pipe", "diamond", "inverted", "bar", "none",
+  "arrow",
+  "triangle",
+  "square",
+  "dot",
+  "pipe",
+  "diamond",
+  "inverted",
+  "bar",
+  "none",
 ];
 
 export default function Diagram() {
@@ -45,8 +64,12 @@ export default function Diagram() {
         />
       ))}
 
-      <Text id="n-note" color="light-green">Text color pass-through.</Text>
-      <Sticky id="s-note" color="light-red" on="arrows">Sticky color pass-through.</Sticky>
+      <Text id="n-note" color="light-green">
+        Text color pass-through.
+      </Text>
+      <Sticky id="s-note" color="light-red" on="arrows">
+        Sticky color pass-through.
+      </Sticky>
     </Doc>
   );
 }

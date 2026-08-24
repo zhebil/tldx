@@ -8,7 +8,9 @@ import { StubLayout } from "../domain/ports/layout.fake.js";
 
 import { formatMeasure, narrowToFrame, runMeasure, type MeasureIo } from "./measure.js";
 
-function shape(overrides: Partial<AbsShape> & Pick<AbsShape, "id" | "x" | "y" | "w" | "h">): AbsShape {
+function shape(
+  overrides: Partial<AbsShape> & Pick<AbsShape, "id" | "x" | "y" | "w" | "h">,
+): AbsShape {
   return { kind: "box", label: overrides.id, parentId: "doc", ancestorFrameIds: [], ...overrides };
 }
 
@@ -38,12 +40,34 @@ describe("narrowToFrame", () => {
     shape({ id: "standalone", x: 0, y: 0, w: 10, h: 10 }),
     shape({ id: "ctx", kind: "frame", x: 100, y: 0, w: 400, h: 100 }),
     shape({ id: "c1-sys", x: 100, y: 0, w: 90, h: 44, parentId: "ctx", ancestorFrameIds: ["ctx"] }),
-    shape({ id: "nested", kind: "frame", x: 100, y: 0, w: 90, h: 44, parentId: "ctx", ancestorFrameIds: ["ctx"] }),
-    shape({ id: "deep", x: 100, y: 0, w: 10, h: 10, parentId: "nested", ancestorFrameIds: ["ctx", "nested"] }),
+    shape({
+      id: "nested",
+      kind: "frame",
+      x: 100,
+      y: 0,
+      w: 90,
+      h: 44,
+      parentId: "ctx",
+      ancestorFrameIds: ["ctx"],
+    }),
+    shape({
+      id: "deep",
+      x: 100,
+      y: 0,
+      w: 10,
+      h: 10,
+      parentId: "nested",
+      ancestorFrameIds: ["ctx", "nested"],
+    }),
   ];
 
   it("keeps the frame itself and every descendant, dropping siblings", () => {
-    expect(narrowToFrame(shapes, "ctx").map((s) => s.id)).toEqual(["ctx", "c1-sys", "nested", "deep"]);
+    expect(narrowToFrame(shapes, "ctx").map((s) => s.id)).toEqual([
+      "ctx",
+      "c1-sys",
+      "nested",
+      "deep",
+    ]);
   });
 
   it("narrows to a nested frame's own descendants only", () => {
@@ -102,8 +126,24 @@ describe("runMeasure", () => {
       formatMeasure([
         shape({ id: "standalone", x: 0, y: 0, w: 60, h: 30 }),
         shape({ id: "ctx", kind: "frame", x: 100, y: 0, w: 464, h: 100 }),
-        shape({ id: "c1-sys", x: 100, y: 0, w: 90, h: 44, parentId: "ctx", ancestorFrameIds: ["ctx"] }),
-        shape({ id: "c1-smart", x: 230, y: 0, w: 270, h: 44, parentId: "ctx", ancestorFrameIds: ["ctx"] }),
+        shape({
+          id: "c1-sys",
+          x: 100,
+          y: 0,
+          w: 90,
+          h: 44,
+          parentId: "ctx",
+          ancestorFrameIds: ["ctx"],
+        }),
+        shape({
+          id: "c1-smart",
+          x: 230,
+          y: 0,
+          w: 270,
+          h: 44,
+          parentId: "ctx",
+          ancestorFrameIds: ["ctx"],
+        }),
       ]) + "\n",
     );
     expect(io.stderr).toBe("");

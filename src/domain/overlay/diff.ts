@@ -18,10 +18,7 @@ import { RESTYLE_RECORD_FIELDS } from "../../contracts/overlay.js";
 import type { OverlayEntry, OverlayPlacement } from "../../contracts/overlay.js";
 import type { SceneJSON, TLRecord, TLRecordId } from "../../contracts/scene-json.js";
 
-export function diffScenes(
-  base: SceneJSON,
-  current: SceneJSON,
-): Record<TLRecordId, OverlayEntry> {
+export function diffScenes(base: SceneJSON, current: SceneJSON): Record<TLRecordId, OverlayEntry> {
   const entries: Record<TLRecordId, OverlayEntry> = {};
 
   for (const [id, record] of Object.entries(current.store)) {
@@ -156,7 +153,6 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   const aKeys = Object.keys(aRecord);
   const bKeys = Object.keys(bRecord);
   return (
-    aKeys.length === bKeys.length &&
-    aKeys.every((key) => deepEqual(aRecord[key], bRecord[key]))
+    aKeys.length === bKeys.length && aKeys.every((key) => deepEqual(aRecord[key], bRecord[key]))
   );
 }

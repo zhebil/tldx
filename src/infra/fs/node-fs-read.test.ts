@@ -2,10 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  runFsReadContract,
-  type FsReadHarness,
-} from "../../app/ports/fs.contract.js";
+import { runFsReadContract, type FsReadHarness } from "../../app/ports/fs.contract.js";
 
 import { createNodeFsRead } from "./node-fs-read.js";
 

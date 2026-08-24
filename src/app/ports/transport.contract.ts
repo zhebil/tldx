@@ -31,10 +31,7 @@ export interface TransportHarness {
   dispose(): Promise<void>;
 }
 
-async function waitFor(
-  predicate: () => boolean,
-  timeoutMs: number,
-): Promise<void> {
+async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return;
@@ -76,9 +73,7 @@ export function runTransportContract(
         const sub = await h.subscribe();
         try {
           const m1 = sceneMessage.scene(sceneJson([]));
-          const m2 = sceneMessage.error([
-            { severity: "error", code: "test/x", message: "boom" },
-          ]);
+          const m2 = sceneMessage.error([{ severity: "error", code: "test/x", message: "boom" }]);
           const m3 = sceneMessage.ping();
           h.port.push(m1);
           h.port.push(m2);
@@ -121,10 +116,7 @@ export function runTransportContract(
         try {
           const msg = sceneMessage.scene(sceneJson([]));
           h.port.push(msg);
-          await waitFor(
-            () => a.received.length >= 1 && b.received.length >= 1,
-            timeout,
-          );
+          await waitFor(() => a.received.length >= 1 && b.received.length >= 1, timeout);
           expect(a.received[0]).toEqual(msg);
           expect(b.received[0]).toEqual(msg);
         } finally {

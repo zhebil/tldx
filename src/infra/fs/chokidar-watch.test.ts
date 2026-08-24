@@ -2,10 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  runWatchContract,
-  type WatchHarness,
-} from "../../app/ports/watch.contract.js";
+import { runWatchContract, type WatchHarness } from "../../app/ports/watch.contract.js";
 
 import { createChokidarWatch } from "./chokidar-watch.js";
 

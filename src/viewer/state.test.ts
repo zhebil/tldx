@@ -3,12 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Diagnostic } from "../contracts/diagnostic.js";
 import type { SceneJSON } from "../contracts/scene-json.js";
 
-import {
-  applyMessage,
-  initialViewerState,
-  sceneTitle,
-  type ViewerState,
-} from "./state.js";
+import { applyMessage, initialViewerState, sceneTitle, type ViewerState } from "./state.js";
 
 const SCENE_A: SceneJSON = {
   store: {},

@@ -93,9 +93,7 @@ describe("compileFile", () => {
         inputs: [path],
       });
       const layout: LayoutPort = {
-        layout: vi.fn(async (ir: IRDoc): Promise<IRDocPositioned> =>
-          new StubLayout().layout(ir),
-        ),
+        layout: vi.fn(async (ir: IRDoc): Promise<IRDocPositioned> => new StubLayout().layout(ir)),
       };
       await compileFile(path, deps({ [path]: SRC }, layout, execute));
       expect(layout.layout).toHaveBeenCalledTimes(1);
@@ -137,10 +135,7 @@ describe("compileFile", () => {
       const { doc, box } = astBuilders(path);
       const execute = new FakeExecute();
       execute.setResult(SRC, {
-        ast: doc({ id: "d" }, [
-          box({ id: "x" }),
-          box({ id: "x" }),
-        ]),
+        ast: doc({ id: "d" }, [box({ id: "x" }), box({ id: "x" })]),
         inputs: [path],
       });
       const layout: LayoutPort = { layout: vi.fn() };

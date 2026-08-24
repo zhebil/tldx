@@ -156,9 +156,7 @@ function buildApp(
   );
 
   // SPA fallback, so client-side routing survives a hard reload.
-  app.get("*", async (c, next) =>
-    serveStatic({ root: bundleRoot, path: "index.html" })(c, next),
-  );
+  app.get("*", async (c, next) => serveStatic({ root: bundleRoot, path: "index.html" })(c, next));
 
   return app;
 }
@@ -184,9 +182,7 @@ function makeRootListener(
   };
 }
 
-export async function startDevServer(
-  options: StartDevServerOptions,
-): Promise<DevServerHandle> {
+export async function startDevServer(options: StartDevServerOptions): Promise<DevServerHandle> {
   const host = options.host ?? "127.0.0.1";
   const bundleRoot = resolve(options.viewerBundleDir);
 
@@ -204,10 +200,7 @@ export async function startDevServer(
         fetch: app.fetch,
         port: options.port,
         hostname: host,
-        createServer: ((
-          _serverOptions: ServerOptions,
-          listener: RequestListener,
-        ): Server => {
+        createServer: ((_serverOptions: ServerOptions, listener: RequestListener): Server => {
           const wrapped = makeRootListener(listener, options.transport, options.onActivity);
           return createHttpServer(wrapped);
         }) as unknown as typeof createHttpServer,

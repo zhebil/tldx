@@ -43,7 +43,8 @@ describe("runAbsorb - entries never grow", () => {
     if (base === null) throw new Error("fixture failed to compile");
     const movedBase = base.store["shape:moved"];
     const noopBase = base.store["shape:noop"];
-    if (movedBase === undefined || noopBase === undefined) throw new Error("fixture missing expected shapes");
+    if (movedBase === undefined || noopBase === undefined)
+      throw new Error("fixture missing expected shapes");
 
     const overlay: Overlay = {
       v: OVERLAY_VERSION,
@@ -63,7 +64,8 @@ describe("runAbsorb - entries never grow", () => {
     fs.setFile(overlayPathFor(PATH), JSON.stringify(overlay));
 
     const result = await runAbsorb({ path: PATH, force: false }, deps);
-    if (result.status !== "absorbed") throw new Error(`expected absorbed, got ${JSON.stringify(result)}`);
+    if (result.status !== "absorbed")
+      throw new Error(`expected absorbed, got ${JSON.stringify(result)}`);
 
     const overlayOnDisk = JSON.parse(await fs.read(overlayPathFor(PATH))) as Overlay;
     const inputIds = new Set(Object.keys(overlay.entries));

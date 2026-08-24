@@ -160,10 +160,7 @@ describe("scene-json round-trip through tldraw schema", () => {
 
     for (const record of Object.values(result.value)) {
       const recordType = (
-        schema.types as Record<
-          string,
-          { validate: (r: unknown) => unknown } | undefined
-        >
+        schema.types as Record<string, { validate: (r: unknown) => unknown } | undefined>
       )[record.typeName];
       if (!recordType) {
         throw new Error(`schema has no type for "${record.typeName}"`);

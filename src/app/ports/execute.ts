@@ -15,9 +15,7 @@
 import type { AstNode } from "../../domain/parser/ast.js";
 import type { Diagnostic } from "../../domain/diagnostics/index.js";
 
-export type ExecuteResult =
-  | { ast: AstNode; inputs: string[] }
-  | { diagnostics: Diagnostic[] };
+export type ExecuteResult = { ast: AstNode; inputs: string[] } | { diagnostics: Diagnostic[] };
 
 export interface ExecutePort {
   execute(source: string, path: string): Promise<ExecuteResult>;

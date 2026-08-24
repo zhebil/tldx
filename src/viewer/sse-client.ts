@@ -1,7 +1,4 @@
-import {
-  SCENE_MESSAGE_VERSION,
-  type SceneMessage,
-} from "../contracts/scene-message.js";
+import { SCENE_MESSAGE_VERSION, type SceneMessage } from "../contracts/scene-message.js";
 
 export type SceneMessageHandler = (message: SceneMessage) => void;
 

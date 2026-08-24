@@ -19,16 +19,16 @@ import {
   type OverlayPlacement,
 } from "../contracts/overlay.js";
 import type { SceneJSON, TLRecord } from "../contracts/scene-json.js";
-import { absorbAdded, patchGapAttr, planMoveCandidates, spliceReorder } from "../domain/absorb/index.js";
+import {
+  absorbAdded,
+  patchGapAttr,
+  planMoveCandidates,
+  spliceReorder,
+} from "../domain/absorb/index.js";
 import { hasErrors, type Diagnostic } from "../domain/diagnostics/index.js";
 import { emit } from "../domain/emit/index.js";
 import { lower, type IRDoc, type IRDocPositioned } from "../domain/ir/index.js";
-import {
-  applyOverlay,
-  deepEqual,
-  overlayPathFor,
-  sceneHash,
-} from "../domain/overlay/index.js";
+import { applyOverlay, deepEqual, overlayPathFor, sceneHash } from "../domain/overlay/index.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 
 import { compileFile, type CompileFileDeps } from "./compile-file.js";
@@ -56,7 +56,12 @@ export type AbsorbResult =
   | { status: "compile-error"; diagnostics: Diagnostic[]; backupPath?: string }
   | { status: "refused-dirty"; message: string; backupPath?: string }
   | { status: "codegen-error"; message: string; backupPath?: string }
-  | { status: "verify-failed"; diverging: string[]; diagnostics?: Diagnostic[]; backupPath?: string }
+  | {
+      status: "verify-failed";
+      diverging: string[];
+      diagnostics?: Diagnostic[];
+      backupPath?: string;
+    }
   | {
       status: "absorbed";
       absorbedIds: string[];
@@ -72,7 +77,10 @@ const BACKUP_SUFFIX = ".bak";
 
 /** `exactOptionalPropertyTypes` rejects `backupPath: undefined` - spread it
  *  in only when a backup was actually written. */
-function withBackup<T extends Record<string, unknown>>(result: T, backupPath: string | undefined): T {
+function withBackup<T extends Record<string, unknown>>(
+  result: T,
+  backupPath: string | undefined,
+): T {
   return backupPath === undefined ? result : { ...result, backupPath };
 }
 
@@ -97,11 +105,14 @@ export async function runAbsorb(args: AbsorbArgs, deps: AbsorbDeps): Promise<Abs
   const target = applyOverlay(overlay, base).scene;
 
   const { absorbable, residual } = partition(overlay);
-  const movedCandidates = residual.filter((e): e is [string, OverlayEntry & { moved: OverlayPlacement }] => e[1].moved !== undefined);
+  const movedCandidates = residual.filter(
+    (e): e is [string, OverlayEntry & { moved: OverlayPlacement }] => e[1].moved !== undefined,
+  );
   if (absorbable.length === 0 && movedCandidates.length === 0) {
     return {
       status: "nothing",
-      message: "nothing absorb can express yet: every overlay entry is a restyled/relabelled/deleted op, or an added shape absorb doesn't handle (only added geo/note shapes are absorbable)",
+      message:
+        "nothing absorb can express yet: every overlay entry is a restyled/relabelled/deleted op, or an added shape absorb doesn't handle (only added geo/note shapes are absorbable)",
     };
   }
 
@@ -114,7 +125,14 @@ export async function runAbsorb(args: AbsorbArgs, deps: AbsorbDeps): Promise<Abs
     return { status: "codegen-error", message: genResult.error };
   }
 
-  const moveResult = await runMoveLadder(genResult.source, path, base, target, movedCandidates, deps);
+  const moveResult = await runMoveLadder(
+    genResult.source,
+    path,
+    base,
+    target,
+    movedCandidates,
+    deps,
+  );
 
   const gitStatus = deps.gitStatus === undefined ? "no-repo" : await deps.gitStatus(path);
   if (gitStatus === "dirty" && !force) {
@@ -135,7 +153,11 @@ export async function runAbsorb(args: AbsorbArgs, deps: AbsorbDeps): Promise<Abs
   if (recompiled.sceneJson === null) {
     await deps.fsWrite.write(path, source);
     return withBackup(
-      { status: "verify-failed" as const, diverging: [] as string[], diagnostics: recompiled.diagnostics },
+      {
+        status: "verify-failed" as const,
+        diverging: [] as string[],
+        diagnostics: recompiled.diagnostics,
+      },
       backupPath,
     );
   }
@@ -147,7 +169,9 @@ export async function runAbsorb(args: AbsorbArgs, deps: AbsorbDeps): Promise<Abs
       residualEntries[id] = entry;
       continue;
     }
-    const rest = Object.fromEntries(Object.entries(entry).filter(([key]) => key !== "moved")) as OverlayEntry;
+    const rest = Object.fromEntries(
+      Object.entries(entry).filter(([key]) => key !== "moved"),
+    ) as OverlayEntry;
     if (Object.keys(rest).length > 0) residualEntries[id] = rest;
   }
   const residualOverlay: Overlay =
@@ -218,7 +242,10 @@ async function runMoveLadder(
   }
 
   const notes = await Promise.all(
-    pending.map(async ([id, entry]) => `${id}: ${await explainUnabsorbable(current, path, base, id, entry.moved, deps)}`),
+    pending.map(
+      async ([id, entry]) =>
+        `${id}: ${await explainUnabsorbable(current, path, base, id, entry.moved, deps)}`,
+    ),
   );
 
   return { source: current, absorbedIds, notes };
@@ -280,7 +307,8 @@ async function explainUnabsorbable(
   deps: AbsorbDeps,
 ): Promise<string> {
   const baseRecord = base.store[id];
-  if (baseRecord === undefined) return "no such record in the base scene - can't plan a move for it";
+  if (baseRecord === undefined)
+    return "no such record in the base scene - can't plan a move for it";
   const compiled = await compileIR(current, path, deps);
   if (compiled === null) return "current source failed to compile while planning its move";
   const plan = planMoveCandidates(compiled.ir, compiled.positioned, id, placement, {
@@ -316,7 +344,11 @@ async function compileIR(
   }
 }
 
-async function compileScene(source: string, path: string, deps: AbsorbDeps): Promise<SceneJSON | null> {
+async function compileScene(
+  source: string,
+  path: string,
+  deps: AbsorbDeps,
+): Promise<SceneJSON | null> {
   const compiled = await compileIR(source, path, deps);
   if (compiled === null) return null;
   return safeEmit(compiled.positioned);

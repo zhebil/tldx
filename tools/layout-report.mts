@@ -9,11 +9,7 @@ import { basename } from "node:path";
 
 import { hasErrors } from "../src/domain/diagnostics/index.js";
 import { lower } from "../src/domain/ir/index.js";
-import type {
-  IRDocPositioned,
-  IREdge,
-  IRElementPositioned,
-} from "../src/domain/ir/index.js";
+import type { IRDocPositioned, IREdge, IRElementPositioned } from "../src/domain/ir/index.js";
 import { isAncestor, overlapArea } from "../src/domain/layout/occlusion.js";
 import type { AbsShape, ShapeKind } from "../src/domain/layout/occlusion.js";
 import { createJsxExecute } from "../src/infra/execute-jsx/execute-jsx.js";
@@ -194,11 +190,12 @@ function formatGeometryTable(shapes: AbsShape[]): string {
     String(Math.round(s.w)),
     String(Math.round(s.h)),
   ]);
-  const widths = header.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)),
-  );
+  const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
   const fmt = (r: string[]): string =>
-    r.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ").trimEnd();
+    r
+      .map((c, i) => c.padEnd(widths[i] ?? 0))
+      .join("  ")
+      .trimEnd();
   return [fmt(header), ...rows.map(fmt)].join("\n");
 }
 
@@ -228,9 +225,7 @@ function metricsLines(
   out.push(`canvas: ${Math.round(canvasW)} x ${Math.round(canvasH)}`);
   out.push(`aspect ratio: ${aspect.toFixed(2)}`);
 
-  const leafArea = shapes
-    .filter((s) => s.kind !== "frame")
-    .reduce((sum, s) => sum + s.w * s.h, 0);
+  const leafArea = shapes.filter((s) => s.kind !== "frame").reduce((sum, s) => sum + s.w * s.h, 0);
   const fillRatio = canvasArea > 0 ? leafArea / canvasArea : 0;
   out.push(`fill ratio (leaf area / canvas area): ${fillRatio.toFixed(3)}`);
 
@@ -314,10 +309,7 @@ function metricsLines(
   return out;
 }
 
-function gridOrderViolations(
-  children: ContainerInfo["children"],
-  serpentine: boolean,
-): number {
+function gridOrderViolations(children: ContainerInfo["children"], serpentine: boolean): number {
   let count = 0;
   let row = 0;
   for (let i = 1; i < children.length; i++) {
@@ -339,10 +331,7 @@ function sourceOrderViolations(c: ContainerInfo): number {
   if (c.mode === "grid") {
     // A grid may be placed row-major or serpentine, and the geometry alone does not
     // say which; scoring under both and keeping the lower count accepts either.
-    return Math.min(
-      gridOrderViolations(c.children, false),
-      gridOrderViolations(c.children, true),
-    );
+    return Math.min(gridOrderViolations(c.children, false), gridOrderViolations(c.children, true));
   }
   let count = 0;
   for (let i = 1; i < c.children.length; i++) {
@@ -369,14 +358,11 @@ const GRID_MAX_H = 60;
 function renderAscii(shapes: AbsShape[], edges: IREdge[], byId: Map<string, AbsShape>): string {
   const { minX, minY, w: canvasW, h: canvasH } = bounds(shapes);
   const gridH =
-    canvasW > 0
-      ? clamp(Math.round(((canvasH / canvasW) * GRID_W) / 2), 1, GRID_MAX_H)
-      : 1;
+    canvasW > 0 ? clamp(Math.round(((canvasH / canvasW) * GRID_W) / 2), 1, GRID_MAX_H) : 1;
 
   const scaleX = canvasW > 0 ? (GRID_W - 1) / canvasW : 0;
   const scaleY = canvasH > 0 ? (gridH - 1) / canvasH : 0;
-  const toCol = (x: number): number =>
-    clamp(Math.round((x - minX) * scaleX), 0, GRID_W - 1);
+  const toCol = (x: number): number => clamp(Math.round((x - minX) * scaleX), 0, GRID_W - 1);
   const toRow = (y: number): number => clamp(Math.round((y - minY) * scaleY), 0, gridH - 1);
 
   const grid: string[][] = Array.from({ length: gridH }, () => Array(GRID_W).fill(" "));

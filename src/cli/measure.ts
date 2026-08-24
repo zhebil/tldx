@@ -41,7 +41,10 @@ export function formatMeasure(shapes: readonly AbsShape[]): string {
   const idWidth = Math.max(0, ...shapes.map((s) => s.id.length));
   const sizeWidth = Math.max(0, ...shapes.map((s) => sizeOf(s).length));
   return shapes
-    .map((s) => `${s.id.padEnd(idWidth)}  ${sizeOf(s).padEnd(sizeWidth)}  @ (${Math.round(s.x)},${Math.round(s.y)})`)
+    .map(
+      (s) =>
+        `${s.id.padEnd(idWidth)}  ${sizeOf(s).padEnd(sizeWidth)}  @ (${Math.round(s.x)},${Math.round(s.y)})`,
+    )
     .join("\n");
 }
 
@@ -54,7 +57,9 @@ export async function runMeasure(args: RunMeasureArgs): Promise<number> {
   const { deps, io } = args;
   const frameIdx = args.argv.indexOf("--frame");
   const frame = frameIdx >= 0 ? args.argv[frameIdx + 1] : undefined;
-  const path = args.argv.find((a, i) => !a.startsWith("--") && (frameIdx < 0 || i !== frameIdx + 1));
+  const path = args.argv.find(
+    (a, i) => !a.startsWith("--") && (frameIdx < 0 || i !== frameIdx + 1),
+  );
 
   if (path === undefined) {
     io.writeStderr(`tldx measure: missing <file> argument\n${USAGE}\n`);
@@ -89,7 +94,10 @@ export async function runMeasure(args: RunMeasureArgs): Promise<number> {
   if (frame !== undefined) {
     narrowed = narrowToFrame(shapes, frame);
     if (narrowed.length === 0) {
-      const validIds = shapes.map((s) => s.id).sort().join(", ");
+      const validIds = shapes
+        .map((s) => s.id)
+        .sort()
+        .join(", ");
       io.writeStderr(`tldx measure: unknown --frame id "${frame}". Valid ids: ${validIds}\n`);
       return 1;
     }

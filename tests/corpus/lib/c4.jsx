@@ -12,9 +12,7 @@ export function Person({ id, name, description }) {
 }
 
 export function System({ id, name, description, external }) {
-  const label = description
-    ? `${name}${external ? " (external)" : ""} - ${description}`
-    : name;
+  const label = description ? `${name}${external ? " (external)" : ""} - ${description}` : name;
   return (
     <Box id={id} label={label} geo="rectangle" color={external ? "grey" : "blue"} fill="semi" />
   );

@@ -22,9 +22,7 @@ export function mergeOverlayEntries(
   fresh: Record<TLRecordId, OverlayEntry>,
   snapshotIds: ReadonlySet<TLRecordId>,
 ): { entries: Record<TLRecordId, OverlayEntry>; preserved: TLRecordId[] } {
-  const preserved = Object.keys(previous).filter(
-    (id) => !(id in fresh) && !snapshotIds.has(id),
-  );
+  const preserved = Object.keys(previous).filter((id) => !(id in fresh) && !snapshotIds.has(id));
   const entries: Record<TLRecordId, OverlayEntry> = { ...fresh };
   for (const id of preserved) entries[id] = previous[id]!;
   return { entries, preserved };

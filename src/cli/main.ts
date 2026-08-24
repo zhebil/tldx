@@ -53,7 +53,10 @@ function defaultViewerBundleDir(): string {
  * A restart shouldn't pile up browser tabs: if a live `tldx serve` is already
  * recorded for this file, a tab already points at it.
  */
-export function shouldOpenBrowser(noOpen: boolean, live: { readonly pid: number } | undefined): boolean {
+export function shouldOpenBrowser(
+  noOpen: boolean,
+  live: { readonly pid: number } | undefined,
+): boolean {
   return !noOpen && live === undefined;
 }
 
@@ -84,7 +87,10 @@ export function distStalenessHint(
  * Parks the process until the user signals shutdown or the handle's idle-TTL
  * reaper fires. Either way: close the handle and exit 0.
  */
-async function awaitShutdown(handle: { close(): Promise<void>; idleExpired: Promise<void> }): Promise<number> {
+async function awaitShutdown(handle: {
+  close(): Promise<void>;
+  idleExpired: Promise<void>;
+}): Promise<number> {
   return new Promise<number>((resolveCode) => {
     let resolving = false;
     const finish = (code: number): void => {
@@ -184,7 +190,8 @@ const commands: readonly Command[] = [
   {
     name: "serve",
     args: "<file> [--no-open] [--ttl <minutes>]",
-    description: "watch a .tldx or .tldx.jsx file and serve the live viewer locally (default --ttl 60; 0 disables)",
+    description:
+      "watch a .tldx or .tldx.jsx file and serve the live viewer locally (default --ttl 60; 0 disables)",
     run: async (rest, io) => {
       const { path, noOpen, ttlMinutes, error } = parseServeArgs(rest);
       if (error !== undefined) {
@@ -199,7 +206,9 @@ const commands: readonly Command[] = [
         const live = findServe(path);
         const openThisTime = shouldOpenBrowser(noOpen, live);
         if (!openThisTime && !noOpen && live !== undefined) {
-          io.writeStdout(`tldx serve: a server for ${path} is already live at ${live.url}; not opening another tab\n`);
+          io.writeStdout(
+            `tldx serve: a server for ${path} is already live at ${live.url}; not opening another tab\n`,
+          );
         }
         const handle = await runServe({
           path,

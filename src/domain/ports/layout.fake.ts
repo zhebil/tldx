@@ -40,10 +40,7 @@ export class StubLayout implements LayoutPort {
   }
 }
 
-function layoutChildren(
-  children: readonly IRElement[],
-  originY: number,
-): IRElementPositioned[] {
+function layoutChildren(children: readonly IRElement[], originY: number): IRElementPositioned[] {
   const out: IRElementPositioned[] = [];
   let cursorX = 0;
   for (const child of children) {
@@ -77,11 +74,7 @@ function placeAt(
   }
 }
 
-function placeBox(
-  box: IRBox,
-  defaultX: number,
-  defaultY: number,
-): IRBoxPositioned {
+function placeBox(box: IRBox, defaultX: number, defaultY: number): IRBoxPositioned {
   const size = estimatedBoxSize(box.label, undefined, box);
   return {
     ...box,
@@ -92,11 +85,7 @@ function placeBox(
   };
 }
 
-function placeNote(
-  note: IRNote,
-  defaultX: number,
-  defaultY: number,
-): IRNotePositioned {
+function placeNote(note: IRNote, defaultX: number, defaultY: number): IRNotePositioned {
   const size = estimatedNoteSize(note.text, note);
   return {
     ...note,
@@ -107,11 +96,7 @@ function placeNote(
   };
 }
 
-function placeFrame(
-  frame: IRFrame,
-  defaultX: number,
-  defaultY: number,
-): IRFramePositioned {
+function placeFrame(frame: IRFrame, defaultX: number, defaultY: number): IRFramePositioned {
   // Children inside a frame start below the chrome so the title bar doesn't
   // sit on top of the first row.
   const placedChildren = layoutChildren(frame.children, FRAME_PAD_TOP);
@@ -126,9 +111,7 @@ function placeFrame(
   };
 }
 
-function childBounds(
-  children: readonly IRElementPositioned[],
-): { w: number; h: number } {
+function childBounds(children: readonly IRElementPositioned[]): { w: number; h: number } {
   let maxX = 0;
   let maxY = 0;
   for (const c of children) {

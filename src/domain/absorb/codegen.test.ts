@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 import { boxShape, noteShape } from "../../contracts/builders.js";
 import type { TLRecord } from "../../contracts/scene-json.js";
 
-import { absorbAdded, elementJsx, offsetAt, patchGapAttr, scanElement, spliceReorder } from "./codegen.js";
+import {
+  absorbAdded,
+  elementJsx,
+  offsetAt,
+  patchGapAttr,
+  scanElement,
+  spliceReorder,
+} from "./codegen.js";
 
 describe("domain/absorb/codegen: elementJsx", () => {
   it("round-trips a geo record's every DSL-expressible prop into a <Box>", () => {
@@ -39,7 +46,7 @@ describe("domain/absorb/codegen: elementJsx", () => {
     expect(elementJsx(record)).toContain('id="abc123"');
   });
 
-  it("omits label entirely for an empty richText, rather than emitting label=\"\"", () => {
+  it('omits label entirely for an empty richText, rather than emitting label=""', () => {
     const record = boxShape({ id: "shape:empty", x: 0, y: 0, w: 40, h: 40 });
     const jsx = elementJsx(record) ?? "";
     expect(jsx).not.toMatch(/\blabel=/);
@@ -91,7 +98,14 @@ describe("domain/absorb/codegen: elementJsx", () => {
 
 describe("domain/absorb/codegen: absorbAdded splice", () => {
   const box = (id: string, x: number, index?: string) =>
-    boxShape({ id: `shape:${id}`, x, y: 0, w: 40, h: 40, ...(index === undefined ? {} : { index }) });
+    boxShape({
+      id: `shape:${id}`,
+      x,
+      y: 0,
+      w: 40,
+      h: 40,
+      ...(index === undefined ? {} : { index }),
+    });
 
   it("leaves the source byte-identical for an empty record list", () => {
     const source = 'import { Doc } from "tldx";\nexport default () => (\n  <Doc>\n  </Doc>\n);\n';
@@ -212,8 +226,9 @@ describe("domain/absorb/codegen: offsetAt/scanElement (move-ladder text scanning
   });
 
   it("scanElement spans a paired element, including nested children of the same tag name", () => {
-    const source = '<Row id="r">\n  <Frame id="f1"><Frame id="f2" /></Frame>\n  <Box id="b" />\n</Row>';
-    const start = source.indexOf("<Frame id=\"f1\"");
+    const source =
+      '<Row id="r">\n  <Frame id="f1"><Frame id="f2" /></Frame>\n  <Box id="b" />\n</Row>';
+    const start = source.indexOf('<Frame id="f1"');
     const span = scanElement(source, start);
     expect(source.slice(span!.start, span!.end)).toBe('<Frame id="f1"><Frame id="f2" /></Frame>');
   });

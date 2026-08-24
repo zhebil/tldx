@@ -112,46 +112,42 @@ describe("shorthand-equivalence: Row/Col/Grid produce identical scene JSON to Fr
   });
 
   for (const fixture of fixtures) {
-    it(
-      `${fixture.name}: shorthand form matches <Frame layout=...> form`,
-      async () => {
-        if (fixture.rewriteCount > 0) {
-          expect(fixture.fixedSource).not.toBe(fixture.original);
-        }
+    it(`${fixture.name}: shorthand form matches <Frame layout=...> form`, async () => {
+      if (fixture.rewriteCount > 0) {
+        expect(fixture.fixedSource).not.toBe(fixture.original);
+      }
 
-        const tmpDir = mkdtempSync(join(tmpdir(), "tldx-shorthand-"));
-        // A fixture may relatively import sibling modules, so copy those
-        // alongside for the rewritten copy to resolve.
-        const libDir = join(HERE, "lib");
-        if (existsSync(libDir)) cpSync(libDir, join(tmpDir, "lib"), { recursive: true });
-        const tmpPath = join(tmpDir, fixture.name);
-        writeFileSync(tmpPath, fixture.fixedSource, "utf8");
+      const tmpDir = mkdtempSync(join(tmpdir(), "tldx-shorthand-"));
+      // A fixture may relatively import sibling modules, so copy those
+      // alongside for the rewritten copy to resolve.
+      const libDir = join(HERE, "lib");
+      if (existsSync(libDir)) cpSync(libDir, join(tmpDir, "lib"), { recursive: true });
+      const tmpPath = join(tmpDir, fixture.name);
+      writeFileSync(tmpPath, fixture.fixedSource, "utf8");
 
-        try {
-          const deps = {
-            fs: createNodeFsRead(),
-            layout: new ElkLayoutAdapter(),
-            execute: createJsxExecute(),
-          };
-          const [originalResult, rewrittenResult] = await Promise.all([
-            compileFile(fixture.path, deps),
-            compileFile(tmpPath, deps),
-          ]);
+      try {
+        const deps = {
+          fs: createNodeFsRead(),
+          layout: new ElkLayoutAdapter(),
+          execute: createJsxExecute(),
+        };
+        const [originalResult, rewrittenResult] = await Promise.all([
+          compileFile(fixture.path, deps),
+          compileFile(tmpPath, deps),
+        ]);
 
-          // A fixture may carry a legitimate occlusion warning; the
-          // invariant under test is that the rewrite is scene-JSON-identical,
-          // not that either form is silent.
-          expect(hasErrors(originalResult.diagnostics)).toBe(false);
-          expect(hasErrors(rewrittenResult.diagnostics)).toBe(false);
-          expect(rewrittenResult.sceneJson).not.toBeNull();
-          expect(JSON.stringify(rewrittenResult.sceneJson)).toBe(
-            JSON.stringify(originalResult.sceneJson),
-          );
-        } finally {
-          rmSync(tmpDir, { recursive: true, force: true });
-        }
-      },
-      30_000,
-    );
+        // A fixture may carry a legitimate occlusion warning; the
+        // invariant under test is that the rewrite is scene-JSON-identical,
+        // not that either form is silent.
+        expect(hasErrors(originalResult.diagnostics)).toBe(false);
+        expect(hasErrors(rewrittenResult.diagnostics)).toBe(false);
+        expect(rewrittenResult.sceneJson).not.toBeNull();
+        expect(JSON.stringify(rewrittenResult.sceneJson)).toBe(
+          JSON.stringify(originalResult.sceneJson),
+        );
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }, 30_000);
   }
 });

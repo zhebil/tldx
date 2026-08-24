@@ -3,7 +3,7 @@
 Write architecture and flow diagrams as JSX. `tldx` lays them out and renders
 them on a live [tldraw](https://tldraw.dev) canvas that reloads as you save.
 
-You describe *what connects to what*. Layout, sizing, edge routing and label
+You describe _what connects to what_. Layout, sizing, edge routing and label
 placement are the tool's job — there are no coordinates in a `.tldx.jsx` file
 unless you want them.
 

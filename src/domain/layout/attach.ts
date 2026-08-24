@@ -79,9 +79,10 @@ function collectEdges(children: readonly IRElementPositioned[], out: IREdge[] = 
 }
 
 /** Removes every note with `on` set from the tree, wherever declared, in document order. */
-function stripAttached(
-  children: readonly IRElementPositioned[],
-): { children: IRElementPositioned[]; removed: IRNotePositioned[] } {
+function stripAttached(children: readonly IRElementPositioned[]): {
+  children: IRElementPositioned[];
+  removed: IRNotePositioned[];
+} {
   const removed: IRNotePositioned[] = [];
   const kept: IRElementPositioned[] = [];
   for (const c of children) {
@@ -201,7 +202,11 @@ function pickPlacement(
   return { ...right, y: Math.max(0, right.y) };
 }
 
-function overlapArea(rect: Rect, obstacles: ReadonlyMap<string, Rect>, exclude: ReadonlySet<string>): number {
+function overlapArea(
+  rect: Rect,
+  obstacles: ReadonlyMap<string, Rect>,
+  exclude: ReadonlySet<string>,
+): number {
   let total = 0;
   for (const [id, r] of obstacles) {
     if (exclude.has(id)) continue;

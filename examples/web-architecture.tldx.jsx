@@ -51,14 +51,32 @@ export default function WebArchitecture() {
       <Edge from="app-tier" to="db-replica" label="reads" font="sans" size="s" />
       <Edge from="app-tier" to="queue" label="enqueue" font="sans" size="s" />
 
-      <Edge from="db-primary" to="db-replica" label="streaming replication" dash="dashed" color="blue" font="sans" size="s" />
+      <Edge
+        from="db-primary"
+        to="db-replica"
+        label="streaming replication"
+        dash="dashed"
+        color="blue"
+        font="sans"
+        size="s"
+      />
 
       <Edge from="queue" to="worker" label="dequeue" font="sans" size="s" />
       <Edge from="worker" to="db-primary" label="job status" font="sans" size="s" />
       <Edge from="worker" to="objects" label="upload" font="sans" size="s" />
-      <Edge from="worker" to="payments" label="charge" color="red" dash="dashed" font="sans" size="s" />
+      <Edge
+        from="worker"
+        to="payments"
+        label="charge"
+        color="red"
+        dash="dashed"
+        font="sans"
+        size="s"
+      />
 
-      <Sticky on="worker">One worker spans three tiers: queue, data, and the external gateway.</Sticky>
+      <Sticky on="worker">
+        One worker spans three tiers: queue, data, and the external gateway.
+      </Sticky>
     </Doc>
   );
 }

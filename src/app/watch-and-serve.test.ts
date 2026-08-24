@@ -32,10 +32,7 @@ const ANOTHER_VALID_AST = doc({ id: "auth" }, [
   note({ id: "readme" }, "ok"),
 ]);
 
-const IR_BROKEN_AST = doc({ id: "d" }, [
-  box({ id: "x" }),
-  box({ id: "x" }),
-]);
+const IR_BROKEN_AST = doc({ id: "d" }, [box({ id: "x" }), box({ id: "x" })]);
 
 interface Setup {
   deps: WatchAndServeDeps;
@@ -82,9 +79,7 @@ describe("watchAndServe", () => {
     expect(m.v).toBe(1);
     expect(m.kind).toBe("scene");
     if (isScene(m)) {
-      const shapeRecords = Object.values(m.payload.store).filter(
-        (r) => r.typeName === "shape",
-      );
+      const shapeRecords = Object.values(m.payload.store).filter((r) => r.typeName === "shape");
       expect(shapeRecords.length).toBeGreaterThan(0);
     }
 
@@ -146,9 +141,7 @@ describe("watchAndServe", () => {
       expect(codes.some((c) => c.startsWith("runtime/"))).toBe(true);
     }
     // Critically: only one error message was pushed - no scene accompanied it.
-    const errorsAfterFirst = transport.pushed
-      .slice(1)
-      .filter((m) => m.kind === "scene");
+    const errorsAfterFirst = transport.pushed.slice(1).filter((m) => m.kind === "scene");
     expect(errorsAfterFirst).toHaveLength(0);
 
     await handle.close();
@@ -262,7 +255,9 @@ describe("watchAndServe", () => {
         },
       });
 
-      const afterDrag = JSON.parse(await fs.read(overlayPath)) as { entries: Record<string, unknown> };
+      const afterDrag = JSON.parse(await fs.read(overlayPath)) as {
+        entries: Record<string, unknown>;
+      };
       expect(afterDrag.entries["shape:dash"]).toBeDefined();
 
       // An unrelated source edit drops "dash" from the diagram entirely -
@@ -333,7 +328,9 @@ describe("watchAndServe", () => {
           "shape:dash": { ...dashRecord, x: 999, y: 999 },
         },
       });
-      const afterDrag = JSON.parse(await fs.read(overlayPath)) as { entries: Record<string, unknown> };
+      const afterDrag = JSON.parse(await fs.read(overlayPath)) as {
+        entries: Record<string, unknown>;
+      };
       expect(afterDrag.entries["shape:dash"]).toBeDefined();
 
       // Undo: the browser's next snapshot has "dash" back at its compiled
@@ -344,7 +341,9 @@ describe("watchAndServe", () => {
         store: initial.payload.store,
       });
 
-      const afterUndo = JSON.parse(await fs.read(overlayPath)) as { entries: Record<string, unknown> };
+      const afterUndo = JSON.parse(await fs.read(overlayPath)) as {
+        entries: Record<string, unknown>;
+      };
       expect(afterUndo.entries["shape:dash"]).toBeUndefined();
       // Not the "invalidated id" path - nothing should be preserved.
       expect(log.byCode("overlay/preserved")).toHaveLength(0);

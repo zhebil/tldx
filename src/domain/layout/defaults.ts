@@ -306,7 +306,11 @@ export function labelOverflow(
  * changes the very fractions the scale was derived from. Each pass multiplies
  * `k` by the residual overflow, which converges in two or three steps.
  */
-export function geoScale(label: string | undefined, maxW: number | undefined, style?: BoxStyle): number {
+export function geoScale(
+  label: string | undefined,
+  maxW: number | undefined,
+  style?: BoxStyle,
+): number {
   if (label === undefined || label.length === 0) return 1;
   const model = GEO_MODEL[style?.geo ?? "rectangle"];
   if (model === "rect") return 1;

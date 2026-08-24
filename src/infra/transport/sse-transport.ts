@@ -13,10 +13,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { ClockPort, TimerHandle } from "../../app/ports/clock.js";
-import {
-  TransportClosedError,
-  type TransportPort,
-} from "../../app/ports/transport.js";
+import { TransportClosedError, type TransportPort } from "../../app/ports/transport.js";
 import type { SceneMessage } from "../../contracts/scene-message.js";
 
 export interface SseTransport extends TransportPort {
@@ -50,9 +47,7 @@ function format(message: SceneMessage): string {
   return `data: ${JSON.stringify(message)}\n\n`;
 }
 
-export function createSseTransport(
-  options: CreateSseTransportOptions,
-): SseTransport {
+export function createSseTransport(options: CreateSseTransportOptions): SseTransport {
   const { clock } = options;
   const heartbeatMs = options.heartbeatMs ?? 15_000;
   if (heartbeatMs <= 0) {

@@ -86,7 +86,10 @@ function stickyAttrs(record: TLRecord): { attrs: string[]; text: string } {
     strAttr("verticalAlign", props.verticalAlign),
     strAttr("labelColor", props.labelColor),
   ];
-  return { attrs: attrs.filter((a): a is string => a !== null), text: richTextToPlain(props.richText) };
+  return {
+    attrs: attrs.filter((a): a is string => a !== null),
+    text: richTextToPlain(props.richText),
+  };
 }
 
 function stickyJsx(record: TLRecord): string {
@@ -141,7 +144,8 @@ export function scanOpenTag(source: string, start: number): OpenTag | null {
       i += 1;
       continue;
     }
-    if (depth === 0 && ch === "/" && source[i + 1] === ">") return { tagEnd: i + 2, selfClosing: true };
+    if (depth === 0 && ch === "/" && source[i + 1] === ">")
+      return { tagEnd: i + 2, selfClosing: true };
     if (depth === 0 && ch === ">") return { tagEnd: i + 1, selfClosing: false };
     i += 1;
   }
@@ -305,7 +309,9 @@ export function patchGapAttr(
   const inner = source.slice(start, innerEnd);
   const attrRe = new RegExp(`\\b${attr}=(?:"[^"]*"|\\{[^}]*\\})`);
   const formatted = `${attr}="${value}"`;
-  const patched = attrRe.test(inner) ? inner.replace(attrRe, formatted) : `${inner.replace(/\s+$/, "")} ${formatted}`;
+  const patched = attrRe.test(inner)
+    ? inner.replace(attrRe, formatted)
+    : `${inner.replace(/\s+$/, "")} ${formatted}`;
   return { source: source.slice(0, start) + patched + source.slice(innerEnd) };
 }
 
@@ -314,7 +320,10 @@ const TLDX_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["']tldx["']/;
 /** Adds `Box`/`Sticky` to the existing `import { ... } from "tldx"`, but only
  *  when absorb actually introduces one the source wasn't already using. Errors
  *  rather than guessing if there is no such import to extend. */
-function ensureImports(source: string, records: readonly TLRecord[]): { source: string } | { error: string } {
+function ensureImports(
+  source: string,
+  records: readonly TLRecord[],
+): { source: string } | { error: string } {
   const needed: string[] = [];
   if (records.some((r) => r.type === "geo")) needed.push("Box");
   if (records.some((r) => r.type === "note")) needed.push("Sticky");
@@ -403,7 +412,13 @@ export function absorbAdded(
   const closeLineStart = patched.lastIndexOf("\n", closeIdx - 1) + 1;
   const beforeClose = patched.slice(closeLineStart, closeIdx);
   if (/^\s*$/.test(beforeClose)) {
-    return { source: patched.slice(0, closeLineStart) + `${elementsBlock}\n` + patched.slice(closeLineStart) };
+    return {
+      source:
+        patched.slice(0, closeLineStart) + `${elementsBlock}\n` + patched.slice(closeLineStart),
+    };
   }
-  return { source: patched.slice(0, closeIdx) + `\n${elementsBlock}\n${rootIndent}` + patched.slice(closeIdx) };
+  return {
+    source:
+      patched.slice(0, closeIdx) + `\n${elementsBlock}\n${rootIndent}` + patched.slice(closeIdx),
+  };
 }

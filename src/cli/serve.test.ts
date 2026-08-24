@@ -20,7 +20,13 @@ import { overlayPathFor } from "../domain/overlay/index.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
 import { findServe, hashSource, recordServe } from "../infra/serve-registry/serve-registry.js";
 
-import { runServe, viewerStalenessWarning, type ServeDeps, type ServeHandle, type ServeIo } from "./serve.js";
+import {
+  runServe,
+  viewerStalenessWarning,
+  type ServeDeps,
+  type ServeHandle,
+  type ServeIo,
+} from "./serve.js";
 
 // FakeExecute has no result programmed for this source, so it falls back to
 // its default empty-doc AST.
@@ -246,9 +252,7 @@ describe("runServe", () => {
     try {
       const deps = makeDeps();
       deps.port = blockedPort;
-      await expect(
-        runServe({ path: "doc.tldx.jsx", deps, io: makeIo() }),
-      ).rejects.toBeDefined();
+      await expect(runServe({ path: "doc.tldx.jsx", deps, io: makeIo() })).rejects.toBeDefined();
     } finally {
       await new Promise<void>((resolve) => {
         blocker.close(() => {
@@ -291,7 +295,9 @@ describe("viewerStalenessWarning", () => {
     utimesSync(join(distViewer, "index.html"), new Date(1000), new Date(1000));
     utimesSync(join(srcViewer, "app.tsx"), new Date(2000), new Date(2000));
 
-    expect(viewerStalenessWarning(distViewer)).toMatch(/dist\/viewer looks stale.*npm run build:viewer/);
+    expect(viewerStalenessWarning(distViewer)).toMatch(
+      /dist\/viewer looks stale.*npm run build:viewer/,
+    );
   });
 
   it("is silent when src/viewer doesn't exist next to dist/ (an installed package)", () => {
