@@ -8,11 +8,6 @@ build/
 .idea/
 .vscode/
 
-# Beads / Dolt files (added by bd init)
-.beads/
-.dolt/
-*.db
-.beads-credential-key
 .claude
 .playwright-mcp/
 
