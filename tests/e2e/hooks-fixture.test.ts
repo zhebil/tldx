@@ -1,6 +1,6 @@
 /**
- * Fixture-driven e2e test for the plugin hooks `hooks/on-edit.sh` (PostToolUse)
- * and `hooks/on-prompt.sh` (UserPromptSubmit).
+ * Fixture-driven e2e test for the plugin hooks `plugin/hooks/on-edit.sh` (PostToolUse)
+ * and `plugin/hooks/on-prompt.sh` (UserPromptSubmit).
  *
  * Both scripts are pinned by spawning them for real via `spawnSync("sh", ...)`,
  * feeding the hook's stdin JSON contract and reading stdout/exit code back -
@@ -33,8 +33,8 @@ function runHook(script: string, stdin: unknown, extraEnv: Record<string, string
   });
 }
 
-describe("e2e: hooks/on-edit.sh", () => {
-  const HOOK = join(REPO_ROOT, "hooks", "on-edit.sh");
+describe("e2e: plugin/hooks/on-edit.sh", () => {
+  const HOOK = join(REPO_ROOT, "plugin", "hooks", "on-edit.sh");
 
   it(
     "does nothing for a non-*.tldx.jsx file path",
@@ -90,8 +90,8 @@ describe("e2e: hooks/on-edit.sh", () => {
   );
 });
 
-describe("e2e: hooks/on-prompt.sh", () => {
-  const HOOK = join(REPO_ROOT, "hooks", "on-prompt.sh");
+describe("e2e: plugin/hooks/on-prompt.sh", () => {
+  const HOOK = join(REPO_ROOT, "plugin", "hooks", "on-prompt.sh");
   let dir: string;
 
   beforeEach(() => {

@@ -1,11 +1,28 @@
 {
   "name": "tldx",
-  "owner": { "name": "Yevhenii Bilyk", "email": "jbilyk1996@gmail.com" },
+  "owner": {
+    "name": "Zhebil",
+    "email": "jbilyk1996@gmail.com"
+  },
   "plugins": [
     {
       "name": "tldx",
-      "source": "./",
-      "description": "Write architecture diagrams as JSX and see them rendered."
+      "description": "Write architecture and flow diagrams as JSX and see them rendered on a live tldraw canvas.",
+      "author": {
+        "name": "Zhebil"
+      },
+      "homepage": "https://github.com/zhebil/tldx",
+      "repository": "https://github.com/zhebil/tldx",
+      "license": "MIT",
+      "category": "development",
+      "tags": [
+        "diagrams",
+        "tldraw",
+        "jsx",
+        "architecture",
+        "claude-code-plugin"
+      ],
+      "source": "./plugin"
     }
   ]
 }
