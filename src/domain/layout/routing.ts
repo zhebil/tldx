@@ -269,7 +269,9 @@ function placeLabels(
       return { score, shapeScore };
     };
 
-    const search = (bend: number): { t: number; box: LabelBox; score: number; shapeScore: number } => {
+    const search = (
+      bend: number,
+    ): { t: number; box: LabelBox; score: number; shapeScore: number } => {
       const probe = { ...slot, bend };
       let bestT = 0.5;
       let bestScore = Infinity;
@@ -322,7 +324,10 @@ function placeLabels(
       if (grownBend !== slot.bend) {
         const box = boxAt({ ...slot, bend: grownBend }, 0.5);
         const { score, shapeScore } = scoreAt(box);
-        if (shapeScore < best.shapeScore || (shapeScore === best.shapeScore && score < best.score)) {
+        if (
+          shapeScore < best.shapeScore ||
+          (shapeScore === best.shapeScore && score < best.score)
+        ) {
           best = { t: 0.5, box, score, shapeScore };
           bestBend = grownBend;
         }
@@ -462,7 +467,11 @@ function fanSharedPairs(
  * wide bar), the ray cuts in diagonally and can exit the wrong side entirely.
  * Mutates `routes` in place; `edges` already excludes self-edges.
  */
-function attachFacingProximity(edges: IREdge[], byId: Map<string, AbsShape>, routes: Map<string, EdgeRoute>): void {
+function attachFacingProximity(
+  edges: IREdge[],
+  byId: Map<string, AbsShape>,
+  routes: Map<string, EdgeRoute>,
+): void {
   for (const edge of edges) {
     if (routes.has(edge.id)) continue;
     const from = byId.get(edge.from);
@@ -558,7 +567,11 @@ function labelAwareFanStep(
   const groupIds = new Set(group.map((e) => e.id));
   const otherLabels = allEdges.filter((e) => e.label !== undefined && !groupIds.has(e.id));
 
-  for (const step of [wanted, baseStep + (wanted - baseStep) * 0.66, baseStep + (wanted - baseStep) * 0.33]) {
+  for (const step of [
+    wanted,
+    baseStep + (wanted - baseStep) * 0.66,
+    baseStep + (wanted - baseStep) * 0.33,
+  ]) {
     if (fanStepClearsObstacles(group, loId, step, byId, shapes, otherLabels, routes)) return step;
   }
   return baseStep;
@@ -622,7 +635,8 @@ function edgeBendClearsObstacles(
     const box = approxLabelBox(edge, byId, bend, startAnchor, endAnchor);
     // Inflated by `CLEAR_MARGIN`: this is an approximation, so treat a
     // near-miss as a miss and reject the step in favour of a smaller one.
-    if (box !== null && otherLabelBoxes.some((o) => boxesOverlap(inflate(box, CLEAR_MARGIN), o))) return false;
+    if (box !== null && otherLabelBoxes.some((o) => boxesOverlap(inflate(box, CLEAR_MARGIN), o)))
+      return false;
   }
   return true;
 }
@@ -695,16 +709,35 @@ function clearObstaclesOnEveryRoute(
     const existing = route?.bend ?? 0;
     const startAnchor = route?.startAnchor;
     const endAnchor = route?.endAnchor;
-    if (edgeBendClearsObstacles(edge, existing, byId, blockerPool, [], startAnchor, endAnchor)) continue;
+    if (edgeBendClearsObstacles(edge, existing, byId, blockerPool, [], startAnchor, endAnchor))
+      continue;
 
     if (existing === 0) {
-      const bend = growBendClear(edge, existing, byId, blockerPool, [], [1, -1], startAnchor, endAnchor);
+      const bend = growBendClear(
+        edge,
+        existing,
+        byId,
+        blockerPool,
+        [],
+        [1, -1],
+        startAnchor,
+        endAnchor,
+      );
       if (bend !== existing) routes.set(edge.id, { ...(route ?? { bend: 0 }), bend });
       continue;
     }
 
     const committed = Math.sign(existing) as 1 | -1;
-    let bend = growBendClear(edge, existing, byId, blockerPool, [], [committed], startAnchor, endAnchor);
+    let bend = growBendClear(
+      edge,
+      existing,
+      byId,
+      blockerPool,
+      [],
+      [committed],
+      startAnchor,
+      endAnchor,
+    );
     if (bend === existing) {
       bend = growBendClear(
         edge,
@@ -772,7 +805,20 @@ function growBendForLabelSquish(
     // `GROW_STEP`, or a short chord's whole budget is one or two samples wide
     // and the search misses an improvement that was inside it all along.
     const step = budget / GROW_MAX_ROUNDS;
-    const grown = growBendClear(edge, bend, byId, blockerPool, [], signs, startAnchor, endAnchor, false, budget, true, step);
+    const grown = growBendClear(
+      edge,
+      bend,
+      byId,
+      blockerPool,
+      [],
+      signs,
+      startAnchor,
+      endAnchor,
+      false,
+      budget,
+      true,
+      step,
+    );
     if (grown !== bend) routes.set(edge.id, { ...(route ?? { bend: 0 }), bend: grown });
   }
 }
@@ -935,7 +981,9 @@ function applyMinimizedBend(
   t: number,
 ): void {
   const box =
-    edge.label !== undefined ? approxLabelBox(edge, byId, bend, route.startAnchor, route.endAnchor, t) : null;
+    edge.label !== undefined
+      ? approxLabelBox(edge, byId, bend, route.startAnchor, route.endAnchor, t)
+      : null;
   routes.set(edge.id, { ...route, bend, ...(box ? { labelBox: box } : {}) });
   snapshot.set(edge.id, { bend, ...(box ? { labelBox: box } : {}) });
 }
@@ -977,7 +1025,15 @@ function growBendClear(
   const blockers = blockerPool.filter((s) => s.id !== from.id && s.id !== to.id);
 
   let best = initialBend;
-  let bestHits = violationCount(edge, initialBend, byId, blockers, otherLabelBoxes, startAnchor, endAnchor);
+  let bestHits = violationCount(
+    edge,
+    initialBend,
+    byId,
+    blockers,
+    otherLabelBoxes,
+    startAnchor,
+    endAnchor,
+  );
   if (bestHits === 0) return initialBend;
 
   const start = terminalPoint(from, startAnchor, to);
@@ -1004,7 +1060,15 @@ function growBendClear(
       if (sag > cap) break;
 
       const bend = round1(sign * sag);
-      const hits = violationCount(edge, bend, byId, blockers, otherLabelBoxes, startAnchor, endAnchor);
+      const hits = violationCount(
+        edge,
+        bend,
+        byId,
+        blockers,
+        otherLabelBoxes,
+        startAnchor,
+        endAnchor,
+      );
       // The path case keeps the best partial attempt when nothing fully
       // clears. The label case stays all-or-nothing: `violationCount` also
       // counts path obstacles, which can sit at the same nonzero floor for
@@ -1178,7 +1242,10 @@ function arcSampler(a: Point, b: Point, bend: number): (t: number) => Point {
   const apex: Point = { x: a.x + dx / 2 + perp.x * bend, y: a.y + dy / 2 + perp.y * bend };
   const distToApex = (d: number): number => {
     const ang = a0 + d / 2;
-    return Math.hypot(centre.x + radius * Math.cos(ang) - apex.x, centre.y + radius * Math.sin(ang) - apex.y);
+    return Math.hypot(
+      centre.x + radius * Math.cos(ang) - apex.x,
+      centre.y + radius * Math.sin(ang) - apex.y,
+    );
   };
   const other = delta > 0 ? delta - 2 * Math.PI : delta + 2 * Math.PI;
   const sweep = distToApex(other) < distToApex(delta) ? other : delta;
@@ -1232,7 +1299,7 @@ function assignLanes(candidates: RouteCandidate[]): Map<string, number> {
     group.sort((a, b) => {
       const spanA = a.chordAxisMax - a.chordAxisMin;
       const spanB = b.chordAxisMax - b.chordAxisMin;
-      return spanA !== spanB ? spanA - spanB : (a.edgeId < b.edgeId ? -1 : 1);
+      return spanA !== spanB ? spanA - spanB : a.edgeId < b.edgeId ? -1 : 1;
     });
 
     const assigned: { rank: number; min: number; max: number }[] = [];
@@ -1273,14 +1340,23 @@ function finalizeRoute(candidate: RouteCandidate, assignedRank: number): EdgeRou
   // still matter: they are what lifts the chord off the boxes in between.
   const bend = round1(sag * sign);
   const anchor = normalizedAnchor(axis, side);
-  return { bend: Math.abs(bend) < MIN_BEND ? 0 : bend, startAnchor: anchor, endAnchor: { ...anchor } };
+  return {
+    bend: Math.abs(bend) < MIN_BEND ? 0 : bend,
+    startAnchor: anchor,
+    endAnchor: { ...anchor },
+  };
 }
 
 function collect(ir: IRDocPositioned): { shapes: AbsShape[]; edges: IREdge[] } {
   const shapes: AbsShape[] = [];
   const edges: IREdge[] = [];
 
-  function visit(parentId: string, children: IRElementPositioned[], offX: number, offY: number): void {
+  function visit(
+    parentId: string,
+    children: IRElementPositioned[],
+    offX: number,
+    offY: number,
+  ): void {
     for (const child of children) {
       if (child.kind === "edge") {
         edges.push(child);
@@ -1309,7 +1385,11 @@ function collect(ir: IRDocPositioned): { shapes: AbsShape[]; edges: IREdge[] } {
   return { shapes, edges };
 }
 
-function computeCandidate(edge: IREdge, byId: Map<string, AbsShape>, allShapes: AbsShape[]): RouteCandidate | null {
+function computeCandidate(
+  edge: IREdge,
+  byId: Map<string, AbsShape>,
+  allShapes: AbsShape[],
+): RouteCandidate | null {
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
   if (!from || !to) return null;
@@ -1347,13 +1427,23 @@ function computeCandidate(edge: IREdge, byId: Map<string, AbsShape>, allShapes: 
     return maxSag;
   };
 
-  const bandMin = Math.min(perpMin(axis, from), perpMin(axis, to), ...crossed.map((c) => perpMin(axis, c)));
-  const bandMax = Math.max(perpMax(axis, from), perpMax(axis, to), ...crossed.map((c) => perpMax(axis, c)));
+  const bandMin = Math.min(
+    perpMin(axis, from),
+    perpMin(axis, to),
+    ...crossed.map((c) => perpMin(axis, c)),
+  );
+  const bandMax = Math.max(
+    perpMax(axis, from),
+    perpMax(axis, to),
+    ...crossed.map((c) => perpMax(axis, c)),
+  );
   const chordAxisMin = Math.min(axisFrom, axisTo);
   const chordAxisMax = Math.max(axisFrom, axisTo);
 
   const excluded = new Set([from.id, to.id, ...crossed.map((c) => c.id)]);
-  const others = allShapes.filter((s) => (s.kind === "box" || s.kind === "note") && !excluded.has(s.id));
+  const others = allShapes.filter(
+    (s) => (s.kind === "box" || s.kind === "note") && !excluded.has(s.id),
+  );
 
   const gap = (side: Side): number => {
     let best = Infinity;
@@ -1368,7 +1458,8 @@ function computeCandidate(edge: IREdge, byId: Map<string, AbsShape>, allShapes: 
     return best;
   };
 
-  const midPerp = (side: Side): number => (anchorPerp(axis, side, from) + anchorPerp(axis, side, to)) / 2;
+  const midPerp = (side: Side): number =>
+    (anchorPerp(axis, side, from) + anchorPerp(axis, side, to)) / 2;
 
   const negSag = requiredSag("neg");
   const posSag = requiredSag("pos");
@@ -1424,7 +1515,11 @@ function ancestorChain(containerId: string, byId: Map<string, AbsShape>): string
 }
 
 /** Lowest common ancestor container of two edge endpoints' immediate parents, used as the lane-grouping key. */
-function lowestCommonAncestor(aParentId: string, bParentId: string, byId: Map<string, AbsShape>): string {
+function lowestCommonAncestor(
+  aParentId: string,
+  bParentId: string,
+  byId: Map<string, AbsShape>,
+): string {
   const bChain = new Set(ancestorChain(bParentId, byId));
   for (const id of ancestorChain(aParentId, byId)) {
     if (bChain.has(id)) return id;
@@ -1439,7 +1534,9 @@ function deriveAxis(from: AbsShape, to: AbsShape): Axis | null {
 }
 
 function isCrossing(axis: Axis, from: AbsShape, to: AbsShape, s: AbsShape): boolean {
-  if (!rangesOverlap(perpMin(axis, from), perpMax(axis, from), perpMin(axis, s), perpMax(axis, s))) {
+  if (
+    !rangesOverlap(perpMin(axis, from), perpMax(axis, from), perpMin(axis, s), perpMax(axis, s))
+  ) {
     return false;
   }
   if (!rangesOverlap(perpMin(axis, to), perpMax(axis, to), perpMin(axis, s), perpMax(axis, s))) {

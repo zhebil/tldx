@@ -19,7 +19,10 @@ function span(line: number) {
 
 /** A row of `n` boxes (`b0`, `b1`, ...) at distinct source lines, each 100px
  *  wide with a 40px gap, laid out left to right starting at x=0. */
-function rowIR(n: number, opts: { gap?: number; colGap?: number } = {}): { ir: IRDoc; positioned: IRDocPositioned } {
+function rowIR(
+  n: number,
+  opts: { gap?: number; colGap?: number } = {},
+): { ir: IRDoc; positioned: IRDocPositioned } {
   const gap = opts.gap ?? 40;
   const boxes: IRBox[] = Array.from({ length: n }, (_, i) => ({
     kind: "box",
@@ -50,7 +53,10 @@ function rowIR(n: number, opts: { gap?: number; colGap?: number } = {}): { ir: I
   return { ir, positioned };
 }
 
-function colIR(n: number, opts: { gap?: number; rowGap?: number } = {}): { ir: IRDoc; positioned: IRDocPositioned } {
+function colIR(
+  n: number,
+  opts: { gap?: number; rowGap?: number } = {},
+): { ir: IRDoc; positioned: IRDocPositioned } {
   const gap = opts.gap ?? 40;
   const boxes: IRBox[] = Array.from({ length: n }, (_, i) => ({
     kind: "box",
@@ -132,7 +138,13 @@ describe("planMoveCandidates: refusals", () => {
 
   it("refuses a reparent", () => {
     const { ir, positioned } = rowIR(2);
-    const plan = planMoveCandidates(ir, positioned, "shape:b0", { parentId: "shape:elsewhere" }, { x: 0, y: 0 });
+    const plan = planMoveCandidates(
+      ir,
+      positioned,
+      "shape:b0",
+      { parentId: "shape:elsewhere" },
+      { x: 0, y: 0 },
+    );
     if (!("reason" in plan)) throw new Error("expected unabsorbable");
     expect(plan.reason).toMatch(/reparented/);
   });
@@ -150,7 +162,10 @@ describe("planMoveCandidates: refusals", () => {
     const irPinned: IRDoc = { ...ir, children: [pinned, ir.children[1] as IRElement] };
     const posPinned: IRDocPositioned = {
       ...positioned,
-      children: [{ ...(positioned.children[0] as IRBoxPositioned), x: 5, y: 5 }, positioned.children[1]!],
+      children: [
+        { ...(positioned.children[0] as IRBoxPositioned), x: 5, y: 5 },
+        positioned.children[1]!,
+      ],
     };
     const plan = planMoveCandidates(irPinned, posPinned, "shape:b0", { x: 50 }, { x: 5, y: 5 });
     if (!("reason" in plan)) throw new Error("expected unabsorbable");

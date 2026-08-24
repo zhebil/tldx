@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { IRBoxPositioned, IRDocPositioned, IREdge, IRElementPositioned, IRFramePositioned } from "../ir/index.js";
+import type {
+  IRBoxPositioned,
+  IRDocPositioned,
+  IREdge,
+  IRElementPositioned,
+  IRFramePositioned,
+} from "../ir/index.js";
 
 import { ARROW_LABEL_PADDING, arrowLabelLineHeight } from "./glyph-metrics.js";
 import { computeEdgeRoutes, type LabelBox } from "./routing.js";
@@ -24,7 +30,13 @@ function box(input: {
   geo?: NonNullable<IRBoxPositioned["geo"]>;
 }): IRBoxPositioned {
   const { geo, ...rest } = input;
-  return { kind: "box", idExplicit: true, span: SPAN, ...rest, ...(geo === undefined ? {} : { geo }) };
+  return {
+    kind: "box",
+    idExplicit: true,
+    span: SPAN,
+    ...rest,
+    ...(geo === undefined ? {} : { geo }),
+  };
 }
 
 function frame(input: {
@@ -219,10 +231,24 @@ describe("computeEdgeRoutes", () => {
     // stay outside any frame. The chord still needs to clear b and c, so it
     // should bow exactly like the non-nested case (frames aren't obstacles).
     const ir = doc("root", [
-      frame({ id: "f1", x: 0, y: 0, w: 100, h: 50, children: [box({ id: "a", x: 0, y: 0, w: 100, h: 50 })] }),
+      frame({
+        id: "f1",
+        x: 0,
+        y: 0,
+        w: 100,
+        h: 50,
+        children: [box({ id: "a", x: 0, y: 0, w: 100, h: 50 })],
+      }),
       box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
       box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
-      frame({ id: "f2", x: 450, y: 0, w: 100, h: 50, children: [box({ id: "d", x: 0, y: 0, w: 100, h: 50 })] }),
+      frame({
+        id: "f2",
+        x: 450,
+        y: 0,
+        w: 100,
+        h: 50,
+        children: [box({ id: "d", x: 0, y: 0, w: 100, h: 50 })],
+      }),
       edge({ id: "ad", from: "a", to: "d" }),
     ]);
     const routes = computeEdgeRoutes(ir);
@@ -251,11 +277,25 @@ describe("computeEdgeRoutes", () => {
         w: 700,
         h: 50,
         children: [
-          frame({ id: "f1", x: 0, y: 0, w: 100, h: 50, children: [box({ id: "a", x: 0, y: 0, w: 100, h: 50 })] }),
+          frame({
+            id: "f1",
+            x: 0,
+            y: 0,
+            w: 100,
+            h: 50,
+            children: [box({ id: "a", x: 0, y: 0, w: 100, h: 50 })],
+          }),
           box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
           box({ id: "c", x: 300, y: 0, w: 100, h: 50 }),
           box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
-          frame({ id: "f5", x: 600, y: 0, w: 100, h: 50, children: [box({ id: "e", x: 0, y: 0, w: 100, h: 50 })] }),
+          frame({
+            id: "f5",
+            x: 600,
+            y: 0,
+            w: 100,
+            h: 50,
+            children: [box({ id: "e", x: 0, y: 0, w: 100, h: 50 })],
+          }),
         ],
       }),
       edge({ id: "ad", from: "a", to: "d" }),
@@ -441,7 +481,14 @@ describe("computeEdgeRoutes", () => {
   describe("detour around obstacles", () => {
     it("bows a diagonal edge around the box its straight chord runs through", () => {
       const ir = doc("root", [
-        frame({ id: "top", x: 0, y: 0, w: 500, h: 100, children: [box({ id: "a", x: 20, y: 20, w: 100, h: 50 })] }),
+        frame({
+          id: "top",
+          x: 0,
+          y: 0,
+          w: 500,
+          h: 100,
+          children: [box({ id: "a", x: 20, y: 20, w: 100, h: 50 })],
+        }),
         frame({
           id: "middle",
           x: 0,
@@ -471,7 +518,14 @@ describe("computeEdgeRoutes", () => {
 
     it("leaves a long diagonal edge alone when its chord already runs through empty space", () => {
       const ir = doc("root", [
-        frame({ id: "top", x: 0, y: 0, w: 900, h: 100, children: [box({ id: "a", x: 20, y: 20, w: 100, h: 50 })] }),
+        frame({
+          id: "top",
+          x: 0,
+          y: 0,
+          w: 900,
+          h: 100,
+          children: [box({ id: "a", x: 20, y: 20, w: 100, h: 50 })],
+        }),
         frame({
           id: "bottom",
           x: 0,
@@ -553,7 +607,9 @@ describe("computeEdgeRoutes", () => {
       ]);
       const routes = computeEdgeRoutes(ir);
       const route = routes.get("ab");
-      expect(route === undefined || route.labelPosition === undefined || route.labelPosition === 0.5).toBe(true);
+      expect(
+        route === undefined || route.labelPosition === undefined || route.labelPosition === 0.5,
+      ).toBe(true);
     });
 
     it("places a diagonal edge's label using a diamond terminal's real outline, not its bounding box", () => {
@@ -592,7 +648,13 @@ describe("computeEdgeRoutes", () => {
       const fin2 = { id: "fin2", x: 96, y: 90, w: 180, h: 380 };
       const closing = { id: "closing", x: 396, y: 90, w: 180, h: 380 };
 
-      const bareIr = doc("root", [box(fin1), box(timeWait), box(fin2), box(closing), edge({ id: "e", from: "fin1", to: "timeWait" })]);
+      const bareIr = doc("root", [
+        box(fin1),
+        box(timeWait),
+        box(fin2),
+        box(closing),
+        edge({ id: "e", from: "fin1", to: "timeWait" }),
+      ]);
       const bareBend = Math.abs(computeEdgeRoutes(bareIr).get("e")!.bend);
 
       const ir = doc("root", [
@@ -764,7 +826,8 @@ describe("computeEdgeRoutes", () => {
       // tldraw only ever wraps to whole lines - a label rendered at (close
       // to) a single line's height is materially better than the 3-line
       // wrap the un-widened chord produces.
-      const oneLine = arrowLabelLineHeight({ label: LONG_LABEL } as never) + 2 * ARROW_LABEL_PADDING;
+      const oneLine =
+        arrowLabelLineHeight({ label: LONG_LABEL } as never) + 2 * ARROW_LABEL_PADDING;
       expect(route?.labelBox?.h ?? Infinity).toBeLessThan(oneLine * 1.5);
     });
 

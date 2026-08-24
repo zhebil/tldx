@@ -8,11 +8,7 @@
 
 import { watch as chokidarWatch, type FSWatcher } from "chokidar";
 
-import type {
-  WatchHandle,
-  WatchListener,
-  WatchPort,
-} from "../../app/ports/watch.js";
+import type { WatchHandle, WatchListener, WatchPort } from "../../app/ports/watch.js";
 
 export function createChokidarWatch(): WatchPort {
   return {

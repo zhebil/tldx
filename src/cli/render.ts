@@ -12,8 +12,17 @@ import { existsSync } from "node:fs";
 import { extname, resolve, basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { exportImage, type RenderFormat, type RenderOptions } from "../infra/render/export-image.js";
-import { codeFingerprint, findServe, hashSource, type ServeRecord } from "../infra/serve-registry/serve-registry.js";
+import {
+  exportImage,
+  type RenderFormat,
+  type RenderOptions,
+} from "../infra/render/export-image.js";
+import {
+  codeFingerprint,
+  findServe,
+  hashSource,
+  type ServeRecord,
+} from "../infra/serve-registry/serve-registry.js";
 
 import { runServe, type ServeDeps, type ServeIo } from "./serve.js";
 
@@ -42,7 +51,10 @@ export function parseArgs(argv: readonly string[]): ParsedRenderArgs {
         opts.frame = argv[++i];
         break;
       case "--shapes":
-        opts.shapes = (argv[++i] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+        opts.shapes = (argv[++i] ?? "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
         break;
       case "--padding":
         opts.padding = Number(argv[++i]);
@@ -126,9 +138,11 @@ export function staleReason(
 ): string | undefined {
   const sourceStale = isStale(currentHash, reused);
   const codeStale = isCodeStale(currentCodeFingerprint, reused);
-  if (sourceStale && codeStale) return "source and the code that compiled it have both changed since that compile";
+  if (sourceStale && codeStale)
+    return "source and the code that compiled it have both changed since that compile";
   if (sourceStale) return "source has changed since that compile";
-  if (codeStale) return "the code that compiled it (src/domain, src/app, ...) has changed since that server started";
+  if (codeStale)
+    return "the code that compiled it (src/domain, src/app, ...) has changed since that server started";
   return undefined;
 }
 
@@ -167,7 +181,9 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
     const reused = findServe(file);
     const currentCodeFingerprint = codeFingerprint(dirname(fileURLToPath(import.meta.url)));
     const reason =
-      reused !== undefined ? staleReason(hashSource(await deps.fs.read(file)), currentCodeFingerprint, reused) : undefined;
+      reused !== undefined
+        ? staleReason(hashSource(await deps.fs.read(file)), currentCodeFingerprint, reused)
+        : undefined;
     const stale = reason !== undefined;
 
     if (reused !== undefined && !stale) {
@@ -180,11 +196,17 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
     } else {
       if (reuseOnly) {
         throw stale && reused !== undefined
-          ? new Error(`reused serve on ${describeReused(file, reused)} is stale (${reason}); refusing under --reuse-only`)
-          : new Error(`no running \`tldx serve\` for ${file}; start one, or drop --reuse-only to boot a browser`);
+          ? new Error(
+              `reused serve on ${describeReused(file, reused)} is stale (${reason}); refusing under --reuse-only`,
+            )
+          : new Error(
+              `no running \`tldx serve\` for ${file}; start one, or drop --reuse-only to boot a browser`,
+            );
       }
       if (stale && reused !== undefined) {
-        io.writeStdout(`tldx render: reused serve on ${describeReused(file, reused)} is stale (${reason}), rebuilding\n`);
+        io.writeStdout(
+          `tldx render: reused serve on ${describeReused(file, reused)} is stale (${reason}), rebuilding\n`,
+        );
       }
       const handle = await runServe({ path: file, deps: withoutFsWrite(deps), io });
       try {

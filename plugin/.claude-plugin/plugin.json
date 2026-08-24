@@ -9,11 +9,5 @@
   "homepage": "https://github.com/zhebil/tldx",
   "repository": "https://github.com/zhebil/tldx",
   "license": "MIT",
-  "keywords": [
-    "diagrams",
-    "tldraw",
-    "jsx",
-    "architecture",
-    "hooks"
-  ]
+  "keywords": ["diagrams", "tldraw", "jsx", "architecture", "hooks"]
 }

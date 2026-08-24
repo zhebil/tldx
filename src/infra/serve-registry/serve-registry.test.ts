@@ -1,11 +1,27 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { codeFingerprint, findServe, hashSource, newestMtimeMs, recordServe, touchServeCompile } from "./serve-registry.js";
+import {
+  codeFingerprint,
+  findServe,
+  hashSource,
+  newestMtimeMs,
+  recordServe,
+  touchServeCompile,
+} from "./serve-registry.js";
 
 // Well past any real OS pid range, so `process.kill(pid, 0)` reliably
 // reports "no such process".
@@ -62,7 +78,11 @@ describe("recordServe / findServe", () => {
 
   it("records a codeFingerprint up front when given one", () => {
     const file = tempFile();
-    const forget = recordServe(file, "http://127.0.0.1:4000", { hash: "abcd1234", at: 42, codeFingerprint: 999 });
+    const forget = recordServe(file, "http://127.0.0.1:4000", {
+      hash: "abcd1234",
+      at: 42,
+      codeFingerprint: 999,
+    });
 
     expect(findServe(file)).toEqual({
       pid: process.pid,

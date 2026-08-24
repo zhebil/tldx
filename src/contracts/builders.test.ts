@@ -19,9 +19,7 @@ describe("sceneMessage", () => {
   });
 
   it("error wraps diagnostics at v=1", () => {
-    const msg = sceneMessage.error([
-      { severity: "error", code: "x/y", message: "boom" },
-    ]);
+    const msg = sceneMessage.error([{ severity: "error", code: "x/y", message: "boom" }]);
     expect(msg).toMatchObject({
       v: 1,
       kind: "error",
@@ -91,7 +89,15 @@ describe("record factories", () => {
   });
 
   it("boxShape accepts color/fill overrides", () => {
-    const shape = boxShape({ id: "shape:a", x: 0, y: 0, w: 100, h: 50, color: "yellow", fill: "semi" });
+    const shape = boxShape({
+      id: "shape:a",
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 50,
+      color: "yellow",
+      fill: "semi",
+    });
     expect(shape.props).toMatchObject({ color: "yellow", fill: "semi" });
   });
 
@@ -107,17 +113,13 @@ describe("record factories", () => {
     expect(shape.props).toMatchObject({
       richText: {
         type: "doc",
-        content: [
-          { type: "paragraph", content: [{ type: "text", text: "Login" }] },
-        ],
+        content: [{ type: "paragraph", content: [{ type: "text", text: "Login" }] }],
       },
     });
   });
 
   it("noteShape produces a tldraw note record", () => {
-    expect(
-      noteShape({ id: "shape:n", x: 0, y: 0, text: "todo" }),
-    ).toMatchObject({
+    expect(noteShape({ id: "shape:n", x: 0, y: 0, text: "todo" })).toMatchObject({
       typeName: "shape",
       type: "note",
       props: { color: "yellow", size: "m" },
@@ -125,9 +127,7 @@ describe("record factories", () => {
   });
 
   it("frameShape carries w/h and a name", () => {
-    expect(
-      frameShape({ id: "shape:f", x: 0, y: 0, w: 800, h: 600, name: "Auth" }),
-    ).toMatchObject({
+    expect(frameShape({ id: "shape:f", x: 0, y: 0, w: 800, h: 600, name: "Auth" })).toMatchObject({
       typeName: "shape",
       type: "frame",
       props: { w: 800, h: 600, name: "Auth" },
@@ -184,9 +184,7 @@ describe("richText", () => {
   it("single line wraps in one paragraph with one text node", () => {
     expect(richText("hello")).toEqual({
       type: "doc",
-      content: [
-        { type: "paragraph", content: [{ type: "text", text: "hello" }] },
-      ],
+      content: [{ type: "paragraph", content: [{ type: "text", text: "hello" }] }],
     });
   });
 

@@ -78,7 +78,9 @@ async function reportFile(file: string): Promise<void> {
 
   const crowded = crowdedPairs(sortedArrows);
   for (const { a, b, fraction } of crowded) {
-    process.stdout.write(`  crowded: ${a} / ${b} (${Math.round(fraction * 100)}% within ${CROWD_PX}px)\n`);
+    process.stdout.write(
+      `  crowded: ${a} / ${b} (${Math.round(fraction * 100)}% within ${CROWD_PX}px)\n`,
+    );
   }
   process.stdout.write(`arrow pairs crowding each other: ${crowded.length}\n`);
 
@@ -177,10 +179,7 @@ function rectsOverlap(
  * bounding box (page space) intersects a shape that is neither the arrow's
  * `from` nor `to`.
  */
-export function labelOverlapPairs(
-  arrows: ArrowTruth[],
-  shapes: ShapeBounds[],
-): LabelOverlapPair[] {
+export function labelOverlapPairs(arrows: ArrowTruth[], shapes: ShapeBounds[]): LabelOverlapPair[] {
   const pairs: LabelOverlapPair[] = [];
   for (const { arrowId, from, to, labelBox } of arrows) {
     if (!labelBox) continue;

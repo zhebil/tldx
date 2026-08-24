@@ -19,7 +19,13 @@ export default function Diagram() {
         external
       />
 
-      <Edge id="e-customer-web" from="customer" to="web-app" label="browses, orders" color="violet" />
+      <Edge
+        id="e-customer-web"
+        from="customer"
+        to="web-app"
+        label="browses, orders"
+        color="violet"
+      />
       <Edge id="e-web-api" from="web-app" to="api" label="calls" color="light-blue" />
       <Edge id="e-api-db" from="api" to="database" label="reads" color="light-blue" />
       <Edge id="e-api-payment" from="api" to="payment-gateway" label="charges card" color="grey" />

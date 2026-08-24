@@ -8,7 +8,12 @@
  * Never prints, never exits - the CLI owns stdio and the exit code.
  */
 
-import { OVERLAY_VERSION, type Overlay, type OverlayEntry, type OverlayPlacement } from "../contracts/overlay.js";
+import {
+  OVERLAY_VERSION,
+  type Overlay,
+  type OverlayEntry,
+  type OverlayPlacement,
+} from "../contracts/overlay.js";
 import type { Diagnostic } from "../domain/diagnostics/index.js";
 import { applyOverlay, deepEqual, overlayPathFor, sceneHash } from "../domain/overlay/index.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
@@ -77,7 +82,13 @@ export async function runVerify(args: { path: string }, deps: VerifyDeps): Promi
   };
 }
 
-const OP_ORDER = ["moved", "restyled", "relabelled", "deleted", "added"] as const satisfies readonly (keyof OverlayEntry)[];
+const OP_ORDER = [
+  "moved",
+  "restyled",
+  "relabelled",
+  "deleted",
+  "added",
+] as const satisfies readonly (keyof OverlayEntry)[];
 
 function opsOf(entry: OverlayEntry): string[] {
   return OP_ORDER.filter((op) => entry[op] !== undefined);
@@ -87,9 +98,11 @@ function detailOf(entry: OverlayEntry): string {
   const parts: string[] = [];
   if (entry.moved !== undefined) parts.push(movedDetail(entry.moved));
   if (entry.restyled !== undefined) parts.push(restyledDetail(entry.restyled));
-  if (entry.relabelled !== undefined) parts.push(`relabelled to ${JSON.stringify(entry.relabelled)}`);
+  if (entry.relabelled !== undefined)
+    parts.push(`relabelled to ${JSON.stringify(entry.relabelled)}`);
   if (entry.deleted === true) parts.push("deleted");
-  if (entry.added !== undefined) parts.push(`added ${String(entry.added.type ?? entry.added.typeName)} shape`);
+  if (entry.added !== undefined)
+    parts.push(`added ${String(entry.added.type ?? entry.added.typeName)} shape`);
   return parts.join("; ");
 }
 
@@ -99,7 +112,8 @@ function movedDetail(p: OverlayPlacement): string {
   if (p.rotation !== undefined) clauses.push(`rotation to ${p.rotation}`);
   if (p.parentId !== undefined) clauses.push("reparented");
   if (p.index !== undefined) clauses.push("reordered");
-  if (p.w !== undefined || p.h !== undefined) clauses.push(`resized to ${p.w ?? "?"}x${p.h ?? "?"}`);
+  if (p.w !== undefined || p.h !== undefined)
+    clauses.push(`resized to ${p.w ?? "?"}x${p.h ?? "?"}`);
   return `moved ${clauses.join(", ")}`;
 }
 

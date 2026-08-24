@@ -43,7 +43,9 @@ function propsOf(record: TLRecord): Record<string, unknown> {
 function buildMutatedSnapshot(base: SceneJSON): SceneJSON {
   const shapes = Object.values(base.store).filter((r) => r.typeName === "shape");
   const withSize = shapes.find((r) => typeof propsOf(r).w === "number");
-  const withColor = shapes.find((r) => r.id !== withSize?.id && typeof propsOf(r).color === "string");
+  const withColor = shapes.find(
+    (r) => r.id !== withSize?.id && typeof propsOf(r).color === "string",
+  );
   const page = Object.values(base.store).find((r) => r.typeName === "page");
   if (withSize === undefined || withColor === undefined || page === undefined) {
     throw new Error("fixture does not have enough shapes to build a mutated snapshot");
@@ -92,69 +94,65 @@ describe("e2e: overlay round-trip through tldx serve", () => {
     if (bundleDir !== undefined) await rm(bundleDir, { recursive: true, force: true });
   });
 
-  it(
-    "reloading the served page reproduces the pre-reload scene",
-    async () => {
-      workDir = await mkdtemp(join(tmpdir(), "tldx-overlay-serve-"));
-      bundleDir = await mkdtemp(join(tmpdir(), "tldx-overlay-serve-bundle-"));
-      const filePath = join(workDir, "auth.tldx.jsx");
-      await copyFile(join(FIXTURES, "auth.tldx.jsx"), filePath);
+  it("reloading the served page reproduces the pre-reload scene", async () => {
+    workDir = await mkdtemp(join(tmpdir(), "tldx-overlay-serve-"));
+    bundleDir = await mkdtemp(join(tmpdir(), "tldx-overlay-serve-bundle-"));
+    const filePath = join(workDir, "auth.tldx.jsx");
+    await copyFile(join(FIXTURES, "auth.tldx.jsx"), filePath);
 
-      handle = await runServe({
-        path: filePath,
-        deps: {
-          fs: createNodeFsRead(),
-          fsWrite: createNodeFsWrite(),
-          watch: createChokidarWatch(),
-          layout: new ElkLayoutAdapter(),
-          execute: createJsxExecute(),
-          log: { log: () => {} },
-          clock: createSystemClock(),
-          viewerBundleDir: bundleDir,
-          openBrowser: () => {},
-        },
-        io: noopIo(),
-      });
+    handle = await runServe({
+      path: filePath,
+      deps: {
+        fs: createNodeFsRead(),
+        fsWrite: createNodeFsWrite(),
+        watch: createChokidarWatch(),
+        layout: new ElkLayoutAdapter(),
+        execute: createJsxExecute(),
+        log: { log: () => {} },
+        clock: createSystemClock(),
+        viewerBundleDir: bundleDir,
+        openBrowser: () => {},
+      },
+      io: noopIo(),
+    });
 
-      const firstConn = new AbortController();
-      let base: SceneJSON;
-      try {
-        const res = await fetch(`${handle.url}events`, { signal: firstConn.signal });
-        if (res.body === null) throw new Error("SSE response had no body");
-        const message = await readFirstSceneMessage(res.body);
-        expect(message.kind).toBe("scene");
-        if (message.kind !== "scene") throw new Error("expected a scene message");
-        base = message.payload;
-      } finally {
-        firstConn.abort();
-      }
+    const firstConn = new AbortController();
+    let base: SceneJSON;
+    try {
+      const res = await fetch(`${handle.url}events`, { signal: firstConn.signal });
+      if (res.body === null) throw new Error("SSE response had no body");
+      const message = await readFirstSceneMessage(res.body);
+      expect(message.kind).toBe("scene");
+      if (message.kind !== "scene") throw new Error("expected a scene message");
+      base = message.payload;
+    } finally {
+      firstConn.abort();
+    }
 
-      const mutated = buildMutatedSnapshot(base);
+    const mutated = buildMutatedSnapshot(base);
 
-      const putRes = await fetch(`${handle.url}overlay`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(mutated),
-      });
-      expect(putRes.status).toBe(204);
+    const putRes = await fetch(`${handle.url}overlay`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(mutated),
+    });
+    expect(putRes.status).toBe(204);
 
-      const overlayPath = overlayPathFor(filePath);
-      const overlayRaw = await readFile(overlayPath, "utf8");
-      const overlayParsed: unknown = JSON.parse(overlayRaw);
-      expect(isOverlay(overlayParsed)).toBe(true);
+    const overlayPath = overlayPathFor(filePath);
+    const overlayRaw = await readFile(overlayPath, "utf8");
+    const overlayParsed: unknown = JSON.parse(overlayRaw);
+    expect(isOverlay(overlayParsed)).toBe(true);
 
-      const reloadConn = new AbortController();
-      try {
-        const res = await fetch(`${handle.url}events`, { signal: reloadConn.signal });
-        if (res.body === null) throw new Error("SSE response had no body");
-        const message = await readFirstSceneMessage(res.body);
-        expect(message.kind).toBe("scene");
-        if (message.kind !== "scene") throw new Error("expected a scene message");
-        expect(message.payload).toEqual(mutated);
-      } finally {
-        reloadConn.abort();
-      }
-    },
-    30_000,
-  );
+    const reloadConn = new AbortController();
+    try {
+      const res = await fetch(`${handle.url}events`, { signal: reloadConn.signal });
+      if (res.body === null) throw new Error("SSE response had no body");
+      const message = await readFirstSceneMessage(res.body);
+      expect(message.kind).toBe("scene");
+      if (message.kind !== "scene") throw new Error("expected a scene message");
+      expect(message.payload).toEqual(mutated);
+    } finally {
+      reloadConn.abort();
+    }
+  }, 30_000);
 });

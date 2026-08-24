@@ -138,12 +138,24 @@ describe("geo-aware sizing", () => {
     arrow: (a, b) => a <= 0.68 && b <= 0.24,
   };
   const model: Record<string, string> = {
-    rectangle: "rect", "check-box": "rect", "x-box": "rect", cloud: "rect",
-    ellipse: "ellipse", oval: "ellipse", hexagon: "ellipse", octagon: "ellipse",
-    pentagon: "ellipse", heart: "ellipse",
-    diamond: "diamond", rhombus: "diamond", "rhombus-2": "diamond",
-    star: "diamond", trapezoid: "diamond",
-    "arrow-up": "arrow", "arrow-down": "arrow", "arrow-left": "arrow",
+    rectangle: "rect",
+    "check-box": "rect",
+    "x-box": "rect",
+    cloud: "rect",
+    ellipse: "ellipse",
+    oval: "ellipse",
+    hexagon: "ellipse",
+    octagon: "ellipse",
+    pentagon: "ellipse",
+    heart: "ellipse",
+    diamond: "diamond",
+    rhombus: "diamond",
+    "rhombus-2": "diamond",
+    star: "diamond",
+    trapezoid: "diamond",
+    "arrow-up": "arrow",
+    "arrow-down": "arrow",
+    "arrow-left": "arrow",
     "arrow-right": "arrow",
     triangle: "triangle",
   };
@@ -182,17 +194,17 @@ describe("geo aspect ratio", () => {
 
   it("a long label still ends up wider than a short one on the same geo (the target is a floor on height, not a ceiling on width)", () => {
     const short = estimatedBoxSize("OK", undefined, { geo: "diamond" });
-    const long = estimatedBoxSize(
-      "error rate below 1 percent for 10 minutes straight",
-      undefined,
-      { geo: "diamond" },
-    );
+    const long = estimatedBoxSize("error rate below 1 percent for 10 minutes straight", undefined, {
+      geo: "diamond",
+    });
     expect(long.w).toBeGreaterThan(short.w);
   });
 
   it("a rectangle's sizing is unaffected - the aspect target only pulls non-rect geos", () => {
     const label = "Some medium length label here";
-    expect(estimatedBoxSize(label)).toEqual(estimatedBoxSize(label, undefined, { geo: "rectangle" }));
+    expect(estimatedBoxSize(label)).toEqual(
+      estimatedBoxSize(label, undefined, { geo: "rectangle" }),
+    );
   });
 
   it("D20 regression: a maxW-capped diamond's proportions are unchanged by the aspect-ratio fix", () => {

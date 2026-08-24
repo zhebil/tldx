@@ -16,9 +16,7 @@ describe("createStderrLog", () => {
       code: "watch/recompile-ok",
       msg: "compiled ok (initial)",
     });
-    expect(cap.lines).toEqual([
-      "[info] watch/recompile-ok: compiled ok (initial)\n",
-    ]);
+    expect(cap.lines).toEqual(["[info] watch/recompile-ok: compiled ok (initial)\n"]);
   });
 
   it("appends JSON-encoded structured fields when present", () => {
@@ -47,9 +45,6 @@ describe("createStderrLog", () => {
     const log = createStderrLog({ write: cap.write });
     log.log({ level: "info", code: "a", msg: "first" });
     log.log({ level: "error", code: "b", msg: "second" });
-    expect(cap.lines).toEqual([
-      "[info] a: first\n",
-      "[error] b: second\n",
-    ]);
+    expect(cap.lines).toEqual(["[info] a: first\n", "[error] b: second\n"]);
   });
 });

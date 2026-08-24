@@ -214,7 +214,9 @@ export function Swimlanes(props: Props, source?: JsxSource): AstFrame {
   return {
     ...frame,
     tag: "Swimlanes",
-    children: frame.children.map((child) => (child.kind === "frame" ? withRowLayout(child) : child)),
+    children: frame.children.map((child) =>
+      child.kind === "frame" ? withRowLayout(child) : child,
+    ),
   };
 }
 
@@ -304,9 +306,7 @@ function edgesSpecText(children: unknown): string {
   if (Array.isArray(children) && children.length === 1 && typeof children[0] === "string") {
     return children[0];
   }
-  throw new Error(
-    "<Edges> requires a single string of edge specs, e.g. <Edges>{`a -> b`}</Edges>",
-  );
+  throw new Error("<Edges> requires a single string of edge specs, e.g. <Edges>{`a -> b`}</Edges>");
 }
 
 /**

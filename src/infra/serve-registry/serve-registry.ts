@@ -6,7 +6,16 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
@@ -130,7 +139,13 @@ export function touchServeCompile(file: string, hash: string, compiledAt: number
     if (!existsSync(path)) return;
     const record = JSON.parse(readFileSync(path, "utf8")) as Partial<ServeRecord>;
     if (record.pid !== process.pid || record.url === undefined || record.file === undefined) return;
-    const updated: ServeRecord = { pid: record.pid, url: record.url, file: record.file, hash, compiledAt };
+    const updated: ServeRecord = {
+      pid: record.pid,
+      url: record.url,
+      file: record.file,
+      hash,
+      compiledAt,
+    };
     writeFileSync(path, JSON.stringify(updated));
   } catch {
     // best-effort
@@ -146,7 +161,8 @@ export function findServe(file: string): ServeRecord | undefined {
       const result: ServeRecord = { pid: record.pid, url: record.url, file: record.file ?? file };
       if (typeof record.hash === "string") result.hash = record.hash;
       if (typeof record.compiledAt === "number") result.compiledAt = record.compiledAt;
-      if (typeof record.codeFingerprint === "number") result.codeFingerprint = record.codeFingerprint;
+      if (typeof record.codeFingerprint === "number")
+        result.codeFingerprint = record.codeFingerprint;
       return result;
     }
   } catch {

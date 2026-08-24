@@ -30,10 +30,7 @@ interface Booted {
  * which dominates this test's wall time. Production (`tldx serve`) is
  * unaffected: the server side keeps default keep-alive behavior.
  */
-async function closeFetch(
-  input: string | URL,
-  init: RequestInit = {},
-): Promise<Response> {
+async function closeFetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set("Connection", "close");
   return fetch(input, { ...init, headers });
@@ -106,7 +103,7 @@ describe("startDevServer", () => {
 
   it("falls back to index.html for unknown paths (SPA routing)", async () => {
     booted = await bootWithBundle({
-      "index.html": "<!doctype html><body data-spa=\"yes\"></body>",
+      "index.html": '<!doctype html><body data-spa="yes"></body>',
     });
 
     const res = await closeFetch(`${booted.server.url}some/deep/route`);
@@ -135,9 +132,7 @@ describe("startDevServer", () => {
         signal: controller.signal,
       });
       expect(response.status).toBe(200);
-      expect(response.headers.get("content-type") ?? "").toMatch(
-        /text\/event-stream/,
-      );
+      expect(response.headers.get("content-type") ?? "").toMatch(/text\/event-stream/);
       if (response.body === null) {
         throw new Error("SSE response had no body");
       }
@@ -161,13 +156,9 @@ describe("startDevServer", () => {
             if (event.startsWith(":")) {
               opened = true;
             } else {
-              const dataLines = event
-                .split("\n")
-                .filter((l) => l.startsWith("data: "));
+              const dataLines = event.split("\n").filter((l) => l.startsWith("data: "));
               if (dataLines.length > 0) {
-                const data = dataLines
-                  .map((l) => l.slice("data: ".length))
-                  .join("\n");
+                const data = dataLines.map((l) => l.slice("data: ".length)).join("\n");
                 received.push(JSON.parse(data) as SceneMessage);
                 return;
               }
@@ -207,10 +198,7 @@ describe("startDevServer", () => {
   });
 
   it("still 405s POST on other static routes when onOverlayPut is configured", async () => {
-    booted = await bootWithBundle(
-      { "index.html": "<!doctype html>" },
-      async () => {},
-    );
+    booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async () => {});
 
     const res = await closeFetch(`${booted.server.url}index.html`, {
       method: "POST",
@@ -221,11 +209,7 @@ describe("startDevServer", () => {
 
   it("fires onActivity for a static asset, an /events connect, and a /heartbeat ping", async () => {
     let activity = 0;
-    booted = await bootWithBundle(
-      { "index.html": "<!doctype html>" },
-      undefined,
-      () => activity++,
-    );
+    booted = await bootWithBundle({ "index.html": "<!doctype html>" }, undefined, () => activity++);
 
     await closeFetch(`${booted.server.url}index.html`);
     expect(activity).toBe(1);

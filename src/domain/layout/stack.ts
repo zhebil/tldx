@@ -105,7 +105,11 @@ export async function hybridLayout(ir: IRDoc, placeAuto: AutoPlacer): Promise<IR
   const mayAutoGrid = ir.layout === undefined && ir.cols === undefined;
   const docEdges: AutoEdge[] = [];
   collectEdgesDeep(ir.children, docEdges);
-  const { children, mode: usedMode, cols: usedCols } = await layoutContainer(
+  const {
+    children,
+    mode: usedMode,
+    cols: usedCols,
+  } = await layoutContainer(
     ir.children,
     mode,
     ir.cols,
@@ -179,7 +183,11 @@ async function sizeFrame(
   const pad = frame.pad ?? FRAME_PAD_INNER;
   const hasFrameChild = frame.children.some((c) => c.kind === "frame" && drawsChrome(c));
   const padTop = pad + (hasFrameChild ? FRAME_TITLE_PX : 0);
-  const { children, w: contentW, h: contentH } = await layoutContainer(
+  const {
+    children,
+    w: contentW,
+    h: contentH,
+  } = await layoutContainer(
     frame.children,
     mode,
     frame.cols,
@@ -197,7 +205,11 @@ async function sizeFrame(
   const w = frame.w ?? contentW;
   const h = frame.h ?? contentH;
   const { x: _x, y: _y, w: _w, h: _h, children: _c, ...rest } = frame;
-  void _x; void _y; void _w; void _h; void _c;
+  void _x;
+  void _y;
+  void _w;
+  void _h;
+  void _c;
   return { ...rest, x: frame.x ?? 0, y: frame.y ?? 0, w, h, children };
 }
 
@@ -231,13 +243,14 @@ async function layoutContainer(
   mode: LayoutMode;
   cols: number | undefined;
 }> {
-  const sized: (IRBoxPositioned | IRNotePositioned | IRFramePositioned | null)[] = await Promise.all(
-    children.map(async (c) => {
-      if (c.kind === "edge") return null;
-      if (c.kind === "doc") throw new Error("layout: nested <doc> is not permitted");
-      return sizeElement(c, placeAuto, docEdges);
-    }),
-  );
+  const sized: (IRBoxPositioned | IRNotePositioned | IRFramePositioned | null)[] =
+    await Promise.all(
+      children.map(async (c) => {
+        if (c.kind === "edge") return null;
+        if (c.kind === "doc") throw new Error("layout: nested <doc> is not permitted");
+        return sizeElement(c, placeAuto, docEdges);
+      }),
+    );
 
   const flowedIndices = children
     .map((_, i) => i)
@@ -336,10 +349,22 @@ async function layoutContainer(
     const effectiveRowGap = vGap;
     const rowGaps =
       flowMode === "grid"
-        ? skipRowGaps(collapsedIds, edges, resolveCols(flowCols, collapsedEls.length), effectiveRowGap)
+        ? skipRowGaps(
+            collapsedIds,
+            edges,
+            resolveCols(flowCols, collapsedEls.length),
+            effectiveRowGap,
+          )
         : // `row`/`col`: escalates only the specific boundary a cross-container
           // edge needs, not the whole container's gap.
-          labelClearanceGaps(flowMode, flowCols, collapsedIds, clearanceEdges, baseMainGap, elementById);
+          labelClearanceGaps(
+            flowMode,
+            flowCols,
+            collapsedIds,
+            clearanceEdges,
+            baseMainGap,
+            elementById,
+          );
     const positions = computeFlowPositions(
       collapsedEls,
       flowMode,
@@ -352,7 +377,15 @@ async function layoutContainer(
       align,
       serpentine,
     );
-    expandFanBlocks(sized, flowedIndices, positions, collapsedIds, blocks, targetOwner, effectiveGap);
+    expandFanBlocks(
+      sized,
+      flowedIndices,
+      positions,
+      collapsedIds,
+      blocks,
+      targetOwner,
+      effectiveGap,
+    );
     const bbox = boundingBox(children, sized);
     w = bbox.maxX + pad.right;
     h = bbox.maxY + pad.bottom;
@@ -517,10 +550,7 @@ function collectAutoEdges(children: readonly IRElement[]): AutoEdge[] {
  * in `children`'s subtree, or whose two endpoints resolve to the same direct
  * child (self-loop at this container's level).
  */
-function resolveEdgeOwners(
-  children: readonly IRElement[],
-  edges: readonly AutoEdge[],
-): AutoEdge[] {
+function resolveEdgeOwners(children: readonly IRElement[], edges: readonly AutoEdge[]): AutoEdge[] {
   const owner = new Map<string, string>();
   for (const c of children) {
     if (c.kind === "edge" || c.kind === "doc") continue;
@@ -694,8 +724,10 @@ function minGapToFlipDominance(
   const bottomOwner = elementById.get(bottomOwnerId);
   if (topOwner === undefined || bottomOwner === undefined) return undefined;
   const topCenter = localCenter(topOwner, topTargetId) ?? { x: topOwner.w / 2, y: topOwner.h / 2 };
-  const bottomCenter =
-    localCenter(bottomOwner, bottomTargetId) ?? { x: bottomOwner.w / 2, y: bottomOwner.h / 2 };
+  const bottomCenter = localCenter(bottomOwner, bottomTargetId) ?? {
+    x: bottomOwner.w / 2,
+    y: bottomOwner.h / 2,
+  };
   const offsetXTop = topCenter.x - topOwner.w / 2;
   const offsetXBottom = bottomCenter.x - bottomOwner.w / 2;
   const dx = Math.abs(offsetXTop - offsetXBottom);

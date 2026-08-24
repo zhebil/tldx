@@ -18,10 +18,7 @@ export interface ClockHarness {
   dispose(): Promise<void>;
 }
 
-export function runClockContract(
-  label: string,
-  make: () => Promise<ClockHarness>,
-): void {
+export function runClockContract(label: string, make: () => Promise<ClockHarness>): void {
   describe(`ClockPort contract: ${label}`, () => {
     it("now() is monotonic non-decreasing across an advance", async () => {
       const h = await make();

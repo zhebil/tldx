@@ -18,8 +18,8 @@ export function Fragment(props: Props): unknown[] {
 }
 
 // Read by tsc for JSX expression typing when a file's `jsxImportSource`
-// points here.
-// eslint-disable-next-line @typescript-eslint/no-namespace -- required by TS's JSX typing convention, not a general-purpose namespace.
+// points here. A namespace is what TS's JSX typing convention wants here, not
+// a general-purpose one.
 export namespace JSX {
   export type Element = AstNode | AstNode[];
   export interface ElementChildrenAttribute {

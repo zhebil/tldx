@@ -178,10 +178,6 @@ export type IRElement = IRDoc | IRFrame | IRBox | IRNote | IREdge;
 
 export type IRContainer = IRDoc | IRFrame;
 
-export function isContainer(el: IRElement): el is IRContainer {
-  return el.kind === "doc" || el.kind === "frame";
-}
-
 /**
  * Positioned IR. Output of `domain/ports/layout.ts`, input to `domain/emit/`.
  * `box`/`note`/`frame` carry a required rect; `doc` and `edge` have none.

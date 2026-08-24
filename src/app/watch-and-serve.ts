@@ -56,10 +56,7 @@ export interface WatchAndServeHandle {
   putOverlay(snapshot: SceneJSON): Promise<void>;
 }
 
-export function watchAndServe(
-  path: string,
-  deps: WatchAndServeDeps,
-): WatchAndServeHandle {
+export function watchAndServe(path: string, deps: WatchAndServeDeps): WatchAndServeHandle {
   let inFlight: Promise<void> = Promise.resolve();
   let closed = false;
   let lastCompiled: SceneJSON | null = null;

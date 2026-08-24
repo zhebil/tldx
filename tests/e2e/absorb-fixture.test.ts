@@ -100,10 +100,51 @@ describe("e2e: tldx absorb - canvas-first case", () => {
     const pageId = pageIdOf(base);
 
     const records: TLRecord[] = [
-      boxShape({ id: "shape:abs-move", x: 0, y: 0, w: 100, h: 50, color: "red", fill: "solid", parentId: pageId, text: "One", index: "a1" }),
-      boxShape({ id: "shape:abs-restyle", x: 200, y: 0, w: 80, h: 40, color: "blue", parentId: pageId, text: "Two", index: "a3" }),
-      boxShape({ id: "shape:abs-label", x: 400, y: 0, w: 80, h: 40, color: "green", parentId: pageId, text: "Three", index: "a5" }),
-      boxShape({ id: "shape:abs-delete", x: 600, y: 0, w: 80, h: 40, color: "orange", parentId: pageId, text: "Four", index: "a7" }),
+      boxShape({
+        id: "shape:abs-move",
+        x: 0,
+        y: 0,
+        w: 100,
+        h: 50,
+        color: "red",
+        fill: "solid",
+        parentId: pageId,
+        text: "One",
+        index: "a1",
+      }),
+      boxShape({
+        id: "shape:abs-restyle",
+        x: 200,
+        y: 0,
+        w: 80,
+        h: 40,
+        color: "blue",
+        parentId: pageId,
+        text: "Two",
+        index: "a3",
+      }),
+      boxShape({
+        id: "shape:abs-label",
+        x: 400,
+        y: 0,
+        w: 80,
+        h: 40,
+        color: "green",
+        parentId: pageId,
+        text: "Three",
+        index: "a5",
+      }),
+      boxShape({
+        id: "shape:abs-delete",
+        x: 600,
+        y: 0,
+        w: 80,
+        h: 40,
+        color: "orange",
+        parentId: pageId,
+        text: "Four",
+        index: "a7",
+      }),
     ];
     const entries: Record<string, OverlayEntry> = {};
     for (const record of records) entries[record.id] = { added: record };
@@ -139,7 +180,15 @@ describe("e2e: tldx absorb - canvas-first case", () => {
     if (base === null) throw new Error("stub failed to compile");
     const pageId = pageIdOf(base);
 
-    const absorbable = boxShape({ id: "shape:abs-only", x: 0, y: 0, w: 60, h: 30, parentId: pageId, text: "Absorb me" });
+    const absorbable = boxShape({
+      id: "shape:abs-only",
+      x: 0,
+      y: 0,
+      w: 60,
+      h: 30,
+      parentId: pageId,
+      text: "Absorb me",
+    });
     const residualArrow = arrowShape({ id: "shape:leave-me", x: 0, y: 0, parentId: pageId });
 
     const entries: Record<string, OverlayEntry> = {
@@ -157,7 +206,9 @@ describe("e2e: tldx absorb - canvas-first case", () => {
     expect(exitCode).toBe(0);
 
     const overlayOnDisk = JSON.parse(await readFile(overlayPathFor(path), "utf8")) as Overlay;
-    expect(Object.keys(overlayOnDisk.entries).sort()).toEqual(["shape:ghost", "shape:leave-me"].sort());
+    expect(Object.keys(overlayOnDisk.entries).sort()).toEqual(
+      ["shape:ghost", "shape:leave-me"].sort(),
+    );
     expect(overlayOnDisk.entries["shape:leave-me"]).toEqual({ added: residualArrow });
 
     const rewrittenScene = (await compileFile(path, compileFileDeps(deps))).sceneJson;
@@ -272,16 +323,32 @@ describe("e2e: tldx absorb - move ladder", () => {
       v: OVERLAY_VERSION,
       basedOn: sceneHash(base),
       entries: {
-        "shape:a": { moved: { x: reordered.store["shape:a"]!.x as number, y: reordered.store["shape:a"]!.y as number } },
-        "shape:b": { moved: { x: reordered.store["shape:b"]!.x as number, y: reordered.store["shape:b"]!.y as number } },
-        "shape:c": { moved: { x: reordered.store["shape:c"]!.x as number, y: reordered.store["shape:c"]!.y as number } },
+        "shape:a": {
+          moved: {
+            x: reordered.store["shape:a"]!.x as number,
+            y: reordered.store["shape:a"]!.y as number,
+          },
+        },
+        "shape:b": {
+          moved: {
+            x: reordered.store["shape:b"]!.x as number,
+            y: reordered.store["shape:b"]!.y as number,
+          },
+        },
+        "shape:c": {
+          moved: {
+            x: reordered.store["shape:c"]!.x as number,
+            y: reordered.store["shape:c"]!.y as number,
+          },
+        },
       },
     };
     await writeOverlay(deps, path, overlay);
     const target = applyOverlay(overlay, base).scene;
 
     const result = await runAbsorb({ path, force: false }, deps);
-    if (result.status !== "absorbed") throw new Error(`expected absorbed, got ${JSON.stringify(result)}`);
+    if (result.status !== "absorbed")
+      throw new Error(`expected absorbed, got ${JSON.stringify(result)}`);
     expect(result.absorbedIds.sort()).toEqual(["shape:a", "shape:b", "shape:c"]);
     expect(result.residualCount).toBe(0);
 
@@ -330,7 +397,8 @@ describe("e2e: tldx absorb - move ladder", () => {
     const target = applyOverlay(overlay, base).scene;
 
     const result = await runAbsorb({ path, force: false }, deps);
-    if (result.status !== "absorbed") throw new Error(`expected absorbed, got ${JSON.stringify(result)}`);
+    if (result.status !== "absorbed")
+      throw new Error(`expected absorbed, got ${JSON.stringify(result)}`);
     expect(result.absorbedIds).toContain("shape:b");
 
     const rewritten = await readFile(path, "utf8");
@@ -360,14 +428,19 @@ describe("e2e: tldx absorb - move ladder", () => {
     await writeOverlay(deps, path, overlay);
 
     const result = await runAbsorb({ path, force: false }, deps);
-    if (result.status !== "absorbed") throw new Error(`expected absorbed (with nothing actually absorbed), got ${JSON.stringify(result)}`);
+    if (result.status !== "absorbed")
+      throw new Error(
+        `expected absorbed (with nothing actually absorbed), got ${JSON.stringify(result)}`,
+      );
     expect(result.absorbedIds).toEqual([]);
     expect(result.residualCount).toBe(1);
     expect(result.moveNotes).toBeDefined();
     expect(result.moveNotes?.some((n) => n.startsWith("shape:b:"))).toBe(true);
 
     const overlayOnDisk = JSON.parse(await readFile(overlayPathFor(path), "utf8")) as Overlay;
-    expect(overlayOnDisk.entries["shape:b"]).toEqual({ moved: { x: (bBase.x as number) + 5, y: bBase.y as number } });
+    expect(overlayOnDisk.entries["shape:b"]).toEqual({
+      moved: { x: (bBase.x as number) + 5, y: bBase.y as number },
+    });
     const sourceAfter = await readFile(path, "utf8");
     expect(sourceAfter).toBe(ROW_SOURCE);
   });

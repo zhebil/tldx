@@ -1,7 +1,4 @@
-import {
-  runClockContract,
-  type ClockHarness,
-} from "../../app/ports/clock.contract.js";
+import { runClockContract, type ClockHarness } from "../../app/ports/clock.contract.js";
 
 import { createSystemClock } from "./system-clock.js";
 

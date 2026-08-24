@@ -26,8 +26,6 @@ export function createNodeFsRead(): FsReadPort {
 
 function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
   return (
-    typeof err === "object" &&
-    err !== null &&
-    typeof (err as { code?: unknown }).code === "string"
+    typeof err === "object" && err !== null && typeof (err as { code?: unknown }).code === "string"
   );
 }

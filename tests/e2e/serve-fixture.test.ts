@@ -73,10 +73,7 @@ function createCaptureLog(): ReturnType<typeof createStderrLog> & {
   };
 }
 
-async function bootServe(
-  fixtureName: string,
-  bundleDir: string,
-): Promise<Setup> {
+async function bootServe(fixtureName: string, bundleDir: string): Promise<Setup> {
   const workDir = await mkdtemp(join(tmpdir(), "tldx-serve-"));
   const filePath = join(workDir, fixtureName);
   await copyFile(join(FIXTURES, fixtureName), filePath);
@@ -168,9 +165,7 @@ describe("e2e: tldx serve", () => {
           signal: controller.signal,
         });
         expect(res.status).toBe(200);
-        expect(res.headers.get("content-type") ?? "").toMatch(
-          /text\/event-stream/,
-        );
+        expect(res.headers.get("content-type") ?? "").toMatch(/text\/event-stream/);
         if (res.body === null) throw new Error("SSE response had no body");
 
         const message = await readFirstSceneMessage(res.body);
@@ -186,9 +181,7 @@ describe("e2e: tldx serve", () => {
         controller.abort();
       }
 
-      expect(
-        setup.log.events.some((e) => e.code === "watch/recompile-ok"),
-      ).toBe(true);
+      expect(setup.log.events.some((e) => e.code === "watch/recompile-ok")).toBe(true);
     } finally {
       await rm(bundleDir, { recursive: true, force: true });
     }

@@ -83,10 +83,14 @@ const MEASURE_SCRIPT = `(async () => {
 
 async function main(): Promise<void> {
   const all = process.argv.includes("--all");
-  const child = spawn(resolve(REPO_ROOT, "node_modules", ".bin", "tsx"), ["src/cli/main.ts", "serve", PROBE_FILE], {
-    cwd: REPO_ROOT,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const child = spawn(
+    resolve(REPO_ROOT, "node_modules", ".bin", "tsx"),
+    ["src/cli/main.ts", "serve", PROBE_FILE],
+    {
+      cwd: REPO_ROOT,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
 
   try {
     const url = await waitForServeUrl(child);
@@ -101,7 +105,11 @@ function waitForServeUrl(child: ReturnType<typeof spawn>): Promise<string> {
   return new Promise((res, rej) => {
     let stderr = "";
     const timer = setTimeout(() => {
-      rej(new Error(`tldx serve did not print a URL within ${SERVE_READY_TIMEOUT_MS}ms; stderr: ${stderr}`));
+      rej(
+        new Error(
+          `tldx serve did not print a URL within ${SERVE_READY_TIMEOUT_MS}ms; stderr: ${stderr}`,
+        ),
+      );
     }, SERVE_READY_TIMEOUT_MS);
 
     child.stdout?.on("data", (chunk: Buffer) => {
@@ -125,7 +133,10 @@ function waitForServeUrl(child: ReturnType<typeof spawn>): Promise<string> {
 async function measure(url: string): Promise<Record<string, Combo>> {
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({
+      viewport: { width: 1600, height: 1200 },
+      deviceScaleFactor: 1,
+    });
     await page.goto(url, { waitUntil: "networkidle" });
     await page.waitForSelector("[data-shape-id]", { timeout: 15_000, state: "attached" });
     await page.waitForTimeout(1_500);
@@ -144,8 +155,11 @@ function formatTables(combos: Record<string, Combo>): string {
       .sort()
       .map((ch) => `${JSON.stringify(ch)}: ${combo.glyphs[ch]!.toFixed(2)}`);
     const lines: string[] = [];
-    for (let i = 0; i < entries.length; i += 6) lines.push(`  ${entries.slice(i, i + 6).join(", ")},`);
-    out.push(`const ${font.toUpperCase()}_ADVANCE: Record<string, number> = {\n${lines.join("\n")}\n};\n`);
+    for (let i = 0; i < entries.length; i += 6)
+      lines.push(`  ${entries.slice(i, i + 6).join(", ")},`);
+    out.push(
+      `const ${font.toUpperCase()}_ADVANCE: Record<string, number> = {\n${lines.join("\n")}\n};\n`,
+    );
   }
   return out.join("\n");
 }
@@ -187,6 +201,8 @@ function killChild(child: ReturnType<typeof spawn>): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  process.stderr.write(`tools/font-metrics.mts: ${err instanceof Error ? err.message : String(err)}\n`);
+  process.stderr.write(
+    `tools/font-metrics.mts: ${err instanceof Error ? err.message : String(err)}\n`,
+  );
   process.exit(1);
 });

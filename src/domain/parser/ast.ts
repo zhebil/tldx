@@ -67,16 +67,3 @@ export type AstEdge = {
 };
 
 export type AstNode = AstDoc | AstFrame | AstBox | AstNote | AstEdge;
-
-export const ALLOWED_ELEMENT_NAMES = [
-  "doc",
-  "frame",
-  "box",
-  "note",
-  "edge",
-] as const;
-export type AllowedElementName = (typeof ALLOWED_ELEMENT_NAMES)[number];
-
-export function isAllowedElementName(name: string): name is AllowedElementName {
-  return (ALLOWED_ELEMENT_NAMES as readonly string[]).includes(name);
-}

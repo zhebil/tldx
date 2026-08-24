@@ -319,7 +319,12 @@ function arrowPlacement(edge: IREdge, ctx: EmitContext): { parentId: string; ind
 
 // `isExact` skips tldraw's arc-vs-outline clipping, which is unstable when the
 // anchor already sits on the outline and can trim a bowed arrow to a 10px stub.
-function emitEdge(edge: IREdge, out: TLRecord[], route: EdgeRoute | undefined, ctx: EmitContext): void {
+function emitEdge(
+  edge: IREdge,
+  out: TLRecord[],
+  route: EdgeRoute | undefined,
+  ctx: EmitContext,
+): void {
   const arrowId = shapeId(edge.id);
   const { parentId, index } = arrowPlacement(edge, ctx);
   out.push(
@@ -347,7 +352,9 @@ function emitEdge(edge: IREdge, out: TLRecord[], route: EdgeRoute | undefined, c
       arrowId,
       shapeId: shapeId(edge.from),
       terminal: "start",
-      ...(route?.startAnchor === undefined ? {} : { normalizedAnchor: route.startAnchor, isPrecise: true, isExact: true }),
+      ...(route?.startAnchor === undefined
+        ? {}
+        : { normalizedAnchor: route.startAnchor, isPrecise: true, isExact: true }),
     }),
   );
   out.push(
@@ -356,7 +363,9 @@ function emitEdge(edge: IREdge, out: TLRecord[], route: EdgeRoute | undefined, c
       arrowId,
       shapeId: shapeId(edge.to),
       terminal: "end",
-      ...(route?.endAnchor === undefined ? {} : { normalizedAnchor: route.endAnchor, isPrecise: true, isExact: true }),
+      ...(route?.endAnchor === undefined
+        ? {}
+        : { normalizedAnchor: route.endAnchor, isPrecise: true, isExact: true }),
     }),
   );
 }

@@ -128,7 +128,7 @@ describe("diffScenes", () => {
         },
       ],
     };
-    (current.store["shape:a"]?.props as { richText: unknown }).richText = weirdRichText;
+    (current.store["shape:a"]!.props as { richText: unknown }).richText = weirdRichText;
     const entries = diffScenes(base, current);
     expect(entries["shape:a"]).toEqual({ restyled: { richText: weirdRichText } });
     assertRoundTrip(base, current);
@@ -150,7 +150,12 @@ describe("diffScenes", () => {
       boxShape({ id: "shape:a", x: 0, y: 0, w: 100, h: 50 }),
       boxShape({ id: "shape:b", x: 200, y: 0, w: 100, h: 50 }),
       arrowShape({ id: "shape:e", x: 0, y: 0 }),
-      arrowBinding({ id: "binding:start", arrowId: "shape:e", shapeId: "shape:a", terminal: "start" }),
+      arrowBinding({
+        id: "binding:start",
+        arrowId: "shape:e",
+        shapeId: "shape:a",
+        terminal: "start",
+      }),
       arrowBinding({ id: "binding:end", arrowId: "shape:e", shapeId: "shape:b", terminal: "end" }),
     ]);
     const current = sceneJson([
@@ -176,7 +181,16 @@ describe("diffScenes", () => {
     const current = sceneJson([
       documentRecord(),
       pageRecord({ id: "page:main" }),
-      boxShape({ id: "shape:a", x: 40, y: 10, w: 100, h: 50, text: "new", color: "red", opacity: 0.7 }),
+      boxShape({
+        id: "shape:a",
+        x: 40,
+        y: 10,
+        w: 100,
+        h: 50,
+        text: "new",
+        color: "red",
+        opacity: 0.7,
+      }),
     ]);
     const entries = diffScenes(base, current);
     expect(entries["shape:a"]).toEqual({

@@ -8,40 +8,40 @@ those props take. Anything not listed here is rejected with `ir/unknown-prop`.
 **Containers.** Each lays out its children independently of its parent's axis,
 so nesting is how you get structure.
 
-| | |
-|---|---|
-| `<Doc>` | the root, one per file |
-| `<Frame name>` | border + title |
-| `<Group>` | no chrome, pure layout — the workhorse |
-| `<Row>` `<Col>` `<Grid>` | `<Frame>` with `layout` forced |
-| `<Pipeline>` | a row; children are auto-wired in source order (each needs an `id`) |
-| `<Layers>` | a column of tiers; an unnamed tier draws no chrome |
-| `<Swimlanes>` | like `<Layers>`, but lanes keep chrome. Columns do **not** align across lanes |
-| `<Graph>` | `layout="auto"`, hands the container to ELK. A last resort — prefer nested `<Group>` |
+|                          |                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| `<Doc>`                  | the root, one per file                                                               |
+| `<Frame name>`           | border + title                                                                       |
+| `<Group>`                | no chrome, pure layout — the workhorse                                               |
+| `<Row>` `<Col>` `<Grid>` | `<Frame>` with `layout` forced                                                       |
+| `<Pipeline>`             | a row; children are auto-wired in source order (each needs an `id`)                  |
+| `<Layers>`               | a column of tiers; an unnamed tier draws no chrome                                   |
+| `<Swimlanes>`            | like `<Layers>`, but lanes keep chrome. Columns do **not** align across lanes        |
+| `<Graph>`                | `layout="auto"`, hands the container to ELK. A last resort — prefer nested `<Group>` |
 
 **Leaves.**
 
-| | |
-|---|---|
-| `<Box label>` | a geo shape |
-| `<Text>…</Text>` | tldraw's text shape, no border |
-| `<Sticky on>…</Sticky>` | a real tldraw note, fixed at 200px wide |
-| `<Edge from to>` | one arrow |
-| `<Edges>` | a block of arrows, one per line (see below) |
-| `flow("a","b","c")` | a function that expands to a chain of edges |
+|                         |                                             |
+| ----------------------- | ------------------------------------------- |
+| `<Box label>`           | a geo shape                                 |
+| `<Text>…</Text>`        | tldraw's text shape, no border              |
+| `<Sticky on>…</Sticky>` | a real tldraw note, fixed at 200px wide     |
+| `<Edge from to>`        | one arrow                                   |
+| `<Edges>`               | a block of arrows, one per line (see below) |
+| `flow("a","b","c")`     | a function that expands to a chain of edges |
 
 An unnamed container that isn't a `<Group>` also draws no chrome.
 
 ## Props
 
-| element | props |
-|---|---|
-| `<Doc>` | `id title direction layout gap rowGap colGap pad cols align equalize` |
-| `<Frame>` and aliases | all of `<Doc>`'s, plus `name x y w h color` |
-| `<Box>` | `id label x y w h maxW color fill dash geo textAlign verticalAlign labelColor font size` |
-| `<Text>` | `id x y w maxW color textAlign font size` |
-| `<Sticky>` | `id on x y w h maxW color textAlign verticalAlign labelColor font size` |
-| `<Edge>` `<Edges>` | `id from to fromSide toSide color dash arrowheadStart arrowheadEnd label labelColor font size` |
+| element               | props                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| `<Doc>`               | `id title direction layout gap rowGap colGap pad cols align equalize`                          |
+| `<Frame>` and aliases | all of `<Doc>`'s, plus `name x y w h color`                                                    |
+| `<Box>`               | `id label x y w h maxW color fill dash geo textAlign verticalAlign labelColor font size`       |
+| `<Text>`              | `id x y w maxW color textAlign font size`                                                      |
+| `<Sticky>`            | `id on x y w h maxW color textAlign verticalAlign labelColor font size`                        |
+| `<Edge>` `<Edges>`    | `id from to fromSide toSide color dash arrowheadStart arrowheadEnd label labelColor font size` |
 
 `<Text>` has no `h` — tldraw's text shape doesn't have one. `fill`, `dash` and
 `geo` are `<Box>`-only.
@@ -70,20 +70,20 @@ a `title` - use `<Frame name>` or `<Text>` for a visible heading.
 
 ## Values
 
-| prop | values |
-|---|---|
-| `layout` | `col` (default) `row` `grid` `auto` `free` |
-| `align` | `start` `center` (default) `end` `stretch` |
-| `direction` | `RIGHT` (default) `DOWN` `LEFT` `UP` — only affects `layout="auto"` |
-| `color`, `labelColor` | `black` `grey` `white` `red` `light-red` `orange` `yellow` `green` `light-green` `blue` `light-blue` `violet` `light-violet` |
-| `fill` | `none` `semi` `solid` `pattern` `fill` |
-| `dash` | `draw` `solid` `dashed` `dotted` |
-| `font` | `draw` (default) `sans` `serif` `mono` |
-| `size` | `s` `m` (default) `l` `xl` |
-| `textAlign`, `verticalAlign` | `start` `middle` `end` |
-| `arrowheadStart`, `arrowheadEnd` | `arrow` `triangle` `square` `dot` `pipe` `diamond` `inverted` `bar` `none` |
-| `geo` | `rectangle` (default) `ellipse` `oval` `diamond` `rhombus` `hexagon` `octagon` `pentagon` `triangle` `trapezoid` `star` `cloud` `heart` `check-box` `x-box` `arrow-up` `arrow-down` `arrow-left` `arrow-right` |
-| `fromSide`, `toSide` | `n` `ne` `e` `se` `s` `sw` `w` `nw` `center`, or `"x,y"` with each in 0..1 |
+| prop                             | values                                                                                                                                                                                                         |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `layout`                         | `col` (default) `row` `grid` `auto` `free`                                                                                                                                                                     |
+| `align`                          | `start` `center` (default) `end` `stretch`                                                                                                                                                                     |
+| `direction`                      | `RIGHT` (default) `DOWN` `LEFT` `UP` — only affects `layout="auto"`                                                                                                                                            |
+| `color`, `labelColor`            | `black` `grey` `white` `red` `light-red` `orange` `yellow` `green` `light-green` `blue` `light-blue` `violet` `light-violet`                                                                                   |
+| `fill`                           | `none` `semi` `solid` `pattern` `fill`                                                                                                                                                                         |
+| `dash`                           | `draw` `solid` `dashed` `dotted`                                                                                                                                                                               |
+| `font`                           | `draw` (default) `sans` `serif` `mono`                                                                                                                                                                         |
+| `size`                           | `s` `m` (default) `l` `xl`                                                                                                                                                                                     |
+| `textAlign`, `verticalAlign`     | `start` `middle` `end`                                                                                                                                                                                         |
+| `arrowheadStart`, `arrowheadEnd` | `arrow` `triangle` `square` `dot` `pipe` `diamond` `inverted` `bar` `none`                                                                                                                                     |
+| `geo`                            | `rectangle` (default) `ellipse` `oval` `diamond` `rhombus` `hexagon` `octagon` `pentagon` `triangle` `trapezoid` `star` `cloud` `heart` `check-box` `x-box` `arrow-up` `arrow-down` `arrow-left` `arrow-right` |
+| `fromSide`, `toSide`             | `n` `ne` `e` `se` `s` `sw` `w` `nw` `center`, or `"x,y"` with each in 0..1                                                                                                                                     |
 
 ## Edges
 

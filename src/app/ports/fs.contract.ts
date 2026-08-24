@@ -20,10 +20,7 @@ export interface FsReadHarness {
   dispose(): Promise<void>;
 }
 
-export function runFsReadContract(
-  label: string,
-  make: () => Promise<FsReadHarness>,
-): void {
+export function runFsReadContract(label: string, make: () => Promise<FsReadHarness>): void {
   describe(`FsReadPort contract: ${label}`, () => {
     it("reads UTF-8 content of an existing file", async () => {
       const h = await make();

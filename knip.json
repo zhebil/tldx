@@ -1,0 +1,29 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/runtime/jsx-runtime.ts",
+    "src/runtime/jsx-dev-runtime.ts",
+
+    "tools/*.mts",
+
+    "src/**/*.test.{ts,tsx}",
+    "tests/**/*.test.ts",
+
+    "src/**/*.{contract,fake,fixture}.ts",
+    "tests/e2e/fidelity/*.ts",
+
+    "examples/*.tldx.jsx",
+    "tests/corpus/*.tldx.jsx",
+    "tests/e2e/fixtures/*.tldx.jsx"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx,jsx}", "tools/**/*.mts", "examples/*.jsx"],
+  "paths": {
+    "tldx": ["src/runtime/index.ts"],
+    "tldx/jsx-runtime": ["src/runtime/jsx-runtime.ts"],
+    "tldx/jsx-dev-runtime": ["src/runtime/jsx-dev-runtime.ts"]
+  },
+  "ignoreExportsUsedInFile": true,
+  "rules": {
+    "duplicates": "off"
+  }
+}

@@ -18,20 +18,16 @@ import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 describe("corpus: multi-file diagram pulls its imported module into the watch set", () => {
-  it(
-    "c4-context.tldx.jsx compiles clean and result.inputs includes lib/c4.jsx",
-    async () => {
-      const path = join(HERE, "c4-context.tldx.jsx");
-      const result = await compileFile(path, {
-        fs: createNodeFsRead(),
-        layout: new ElkLayoutAdapter(),
-        execute: createJsxExecute(),
-      });
+  it("c4-context.tldx.jsx compiles clean and result.inputs includes lib/c4.jsx", async () => {
+    const path = join(HERE, "c4-context.tldx.jsx");
+    const result = await compileFile(path, {
+      fs: createNodeFsRead(),
+      layout: new ElkLayoutAdapter(),
+      execute: createJsxExecute(),
+    });
 
-      expect(result.diagnostics).toEqual([]);
-      expect(result.sceneJson).not.toBeNull();
-      expect(result.inputs?.some((f) => f.endsWith(join("lib", "c4.jsx")))).toBe(true);
-    },
-    30_000,
-  );
+    expect(result.diagnostics).toEqual([]);
+    expect(result.sceneJson).not.toBeNull();
+    expect(result.inputs?.some((f) => f.endsWith(join("lib", "c4.jsx")))).toBe(true);
+  }, 30_000);
 });

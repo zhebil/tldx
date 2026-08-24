@@ -30,10 +30,7 @@ export interface WatchHarness {
 }
 
 /** Poll `predicate` every 10ms up to `timeoutMs`, then throw. */
-async function waitFor(
-  predicate: () => boolean,
-  timeoutMs: number,
-): Promise<void> {
+async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return;

@@ -26,11 +26,7 @@ export class FileNotFoundError extends Error {
 
 /** Checks `err.code` rather than `instanceof`, so it works across realms. */
 export function isFileNotFoundError(err: unknown): err is { code: "ENOENT" } {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    (err as { code?: unknown }).code === "ENOENT"
-  );
+  return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "ENOENT";
 }
 
 /**

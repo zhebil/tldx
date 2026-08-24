@@ -53,7 +53,9 @@ export async function runOverlayCli(args: RunOverlayCliArgs): Promise<number> {
     return 0;
   }
 
-  const lines = [`${entries.length} overlay entr${entries.length === 1 ? "y" : "ies"} at ${overlayPath}:`];
+  const lines = [
+    `${entries.length} overlay entr${entries.length === 1 ? "y" : "ies"} at ${overlayPath}:`,
+  ];
   for (const entry of entries) {
     const marker = entry.changesScene ? "" : " (already in the source)";
     lines.push(`  ${entry.id}  ${entry.ops.join("+")}  ${entry.detail}${marker}`);
