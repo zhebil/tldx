@@ -1,12 +1,9 @@
 /**
  * `tldx measure <file> [--frame <id>]`: print each shape's id, size, and
- * position without the render-to-SVG-and-grep workaround (tldx-9mu).
+ * position.
  *
- * Builds the same mini pipeline `tools/layout-report.mts` does (fs read ->
- * jsx execute -> lower -> layout) instead of `compileFile`, which only
- * returns opaque `SceneJSON` - useless for geometry. Reuses
- * `domain/layout/occlusion.ts`'s `walkShapes` for the geometry itself
- * rather than re-walking the IR a second time.
+ * Runs the pipeline by hand (read -> execute -> lower -> layout) rather than
+ * via `compileFile`, whose opaque `SceneJSON` carries no geometry.
  */
 
 import type { ExecutePort } from "../app/ports/execute.js";

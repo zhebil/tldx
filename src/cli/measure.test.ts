@@ -63,14 +63,10 @@ describe("runMeasure", () => {
   function makeDeps(): { fs: InMemoryFs; execute: FakeExecute; layout: StubLayout } {
     const fs = new InMemoryFs({ [PATH]: SRC });
     const execute = new FakeExecute();
-    // A standalone box plus a frame with two boxes, all pinned with explicit
-    // x/y/w/h so StubLayout ("explicit x|y|w|h honored verbatim") reproduces
-    // this exact geometry regardless of its own cursor/gap internals.
+    // Every shape, the frame included, is pinned with explicit x/y/w/h, which
+    // StubLayout honours verbatim - so the expected geometry below never
+    // depends on its cursor/gap/padding internals.
     execute.setResult(SRC, {
-      // ctx's own x/y/w/h are pinned too (not derived from its children's
-      // bbox) so the expected geometry below doesn't depend on StubLayout's
-      // frame-padding constants at all - only on "explicit x|y|w|h survive
-      // layout verbatim", which is StubLayout's documented contract.
       ast: doc({}, [
         box({ id: "standalone", label: "Standalone", x: 0, y: 0, w: 60, h: 30 }),
         frame({ id: "ctx", x: 100, y: 0, w: 464, h: 100 }, [

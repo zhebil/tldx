@@ -1,26 +1,7 @@
 #!/usr/bin/env node
 /**
- * `tldx` CLI entry point. Composition root: wires real adapters
- * (NodeFs, ChokidarWatch, ElkLayoutAdapter, JsxExecute, SystemClock,
- * StderrLog, openBrowser) and dispatches subcommands. Per CONTEXT.md, this
- * is the ONLY place real adapters meet use cases.
- *
- * Subcommands:
- *   tldx check <file>   Validate a single `.tldx.jsx` file. Exits non-zero
- *                        on compile errors. Files not ending in `.tldx.jsx`
- *                        are accepted silently with exit 0 (PostToolUse
- *                        hook).
- *   tldx serve <file>   Watch the file, recompile on save, push the scene
- *                        to a local viewer over SSE. Stays alive until
- *                        SIGINT/SIGTERM.
- *   tldx render <file> <out.png>   Export the compiled diagram as an
- *                        image, cropped to content. Reuses a running
- *                        `tldx serve` for the file if one is recorded,
- *                        otherwise boots an ephemeral one.
- *   tldx verify <file>  Pass/fail: does the JSX source alone reproduce
- *                        what the overlay says the canvas looked like?
- *   tldx overlay show <file>   Report what's pending in a diagram's
- *                        overlay.
+ * `tldx` CLI entry point and composition root: the only place real adapters
+ * meet use cases. Subcommands and their usage lines live in `commands` below.
  */
 
 import { existsSync, realpathSync, statSync } from "node:fs";
@@ -60,11 +41,8 @@ type ParsedInvocation =
   | { kind: "command"; name: string; rest: readonly string[] };
 
 /**
- * Resolve the built viewer bundle dir relative to this source file. With
- * `src/cli/main.ts` here and `dist/viewer/` at the repo root, walking two
- * directories up lands at the repo root regardless of cwd. Vite builds
- * write `index.html` and assets there; the dev server 404s gracefully if
- * the dir is empty (e.g. user ran `serve` before `npm run build:viewer`).
+ * The built viewer bundle dir, resolved relative to this source file so it
+ * does not depend on cwd. The dev server 404s gracefully if it is empty.
  */
 function defaultViewerBundleDir(): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -72,27 +50,18 @@ function defaultViewerBundleDir(): string {
 }
 
 /**
- * A restart shouldn't pile up browser tabs (tldx-69w): if a live
- * `tldx serve` is already recorded for this file, a tab already points at
- * it, so this invocation should not open a second one - independent of
- * whether the user passed `--no-open`.
+ * A restart shouldn't pile up browser tabs: if a live `tldx serve` is already
+ * recorded for this file, a tab already points at it.
  */
 export function shouldOpenBrowser(noOpen: boolean, live: { readonly pid: number } | undefined): boolean {
   return !noOpen && live === undefined;
 }
 
 /**
- * Detects a `dist/` built from an older `src/` than what's on disk - the
- * failure mode behind tldx-ppj: `overlay`/`verify` existed in source but a
- * stale build made them print "unknown command" instead of running. Only
- * fires when actually running the compiled `dist/cli/main.js` (not `tsx
- * src/cli/main.ts` in dev, where "stale" would be a false positive since
- * there is no build to be behind) and only in a dev checkout that still has
- * `src/` next to `dist/` - an installed package ships `dist/` alone.
- *
- * `here` defaults to this running file's own directory but is injectable so
- * tests can point it at a throwaway `dist/cli` + `src/` fixture instead of
- * mtime-racing the real repo.
+ * Detects a `dist/` built from an older `src/` than what's on disk, so a
+ * command missing only from a stale build doesn't just look unknown. Silent
+ * unless running the compiled `dist/cli/main.js` from a checkout that still
+ * has `src/` beside `dist/`. `here` is injectable for tests.
  */
 export function distStalenessHint(
   here: string = dirname(fileURLToPath(import.meta.url)),
@@ -112,11 +81,8 @@ export function distStalenessHint(
 }
 
 /**
- * Parked-process resolver. `runServe` returns a handle but the CLI must
- * stay alive until the user signals shutdown, OR (tldx-kts) the handle's
- * idle-TTL reaper decides no one's home. Either way the outcome is the
- * same: close the handle and exit 0 - the reaper has already logged its
- * own reason by the time `idleExpired` resolves.
+ * Parks the process until the user signals shutdown or the handle's idle-TTL
+ * reaper fires. Either way: close the handle and exit 0.
  */
 async function awaitShutdown(handle: { close(): Promise<void>; idleExpired: Promise<void> }): Promise<number> {
   return new Promise<number>((resolveCode) => {
@@ -136,9 +102,8 @@ async function awaitShutdown(handle: { close(): Promise<void>; idleExpired: Prom
 }
 
 /**
- * Parse `tldx serve`'s args: `<file> [--no-open] [--ttl <minutes>]`.
- * `--ttl` takes its value from the following token so the plain positional
- * scan for `path` (any non-`--` token) must skip it explicitly.
+ * Parse `tldx serve`'s args: `<file> [--no-open] [--ttl <minutes>]`. `--ttl`
+ * consumes the next token, so the positional scan for `path` skips it.
  */
 export function parseServeArgs(rest: readonly string[]): {
   path: string | undefined;
@@ -277,9 +242,7 @@ const commands: readonly Command[] = [
         deps: {
           fs: createNodeFsRead(),
           // No fsWrite: render is read-only and must never write an overlay
-          // sidecar (tldx-jwh). runRender strips it defensively too, since
-          // a reused server is a separate process this deps object doesn't
-          // reach anyway.
+          // sidecar. runRender strips it defensively too.
           watch: createChokidarWatch(),
           layout: new ElkLayoutAdapter(),
           execute: createJsxExecute(),
@@ -380,7 +343,6 @@ export async function main(argv: readonly string[], io: CliIo): Promise<number> 
   return cmd.run(parsed.rest, io);
 }
 
-// Run when invoked directly (not when imported by tests).
 function isEntrypoint(): boolean {
   if (
     typeof process === "undefined" ||

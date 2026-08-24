@@ -1,8 +1,7 @@
 /**
- * `tldx overlay show <file>`: report what's pending in a diagram's overlay
- * (`src/app/verify.ts`, same result `tldx verify` uses - a different
- * presenter). Unlike `verify`, this always exits 0 unless the subcommand or
- * args are wrong, or the file fails to compile.
+ * `tldx overlay show <file>`: report what's pending in a diagram's overlay.
+ * Same `runVerify` result as `tldx verify`, different presenter - this one
+ * exits 0 unless the args are wrong or the file fails to compile.
  */
 
 import { runVerify, type VerifyDeps } from "../app/verify.js";

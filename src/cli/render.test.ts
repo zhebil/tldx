@@ -90,7 +90,7 @@ describe("parseArgs", () => {
 });
 
 describe("describeReused", () => {
-  it("formats as :port (file @ hash) - tldx-usr's exact acceptance format", () => {
+  it("formats as :port (file @ hash)", () => {
     const reused: ServeRecord = { pid: 1, url: "http://127.0.0.1:60278/", file: "board.tldx.jsx", hash: "a848f56a" };
     expect(describeReused("/some/dir/board.tldx.jsx", reused)).toBe(":60278 (board.tldx.jsx @ a848f56a)");
   });
@@ -118,7 +118,7 @@ describe("isStale", () => {
   });
 });
 
-describe("isCodeStale (tldx-rab)", () => {
+describe("isCodeStale", () => {
   it("is stale when the current code fingerprint is newer than the reused server's boot fingerprint", () => {
     const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", codeFingerprint: 1000 };
     expect(isCodeStale(2000, reused)).toBe(true);
@@ -136,7 +136,7 @@ describe("isCodeStale (tldx-rab)", () => {
   });
 });
 
-describe("staleReason (tldx-rab)", () => {
+describe("staleReason", () => {
   it("is undefined when neither source nor code has changed", () => {
     const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
     expect(staleReason("aaaaaaaa", 1000, reused)).toBeUndefined();
@@ -266,11 +266,10 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
     }
   });
 
-  it("refuses with a stale message when the registered server's code fingerprint predates the current tree, even though the source hash matches (tldx-rab)", async () => {
+  it("refuses with a stale message when the registered server's code fingerprint predates the current tree, even though the source hash matches", async () => {
     const content = "export default function Diagram() { return null; }";
     const file = tempFile(content);
-    // codeFingerprint: 0 is older than any real file's mtime in this
-    // checkout, so isCodeStale trips regardless of the actual current value.
+    // codeFingerprint 0 predates any real file's mtime, so isCodeStale trips.
     const forget = recordServe(file, "http://127.0.0.1:9999", { hash: hashSource(content), at: 0, codeFingerprint: 0 });
     const io = makeIo();
 
@@ -304,11 +303,8 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
         io,
       });
 
-      // Not stale, so it never hits the refusal branch - it proceeds to
-      // `exportImage` against the (fake) reused URL instead, which fails
-      // fast because nothing is listening there. Either way, the point
-      // pinned here is what matters: no "is stale" / "no running serve"
-      // refusal fired.
+      // Exit 1 because `exportImage` hits a URL with nothing listening, not
+      // because a refusal fired.
       expect(code).toBe(1);
       const stderr = io.stderr.join("");
       expect(stderr).not.toMatch(/is stale/);

@@ -1,41 +1,11 @@
 /**
- * `tldx render <file> <out.png>`: export a compiled diagram as an image via
- * tldraw's `editor.toImage`, cropped to content by construction (no viewport,
- * no zoom-to-fit, no UI-hiding CSS hack). The composition root
- * (`cli/main.ts`) wires real adapters and calls into `runRender`; this
- * module owns argv shape, format inference, serve-reuse, and the exit code.
+ * `tldx render <file> <out.png>`: export a compiled diagram as an image,
+ * cropped to content. Reuses a running `tldx serve` for the file when one is
+ * recorded, alive, and not stale; otherwise boots an ephemeral `runServe`.
+ * `--reuse-only` refuses instead of booting one.
  *
- * URL resolution: reuse a running `tldx serve` for the file if one is
- * recorded, alive, and not stale (`infra/serve-registry`); otherwise boot an
- * in-process, ephemeral `runServe` and close it in a `finally`.
- *
- * `--reuse-only` skips the ephemeral-boot fallback and errors instead, so a
- * hook can render only when a warm `tldx serve` is already free to use.
- *
- * Read-only (tldx-jwh): `render` never writes `*.tldx.overlay.json`. Its
- * own ephemeral boot strips `fsWrite` from the deps it hands to `runServe`
- * (`soloDeps` below), which disables the overlay round-trip for that
- * throwaway server entirely - see `cli/serve.ts`'s module docs. A reused
- * server is a separate, already-running `tldx serve` process render does
- * not control; it was wired with `fsWrite` by its own invocation because it
- * legitimately supports human canvas edits.
- *
- * Reuse safety (tldx-usr, tldx-46n): a reused server's registry record
- * carries the source hash/timestamp of its last successful compile. Reusing
- * prints that hash so a stale server never looks like a compiler bug; a
- * mismatch against the current on-disk hash is treated as stale and
- * triggers a rebuild (or a refusal under `--reuse-only`, since that flag
- * exists specifically to avoid booting a browser).
- *
- * Code staleness (tldx-rab): the fixture hash above only covers the
- * `.tldx.jsx` entry, not the compiler code that ran it. `isCodeStale`
- * compares the reused server's boot-time `codeFingerprint` (a newest-mtime
- * reading over the compiler source tree, set once in `cli/serve.ts`) against
- * the current tree - a mismatch means `src/domain`, `src/app`, etc. changed
- * after that server booted, so its scene reflects code that no longer
- * exists on disk. `staleReason` combines both checks into the single
- * verdict `runRender` acts on, so a reuse is refused/rebuilt for either
- * reason and the message says which.
+ * `render` is read-only: it never writes an overlay sidecar, so its own
+ * ephemeral server is wired without `fsWrite`.
  */
 
 import { existsSync } from "node:fs";
@@ -126,7 +96,7 @@ export type RunRenderArgs = {
   io: ServeIo;
 };
 
-/** `:port (file @ hash)` - or without the hash if the registry record predates compile tracking. */
+/** `:port (file @ hash)`, or without the hash when the record has none. */
 export function describeReused(file: string, reused: ServeRecord): string {
   let host = reused.url;
   try {
@@ -138,17 +108,17 @@ export function describeReused(file: string, reused: ServeRecord): string {
   return `${host} (${label})`;
 }
 
-/** Current on-disk hash disagrees with the reused server's last recorded compile. `undefined` hash = unknown, treated as fresh. */
+/** Current on-disk hash disagrees with the reused server's last recorded compile. An unknown hash counts as fresh. */
 export function isStale(currentHash: string, reused: ServeRecord): boolean {
   return reused.hash !== undefined && reused.hash !== currentHash;
 }
 
-/** The compiler source tree has a file newer than what the reused server's boot fingerprint saw. `undefined` fingerprint = unknown, treated as fresh. */
+/** The compiler source tree has a file newer than the reused server's boot fingerprint. An unknown fingerprint counts as fresh. */
 export function isCodeStale(currentCodeFingerprint: number, reused: ServeRecord): boolean {
   return reused.codeFingerprint !== undefined && currentCodeFingerprint > reused.codeFingerprint;
 }
 
-/** Combined verdict `runRender` acts on: `undefined` means fresh, otherwise the reason to report. */
+/** Combined source/code verdict: `undefined` means fresh, otherwise the reason to report. */
 export function staleReason(
   currentHash: string,
   currentCodeFingerprint: number,
@@ -163,10 +133,9 @@ export function staleReason(
 }
 
 /**
- * `export-image.ts`'s "unknown --frame/--shapes id" error is easy to
- * mistake for a compiler bug when it's really a stale reused server (tldx-usr).
- * Annotate it with when that server's scene was actually compiled, without
- * touching export-image.ts itself.
+ * An "unknown --frame/--shapes id" error is easy to mistake for a compiler
+ * bug when it is really a stale reused server, so annotate it with when that
+ * server's scene was compiled.
  */
 export function withCompiledContext(err: unknown, reused: ServeRecord): Error {
   const message = err instanceof Error ? err.message : String(err);
@@ -178,10 +147,8 @@ export function withCompiledContext(err: unknown, reused: ServeRecord): Error {
 }
 
 /**
- * Render's own ephemeral server must never wire `fsWrite` - a read-only
- * export must not enable the overlay round-trip (tldx-jwh). Returns a copy
- * of `deps` with `fsWrite` dropped entirely (not set to `undefined` - the
- * key is absent, matching `ServeDeps.fsWrite`'s optionality).
+ * Copy of `deps` with the `fsWrite` key absent (not set to `undefined`), so
+ * render's own ephemeral server never enables the overlay round-trip.
  */
 export function withoutFsWrite(deps: ServeDeps): ServeDeps {
   const soloDeps: ServeDeps = { ...deps };

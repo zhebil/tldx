@@ -1,8 +1,7 @@
 /**
  * `tldx absorb <file> [--force]`: fold a diagram's overlay back into its JSX
- * source (`src/app/absorb.ts`). This module owns argv shape, result-to-text
- * formatting, and the exit code; `runAbsorb` itself never prints or exits
- * (CONTEXT.md: app/ never touches stdio).
+ * source. Owns the result-to-text formatting and exit code; `runAbsorb`
+ * itself never prints or exits.
  */
 
 import { runAbsorb, type AbsorbDeps } from "../app/absorb.js";

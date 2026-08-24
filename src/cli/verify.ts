@@ -1,13 +1,9 @@
 /**
- * `tldx verify <file>`: pass/fail check of whether a diagram's JSX source
- * alone reproduces the canvas the overlay describes (`src/app/verify.ts`).
- * This module owns argv shape, result-to-text formatting, and the exit
- * code; `runVerify` itself never prints or exits (CONTEXT.md: app/ never
- * touches stdio).
+ * `tldx verify <file>`: does a diagram's JSX source alone reproduce the
+ * canvas the overlay describes?
  *
- * Pass (exit 0): no overlay, or every overlay entry is already a no-op
- * against the compiled source. Fail (exit 1): a compile error, or one or
- * more entries still change the scene.
+ * Exit 0: no overlay, or every entry is already a no-op against the compiled
+ * source. Exit 1: a compile error, or an entry still changes the scene.
  */
 
 import { runVerify, type VerifyDeps } from "../app/verify.js";

@@ -1,17 +1,7 @@
 /**
- * Pins the guarantee `render.ts`'s module docs describe for the *reuse*
- * branch specifically (tldx-mid): a reused server legitimately has
- * `fsWrite` wired (it's a real, independently-started `tldx serve`), but
- * `runRender` itself must never use that capability - the only thing it does
- * with a reused server is call `exportImage` against its URL.
- *
- * `exportImage` is mocked rather than driven for real: it has no port (one
- * impl, no fake - CONTEXT.md's "render/" row), so there is no other seam,
- * and a real headless-chromium run would be slower and flakier for a
- * guarantee that's about `runRender`'s own code, not the browser's.
- * Whether the browser session itself could ever cause a stray PUT is a
- * separate, already-covered concern (R1 in the module docs) and isn't
- * re-tested here.
+ * A reused server legitimately has `fsWrite` wired, but `runRender` must
+ * never use it. `exportImage` is mocked because it has no port and a real
+ * headless-chromium run would be slower and flakier.
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -61,15 +51,13 @@ function makeIo(): ServeIo & { stdout: string[]; stderr: string[] } {
   };
 }
 
-describe("runRender - reusing a serve that has fsWrite never writes an overlay (tldx-mid)", () => {
+describe("runRender - reusing a serve that has fsWrite never writes an overlay", () => {
   it("leaves the overlay file absent after a successful --reuse-only render", async () => {
     const content = "export default function Diagram() { return null; }";
     const file = tempFile(content);
     const fs = new InMemoryFs({ [file]: content });
     const deps: ServeDeps = {
       fs,
-      // The reused server legitimately has this wired - it's a real,
-      // independently-started `tldx serve`, not render's own boot.
       fsWrite: fs,
       watch: new FakeWatch(),
       layout: new StubLayout(),

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { distStalenessHint } from "./main.js";
 
-describe("distStalenessHint (tldx-ppj: a stale dist/ should say so, not look like a missing command)", () => {
+describe("distStalenessHint (a stale dist/ should say so, not look like a missing command)", () => {
   const dirs: string[] = [];
 
   afterEach(() => {

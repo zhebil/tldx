@@ -1,26 +1,6 @@
 /**
- * Unit test for `runServe`. The composition is thin (transport +
- * dev-server + watchAndServe) and the e2e suite already exercises the
- * happy path end-to-end; this file pins the behaviours that are easy
- * to break and not directly observable in the e2e:
- *
- * 1. `close()` is idempotent - calling it twice must not throw or
- *    double-close the underlying watcher / transport / server.
- * 2. A failed dev-server boot propagates the error from `runServe`. The
- *    cleanup of the already-created transport on this path is established
- *    by code review (the `try/catch` in `serve.ts` calls `transport.close`
- *    before rethrowing); a behavioural assertion would require exposing
- *    the internal transport, which would leak abstraction. Catching the
- *    propagated error here at least guarantees the error path is wired.
- * 3. `ServeHandle.compile` carries the initial compile's source hash
- *    (tldx-usr/tldx-46n).
- * 4. Omitting `fsWrite` disables the overlay round-trip entirely (tldx-jwh:
- *    `render`'s read-only ephemeral server must never write a sidecar).
- * 5. A registered server's serve-registry record picks up the new hash
- *    after a recompile (tldx-46n's staleness detection depends on this).
- *
- * Real adapters are used for the dev server + SSE transport (port 0 keeps
- * the bind ephemeral); domain ports are stubbed via the colocated fakes.
+ * Real adapters for the dev server and SSE transport (port 0 keeps the bind
+ * ephemeral); domain ports are stubbed via the colocated fakes.
  */
 
 import { createServer as createHttpServer } from "node:http";
@@ -43,7 +23,7 @@ import { findServe, hashSource, recordServe } from "../infra/serve-registry/serv
 import { runServe, viewerStalenessWarning, type ServeDeps, type ServeHandle, type ServeIo } from "./serve.js";
 
 // FakeExecute has no result programmed for this source, so it falls back to
-// its default empty-doc AST - real content doesn't matter for these tests.
+// its default empty-doc AST.
 const SRC = "export default function Diagram() { return null; }";
 
 function makeIo(): ServeIo {
@@ -84,7 +64,6 @@ describe("runServe", () => {
   it("close() is idempotent", async () => {
     started = await runServe({ path: "doc.tldx.jsx", deps: makeDeps(), io: makeIo() });
     await started.close();
-    // Second close must not throw and must not reject (single-flight).
     await expect(started.close()).resolves.toBeUndefined();
   });
 
@@ -119,7 +98,7 @@ describe("runServe", () => {
     expect(started.compile.hash).toBe(hashSource(SRC));
   });
 
-  it("exposes a non-zero code fingerprint on the handle (tldx-rab: this checkout has a real src/ tree)", async () => {
+  it("exposes a non-zero code fingerprint on the handle (this checkout has a real src/ tree)", async () => {
     started = await runServe({ path: "doc.tldx.jsx", deps: makeDeps(), io: makeIo() });
     expect(started.compile.codeFingerprint).toBeGreaterThan(0);
   });
@@ -165,10 +144,7 @@ describe("runServe", () => {
     }
   });
 
-  describe("idle-TTL reaper (tldx-kts)", () => {
-    // FakeClock.advance() drives every TTL scenario below - never a real
-    // elapsed-time wait.
-
+  describe("idle-TTL reaper", () => {
     it("exits (resolves idleExpired) after ttlMinutes with no activity", async () => {
       const deps = makeDeps();
       deps.ttlMinutes = 1;
@@ -213,25 +189,20 @@ describe("runServe", () => {
       const log = deps.log as CaptureLog;
       started = await runServe({ path: "doc.tldx.jsx", deps, io: makeIo() });
 
-      // The initial compile already logged one "watch/recompile-ok" during
-      // boot (trigger: "initial") - it must not itself re-arm the reaper a
-      // second time on top of its construction-time arm.
+      // The boot compile logs one "watch/recompile-ok" but must not re-arm
+      // the reaper on top of its construction-time arm.
       expect(log.byCode("watch/recompile-ok")).toHaveLength(1);
 
       clock.advance(59_000);
       watch.emitChange("doc.tldx.jsx");
 
-      // Wait for the async recompile pipeline (real timers - FakeExecute
-      // resolves on a microtask/macrotask, not on the fake clock) to log
-      // the second "watch/recompile-ok" before advancing past the original
-      // deadline.
+      // Real timers: FakeExecute resolves on a macrotask, not the fake clock.
       for (let i = 0; i < 50 && log.byCode("watch/recompile-ok").length < 2; i++) {
         await new Promise((resolve) => setTimeout(resolve, 5));
       }
       expect(log.byCode("watch/recompile-ok")).toHaveLength(2);
 
-      // Without the bump this would already be past the original 60s
-      // deadline (59s + 59s = 118s > 60s).
+      // Without the bump this is past the original 60s deadline (59 + 59).
       clock.advance(59_000);
       let idleFired = false;
       void started.idleExpired.then(() => {
@@ -262,8 +233,7 @@ describe("runServe", () => {
   });
 
   it("propagates dev-server boot failure (port collision)", async () => {
-    // Bind a real listener on 127.0.0.1 to grab a port; runServe targeting
-    // the same port hits EADDRINUSE inside startDevServer, which rejects.
+    // Grab a port so runServe hits EADDRINUSE inside startDevServer.
     const blocker = createHttpServer();
     await new Promise<void>((resolve, reject) => {
       blocker.once("error", reject);
@@ -289,7 +259,7 @@ describe("runServe", () => {
   });
 });
 
-describe("viewerStalenessWarning (tldx-rab)", () => {
+describe("viewerStalenessWarning", () => {
   const dirs: string[] = [];
 
   afterEach(() => {
