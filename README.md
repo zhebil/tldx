@@ -10,8 +10,10 @@ unless you want them.
 ## Install
 
 ```bash
-npm i -g tldx
+npm i -g @zhebil/tldx
 ```
+
+The package is scoped; the command it installs is plain `tldx`.
 
 `tldx render` additionally needs Playwright, which is optional because it pulls
 a browser binary:
@@ -51,7 +53,11 @@ export default function Hello() {
 tldx serve hello.tldx.jsx
 ```
 
-That opens a browser tab and repaints on every save. Because it's JSX, a
+That opens a browser tab and repaints on every save. The `"tldx"` import needs
+nothing installed next to your diagram - the compiler resolves it to its own
+bundled runtime.
+
+Because it's JSX, a
 diagram is ordinary code: components for repeated shapes, `.map()` over a data
 table, `import` a shared palette from another file.
 

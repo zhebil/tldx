@@ -1,9 +1,12 @@
 {
-  "name": "tldx",
+  "name": "@zhebil/tldx",
   "version": "0.0.1",
   "private": false,
   "type": "module",
   "description": "Write architecture and flow diagrams as JSX and render them on a live tldraw canvas.",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "tldx": "dist/cli/main.js"
   },
