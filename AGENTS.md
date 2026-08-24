@@ -14,7 +14,16 @@ npm run check                  # tsc + oxfmt --check + oxlint + knip + vitest
 npm run format                 # oxfmt, in place - run this before `check` complains
 npm run build                  # dist/cli (tsc) + dist/viewer (vite)
 npm run dev:cli -- <args>      # run the CLI from source, e.g. `-- serve examples/kernel.tldx.jsx`
+npm run diagrams               # re-render docs/diagrams/*.tldx.jsx to the SVGs docs/ embeds
 ```
+
+The docs diagrams are source plus a committed SVG. `npm run check` only proves
+the source still compiles - if you change one, run `npm run diagrams` and commit
+the SVG alongside it, or the picture in `docs/architecture.md` goes stale.
+
+Shared entities live in `docs/diagrams/lib/vocabulary.jsx`, not in each diagram.
+Recolouring a layer means editing `LAYER` there once; adding a box that already
+exists elsewhere means importing it, not copying its props.
 
 Each tool owns one question and nothing else, so they never disagree: `tsc`
 types, `oxfmt` formatting, `oxlint` per-file rules _and_ the layer boundaries
