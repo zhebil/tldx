@@ -357,6 +357,13 @@ export function estimatedBoxSize(
   const fit = GEO_FIT[model];
   const { wl, hl } = labelExtent(label, maxW, style);
   const a = wl / maxW;
+  // As h grows the label's height fraction tends to 0, so `fit(a, 0)` is the
+  // best any height can do at this width. Past it the outline can never hold
+  // the label - a triangle needs `w > 2 * wl`, an arrow `w > wl / 0.68` - and
+  // the search below would just double h until it overflowed into the
+  // billions. Give the label the plain rectangular height it needs at this
+  // width instead and let `labelOverflow` report the shortfall.
+  if (fit(a, 0) > 1.001) return { w: maxW, h: boxHeightForWidth(label, maxW, style) };
   // `a` (the label's width fraction of the capped box) is fixed once w is
   // pinned to maxW, so this is a single-variable search: grow h until
   // fit(a, hl / h) <= 1. Binary search, not geoScale's fixed-point multiply,
@@ -375,6 +382,45 @@ export function estimatedBoxSize(
     lo = hi;
   }
   return { w: maxW, h: Math.ceil(lo) };
+}
+
+/**
+ * `maxW` as the sizer should actually apply it to `label` in this `geo`:
+ * itself, or `undefined` for "size this box naturally".
+ *
+ * A rhombus holds about half its bounding box, so a label needs roughly twice
+ * the room - and `estimatedBoxSize` may only spend that on height, because
+ * `maxW` pins the width. A label that wraps to five lines in a 220-wide
+ * diamond therefore comes out 220x680, a 1:3 spike, and the author's only
+ * recourse is to guess a wider `maxW` by hand for a constraint the sizer
+ * already knows. So `maxW` is soft for a non-rect outline: it is dropped when
+ * honouring it would make the box taller than it is wide, or would leave the
+ * label spilling past the outline at any height (a triangle needs
+ * `w > 2 * wl`, an arrow `w > wl / 0.68` - no height fixes those).
+ *
+ * Dropping it, rather than searching for the smallest width that clears the
+ * bar, is not a shortcut: the box's height falls monotonically as it widens,
+ * so every intermediate width is *taller* than the natural box, and usually
+ * larger too. The natural width is the smallest one that isn't a compromise.
+ * It is also the bound on the widening - and is itself bounded, since
+ * `fitBoxWidth` wraps a long single-line label rather than run past
+ * `BOX_ASPECT_TARGET`. The worst case is the box the author would have got by
+ * deleting the prop, never wider.
+ *
+ * A rectangle is returned unchanged: its height is linear in its line count,
+ * so a narrow `maxW` there is a plain instruction, not a geometric spike.
+ */
+export function relaxedMaxW(
+  label: string | undefined,
+  maxW: number | undefined,
+  style?: BoxStyle,
+): number | undefined {
+  if (maxW === undefined || label === undefined || label.length === 0) return maxW;
+  if (GEO_MODEL[style?.geo ?? "rectangle"] === "rect") return maxW;
+
+  const { w, h } = estimatedBoxSize(label, maxW, style);
+  if (h <= w && labelOverflow(label, w, h, style) === undefined) return maxW;
+  return undefined;
 }
 
 /**

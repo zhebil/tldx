@@ -102,26 +102,8 @@ export default function Pipeline() {
 
       <Edge from="sidecar" to="overlay" fromSide="left" toSide="right" dash="dashed" size="s" />
 
-      <Edge
-        from="layout"
-        to="elk"
-        fromSide="1,0.35"
-        toSide="0,0.35"
-        dash="dashed"
-        color="grey"
-        label="one flat container"
-        size="s"
-      />
-      <Edge
-        from="elk"
-        to="layout"
-        fromSide="0,0.75"
-        toSide="1,0.75"
-        dash="dashed"
-        color="grey"
-        label="positions only"
-        size="s"
-      />
+      <Edge from="layout" to="elk" dash="dashed" color="grey" label="one flat container" size="s" />
+      <Edge from="elk" to="layout" dash="dashed" color="grey" label="positions only" size="s" />
     </Doc>
   );
 }

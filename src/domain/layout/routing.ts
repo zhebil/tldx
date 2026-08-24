@@ -198,7 +198,7 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
     routes.set(candidate.edgeId, finalizeRoute(candidate, rankOf.get(candidate.edgeId) ?? 0));
   }
 
-  fanSharedPairs(otherEdges, byId, shapes, routes);
+  const fanned = fanSharedPairs(otherEdges, byId, shapes, routes);
 
   attachFacingProximity(otherEdges, byId, routes);
 
@@ -208,7 +208,7 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
 
   placeLabels(edges, byId, shapes, routes);
 
-  minimizeBends(otherEdges, byId, shapes, routes);
+  minimizeBends(otherEdges, byId, shapes, routes, fanned);
 
   return routes;
 }
@@ -435,10 +435,17 @@ function fanSharedPairs(
   byId: Map<string, AbsShape>,
   shapes: AbsShape[],
   routes: Map<string, EdgeRoute>,
-): void {
+): Set<string> {
+  const fanned = new Set<string>();
   const groups = new Map<string, { loId: string; lo: AbsShape; hi: AbsShape; edges: IREdge[] }>();
   for (const edge of edges) {
-    if (routes.has(edge.id)) continue;
+    // Only an authored anchor is off limits. A route the candidate/lane pass
+    // already committed is not: that pass groups by container/axis/side, so a
+    // reciprocal pair lands in one lane group bowing the *same* way, and
+    // skipping such edges here left the pair to overlap. Fanning wins over
+    // that, and `clearObstaclesOnEveryRoute` re-grows whichever half the
+    // symmetric bend no longer clears.
+    if (edge.fromAnchor !== undefined || edge.toAnchor !== undefined) continue;
     const from = byId.get(edge.from);
     const to = byId.get(edge.to);
     if (!from || !to) continue;
@@ -472,8 +479,10 @@ function fanSharedPairs(
       const bend = round1(offset * (edge.from === loId ? 1 : -1));
       if (Math.abs(bend) < MIN_BEND) return;
       routes.set(edge.id, { bend });
+      fanned.add(edge.id);
     });
   }
+  return fanned;
 }
 
 /**
@@ -505,9 +514,10 @@ function attachFacingProximity(
  * x-overlap) or side by side (no x-overlap, some y-overlap); the diagonal case
  * has no single pair of facing faces. Both anchors share one coordinate along
  * the facing edges so the chord is a straight drop rather than two
- * independently-nudged points that still cut diagonally. That coordinate
- * starts from the narrower (or shorter) shape's centre, clamped into the strip
- * where both extents overlap, so neither shape attaches past its own edge.
+ * independently-nudged points that still cut diagonally. That coordinate is
+ * the narrower (or shorter) shape's centre, which `clampedToCorner` requires
+ * to lie inside the strip where both extents overlap - outside it, the drop
+ * would leave one shape at a corner.
  */
 function facingAnchors(from: AbsShape, to: AbsShape): { from: Point; to: Point } | null {
   const yOverlap = rangesOverlap(from.y, from.y + from.h, to.y, to.y + to.h);
@@ -517,6 +527,7 @@ function facingAnchors(from: AbsShape, to: AbsShape): { from: Point; to: Point }
     const overlapMin = Math.max(from.x, to.x);
     const overlapMax = Math.min(from.x + from.w, to.x + to.w);
     const preferred = from.w <= to.w ? centreX(from) : centreX(to);
+    if (clampedToCorner(preferred, overlapMin, overlapMax, from.w, to.w)) return null;
     const sharedX = clampTo(preferred, overlapMin, overlapMax);
     const fromFace: 0 | 1 = from.y < to.y ? 1 : 0;
     const toFace: 0 | 1 = fromFace === 1 ? 0 : 1;
@@ -529,6 +540,7 @@ function facingAnchors(from: AbsShape, to: AbsShape): { from: Point; to: Point }
     const overlapMin = Math.max(from.y, to.y);
     const overlapMax = Math.min(from.y + from.h, to.y + to.h);
     const preferred = from.h <= to.h ? centreY(from) : centreY(to);
+    if (clampedToCorner(preferred, overlapMin, overlapMax, from.h, to.h)) return null;
     const sharedY = clampTo(preferred, overlapMin, overlapMax);
     const fromFace: 0 | 1 = from.x < to.x ? 1 : 0;
     const toFace: 0 | 1 = fromFace === 1 ? 0 : 1;
@@ -538,6 +550,34 @@ function facingAnchors(from: AbsShape, to: AbsShape): { from: Point; to: Point }
     };
   }
   return null;
+}
+
+/**
+ * How many times the wider shape has to out-span the narrower one before an
+ * attach at its very end still reads as deliberate. Below it the two are peers
+ * and a clamped drop just looks like the arrow fell off a corner; above it the
+ * wide one is a bar or container fanning out to offset children, which is what
+ * `facingAnchors` is for. The example corpus separates cleanly - every peer
+ * pair that needs clamping is under 2, the one bar that needs it is over 5.
+ */
+const FACING_BAR_RATIO = 3;
+
+/**
+ * True when `preferred` falls outside the overlap strip - so clamping it would
+ * put the anchor on a shape's corner - and neither shape is wide enough for
+ * that to be the intended look. `extentA`/`extentB` are the two shapes' spans
+ * along the shared axis.
+ */
+function clampedToCorner(
+  preferred: number,
+  overlapMin: number,
+  overlapMax: number,
+  extentA: number,
+  extentB: number,
+): boolean {
+  if (preferred >= overlapMin && preferred <= overlapMax) return false;
+  const ratio = Math.max(extentA, extentB) / Math.max(1, Math.min(extentA, extentB));
+  return ratio < FACING_BAR_RATIO;
 }
 
 function centreX(s: AbsShape): number {
@@ -880,6 +920,7 @@ function minimizeBends(
   byId: Map<string, AbsShape>,
   shapes: AbsShape[],
   routes: Map<string, EdgeRoute>,
+  fanned: ReadonlySet<string>,
 ): void {
   const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
   const snapshot = new Map<string, { bend: number; labelBox?: LabelBox }>();
@@ -891,6 +932,14 @@ function minimizeBends(
   for (const edge of edges) {
     const route = routes.get(edge.id);
     if (!route || route.bend === 0) continue;
+    // A fan bend is already the minimum separation `fanSharedPairs` chose, so
+    // there is nothing here to give back. It also cannot be judged by
+    // `arcsTooClose` alone: the pair shares both terminals, so two arcs that
+    // meet at the ends stay under the fraction even when the whole middle is
+    // one line, and `snapshot` would score each half against the other's
+    // pre-shrink bend anyway - both halves shrink to zero and the pair lands
+    // back on the same line.
+    if (fanned.has(edge.id)) continue;
     // `approxLabelBox`'s parabola stands in for the real circular arc, and it
     // gets less trustworthy the further `t` sits from the midpoint it was
     // validated at. Shrinking a bend under an already-slid label risks a
