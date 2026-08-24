@@ -36,6 +36,7 @@ import {
   FRAME_PAD_INNER,
   FRAME_TITLE_PX,
   NOTE_MEASURE_PX,
+  relaxedMaxW,
   type Align,
   type Direction,
   type LayoutMode,
@@ -147,6 +148,17 @@ function boxStyle(box: IRBox): IRBox & { standalone?: boolean } {
   return { ...box, ...(box.text === undefined ? {} : { standalone: box.text }) };
 }
 
+/**
+ * `box.maxW` as sizing should apply it - soft for a non-rect outline, so a
+ * diamond widens instead of spiking. Every read of `maxW` in this file goes
+ * through here, so the shared-width vote, the per-box cap and the height
+ * re-solve all agree on one number. An explicit `w` is untouched: that is a
+ * pin, not a cap.
+ */
+function sizingMaxW(box: IRBox): number | undefined {
+  return relaxedMaxW(box.label, box.maxW, boxStyle(box));
+}
+
 async function sizeElement(
   el: IRBox | IRNote | IRFrame,
   placeAuto: AutoPlacer,
@@ -154,7 +166,7 @@ async function sizeElement(
 ): Promise<IRBoxPositioned | IRNotePositioned | IRFramePositioned> {
   switch (el.kind) {
     case "box": {
-      const size = estimatedBoxSize(el.label, el.w ?? el.maxW, boxStyle(el));
+      const size = estimatedBoxSize(el.label, el.w ?? sizingMaxW(el), boxStyle(el));
       return { ...el, x: el.x ?? 0, y: el.y ?? 0, w: el.w ?? size.w, h: el.h ?? size.h };
     }
     case "note": {
@@ -432,14 +444,16 @@ function applyContainerBoxSizing(
       const box = children[i] as IRBox;
       if (box.w !== undefined) continue;
       const style = boxStyle(box);
-      const k = geoScale(box.label, box.maxW, style);
-      sharedW = Math.max(sharedW, Math.ceil(fitBoxWidth(box.label, box.maxW, style) * k));
+      const cap = sizingMaxW(box);
+      const k = geoScale(box.label, cap, style);
+      sharedW = Math.max(sharedW, Math.ceil(fitBoxWidth(box.label, cap, style) * k));
     }
     for (const i of boxIdx) {
       const box = children[i] as IRBox;
       if (box.w !== undefined) continue;
       const style = boxStyle(box);
-      const w = box.maxW === undefined ? sharedW : Math.min(sharedW, box.maxW);
+      const cap = sizingMaxW(box);
+      const w = cap === undefined ? sharedW : Math.min(sharedW, cap);
       if (w < sharedW) {
         // geoScale's k was solved for this box's uncapped natural size, so it
         // no longer holds once maxW pins w below that - re-solve h at the forced w.
@@ -447,7 +461,7 @@ function applyContainerBoxSizing(
         sized[i] = { ...sized[i]!, w, h: box.h ?? capped.h };
         continue;
       }
-      const k = geoScale(box.label, box.maxW, style);
+      const k = geoScale(box.label, cap, style);
       const uw = w / k;
       const rawH = boxHeightForWidth(box.label, uw, style);
       const h = box.h ?? Math.ceil(geoTargetHeight(rawH, uw, box.geo) * k);
@@ -481,7 +495,8 @@ function applyContainerBoxSizing(
   for (const i of boxIdx) {
     const box = children[i] as IRBox;
     const style = boxStyle(box);
-    const naturalH = boxHeightForWidth(box.label, fitBoxWidth(box.label, box.maxW, style), style);
+    const cap = sizingMaxW(box);
+    const naturalH = boxHeightForWidth(box.label, fitBoxWidth(box.label, cap, style), style);
     sharedH = Math.max(sharedH, naturalH);
   }
   for (const i of boxIdx) {

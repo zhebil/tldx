@@ -4,12 +4,14 @@ import { GEOS } from "../ir/styles.js";
 
 import {
   BOX_ASPECT_TARGET,
+  boxHeightForWidth,
   estimatedBoxSize,
   estimatedNoteSize,
   fitBoxWidth,
   geoScale,
   labelExtent,
   labelOverflow,
+  relaxedMaxW,
 } from "./defaults.js";
 import { lineHeightPx, textWidth } from "./glyph-metrics.js";
 
@@ -88,6 +90,19 @@ describe("estimatedBoxSize", () => {
     // ratio: a 3-line label in a 200px diamond is genuinely a tall shape.
     expect(cappedDiamond.h).toBeGreaterThan(cappedRect.h);
     expect(cappedDiamond.h).toBeLessThan(600);
+  });
+
+  it("stops growing height when no height can hold the label, and lets labelOverflow say so", () => {
+    // A triangle's label needs `w > 2 * wl` and an arrow's `w > wl / 0.68`,
+    // so at a pinned width neither is ever satisfied by more height. The
+    // search used to double h 24 times and return 3,053,453,312.
+    const label = "Manual approval release manager signs off";
+    for (const geo of ["triangle", "arrow-right"] as const) {
+      const { w, h } = estimatedBoxSize(label, 220, { geo });
+      expect(w).toBe(220);
+      expect(h).toBe(boxHeightForWidth(label, 220));
+      expect(labelOverflow(label, w, h, { geo })).toBeDefined();
+    }
   });
 
   it("keeps the label rectangle inside the outline at the capped width, for diamond and ellipse alike", () => {
@@ -210,6 +225,43 @@ describe("geo aspect ratio", () => {
   it("D20 regression: a maxW-capped diamond's proportions are unchanged by the aspect-ratio fix", () => {
     const label = "Health gate\nerror rate < 1% for 10 min";
     expect(estimatedBoxSize(label, 200, { geo: "diamond" })).toEqual({ w: 200, h: 403 });
+  });
+});
+
+describe("relaxedMaxW", () => {
+  const label = "Manual approval\nrelease manager signs off";
+  const diamond = { geo: "diamond" } as const;
+
+  it("drops maxW when honouring it would spike the diamond, leaving the natural box (#40)", () => {
+    // The reported case: maxW=220 wraps the label onto five lines and pays
+    // for all of it in height, giving a 220x680 1:3 spike.
+    expect(estimatedBoxSize(label, 220, diamond)).toEqual({ w: 220, h: 680 });
+
+    const relaxed = estimatedBoxSize(label, relaxedMaxW(label, 220, diamond), diamond);
+    expect(relaxed.h).toBeLessThan(relaxed.w);
+    expect(relaxed).toEqual(estimatedBoxSize(label, undefined, diamond));
+  });
+
+  it("honours maxW on a rectangle, and on any box that already fits under it", () => {
+    expect(relaxedMaxW(label, 220, { geo: "rectangle" })).toBe(220);
+    expect(relaxedMaxW(label, 220, undefined)).toBe(220);
+    expect(relaxedMaxW("Yes", 220, diamond)).toBe(220);
+    expect(relaxedMaxW(undefined, 220, diamond)).toBe(220);
+  });
+
+  it("bounds the widening at the natural width, which wraps a long single-line label rather than run on", () => {
+    const long = "A single very long line of label text that will not fit in a narrow diamond";
+    const { w } = estimatedBoxSize(long, relaxedMaxW(long, 200, diamond), diamond);
+
+    expect(w).toBe(estimatedBoxSize(long, undefined, diamond).w);
+    expect(w).toBeLessThan(textWidth(long));
+  });
+
+  it("relaxes a triangle and an arrow too - a low-fill outline is not a diamond-only problem", () => {
+    for (const geo of ["triangle", "arrow-right"] as const) {
+      const { w, h } = estimatedBoxSize(label, relaxedMaxW(label, 220, { geo }), { geo });
+      expect(labelOverflow(label, w, h, { geo })).toBeUndefined();
+    }
   });
 });
 

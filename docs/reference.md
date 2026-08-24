@@ -113,6 +113,13 @@ A `<Box>` sizes itself to its label. `maxW` caps how wide the label may run
 before wrapping; height grows to keep it inside the shape. `<Sticky>` ignores
 `maxW` — tldraw fixes note width at 200px.
 
+On a non-rectangular `geo`, `maxW` is a hint rather than a cap. A diamond
+holds about half its bounding box, so a label that only just fits a 220px
+rectangle needs a 220x680 diamond — a spike. When honouring `maxW` would make
+the box taller than it is wide, the box takes its natural width instead, which
+is what it would have been with no `maxW` at all. Use `w` to pin a width for
+real.
+
 Setting `x`/`y` pins a shape and takes it out of flow layout. Prefer changing
 the layout over pinning.
 
