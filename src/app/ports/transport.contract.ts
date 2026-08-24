@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { sceneJson, sceneMessage } from "../../contracts/builders.js";
+import { pageRecord, sceneJson, sceneMessage } from "../../contracts/builders.js";
 import type { SceneMessage } from "../../contracts/scene-message.js";
 
 import type { TransportPort } from "./transport.js";
@@ -55,7 +55,7 @@ export function runTransportContract(
       try {
         const sub = await h.subscribe();
         try {
-          const msg = sceneMessage.scene(sceneJson([]));
+          const msg = sceneMessage.scene("pageA", sceneJson([]));
           h.port.push(msg);
           await waitFor(() => sub.received.length >= 1, timeout);
           expect(sub.received[0]).toEqual(msg);
@@ -72,8 +72,10 @@ export function runTransportContract(
       try {
         const sub = await h.subscribe();
         try {
-          const m1 = sceneMessage.scene(sceneJson([]));
-          const m2 = sceneMessage.error([{ severity: "error", code: "test/x", message: "boom" }]);
+          const m1 = sceneMessage.scene("pageA", sceneJson([]));
+          const m2 = sceneMessage.error("pageA", [
+            { severity: "error", code: "test/x", message: "boom" },
+          ]);
           const m3 = sceneMessage.ping();
           h.port.push(m1);
           h.port.push(m2);
@@ -88,21 +90,98 @@ export function runTransportContract(
       }
     });
 
-    it("replays the most recent message to a late subscriber", async () => {
+    it("replays the most recent scene of each page, in the order pages were first pushed", async () => {
       const h = await make();
       try {
-        const m1 = sceneMessage.scene(sceneJson([]));
-        const m2 = sceneMessage.ping();
-        h.port.push(m1);
-        h.port.push(m2);
+        const stale = sceneMessage.scene("pageA", sceneJson([]));
+        const a = sceneMessage.scene("pageA", sceneJson([pageRecord({ id: "page:a" })]));
+        const b = sceneMessage.scene("pageB", sceneJson([pageRecord({ id: "page:b" })]));
+        h.port.push(stale);
+        h.port.push(b);
+        h.port.push(a);
         const sub = await h.subscribe();
         try {
-          await waitFor(() => sub.received.length >= 1, timeout);
-          expect(sub.received[0]).toEqual(m2);
-          expect(sub.received).toHaveLength(1);
+          await waitFor(() => sub.received.length >= 2, timeout);
+          expect(sub.received).toEqual([a, b]);
         } finally {
           await sub.close();
         }
+      } finally {
+        await h.dispose();
+      }
+    });
+
+    it("replays a page's last good scene followed by its outstanding error", async () => {
+      const h = await make();
+      try {
+        const scene = sceneMessage.scene("pageA", sceneJson([]));
+        const error = sceneMessage.error("pageA", [
+          { severity: "error", code: "test/x", message: "boom" },
+        ]);
+        h.port.push(scene);
+        h.port.push(error);
+        const sub = await h.subscribe();
+        try {
+          await waitFor(() => sub.received.length >= 2, timeout);
+          expect(sub.received).toEqual([scene, error]);
+        } finally {
+          await sub.close();
+        }
+      } finally {
+        await h.dispose();
+      }
+    });
+
+    it("a successful scene clears that page's replayed error", async () => {
+      const h = await make();
+      try {
+        const scene = sceneMessage.scene("pageA", sceneJson([]));
+        h.port.push(scene);
+        h.port.push(
+          sceneMessage.error("pageA", [{ severity: "error", code: "test/x", message: "boom" }]),
+        );
+        h.port.push(scene);
+        const sub = await h.subscribe();
+        try {
+          await waitFor(() => sub.received.length >= 1, timeout);
+          await new Promise((r) => setTimeout(r, 50));
+          expect(sub.received).toEqual([scene]);
+        } finally {
+          await sub.close();
+        }
+      } finally {
+        await h.dispose();
+      }
+    });
+
+    it("replays nothing for a page that was never pushed, and never replays a ping", async () => {
+      const h = await make();
+      try {
+        h.port.push(sceneMessage.ping());
+        const sub = await h.subscribe();
+        try {
+          await new Promise((r) => setTimeout(r, 100));
+          expect(sub.received).toEqual([]);
+        } finally {
+          await sub.close();
+        }
+      } finally {
+        await h.dispose();
+      }
+    });
+
+    it("reports how many subscribers are connected", async () => {
+      const h = await make();
+      try {
+        expect(h.port.subscriberCount()).toBe(0);
+        const a = await h.subscribe();
+        await waitFor(() => h.port.subscriberCount() === 1, timeout);
+        const b = await h.subscribe();
+        await waitFor(() => h.port.subscriberCount() === 2, timeout);
+        await b.close();
+        await waitFor(() => h.port.subscriberCount() === 1, timeout);
+        await a.close();
+        await waitFor(() => h.port.subscriberCount() === 0, timeout);
       } finally {
         await h.dispose();
       }
@@ -114,7 +193,7 @@ export function runTransportContract(
         const a = await h.subscribe();
         const b = await h.subscribe();
         try {
-          const msg = sceneMessage.scene(sceneJson([]));
+          const msg = sceneMessage.scene("pageA", sceneJson([]));
           h.port.push(msg);
           await waitFor(() => a.received.length >= 1 && b.received.length >= 1, timeout);
           expect(a.received[0]).toEqual(msg);

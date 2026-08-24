@@ -1,17 +1,24 @@
 /**
- * Discovery record letting `tldx render` reuse a running `tldx serve` instead
- * of booting its own. Stored in the OS temp dir, never in the user's repo.
- * Best-effort throughout: a failed write or read must never take `serve` down
- * with it.
+ * Discovery record letting a second `tldx serve` find the server already
+ * running for this project, and letting `tldx render` reuse it. One record per
+ * server, keyed by project root, listing every diagram that server holds.
+ * Stored in the OS temp dir, never in the user's repo.
+ *
+ * Best-effort on reads and updates: a failed write or a corrupt file must never
+ * take a running server down with it. The one exception is `claimServer`, whose
+ * whole job is to fail when someone else got there first.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
+  openSync,
+  closeSync,
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -19,31 +26,83 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
-export type ServeRecord = {
-  pid: number;
-  url: string;
-  file: string;
+/** One diagram held by a server. */
+export type ServeDiagram = {
+  /** Page key in the shared viewer - `sha256(realpath)` truncated. */
+  pageKey: string;
+  /** Page name shown in the viewer's page menu, as of the last compile. */
+  name?: string;
   /** sha256 (first 8 hex chars) of the source file as of the last successful compile. */
   hash?: string;
   /** `ClockPort.now()` reading at that same compile. */
   compiledAt?: number;
+};
+
+export type ServeRecord = {
+  pid: number;
+  url: string;
+  /** Shared secret gating the server's write endpoints. */
+  token: string;
+  /** Idle-TTL the server was started with, in minutes; `0` means disabled. */
+  ttlMinutes: number;
   /**
    * Newest mtime (ms) across the compiler source tree as of this server's
    * boot. Fixed at boot and never re-touched: a running process's own code
    * cannot change under it.
    */
   codeFingerprint?: number;
+  /** Diagrams this server serves, keyed by resolved source path. */
+  diagrams: Record<string, ServeDiagram>;
 };
 
-function recordPath(file: string): string {
-  let key: string;
+/** Resolved path of `file`, falling back to a plain resolve if it does not exist. */
+function realPathOf(file: string): string {
   try {
-    key = realpathSync(file);
+    return realpathSync(file);
   } catch {
-    key = resolve(file);
+    return resolve(file);
   }
-  const hash = createHash("sha256").update(key).digest("hex").slice(0, 16);
-  return join(tmpdir(), "tldx-serve", `${hash}.json`);
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * The viewer page key for a diagram: short, stable per path, and collision-free
+ * in practice. Deliberately not a slug of the diagram's name - slugs collide
+ * across directories and change when a diagram is retitled.
+ */
+export function pageKeyFor(file: string): string {
+  return sha256(realPathOf(file)).slice(0, 8);
+}
+
+/**
+ * The project a diagram belongs to: nearest ancestor holding `.git` (a
+ * directory in a normal clone, a file in a worktree), else nearest holding
+ * `package.json`, else the file's own directory. A filesystem walk rather than
+ * `git rev-parse`, so it costs no subprocess.
+ */
+export function projectRootFor(file: string): string {
+  let dir = dirname(realPathOf(file));
+  const seen = new Set<string>();
+  let packageRoot: string | undefined;
+  for (;;) {
+    if (seen.has(dir)) break;
+    seen.add(dir);
+    if (existsSync(join(dir, ".git"))) return dir;
+    if (packageRoot === undefined && existsSync(join(dir, "package.json"))) packageRoot = dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return packageRoot ?? dirname(realPathOf(file));
+}
+
+function recordPath(projectRoot: string): string {
+  // Resolved, so a claim taken on `/var/...` and a lookup that walked up to
+  // `/private/var/...` (the same directory on macOS) land on the same record.
+  return join(tmpdir(), "tldx-serve", `${sha256(realPathOf(projectRoot)).slice(0, 16)}.json`);
 }
 
 function isAlive(pid: number): boolean {
@@ -57,7 +116,7 @@ function isAlive(pid: number): boolean {
 
 /** Short, stable content hash used both when recording a compile and when checking staleness against it. */
 export function hashSource(source: string): string {
-  return createHash("sha256").update(source).digest("hex").slice(0, 8);
+  return sha256(source).slice(0, 8);
 }
 
 /** Newest mtime (ms) of any file under `dir`, recursing but skipping `node_modules`. `0` if `dir` doesn't exist or is empty. */
@@ -94,84 +153,163 @@ export function codeFingerprint(here: string): number {
   return existsSync(root) ? newestMtimeMs(root) : 0;
 }
 
-export function recordServe(
-  file: string,
-  url: string,
-  compile?: { hash: string | undefined; at: number; codeFingerprint?: number },
-): () => void {
-  const path = recordPath(file);
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    const record: ServeRecord = { pid: process.pid, url, file };
-    if (compile?.hash !== undefined) {
-      record.hash = compile.hash;
-      record.compiledAt = compile.at;
-    }
-    if (compile?.codeFingerprint !== undefined) {
-      record.codeFingerprint = compile.codeFingerprint;
-    }
-    writeFileSync(path, JSON.stringify(record));
-  } catch {
-    // best-effort; a failed write must not stop `serve` from running.
-  }
+/**
+ * Replace the record at `path` atomically. A torn write here would discard
+ * discovery info for every diagram on the server at once, not just one, so the
+ * new content lands in a temp file and is renamed over the target.
+ */
+function writeRecordAtomically(path: string, record: ServeRecord): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const temp = `${path}.${String(process.pid)}.tmp`;
+  writeFileSync(temp, JSON.stringify(record));
+  renameSync(temp, path);
+}
 
-  let removed = false;
-  return () => {
-    if (removed) return;
-    removed = true;
+function readRecord(path: string): ServeRecord | undefined {
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as Partial<ServeRecord>;
+    if (typeof parsed.pid !== "number" || typeof parsed.url !== "string") return undefined;
+    return {
+      pid: parsed.pid,
+      url: parsed.url,
+      token: typeof parsed.token === "string" ? parsed.token : "",
+      ttlMinutes: typeof parsed.ttlMinutes === "number" ? parsed.ttlMinutes : 0,
+      ...(typeof parsed.codeFingerprint === "number"
+        ? { codeFingerprint: parsed.codeFingerprint }
+        : {}),
+      diagrams:
+        typeof parsed.diagrams === "object" && parsed.diagrams !== null ? parsed.diagrams : {},
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+export type ServeClaim = {
+  /** The project root this claim covers. */
+  projectRoot: string;
+  /** Secret to hand to the CLI, and to require on the server's write endpoints. */
+  token: string;
+  /** Publish the bound url and boot fingerprint. Call once the server is listening. */
+  publish(url: string, codeFingerprint: number, ttlMinutes: number): void;
+  /** Record (or update) a diagram this server serves. */
+  addDiagram(file: string, diagram: ServeDiagram): void;
+  /** Update a diagram's compile hash and timestamp after a recompile. */
+  touchCompile(file: string, hash: string, compiledAt: number): void;
+  /** Remove the record. Idempotent. */
+  release(): void;
+};
+
+/**
+ * Take ownership of the server slot for `projectRoot`, or fail if another
+ * process holds it. The exclusive create happens BEFORE the port is bound, so
+ * two `serve` invocations racing from cold cannot both end up listening - the
+ * loser takes the handoff path instead.
+ *
+ * A slot held by a dead process is stale: it is removed and the claim retried
+ * once.
+ */
+export function claimServer(projectRoot: string): ServeClaim | undefined {
+  const path = recordPath(projectRoot);
+  const token = randomUUID();
+  const initial: ServeRecord = { pid: process.pid, url: "", token, ttlMinutes: 0, diagrams: {} };
+
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      rmSync(path, { force: true });
-    } catch {
-      // best-effort
+      mkdirSync(dirname(path), { recursive: true });
+      // `wx` is the claim: it fails rather than truncating an existing record.
+      const fd = openSync(path, "wx");
+      try {
+        writeFileSync(fd, JSON.stringify(initial));
+      } finally {
+        closeSync(fd);
+      }
+      return makeClaim(path, projectRoot, token);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") return undefined;
+      const held = readRecord(path);
+      if (held !== undefined && isAlive(held.pid)) return undefined;
+      // Stale slot: the holder is gone (or the file is corrupt). Clear and retry.
+      try {
+        rmSync(path, { force: true });
+      } catch {
+        return undefined;
+      }
     }
+  }
+  return undefined;
+}
+
+function makeClaim(path: string, projectRoot: string, token: string): ServeClaim {
+  const update = (mutate: (record: ServeRecord) => void): void => {
+    try {
+      const current = readRecord(path);
+      // Another process's record must never be clobbered by ours.
+      if (current === undefined || current.pid !== process.pid) return;
+      mutate(current);
+      writeRecordAtomically(path, current);
+    } catch {
+      // best-effort; a failed update must not stop `serve` from running.
+    }
+  };
+
+  let released = false;
+  return {
+    projectRoot,
+    token,
+    publish(url, fingerprint, ttlMinutes) {
+      update((record) => {
+        record.url = url;
+        record.codeFingerprint = fingerprint;
+        record.ttlMinutes = ttlMinutes;
+      });
+    },
+    addDiagram(file, diagram) {
+      update((record) => {
+        record.diagrams[realPathOf(file)] = diagram;
+      });
+    },
+    touchCompile(file, hash, compiledAt) {
+      update((record) => {
+        const existing = record.diagrams[realPathOf(file)];
+        if (existing === undefined) return;
+        existing.hash = hash;
+        existing.compiledAt = compiledAt;
+      });
+    },
+    release() {
+      if (released) return;
+      released = true;
+      try {
+        const current = readRecord(path);
+        if (current !== undefined && current.pid !== process.pid) return;
+        rmSync(path, { force: true });
+      } catch {
+        // best-effort
+      }
+    },
   };
 }
 
 /**
- * Update the hash/compiledAt of an already-recorded serve after a recompile.
- * No-op if nothing is recorded for `file`, or if the record belongs to another
- * process: an orphaned but still-alive server must never clobber a newer
- * process's record for the same file.
+ * The live server for `file`'s project, or `undefined` if there is none. A
+ * record naming a dead process, or one that cannot be parsed, is removed and
+ * reported as absent.
  */
-export function touchServeCompile(file: string, hash: string, compiledAt: number): void {
-  const path = recordPath(file);
+export function findServer(file: string): ServeRecord | undefined {
+  const path = recordPath(projectRootFor(file));
+  const record = readRecord(path);
+  if (record !== undefined && record.url !== "" && isAlive(record.pid)) return record;
+  if (record !== undefined && isAlive(record.pid)) return undefined; // claimed but not yet listening
   try {
-    if (!existsSync(path)) return;
-    const record = JSON.parse(readFileSync(path, "utf8")) as Partial<ServeRecord>;
-    if (record.pid !== process.pid || record.url === undefined || record.file === undefined) return;
-    const updated: ServeRecord = {
-      pid: record.pid,
-      url: record.url,
-      file: record.file,
-      hash,
-      compiledAt,
-    };
-    writeFileSync(path, JSON.stringify(updated));
-  } catch {
-    // best-effort
-  }
-}
-
-export function findServe(file: string): ServeRecord | undefined {
-  const path = recordPath(file);
-  try {
-    if (!existsSync(path)) return undefined;
-    const record = JSON.parse(readFileSync(path, "utf8")) as Partial<ServeRecord>;
-    if (typeof record.pid === "number" && typeof record.url === "string" && isAlive(record.pid)) {
-      const result: ServeRecord = { pid: record.pid, url: record.url, file: record.file ?? file };
-      if (typeof record.hash === "string") result.hash = record.hash;
-      if (typeof record.compiledAt === "number") result.compiledAt = record.compiledAt;
-      if (typeof record.codeFingerprint === "number")
-        result.codeFingerprint = record.codeFingerprint;
-      return result;
-    }
-  } catch {
-    // fall through to cleanup below
-  }
-  try {
-    rmSync(path, { force: true });
+    if (existsSync(path)) rmSync(path, { force: true });
   } catch {
     // best-effort
   }
   return undefined;
+}
+
+/** The entry for `file` on `record`, if that server serves it. */
+export function diagramOf(record: ServeRecord, file: string): ServeDiagram | undefined {
+  return record.diagrams[realPathOf(file)];
 }

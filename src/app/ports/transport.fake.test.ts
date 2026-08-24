@@ -19,23 +19,24 @@ runTransportContract("InMemoryTransport", async (): Promise<TransportHarness> =>
 describe("InMemoryTransport (fake-specific affordances)", () => {
   it("records pushed messages on `pushed` for assertions", () => {
     const t = new InMemoryTransport();
-    const m1 = sceneMessage.scene(sceneJson([]));
+    const m1 = sceneMessage.scene("pageA", sceneJson([]));
     const m2 = sceneMessage.ping();
     t.push(m1);
     t.push(m2);
     expect(t.pushed).toEqual([m1, m2]);
+    expect(t.messagesFor("pageA")).toEqual([m1]);
   });
 
-  it("activeSubscribers tracks open subscriptions", async () => {
+  it("subscriberCount tracks open subscriptions", async () => {
     const t = new InMemoryTransport();
-    expect(t.activeSubscribers()).toBe(0);
+    expect(t.subscriberCount()).toBe(0);
     const a = t.subscribe();
     const b = t.subscribe();
-    expect(t.activeSubscribers()).toBe(2);
+    expect(t.subscriberCount()).toBe(2);
     await a.close();
-    expect(t.activeSubscribers()).toBe(1);
+    expect(t.subscriberCount()).toBe(1);
     await b.close();
-    expect(t.activeSubscribers()).toBe(0);
+    expect(t.subscriberCount()).toBe(0);
   });
 
   it("push throws after close", async () => {

@@ -17,6 +17,7 @@ import { isOverlay, type Overlay } from "../../../src/contracts/overlay.js";
 import type { SceneJSON } from "../../../src/contracts/scene-json.js";
 import type { SceneMessage } from "../../../src/contracts/scene-message.js";
 import type { Diagnostic } from "../../../src/domain/diagnostics/index.js";
+import { denamespaceScene, namespaceScene } from "../../../src/domain/multipage/index.js";
 import { applyOverlay, overlayPathFor } from "../../../src/domain/overlay/index.js";
 import { createSystemClock } from "../../../src/infra/clock/system-clock.js";
 import { createJsxExecute } from "../../../src/infra/execute-jsx/execute-jsx.js";
@@ -24,6 +25,7 @@ import { createChokidarWatch } from "../../../src/infra/fs/chokidar-watch.js";
 import { createNodeFsRead } from "../../../src/infra/fs/node-fs-read.js";
 import { createNodeFsWrite } from "../../../src/infra/fs/node-fs-write.js";
 import { ElkLayoutAdapter } from "../../../src/infra/layout-elk/elk-layout.js";
+import { pageKeyFor } from "../../../src/infra/serve-registry/serve-registry.js";
 
 import { buildMutatedScene } from "./mutate.js";
 
@@ -165,8 +167,8 @@ export async function checkFidelity(
 
     const putRes = await fetch(`${handle.url}overlay`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(mutated),
+      headers: { "content-type": "application/json", "x-tldx-token": handle.token },
+      body: JSON.stringify({ pageKey: pageKeyFor(filePath), snapshot: mutated }),
     });
     if (putRes.status !== 204) {
       fail("put", `PUT /overlay returned ${putRes.status}, expected 204`);
@@ -205,6 +207,15 @@ export async function checkFidelity(
       return failures;
     }
 
+    // The overlay is written in the diagram's own ids; the served scenes are
+    // namespaced onto its page. Compare like with like - and note a shape the
+    // canvas added arrives back namespaced, since the server re-pushes the
+    // whole page in page ids.
+    const pageKey = pageKeyFor(filePath);
+    const soloBase = denamespaceScene(base, pageKey, base);
+    const soloMutated = denamespaceScene(mutated, pageKey, base);
+    const expectedOnReload = namespaceScene(soloMutated, pageKey);
+
     const reloadConn = new AbortController();
     try {
       const res = await fetch(`${handle.url}events`, { signal: reloadConn.signal });
@@ -212,17 +223,17 @@ export async function checkFidelity(
       const message = await readFirstSceneMessage(res.body);
       if (message.kind !== "scene") {
         fail("reload", `expected a scene message on reload, got "${message.kind}"`);
-      } else if (!scenesEqual(mutated, message.payload)) {
+      } else if (!scenesEqual(expectedOnReload, message.payload)) {
         fail(
           "reload",
-          `reloaded scene diverges from the canvas in ${describeDivergence(mutated, message.payload)}`,
+          `reloaded scene diverges from the canvas in ${describeDivergence(expectedOnReload, message.payload)}`,
         );
       }
     } finally {
       reloadConn.abort();
     }
 
-    const { scene: applied, diagnostics } = apply(overlay, base);
+    const { scene: applied, diagnostics } = apply(overlay, soloBase);
     if (diagnostics.length > 0) {
       fail(
         "apply",
@@ -231,10 +242,10 @@ export async function checkFidelity(
           .join("; ")}`,
       );
     }
-    if (!scenesEqual(mutated, applied)) {
+    if (!scenesEqual(soloMutated, applied)) {
       fail(
         "apply",
-        `applied scene diverges from the canvas in ${describeDivergence(mutated, applied)}`,
+        `applied scene diverges from the canvas in ${describeDivergence(soloMutated, applied)}`,
       );
     }
   } finally {

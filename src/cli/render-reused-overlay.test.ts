@@ -21,7 +21,12 @@ import { CaptureLog } from "../app/ports/log.fake.js";
 import { FakeWatch } from "../app/ports/watch.fake.js";
 import { overlayPathFor } from "../domain/overlay/index.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
-import { hashSource, recordServe } from "../infra/serve-registry/serve-registry.js";
+import {
+  claimServer,
+  hashSource,
+  pageKeyFor,
+  projectRootFor,
+} from "../infra/serve-registry/serve-registry.js";
 
 import { runRender } from "./render.js";
 import type { ServeDeps, ServeIo } from "./serve.js";
@@ -66,10 +71,15 @@ describe("runRender - reusing a serve that has fsWrite never writes an overlay",
       clock: new FakeClock(),
       viewerBundleDir: tmpdir(),
     };
-    const forget = recordServe(file, "http://127.0.0.1:9999", {
+    const claim = claimServer(projectRootFor(file));
+    if (claim === undefined) throw new Error("failed to claim the server slot");
+    claim.publish("http://127.0.0.1:9999/", Number.MAX_SAFE_INTEGER, 60);
+    claim.addDiagram(file, {
+      pageKey: pageKeyFor(file),
       hash: hashSource(content),
-      at: Date.now(),
+      compiledAt: Date.now(),
     });
+    const forget = () => claim.release();
 
     try {
       const io = makeIo();

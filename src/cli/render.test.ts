@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -11,9 +11,11 @@ import { CaptureLog } from "../app/ports/log.fake.js";
 import { FakeWatch } from "../app/ports/watch.fake.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
 import {
+  claimServer,
   hashSource,
-  recordServe,
-  type ServeRecord,
+  pageKeyFor,
+  projectRootFor,
+  type ServeClaim,
 } from "../infra/serve-registry/serve-registry.js";
 
 import {
@@ -26,7 +28,25 @@ import {
   withCompiledContext,
   withoutFsWrite,
 } from "./render.js";
+import type { ReusedServe } from "./render.js";
 import type { ServeDeps, ServeIo } from "./serve.js";
+
+/**
+ * Register a running server for `file`, as `tldx serve` would. Returns the
+ * release, so the temp record never outlives the test.
+ */
+function registerServe(
+  file: string,
+  url: string,
+  diagram: { hash?: string; compiledAt?: number } = {},
+  codeFingerprint?: number,
+): () => void {
+  const claim: ServeClaim | undefined = claimServer(projectRootFor(file));
+  if (claim === undefined) throw new Error("failed to claim the server slot");
+  claim.publish(url, codeFingerprint ?? Number.MAX_SAFE_INTEGER, 60);
+  claim.addDiagram(file, { pageKey: pageKeyFor(file), ...diagram });
+  return () => claim.release();
+}
 
 describe("parseArgs", () => {
   it("resolves positional file/out and defaults", () => {
@@ -106,10 +126,9 @@ describe("parseArgs", () => {
 
 describe("describeReused", () => {
   it("formats as :port (file @ hash)", () => {
-    const reused: ServeRecord = {
-      pid: 1,
+    const reused: ReusedServe = {
       url: "http://127.0.0.1:60278/",
-      file: "board.tldx.jsx",
+      pageKey: "aaaa1111",
       hash: "a848f56a",
     };
     expect(describeReused("/some/dir/board.tldx.jsx", reused)).toBe(
@@ -118,52 +137,76 @@ describe("describeReused", () => {
   });
 
   it("omits the hash when the registry record predates compile tracking", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://127.0.0.1:60278/", file: "board.tldx.jsx" };
+    const reused: ReusedServe = {
+      url: "http://127.0.0.1:60278/",
+      pageKey: "aaaa1111",
+    };
     expect(describeReused("/some/dir/board.tldx.jsx", reused)).toBe(":60278 (board.tldx.jsx)");
   });
 });
 
 describe("isStale", () => {
   it("is stale when the current hash disagrees with the recorded compile", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa" };
+    const reused: ReusedServe = {
+      url: "http://x",
+      pageKey: "aaaa1111",
+      hash: "aaaaaaaa",
+    };
     expect(isStale("bbbbbbbb", reused)).toBe(true);
   });
 
   it("is fresh when hashes match", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa" };
+    const reused: ReusedServe = {
+      url: "http://x",
+      pageKey: "aaaa1111",
+      hash: "aaaaaaaa",
+    };
     expect(isStale("aaaaaaaa", reused)).toBe(false);
   });
 
   it("treats an unknown recorded hash as fresh, not stale", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f" };
+    const reused: ReusedServe = {
+      url: "http://x",
+      pageKey: "aaaa1111",
+    };
     expect(isStale("aaaaaaaa", reused)).toBe(false);
   });
 });
 
 describe("isCodeStale", () => {
   it("is stale when the current code fingerprint is newer than the reused server's boot fingerprint", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", codeFingerprint: 1000 };
+    const reused: ReusedServe = {
+      url: "http://x",
+      pageKey: "aaaa1111",
+      codeFingerprint: 1000,
+    };
     expect(isCodeStale(2000, reused)).toBe(true);
   });
 
   it("is fresh when the current code fingerprint matches or predates the boot fingerprint", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", codeFingerprint: 1000 };
+    const reused: ReusedServe = {
+      url: "http://x",
+      pageKey: "aaaa1111",
+      codeFingerprint: 1000,
+    };
     expect(isCodeStale(1000, reused)).toBe(false);
     expect(isCodeStale(500, reused)).toBe(false);
   });
 
   it("treats an unknown recorded codeFingerprint as fresh, not stale", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f" };
+    const reused: ReusedServe = {
+      url: "http://x",
+      pageKey: "aaaa1111",
+    };
     expect(isCodeStale(2000, reused)).toBe(false);
   });
 });
 
 describe("staleReason", () => {
   it("is undefined when neither source nor code has changed", () => {
-    const reused: ServeRecord = {
-      pid: 1,
+    const reused: ReusedServe = {
       url: "http://x",
-      file: "f",
+      pageKey: "aaaa1111",
       hash: "aaaaaaaa",
       codeFingerprint: 1000,
     };
@@ -171,10 +214,9 @@ describe("staleReason", () => {
   });
 
   it("reports source staleness alone", () => {
-    const reused: ServeRecord = {
-      pid: 1,
+    const reused: ReusedServe = {
       url: "http://x",
-      file: "f",
+      pageKey: "aaaa1111",
       hash: "aaaaaaaa",
       codeFingerprint: 1000,
     };
@@ -182,10 +224,9 @@ describe("staleReason", () => {
   });
 
   it("reports code staleness alone", () => {
-    const reused: ServeRecord = {
-      pid: 1,
+    const reused: ReusedServe = {
       url: "http://x",
-      file: "f",
+      pageKey: "aaaa1111",
       hash: "aaaaaaaa",
       codeFingerprint: 1000,
     };
@@ -195,10 +236,9 @@ describe("staleReason", () => {
   });
 
   it("reports both when source and code have both changed", () => {
-    const reused: ServeRecord = {
-      pid: 1,
+    const reused: ReusedServe = {
       url: "http://x",
-      file: "f",
+      pageKey: "aaaa1111",
       hash: "aaaaaaaa",
       codeFingerprint: 1000,
     };
@@ -210,7 +250,11 @@ describe("staleReason", () => {
 
 describe("withCompiledContext", () => {
   it("annotates an unknown --frame error with when the reused scene was compiled", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", compiledAt: 0 };
+    const reused: ReusedServe = {
+      url: "http://x",
+      pageKey: "aaaa1111",
+      compiledAt: 0,
+    };
     const annotated = withCompiledContext(
       new Error('unknown --frame id "ctx". Valid ids: a, b'),
       reused,
@@ -221,13 +265,20 @@ describe("withCompiledContext", () => {
   });
 
   it("leaves unrelated errors untouched", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", compiledAt: 0 };
+    const reused: ReusedServe = {
+      url: "http://x",
+      pageKey: "aaaa1111",
+      compiledAt: 0,
+    };
     const original = new Error("some other failure");
     expect(withCompiledContext(original, reused)).toBe(original);
   });
 
   it("leaves the error untouched when compiledAt is unknown", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f" };
+    const reused: ReusedServe = {
+      url: "http://x",
+      pageKey: "aaaa1111",
+    };
     const original = new Error('unknown --frame id "ctx". Valid ids: a, b');
     expect(withCompiledContext(original, reused)).toBe(original);
   });
@@ -299,7 +350,7 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
   it("refuses with a stale message (not the generic 'no running serve' one) when the registered server predates the current source", async () => {
     const content = "export default function Diagram() { return null; }";
     const file = tempFile(content);
-    const forget = recordServe(file, "http://127.0.0.1:9999", { hash: "notarealhash", at: 0 });
+    const forget = registerServe(file, "http://127.0.0.1:9999/", { hash: "notarealhash" });
     const io = makeIo();
 
     try {
@@ -323,11 +374,7 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
     const content = "export default function Diagram() { return null; }";
     const file = tempFile(content);
     // codeFingerprint 0 predates any real file's mtime, so isCodeStale trips.
-    const forget = recordServe(file, "http://127.0.0.1:9999", {
-      hash: hashSource(content),
-      at: 0,
-      codeFingerprint: 0,
-    });
+    const forget = registerServe(file, "http://127.0.0.1:9999/", { hash: hashSource(content) }, 0);
     const io = makeIo();
 
     try {
@@ -350,7 +397,7 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
   it("does not refuse when the registered server's hash matches the current source (would proceed to reuse it)", async () => {
     const content = "export default function Diagram() { return null; }";
     const file = tempFile(content);
-    const forget = recordServe(file, "http://127.0.0.1:9999", { hash: hashSource(content), at: 0 });
+    const forget = registerServe(file, "http://127.0.0.1:9999/", { hash: hashSource(content) });
     const io = makeIo();
 
     try {
@@ -367,6 +414,30 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
       expect(stderr).not.toMatch(/is stale/);
       expect(stderr).not.toMatch(/no running `tldx serve`/);
       expect(io.stdout.join("")).toMatch(/reusing serve on :9999 \(diagram\.tldx\.jsx @ /);
+    } finally {
+      forget();
+    }
+  });
+
+  it("refuses reuse when the live server does not serve this file", async () => {
+    const content = "export default function Diagram() { return null; }";
+    const file = tempFile(content);
+    // Same directory, so both files resolve to the same project root.
+    const other = join(dirname(file), "other.tldx.jsx");
+    writeFileSync(other, content);
+    // A server is up for this project, holding a different diagram.
+    const forget = registerServe(other, "http://127.0.0.1:9999/", { hash: hashSource(content) });
+    const io = makeIo();
+
+    try {
+      const code = await runRender({
+        argv: [file, `${file}.png`, "--reuse-only"],
+        deps: makeDeps(file, content),
+        io,
+      });
+
+      expect(code).toBe(1);
+      expect(io.stderr.join("")).toMatch(/no running `tldx serve`/);
     } finally {
       forget();
     }

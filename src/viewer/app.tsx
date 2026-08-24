@@ -1,22 +1,36 @@
-import { useEffect, useReducer, useRef } from "react";
-import { Tldraw, type Editor, type TLStoreSnapshot } from "tldraw";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { Tldraw, type Editor, type TLPageId, type TLRecord, type TLShapeId } from "tldraw";
 import "tldraw/tldraw.css";
 
 import type { Diagnostic } from "../contracts/diagnostic.js";
-import type { SceneJSON } from "../contracts/scene-json.js";
+import { isDocumentRecord, pageIdFor, pageMembers } from "../contracts/page-scope.js";
+import type { SceneJSON, TLRecordId } from "../contracts/scene-json.js";
 
 import { createHeartbeat } from "./heartbeat.js";
+import { mergePageSlice, orphanPageIds } from "./merge-page.js";
 import { createOverlayWriter, type OverlayWriter } from "./overlay-writer.js";
 import { createSseClient } from "./sse-client.js";
-import { applyMessage, initialViewerState, sceneTitle } from "./state.js";
+import {
+  applyMessage,
+  initialViewerState,
+  pageKeyFromHash,
+  sceneTitle,
+  type ViewerState,
+} from "./state.js";
+
+type ViewerPages = ViewerState["pages"];
 
 const EVENTS_URL = "/events";
+const TOKEN_URL = "/token";
 
 export function ViewerApp(): JSX.Element {
   const editorRef = useRef<Editor | null>(null);
   const writerRef = useRef<OverlayWriter | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  /** Scenes already merged into the store, so a re-render does not re-merge. */
+  const mergedRef = useRef<Map<string, SceneJSON>>(new Map());
   const [state, dispatch] = useReducer(applyMessage, initialViewerState);
+  const [currentPageKey, setCurrentPageKey] = useState<string | null>(null);
 
   useEffect(() => {
     const client = createSseClient({
@@ -38,70 +52,156 @@ export function ViewerApp(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    const writer = createOverlayWriter();
-    writerRef.current = writer;
+    let writer: OverlayWriter | null = null;
+    // The write endpoint is gated; a cross-site page cannot read this response,
+    // so serving the token to same-origin script is safe.
+    void fetch(TOKEN_URL)
+      .then((res) => res.json() as Promise<{ token?: string }>)
+      .then((body) => body.token ?? "")
+      .catch(() => "")
+      .then((token) => {
+        writer = createOverlayWriter({ token });
+        writerRef.current = writer;
+      });
     return () => {
       unsubscribeRef.current?.();
       unsubscribeRef.current = null;
-      writer.close();
+      writer?.close();
       writerRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    const title = sceneTitle(state.scene);
+    const title = sceneTitle(
+      currentPageKey === null ? null : (state.pages[currentPageKey]?.scene ?? null),
+    );
     if (title !== null) document.title = `${title} - tldx`;
-  }, [state.scene]);
+  }, [state.pages, currentPageKey]);
 
   useEffect(() => {
     const editor = editorRef.current;
-    if (editor === null || state.scene === null) return;
-    writerRef.current?.noteServerScene(state.scene);
-    if (deepEqual(currentDocumentSnapshot(editor), state.scene)) return;
-    pushScene(editor, state.scene);
-  }, [state.scene]);
+    if (editor === null) return;
+    setCurrentPageKey(mergePages(editor, state.pages, mergedRef.current, writerRef.current));
+  }, [state.pages]);
 
   function handleMount(editor: Editor): void {
     editorRef.current = editor;
     (window as unknown as { editor?: Editor }).editor = editor;
-    if (state.scene !== null) {
-      writerRef.current?.noteServerScene(state.scene);
-      pushScene(editor, state.scene);
-    }
+    setCurrentPageKey(mergePages(editor, state.pages, mergedRef.current, writerRef.current));
     unsubscribeRef.current?.();
     unsubscribeRef.current = editor.store.listen(
       () => {
-        writerRef.current?.onCanvasChange(currentDocumentSnapshot(editor));
+        // The edit belongs to the page it happened on, and only that page's
+        // records travel back - the store holds every served diagram.
+        const key = keyOfPage(editor.getCurrentPageId());
+        if (key === null) return;
+        writerRef.current?.onCanvasChange(key, pageSnapshot(editor, key));
       },
       { source: "user", scope: "document" },
     );
   }
 
+  // Only the page you are looking at gets a banner: a broken diagram you are
+  // not viewing must not cover the one you are.
+  const diagnostics =
+    currentPageKey === null ? [] : (state.pages[currentPageKey]?.diagnostics ?? []);
+
   return (
     <div style={{ position: "fixed", inset: 0 }}>
       <Tldraw onMount={handleMount} />
-      {state.diagnostics.length > 0 ? <DiagnosticBanner diagnostics={state.diagnostics} /> : null}
+      {diagnostics.length > 0 ? <DiagnosticBanner diagnostics={diagnostics} /> : null}
     </div>
   );
 }
 
-export function pushScene(editor: Editor, scene: SceneJSON): void {
-  editor.store.mergeRemoteChanges(() => {
-    editor.loadSnapshot(scene as unknown as TLStoreSnapshot);
-  });
+/** `page:<key>` back to `<key>`, or null for a page no diagram owns. */
+function keyOfPage(pageId: string): string | null {
+  const key = pageId.startsWith("page:") ? pageId.slice("page:".length) : null;
+  return key === null || key === "" ? null : key;
 }
 
 function currentDocumentSnapshot(editor: Editor): SceneJSON {
   return editor.store.getStoreSnapshot("document") as unknown as SceneJSON;
 }
 
+/** One page's records, in the shape the overlay endpoint expects. */
+function pageSnapshot(editor: Editor, key: string): SceneJSON {
+  const document = currentDocumentSnapshot(editor);
+  const members = pageMembers(document.store, key);
+  const store: Record<TLRecordId, (typeof document.store)[string]> = {};
+  for (const id of members) {
+    const record = document.store[id];
+    if (record !== undefined) store[id] = record;
+  }
+  return { schema: document.schema, store };
+}
+
 /**
- * The server re-pushes the applied scene after every overlay write. Reloading
- * an identical snapshot would clear selection and flash the canvas mid-edit,
- * so a scene matching the editor's current document is skipped.
+ * Bring the store in line with every page the server has pushed, and answer
+ * with the page now in view.
+ *
+ * Only pages whose scene actually changed are touched, so a recompile in one
+ * diagram leaves every other page - and its camera and selection - alone. A
+ * page arriving for the first time takes the view, since serving a diagram is
+ * an explicit request to look at it; a recompile never does.
  */
-function deepEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+export function mergePages(
+  editor: Editor,
+  pages: ViewerPages,
+  merged: Map<string, SceneJSON>,
+  writer: OverlayWriter | null,
+): string | null {
+  const arrived: string[] = [];
+  const touched: string[] = [];
+
+  editor.store.mergeRemoteChanges(() => {
+    for (const [key, page] of Object.entries(pages)) {
+      const scene = page.scene;
+      if (scene === null || merged.get(key) === scene) continue;
+      const isNew = !merged.has(key);
+      const { put, remove } = mergePageSlice(
+        currentDocumentSnapshot(editor).store,
+        scene,
+        key,
+        isDocumentRecord,
+      );
+      if (remove.length > 0) editor.store.remove(remove as TLRecordId[] as TLShapeId[]);
+      editor.store.put(put as unknown as TLRecord[]);
+      merged.set(key, scene);
+      touched.push(key);
+      if (isNew) arrived.push(key);
+    }
+
+    // tldraw boots with an empty "Page 1"; incremental puts never replace it.
+    const orphans = orphanPageIds(currentDocumentSnapshot(editor).store, [...merged.keys()]);
+    if (orphans.length > 0 && merged.size > 0) {
+      editor.store.remove(orphans as TLRecordId[] as TLShapeId[]);
+    }
+  });
+
+  // Every page the merge touched, so the next change on any of them is
+  // compared against what the server sent for *that* page. Noting only the
+  // page in view makes tldraw's own post-merge fixups on the others look like
+  // user edits, and writes them into their sidecars.
+  for (const key of touched) writer?.noteServerScene(key, pageSnapshot(editor, key));
+
+  const target = arrived.at(-1) ?? deepLinkedKey(merged) ?? keyOfPage(editor.getCurrentPageId());
+  if (target !== null && merged.has(target)) {
+    editor.setCurrentPage(pageIdFor(target) as TLPageId);
+  }
+  return target;
+}
+
+/**
+ * The page named by `#page=` in the URL, if it is one we actually hold. An
+ * unknown key is ignored rather than treated as an error - the deep link may
+ * name a diagram this server no longer serves.
+ */
+function deepLinkedKey(merged: Map<string, SceneJSON>): string | null {
+  // Guarded so the merge stays callable outside a browser, as its test does.
+  const hash = typeof window === "undefined" ? "" : window.location.hash;
+  const key = pageKeyFromHash(hash);
+  return key !== null && merged.has(key) ? key : null;
 }
 
 interface BannerProps {

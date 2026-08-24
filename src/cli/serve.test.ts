@@ -18,9 +18,17 @@ import { CaptureLog } from "../app/ports/log.fake.js";
 import { FakeWatch } from "../app/ports/watch.fake.js";
 import { overlayPathFor } from "../domain/overlay/index.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
-import { findServe, hashSource, recordServe } from "../infra/serve-registry/serve-registry.js";
+import {
+  claimServer,
+  diagramOf,
+  findServer,
+  hashSource,
+  pageKeyFor,
+  type ServeClaim,
+} from "../infra/serve-registry/serve-registry.js";
 
 import {
+  pageUrl,
   runServe,
   viewerStalenessWarning,
   type ServeDeps,
@@ -39,8 +47,36 @@ function makeIo(): ServeIo {
   };
 }
 
-function makeDeps(): ServeDeps {
-  const fs = new InMemoryFs({ "doc.tldx.jsx": SRC });
+/**
+ * A real project directory on disk, so the registry's project-root walk and
+ * page keys have something to resolve. The diagram sources themselves stay in
+ * the in-memory fs the compile ports read.
+ */
+function makeProject(files: string[] = ["doc.tldx.jsx"]): { root: string; paths: string[] } {
+  const root = mkdtempSync(join(tmpdir(), "tldx-serve-project-"));
+  projectDirs.push(root);
+  mkdirSync(join(root, ".git"));
+  const paths = files.map((name) => {
+    const path = join(root, name);
+    writeFileSync(path, SRC);
+    return path;
+  });
+  return { root, paths };
+}
+
+const projectDirs: string[] = [];
+const claims: ServeClaim[] = [];
+
+/** A claimed registry slot for `root`, released after the test. */
+function makeClaim(root: string): ServeClaim {
+  const claim = claimServer(root);
+  if (claim === undefined) throw new Error("failed to claim the server slot");
+  claims.push(claim);
+  return claim;
+}
+
+function makeDeps(sources: Record<string, string> = { "doc.tldx.jsx": SRC }): ServeDeps {
+  const fs = new InMemoryFs(sources);
   return {
     fs,
     fsWrite: fs,
@@ -65,6 +101,8 @@ describe("runServe", () => {
 
   afterEach(async () => {
     if (started !== undefined) await started.close();
+    while (claims.length > 0) claims.pop()!.release();
+    while (projectDirs.length > 0) rmSync(projectDirs.pop()!, { recursive: true, force: true });
   });
 
   it("close() is idempotent", async () => {
@@ -110,44 +148,99 @@ describe("runServe", () => {
   });
 
   it("omitting fsWrite disables the overlay round-trip - PUT /overlay is accepted but writes nothing", async () => {
-    const deps = makeDeps();
+    const { root, paths } = makeProject();
+    const deps = makeDeps({ [paths[0]!]: SRC });
+    deps.claim = makeClaim(root);
     delete deps.fsWrite;
-    started = await runServe({ path: "doc.tldx.jsx", deps, io: makeIo() });
+    started = await runServe({ path: paths[0]!, deps, io: makeIo() });
 
     const res = await fetch(`${started.url}overlay`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ store: {}, schema: {} }),
+      headers: { "content-type": "application/json", "x-tldx-token": started.token },
+      body: JSON.stringify({ pageKey: pageKeyFor(paths[0]!), snapshot: { store: {}, schema: {} } }),
     });
     expect(res.status).toBe(204);
 
     const fs = deps.fs as InMemoryFs;
-    expect(fs.has(overlayPathFor("doc.tldx.jsx"))).toBe(false);
+    expect(fs.has(overlayPathFor(paths[0]!))).toBe(false);
   });
 
-  it("touches the serve registry's compile hash after a recompile, for a registered file", async () => {
-    const deps = makeDeps();
+  it("touches the registry's compile hash after a recompile", async () => {
+    const { root, paths } = makeProject();
+    const path = paths[0]!;
+    const deps = makeDeps({ [path]: SRC });
+    deps.claim = makeClaim(root);
     const watch = deps.watch as FakeWatch;
-    const path = "doc.tldx.jsx";
     started = await runServe({ path, deps, io: makeIo() });
-    const forget = recordServe(path, started.url, started.compile);
+    deps.claim.publish(started.url, started.compile.codeFingerprint, started.ttlMinutes);
 
-    try {
-      const fs = deps.fs as InMemoryFs;
-      const nextSrc = `${SRC}\n// v2`;
-      fs.setFile(path, nextSrc);
-      watch.emitChange(path);
+    const fs = deps.fs as InMemoryFs;
+    const nextSrc = `${SRC}\n// v2`;
+    fs.setFile(path, nextSrc);
+    watch.emitChange(path);
 
-      const wantHash = hashSource(nextSrc);
-      let record = findServe(path);
-      for (let i = 0; i < 50 && record?.hash !== wantHash; i++) {
-        await new Promise((r) => setTimeout(r, 10));
-        record = findServe(path);
-      }
-      expect(record?.hash).toBe(wantHash);
-    } finally {
-      forget();
+    const wantHash = hashSource(nextSrc);
+    let diagram = diagramOf(findServer(path)!, path);
+    for (let i = 0; i < 50 && diagram?.hash !== wantHash; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+      diagram = diagramOf(findServer(path)!, path);
     }
+    expect(diagram?.hash).toBe(wantHash);
+  });
+
+  describe("many diagrams on one server", () => {
+    it("adds a second diagram as its own page and is idempotent per file", async () => {
+      const { root, paths } = makeProject(["a.tldx.jsx", "b.tldx.jsx"]);
+      const [a, b] = paths as [string, string];
+      const deps = makeDeps({ [a]: SRC, [b]: SRC });
+      deps.claim = makeClaim(root);
+      started = await runServe({ path: a, deps, io: makeIo() });
+      deps.claim.publish(started.url, started.compile.codeFingerprint, started.ttlMinutes);
+
+      const added = await started.addDiagram(b);
+      expect(added).toMatchObject({ pageKey: pageKeyFor(b), alreadyServed: false });
+      expect(added.pageKey).not.toBe(pageKeyFor(a));
+
+      const again = await started.addDiagram(b);
+      expect(again).toMatchObject({ pageKey: pageKeyFor(b), alreadyServed: true });
+
+      // Both are discoverable through the one record for this project.
+      const record = findServer(a)!;
+      expect(Object.keys(record.diagrams)).toHaveLength(2);
+      expect(diagramOf(record, b)?.pageKey).toBe(pageKeyFor(b));
+    });
+
+    it("reports whether a viewer is connected, which is what decides opening a tab", async () => {
+      const { root, paths } = makeProject();
+      const deps = makeDeps({ [paths[0]!]: SRC });
+      deps.claim = makeClaim(root);
+      started = await runServe({ path: paths[0]!, deps, io: makeIo() });
+
+      expect(started.hasViewer()).toBe(false);
+
+      const controller = new AbortController();
+      try {
+        await fetch(`${started.url}events`, { signal: controller.signal });
+        for (let i = 0; i < 50 && !started.hasViewer(); i++) {
+          await new Promise((r) => setTimeout(r, 10));
+        }
+        expect(started.hasViewer()).toBe(true);
+      } finally {
+        controller.abort();
+      }
+    });
+
+    it("opens the browser on the served diagram's page", async () => {
+      const { root, paths } = makeProject();
+      const opened: string[] = [];
+      const deps = makeDeps({ [paths[0]!]: SRC });
+      deps.claim = makeClaim(root);
+      deps.openBrowser = (url) => opened.push(url);
+      started = await runServe({ path: paths[0]!, deps, io: makeIo() });
+
+      expect(opened).toEqual([pageUrl(started.url, pageKeyFor(paths[0]!))]);
+      expect(pageUrl("http://x/", "abc")).toBe("http://x/#page=abc");
+    });
   });
 
   describe("idle-TTL reaper", () => {

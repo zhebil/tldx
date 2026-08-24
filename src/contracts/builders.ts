@@ -50,11 +50,11 @@ const DEFAULT_SCHEMA: TLStoreSchema = {
 // ---------------------------------------------------------------- envelope --
 
 export const sceneMessage = {
-  scene(payload: SceneJSON): SceneMessage {
-    return { v: 1, kind: "scene", payload };
+  scene(pageKey: string, payload: SceneJSON): SceneMessage {
+    return { v: 1, kind: "scene", pageKey, payload };
   },
-  error(diagnostics: Diagnostic[]): SceneMessage {
-    return { v: 1, kind: "error", payload: { diagnostics } };
+  error(pageKey: string, diagnostics: Diagnostic[]): SceneMessage {
+    return { v: 1, kind: "error", pageKey, payload: { diagnostics } };
   },
   ping(): SceneMessage {
     return { v: 1, kind: "ping", payload: {} };

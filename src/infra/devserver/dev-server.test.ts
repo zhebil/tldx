@@ -15,7 +15,7 @@ import { createSseTransport } from "../transport/sse-transport.js";
 import type { SceneJSON } from "../../contracts/scene-json.js";
 import type { SceneMessage } from "../../contracts/scene-message.js";
 
-import { startDevServer, type DevServerHandle } from "./dev-server.js";
+import { startDevServer, type AddDiagramResult, type DevServerHandle } from "./dev-server.js";
 
 interface Booted {
   server: DevServerHandle;
@@ -36,10 +36,13 @@ async function closeFetch(input: string | URL, init: RequestInit = {}): Promise<
   return fetch(input, { ...init, headers });
 }
 
+const TOKEN = "test-token";
+
 async function bootWithBundle(
   files: Record<string, string>,
-  onOverlayPut?: (snapshot: SceneJSON) => Promise<void>,
+  onOverlayPut?: (pageKey: string, snapshot: SceneJSON) => Promise<void>,
   onActivity?: () => void,
+  onAddDiagram?: (file: string) => Promise<AddDiagramResult>,
 ): Promise<Booted> {
   const bundleDir = await mkdtemp(join(tmpdir(), "tldx-devserver-"));
   for (const [name, body] of Object.entries(files)) {
@@ -52,8 +55,10 @@ async function bootWithBundle(
     port: 0,
     viewerBundleDir: bundleDir,
     transport,
+    token: TOKEN,
     ...(onOverlayPut !== undefined ? { onOverlayPut } : {}),
     ...(onActivity !== undefined ? { onActivity } : {}),
+    ...(onAddDiagram !== undefined ? { onAddDiagram } : {}),
   });
   return { server, transport, bundleDir };
 }
@@ -233,55 +238,69 @@ describe("startDevServer", () => {
       schema: { schemaVersion: 2, sequences: {} },
     };
 
+    /** A well-formed authenticated overlay PUT; `overrides` bend one thing at a time. */
+    function putOverlay(overrides: { headers?: Record<string, string>; body?: string } = {}) {
+      return closeFetch(`${booted!.server.url}overlay`, {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          "x-tldx-token": TOKEN,
+          ...overrides.headers,
+        },
+        body: overrides.body ?? JSON.stringify({ pageKey: "abc123", snapshot }),
+      });
+    }
+
     it("404s when no handler is configured", async () => {
       booted = await bootWithBundle({ "index.html": "<!doctype html>" });
 
-      const res = await closeFetch(`${booted.server.url}overlay`, {
-        method: "PUT",
-        body: JSON.stringify(snapshot),
-      });
-
-      expect(res.status).toBe(404);
+      expect((await putOverlay()).status).toBe(404);
     });
 
-    it("204s and forwards the parsed snapshot to the handler", async () => {
-      let received: SceneJSON | undefined;
-      booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async (s) => {
-        received = s;
+    it("204s and forwards the page key and parsed snapshot to the handler", async () => {
+      let received: { pageKey: string; snapshot: SceneJSON } | undefined;
+      booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async (pageKey, s) => {
+        received = { pageKey, snapshot: s };
       });
 
-      const res = await closeFetch(`${booted.server.url}overlay`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(snapshot),
-      });
+      const res = await putOverlay();
 
       expect(res.status).toBe(204);
-      expect(received).toEqual(snapshot);
+      expect(received).toEqual({ pageKey: "abc123", snapshot });
+    });
+
+    it("400s when the page key is missing", async () => {
+      booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async () => {});
+
+      expect((await putOverlay({ body: JSON.stringify({ snapshot }) })).status).toBe(400);
+    });
+
+    it("403s without the token, and does not reach the handler", async () => {
+      let called = false;
+      booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async () => {
+        called = true;
+      });
+
+      expect((await putOverlay({ headers: { "x-tldx-token": "wrong" } })).status).toBe(403);
+      expect(called).toBe(false);
     });
 
     it("400s on a malformed body", async () => {
       booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async () => {});
 
-      const res = await closeFetch(`${booted.server.url}overlay`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ notAScene: true }),
-      });
-
-      expect(res.status).toBe(400);
+      expect(
+        (
+          await putOverlay({
+            body: JSON.stringify({ pageKey: "abc123", snapshot: { notAScene: true } }),
+          })
+        ).status,
+      ).toBe(400);
     });
 
     it("400s on a non-JSON body", async () => {
       booted = await bootWithBundle({ "index.html": "<!doctype html>" }, async () => {});
 
-      const res = await closeFetch(`${booted.server.url}overlay`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: "not json",
-      });
-
-      expect(res.status).toBe(400);
+      expect((await putOverlay({ body: "not json" })).status).toBe(400);
     });
 
     it("500s when the handler throws", async () => {
@@ -289,13 +308,130 @@ describe("startDevServer", () => {
         throw new Error("boom");
       });
 
-      const res = await closeFetch(`${booted.server.url}overlay`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(snapshot),
+      expect((await putOverlay()).status).toBe(500);
+    });
+  });
+
+  describe("POST /diagrams", () => {
+    /** A well-formed authenticated handoff; `overrides` bend one thing at a time. */
+    function postDiagram(overrides: { headers?: Record<string, string>; body?: string } = {}) {
+      return closeFetch(`${booted!.server.url}diagrams`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-tldx-token": TOKEN,
+          ...overrides.headers,
+        },
+        body: overrides.body ?? JSON.stringify({ file: "/tmp/a.tldx.jsx" }),
       });
+    }
+
+    it("404s when no handler is configured", async () => {
+      booted = await bootWithBundle({ "index.html": "<!doctype html>" });
+
+      expect((await postDiagram()).status).toBe(404);
+    });
+
+    it("adds the diagram and returns its page key", async () => {
+      let received: string | undefined;
+      booted = await bootWithBundle(
+        { "index.html": "<!doctype html>" },
+        undefined,
+        undefined,
+        async (file) => {
+          received = file;
+          return { pageKey: "abc123", alreadyServed: false, hasViewer: false };
+        },
+      );
+
+      const res = await postDiagram();
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        pageKey: "abc123",
+        alreadyServed: false,
+        hasViewer: false,
+      });
+      expect(received).toBe("/tmp/a.tldx.jsx");
+    });
+
+    it("403s on a wrong token, without compiling anything", async () => {
+      let called = false;
+      booted = await bootWithBundle(
+        { "index.html": "<!doctype html>" },
+        undefined,
+        undefined,
+        async () => {
+          called = true;
+          return { pageKey: "abc123", alreadyServed: false, hasViewer: false };
+        },
+      );
+
+      expect((await postDiagram({ headers: { "x-tldx-token": "wrong" } })).status).toBe(403);
+      expect(called).toBe(false);
+    });
+
+    it("403s a cross-site request even with the token, without compiling anything", async () => {
+      let called = false;
+      booted = await bootWithBundle(
+        { "index.html": "<!doctype html>" },
+        undefined,
+        undefined,
+        async () => {
+          called = true;
+          return { pageKey: "abc123", alreadyServed: false, hasViewer: false };
+        },
+      );
+
+      expect((await postDiagram({ headers: { origin: "https://evil.example" } })).status).toBe(403);
+      expect(called).toBe(false);
+    });
+
+    it("415s a non-JSON content type, without compiling anything", async () => {
+      let called = false;
+      booted = await bootWithBundle(
+        { "index.html": "<!doctype html>" },
+        undefined,
+        undefined,
+        async () => {
+          called = true;
+          return { pageKey: "abc123", alreadyServed: false, hasViewer: false };
+        },
+      );
+
+      expect((await postDiagram({ headers: { "content-type": "text/plain" } })).status).toBe(415);
+      expect(called).toBe(false);
+    });
+
+    it("400s when the file is missing from the body", async () => {
+      booted = await bootWithBundle(
+        { "index.html": "<!doctype html>" },
+        undefined,
+        undefined,
+        async () => ({
+          pageKey: "abc123",
+          alreadyServed: false,
+          hasViewer: false,
+        }),
+      );
+
+      expect((await postDiagram({ body: JSON.stringify({}) })).status).toBe(400);
+    });
+
+    it("500s with the reason when the handler throws", async () => {
+      booted = await bootWithBundle(
+        { "index.html": "<!doctype html>" },
+        undefined,
+        undefined,
+        async () => {
+          throw new Error("no such file");
+        },
+      );
+
+      const res = await postDiagram();
 
       expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({ error: "no such file" });
     });
   });
 });
