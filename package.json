@@ -1,6 +1,6 @@
 {
   "name": "@zhebil/tldx",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": false,
   "description": "Write architecture and flow diagrams as JSX and render them on a live tldraw canvas.",
   "keywords": [
