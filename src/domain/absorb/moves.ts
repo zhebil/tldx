@@ -1,27 +1,13 @@
 /**
- * `planMoveCandidates`: the escalation ladder for a `moved` overlay entry
- * (`docs/round-trip-scope.md` §2, §7 F4.4; `bd show tldx-d3o`).
+ * `planMoveCandidates`: the escalation ladder for a `moved` overlay entry,
+ * cheapest rung first, for `app/absorb.ts` to try in order (write, recompile,
+ * compare to the target scene, keep the first that verifies). Reorder comes
+ * first, then a gap change - the latter only when the dragged child is the
+ * *last* flowed child along the flow axis, the only geometry a single-shape
+ * drag can express as a uniform gap. Pin is never proposed: it drops the child
+ * from the flow, reflowing every sibling, so it almost never verifies.
  *
- * Cheapest rung first, returned as an ordered list of candidates for
- * `app/absorb.ts` to try in order (write, recompile, compare to the target
- * scene, keep the first that verifies):
- *
- * 1. **Reorder** - the dragged child is a flowed child of a `row`/`col`
- *    container; one candidate per other slot among its siblings (nearest
- *    slot first).
- * 2. **Gap** - only when the dragged child is the *last* flowed child along
- *    the flow axis (the only geometry a single-shape drag can express as a
- *    uniform gap change, since no sibling after it needs to shift too).
- *
- * If neither applies, the list is a single `unabsorbable` entry naming the
- * element and why. Per docs/round-trip-scope.md §2, a pin inside a
- * `row`/`col` container almost never verifies (pinning drops the child from
- * the flow, which reflows every sibling), so pin is never proposed here -
- * `--pin` (not part of F4) covers `layout="free"` children and
- * already-pinned children.
- *
- * Pure: no source text, no I/O. `domain/absorb/codegen.ts` (`spliceReorder`,
- * `patchGapAttr`) turns a plan into source text.
+ * Pure: no source text, no I/O. `codegen.ts` turns a plan into source text.
  */
 
 import type { SourceSpan } from "../../contracts/diagnostic.js";
@@ -36,9 +22,7 @@ import type {
   IRNote,
 } from "../ir/index.js";
 
-// Mirrors `domain/layout/stack.ts`'s unexported `DEFAULT_GAP` - stack.ts is
-// owned by another agent right now, so this is a deliberate small
-// duplication rather than adding an export there.
+/** Mirrors `domain/layout/stack.ts`'s unexported `DEFAULT_GAP`. */
 const DEFAULT_GAP = 40;
 
 export type ReorderCandidate = {

@@ -131,7 +131,7 @@ describe("lower: diagnostics", () => {
     expect(codes).toEqual(["ir/free-endpoint-not-supported"]);
   });
 
-  it("fromSide/toSide (B9) parse a named compass point into a normalizedAnchor fraction", () => {
+  it("fromSide/toSide parse a named compass point into a normalizedAnchor fraction", () => {
     const ast = doc({}, [
       box({ id: "a" }),
       box({ id: "b" }),
@@ -145,7 +145,7 @@ describe("lower: diagnostics", () => {
     expect(edgeIr.toAnchor).toEqual({ x: 0, y: 0 });
   });
 
-  it("fromSide/toSide (B9) parse an 'x,y' fraction directly", () => {
+  it("fromSide/toSide parse an 'x,y' fraction directly", () => {
     const ast = doc({}, [
       box({ id: "a" }),
       box({ id: "b" }),
@@ -159,11 +159,7 @@ describe("lower: diagnostics", () => {
     expect(edgeIr.toAnchor).toBeUndefined();
   });
 
-  it("fromSide/toSide (B9) does not collide with a dotted id (tldx-4s1)", () => {
-    // The whole point of the separate-props design: `from`/`to` stay plain
-    // id strings, so an id with a literal '.' (still discouraged, see the
-    // dotted-anchor rejection above) is only a `from`/`to` concern, never an
-    // anchor-syntax one - fromSide/toSide never look inside the endpoint string.
+  it("fromSide/toSide does not collide with a dotted id", () => {
     const ast = doc({}, [
       box({ id: "use1.api" }),
       box({ id: "b" }),
@@ -214,7 +210,7 @@ describe("lower: diagnostics", () => {
     expect(codes).toEqual(["ir/invalid-boolean-attr"]);
   });
 
-  it("accepts equalize='false' on <doc> and <frame> (C5)", () => {
+  it("accepts equalize='false' on <doc> and <frame>", () => {
     const ast = doc({ equalize: "false" }, [frame({ id: "f", equalize: "false" })]);
     const { ir, codes } = lowerAst(ast);
     expect(codes).toEqual([]);
@@ -230,7 +226,7 @@ describe("lower: diagnostics", () => {
     expect(ir?.equalize).toBeUndefined();
   });
 
-  it("accepts align='stretch' on <doc> and <frame> (D10)", () => {
+  it("accepts align='stretch' on <doc> and <frame>", () => {
     const ast = doc({ align: "stretch" }, [frame({ id: "f", align: "stretch" })]);
     const { ir, codes } = lowerAst(ast);
     expect(codes).toEqual([]);
@@ -240,7 +236,7 @@ describe("lower: diagnostics", () => {
     expect(f.align).toBe("stretch");
   });
 
-  it("accepts rowGap and colGap on <doc> and <frame>, independent of gap (D4)", () => {
+  it("accepts rowGap and colGap on <doc> and <frame>, independent of gap", () => {
     const ast = doc({ layout: "grid", cols: 2, gap: 200, rowGap: 16 }, [
       frame({ id: "f", layout: "grid", cols: 2, colGap: 300, rowGap: 8 }),
     ]);
@@ -256,14 +252,9 @@ describe("lower: diagnostics", () => {
   });
 });
 
-describe("lower: <Edges> compact-form seam (tldx-2rr)", () => {
-  // <Edges> (src/runtime/components.ts) builds plain AstEdge nodes with a
-  // real per-line span, no id, and no unusual attrs - the same shape a
-  // hand-written <Edge> produces. These tests hand-build that exact shape
-  // (lower.ts must not import runtime/, so they can't call <Edges> itself -
-  // see CONTEXT.md's dependency rules) to pin down that a typo'd id from the
-  // compact form gets the identical diagnostic, at the identical span, as
-  // one from the verbose tag.
+describe("lower: <Edges> compact-form seam", () => {
+  // <Edges> builds plain AstEdge nodes, the same shape a hand-written <Edge>
+  // produces. Domain may not import runtime/, so these hand-build that shape.
   it("a typo'd id from a compact-form edge still gets ir/unknown-reference, at the compact form's own span", () => {
     const compactSpan = { file: "diagram.tldx.jsx", line: 41, column: 8 };
     const compactEdge: AstEdge = {
@@ -317,7 +308,7 @@ describe("lower: direction", () => {
   });
 });
 
-describe("lower: synthetic ids per ADR-12", () => {
+describe("lower: synthetic ids", () => {
   it("assigns deterministic ids: same source → same ids", () => {
     const ast = () => doc({}, [note({}, "hello"), note({}, "world")]);
     const a = lowerAst(ast()).ir!;
@@ -411,8 +402,8 @@ describe("lower: ir/unknown-prop", () => {
     expect(d!.message).toBe(
       "'lable' is not supported on '<Box>' (allowed: id, label, x, y, w, h, maxW, color, fill, dash, geo, textAlign, verticalAlign, labelColor, font, size)",
     );
-    // column 3: fixture's synthetic per-attribute column for `lable`, the
-    // second attribute after `id`.
+    // Column 3 is the fixture's synthetic column for `lable`, the second
+    // attribute after `id`.
     expect(d!.span).toEqual({
       file: "test.tldx",
       line: 1,
@@ -459,8 +450,6 @@ describe("lower: ir/unknown-prop", () => {
     expect(codes).toEqual(["ir/unknown-prop"]);
   });
 
-  // D16: `maxW` is documented on <Note> (and <Sticky>, same IR kind); accept
-  // it and parse it as a number like every other note prop.
   it("accepts maxW on <note> and parses it as a number", () => {
     const ast = doc({}, [note({ id: "n", maxW: 160 }, "hi")]);
     const { ir, codes } = lowerAst(ast);
@@ -471,9 +460,9 @@ describe("lower: ir/unknown-prop", () => {
   });
 });
 
-// D19: a JSX string-literal `label` does not process `\n` - it stays two
-// literal characters, not a line break. `check` should warn, not stay silent.
-describe("lower: ir/literal-newline-in-label (D19)", () => {
+// A JSX string-literal `label` does not process `\n`; it stays two literal
+// characters, not a line break.
+describe("lower: ir/literal-newline-in-label", () => {
   it("warns when a <box> label contains a literal backslash-n", () => {
     const ast = doc({}, [box({ id: "a", label: "line one\\nline two" })]);
     const diagnostics = lowerDiagnostics(ast);
@@ -504,10 +493,9 @@ describe("lower: ir/literal-newline-in-label (D19)", () => {
   });
 });
 
-describe("lower: diagnostics name the authored component, not the IR kind (T44)", () => {
-  // Every alias the runtime exposes for `<frame>` (D12): plain `<Frame>` plus
-  // its eight container aliases. `undefined` means "don't pass a tag" -
-  // exercises the plain-`<Frame>` fallback in `displayTag`.
+describe("lower: diagnostics name the authored component, not the IR kind", () => {
+  // `undefined` means "don't pass a tag", exercising the plain-`<Frame>`
+  // fallback in `displayTag`.
   const FRAME_TAGS = [
     undefined,
     "Row",
@@ -540,9 +528,6 @@ describe("lower: diagnostics name the authored component, not the IR kind (T44)"
     expect(diagnostics[0]!.message).toMatch(new RegExp(`^'bogus' is not supported on '<${expectedTag}>'`));
   });
 
-  // D16: `<Note>` and `<Sticky>` both lower to `kind: "note"`; the message
-  // must say which one the author wrote. `maxW` is now an allowed note prop
-  // (T45), so a genuinely unknown prop stands in as the test vehicle.
   it.each(["Note", "Sticky"] as const)("ir/unknown-prop on <%s> names itself, not '<note>'", (tag) => {
     const ast = doc({}, [note({ id: "n", bogus: "x" }, "hi", tag === "Sticky", tag === "Note" ? undefined : tag)]);
     const diagnostics = lowerDiagnostics(ast);
@@ -574,12 +559,7 @@ describe("lower: note sticky marker", () => {
   });
 });
 
-// C1 (tldx-b8v): <Text> lowers to the same "box" IR kind as <Box> (IRBox.text)
-// - it shares every box layout rule - but takes its content from JSX
-// children (like <Note>/<Sticky>), not a `label` attribute, is not
-// addressable-required (an anonymous heading is fine), and rejects the
-// border/fill-only props a real tldraw text shape doesn't have.
-describe("lower: box text marker (C1)", () => {
+describe("lower: box text marker", () => {
   it("<Text> lowers to a box IR node with text: true and its body as label", () => {
     const ast = doc({}, [text({ id: "t" }, "Phase 1")]);
     const { ir, codes } = lowerAst(ast);
@@ -698,7 +678,7 @@ describe("lower: note 'on' target", () => {
   });
 });
 
-describe("lower: style props (T9)", () => {
+describe("lower: style props", () => {
   it("captures color/fill/dash on <box>", () => {
     const ast = doc({}, [box({ id: "a", color: "blue", fill: "solid", dash: "dashed" })]);
     const { ir, codes } = lowerAst(ast);
@@ -799,7 +779,7 @@ describe("lower: style props (T9)", () => {
   });
 });
 
-describe("lower: text align / label color (T10)", () => {
+describe("lower: text align / label color", () => {
   it("captures textAlign/verticalAlign/labelColor on <box>", () => {
     const ast = doc({}, [
       box({ id: "a", textAlign: "end", verticalAlign: "start", labelColor: "red" }),
@@ -854,7 +834,7 @@ describe("lower: text align / label color (T10)", () => {
   });
 });
 
-describe("lower: font / size (T11)", () => {
+describe("lower: font / size", () => {
   it("captures font/size on <box>", () => {
     const ast = doc({}, [box({ id: "a", font: "sans", size: "xl" })]);
     const { ir, codes } = lowerAst(ast);
@@ -888,7 +868,7 @@ describe("lower: font / size (T11)", () => {
   });
 });
 
-describe("lower: arrow labels (T12)", () => {
+describe("lower: arrow labels", () => {
   it("captures label on <edge>", () => {
     const ast = doc({}, [
       box({ id: "a" }),

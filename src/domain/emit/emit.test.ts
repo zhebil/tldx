@@ -22,8 +22,8 @@ describe("domain/emit", () => {
   });
 
   it("uses the pinned schema from contracts/builders", () => {
-    // The schema is opaque to us; we just assert emit doesn't synthesize one
-    // off-band. If this fails we'd be diverging from the round-trip contract.
+    // The schema is opaque here; this only asserts emit doesn't synthesize
+    // one off-band.
     const scene = emit(doc([]));
     expect(scene.schema.schemaVersion).toBe(2);
     expect(scene.schema.sequences["com.tldraw.store"]).toBeGreaterThan(0);
@@ -323,11 +323,6 @@ describe("domain/emit", () => {
     expect((short.store["shape:n3"]?.props as Record<string, unknown>).growY).toBe(0);
   });
 
-  // C2 (tldx-npd): the fake-geo branch for a non-sticky note is retired.
-  // Any note IR that reaches emit without `sticky: true` (impossible through
-  // the public authoring surface now that <Note> is gone - only <Sticky>
-  // produces `kind: "note"`) still emits as a real tldraw note, same as a
-  // sticky one; there is no second, geo-rectangle code path left to test.
   it("emits a non-sticky note IR as a real note shape too (no fake-geo path left)", () => {
     const scene = emit(
       doc([note({ id: "n4", text: "two sentences of context", x: 5, y: 6, w: 240, h: 90 })]),
@@ -370,7 +365,7 @@ describe("domain/emit", () => {
     expect(end?.["toId"]).toBe("shape:b");
     expect((start?.props as { terminal: string }).terminal).toBe("start");
     expect((end?.props as { terminal: string }).terminal).toBe("end");
-    // B13: two boxes side by side attach on the facing edges, not centres.
+    // Two boxes side by side attach on the facing edges, not centres.
     expect((start?.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor).toEqual({
       x: 1,
       y: 0.5,
@@ -477,7 +472,7 @@ describe("domain/emit", () => {
   });
 });
 
-describe("domain/emit: z-order index (R1, docs/round-trip-scope.md §7)", () => {
+describe("domain/emit: z-order index", () => {
   it("assigns non-arrow shapes a gapped index per parent, in emit order", () => {
     const scene = emit(
       doc([
@@ -544,7 +539,7 @@ describe("domain/emit: z-order index (R1, docs/round-trip-scope.md §7)", () => 
   });
 });
 
-describe("domain/emit: style pass-through (T9)", () => {
+describe("domain/emit: style pass-through", () => {
   it("passes box color/fill/dash through to props, defaulting when absent", () => {
     const scene = emit(
       doc([
@@ -563,7 +558,7 @@ describe("domain/emit: style pass-through (T9)", () => {
     expect(plain.dash).toBe("draw");
   });
 
-  it("passes box geo through to props, defaulting to rectangle when absent (T15)", () => {
+  it("passes box geo through to props, defaulting to rectangle when absent", () => {
     const scene = emit(
       doc([
         box({ id: "hex", x: 0, y: 0, w: 100, h: 50, geo: "hexagon" }),
@@ -633,7 +628,7 @@ describe("domain/emit: style pass-through (T9)", () => {
   });
 });
 
-describe("domain/emit: text align / label color pass-through (T10)", () => {
+describe("domain/emit: text align / label color pass-through", () => {
   it("passes box textAlign/verticalAlign/labelColor through, defaulting to middle/middle/black", () => {
     const scene = emit(
       doc([
@@ -701,7 +696,7 @@ describe("domain/emit: text align / label color pass-through (T10)", () => {
   });
 });
 
-describe("domain/emit: font / size pass-through (T11)", () => {
+describe("domain/emit: font / size pass-through", () => {
   it("passes box font/size through, defaulting to draw/m", () => {
     const scene = emit(
       doc([
@@ -750,7 +745,7 @@ describe("domain/emit: font / size pass-through (T11)", () => {
   });
 });
 
-describe("domain/emit: arrow labels (T12)", () => {
+describe("domain/emit: arrow labels", () => {
   it("forwards edge label as arrow text", () => {
     const scene = emit(
       doc([
@@ -804,7 +799,7 @@ describe("domain/emit: arrow labels (T12)", () => {
   });
 });
 
-// -- helpers ------------------------------------------------------------------
+// helpers
 
 const SPAN = { file: "test.tldx", line: 1, column: 1 };
 

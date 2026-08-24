@@ -15,7 +15,7 @@ import {
   textWidth,
 } from "./glyph-metrics.js";
 
-describe("glyph-metrics: (font, size) table coverage (T11)", () => {
+describe("glyph-metrics: (font, size) table coverage", () => {
   it("has an advance table for every FONTS value and a px size for every FONT_SIZES value", () => {
     // Adding a value to FONTS/FONT_SIZES without measuring it breaks this
     // (and, separately, fails to typecheck - ADVANCE/LABEL_FONT_PX are
@@ -35,7 +35,7 @@ describe("glyph-metrics: (font, size) table coverage (T11)", () => {
   });
 });
 
-describe("glyph-metrics: label fits on one line for every (font, size) (T11)", () => {
+describe("glyph-metrics: label fits on one line for every (font, size)", () => {
   for (const font of FONTS) {
     for (const size of FONT_SIZES) {
       it(`${font}/${size}: "Gateway" stays on one line`, () => {
@@ -48,7 +48,7 @@ describe("glyph-metrics: label fits on one line for every (font, size) (T11)", (
   }
 });
 
-describe("textWidth: default pins today's draw/m behavior (T11)", () => {
+describe("textWidth: default pins today's draw/m behavior", () => {
   it("is identical with no TextStyle and with the explicit draw/m default", () => {
     for (const s of ["Gateway", "SystemClock", ""]) {
       expect(textWidth(s)).toBe(textWidth(s, { font: "draw", size: "m" }));
@@ -56,13 +56,13 @@ describe("textWidth: default pins today's draw/m behavior (T11)", () => {
   });
 });
 
-describe("arrowLabelWidth: uses ARROW_LABEL_FONT_SIZES, not LABEL_FONT_PX (T12)", () => {
+describe("arrowLabelWidth: uses ARROW_LABEL_FONT_SIZES, not LABEL_FONT_PX", () => {
   it("differs from textWidth at size m (20px arrow font vs 22px box/note font)", () => {
     expect(arrowLabelWidth("reads", { size: "m" })).not.toBe(textWidth("reads", { size: "m" }));
   });
 });
 
-describe("TEXT_FONT_PX: the standalone tldraw `text` shape's own table (D23, tldx-pnq)", () => {
+describe("TEXT_FONT_PX: the standalone tldraw `text` shape's own table", () => {
   it("pins the three tables against tldraw's own values, so a future edit can't silently collapse them back into one", () => {
     // LABEL_FONT_PX: label inside a geo/note. TEXT_FONT_PX: standalone
     // `text` shape. ARROW_LABEL_FONT_PX: label on an arrow. All three agree

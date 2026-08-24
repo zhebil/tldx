@@ -1,19 +1,12 @@
 /**
  * `hybridLayout`: bottom-up container layout with per-container dispatch.
- * A container (`<doc>` or `<frame>`) with `layout` = `row`/`col`/`grid`
- * (the default when `layout` is absent) or `free` is placed deterministically
- * in this file; a container with `layout="auto"` delegates its already-sized,
- * unpinned children to the injected `AutoPlacer` (ELK in production - see
- * `infra/layout-elk/elk-layout.ts`) as flat, fixed-size leaf nodes plus the
- * edge topology found anywhere in its subtree.
+ * `row`/`col`/`grid`/`free` are placed deterministically here; `auto`
+ * delegates its already-sized, unpinned children to the injected `AutoPlacer`.
  *
- * Same conventions throughout: leaf sizes come from `estimatedBoxSize` /
- * `estimatedNoteSize`, explicit `w`/`h` wins, hard-pinned children (`x` AND
- * `y` set) keep their coordinates verbatim and are excluded from the flow /
- * the auto placer, edges pass through unchanged, and child coordinates are
- * parent-relative. A `<Note on="...">` is excluded from the flow the same
- * way (sized, but not arranged or counted toward the container's bounding
- * box) - `layout/attach.ts` places it after this whole pass finishes.
+ * Throughout: explicit `w`/`h` wins over the estimate, hard-pinned children
+ * (`x` AND `y` set) keep their coordinates and leave the flow, edges pass
+ * through unchanged, and child coordinates are parent-relative. A
+ * `<Note on="...">` is sized but not arranged - `attach.ts` places it later.
  */
 
 import { drawsChrome } from "../ir/index.js";
@@ -55,12 +48,11 @@ const SKIP_ROW_GAP_FACTOR = 2;
 const SKIP_ROW_GAP_MAX = 4;
 const TARGET_ASPECT = 16 / 9;
 /**
- * tldraw `arrowLabel.ts`'s squish margin (64: a straight arrow's body must be
- * at least `label width + 64` before its label renders unsquished) plus the
- * gap the *body* loses to the arrowhead end - `BOUND_ARROW_OFFSET` (10) plus
- * half the arrow's stroke and half the bound shape's, both 1.75 at size `m`
- * (`straight-arrow.ts`). Reserving only the 64 leaves the body ~13px short and
- * the label wraps mid-word (D9).
+ * tldraw's squish margin (64: a straight arrow's body must be at least
+ * `label width + 64` before its label renders unsquished) plus the gap the
+ * *body* loses to the arrowhead end - `BOUND_ARROW_OFFSET` (10) plus half the
+ * arrow's stroke and half the bound shape's, both 1.75 at size `m`. Reserving
+ * only the 64 leaves the body ~13px short and the label wraps mid-word.
  */
 const ARROW_LABEL_MARGIN = 64 + 13.5;
 
@@ -77,12 +69,10 @@ type AutoEdge = {
   font?: StyleFont;
   size?: StyleFontSize;
   /**
-   * Set by `resolveEdgeOwners`, only on the side(s) it actually remapped -
-   * the pre-resolution endpoint id, when that endpoint was a descendant
-   * resolved up to its direct-child owner rather than being the owner
-   * itself. Lets `labelClearanceGaps` find the edge's *real* anchor inside
-   * the owner's already-positioned subtree instead of assuming it sits at
-   * the owner's center (B14).
+   * The pre-resolution endpoint id, set by `resolveEdgeOwners` only on a side
+   * it remapped from a descendant up to its direct-child owner. Lets
+   * `labelClearanceGaps` find the edge's real anchor inside the owner's
+   * subtree instead of assuming it sits at the owner's center.
    */
   origFrom?: string;
   origTo?: string;
@@ -145,10 +135,9 @@ function resolveMode(mode: LayoutMode | undefined): LayoutMode {
 /**
  * `box` re-typed as the style/font-metrics argument every sizing helper in
  * `defaults.ts`/`glyph-metrics.ts` takes: adds `standalone` so a `<Text>`
- * (`IRBox.text`) sizes off `TEXT_FONT_PX` instead of `LABEL_FONT_PX`
- * (D23, tldx-pnq). Can't rename `IRBox.text` itself to line up for free -
- * `IRNote.text` is that element's string content, and both kinds get passed
- * here as their own style object.
+ * (`IRBox.text`) sizes off `TEXT_FONT_PX` instead of `LABEL_FONT_PX`. Renaming
+ * `IRBox.text` to line up isn't free - `IRNote.text` is that element's string
+ * content, and both kinds get passed here as their own style object.
  */
 function boxStyle(box: IRBox): IRBox & { standalone?: boolean } {
   return { ...box, ...(box.text === undefined ? {} : { standalone: box.text }) };
@@ -341,16 +330,15 @@ async function layoutContainer(
       flowMode === "grid"
         ? labelClearanceGap(flowMode, flowCols, collapsedIds, clearanceEdges, baseMainGap)
         : baseMainGap;
-    // Grid's row axis is independent of its column axis - no label-clearance
-    // widening runs against it (D9's clearance is a same-row, horizontal
-    // concern), only the skip-row crossing widening below.
+    // Grid's row axis is independent of its column axis - label clearance is a
+    // same-row, horizontal concern, so only the skip-row widening below
+    // applies to it.
     const effectiveRowGap = vGap;
     const rowGaps =
       flowMode === "grid"
         ? skipRowGaps(collapsedIds, edges, resolveCols(flowCols, collapsedEls.length), effectiveRowGap)
-        : // `row`/`col`: starts at the same uniform gap as before B14, then
-          // escalates only the specific boundary a cross-container edge
-          // needs beyond that baseline (B14) - not the whole container's gap.
+        : // `row`/`col`: escalates only the specific boundary a cross-container
+          // edge needs, not the whole container's gap.
           labelClearanceGaps(flowMode, flowCols, collapsedIds, clearanceEdges, baseMainGap, elementById);
     const positions = computeFlowPositions(
       collapsedEls,
@@ -387,17 +375,13 @@ async function layoutContainer(
  * can't be emitted at all, so only `box` children vote on the shared size.
  *
  * A geo `<Note>` (non-sticky) *receives* the container's shared box width in
- * `col`/`grid` (so it lines up with its siblings) but never votes on it, and
- * never receives the shared height - its height is always re-derived from
- * its own text at whatever width it lands on. Otherwise every box in a
- * grid like `release-pipeline` (62px-tall boxes) would inherit a note's
- * multi-line height and balloon to ~300px.
+ * `col`/`grid` so it lines up with its siblings, but never votes on it and
+ * never receives the shared height - its height is always re-derived from its
+ * own text at whatever width it lands on. Otherwise a grid of 62px boxes would
+ * inherit a note's multi-line height and balloon to ~300px.
  *
- * `equalizeH=false` (container's `equalize="false"`) skips only the shared-
- * height vote below, not the width sharing above - a natural-sized column
- * still wants consistent widths, it just stops forcing every box to the
- * tallest sibling's height. Escape hatch for the minority case where a box's
- * height *is* the data (e.g. proportions in a diagram).
+ * `equalizeH=false` skips only the shared-height vote, not the width sharing:
+ * an escape hatch for when a box's height *is* the data.
  */
 function applyContainerBoxSizing(
   children: readonly IRElement[],
@@ -474,12 +458,11 @@ function applyContainerBoxSizing(
 }
 
 /**
- * `align="stretch"` on a `row`/`col` container (D10): every flowed child - box,
- * note, or frame alike, unlike `applyContainerBoxSizing` above which only
- * votes boxes - grows to the container's cross-axis extent (the widest child
- * in `col`, the tallest in `row`). A child with an explicit `w`/`h` opts out,
- * same as the box-sharing pass. Opt-in only: `align` defaults to `center`,
- * so a container that never asks for `stretch` is untouched.
+ * `align="stretch"` on a `row`/`col` container: every flowed child - box, note,
+ * or frame alike, unlike `applyContainerBoxSizing`, which only votes boxes -
+ * grows to the container's cross-axis extent (the widest child in `col`, the
+ * tallest in `row`). A child with an explicit `w`/`h` opts out. Opt-in only:
+ * `align` defaults to `center`.
  */
 function applyStretchAlign(
   children: readonly IRElement[],
@@ -564,12 +547,9 @@ function resolveEdgeOwners(
 
 /**
  * The container's one declared gap, or the widest clearance any qualifying
- * same-axis adjacent pair needs, whichever is larger - unchanged from
- * before B14. Still exactly right for `grid` (one uniform gap across the
- * whole column axis - `gridPositions` has no per-column-boundary mechanism)
- * and serves as the *starting* per-boundary value for `row`/`col` in
- * `labelClearanceGaps` below, which then escalates only the specific
- * boundary a cross-container edge needs beyond this baseline.
+ * same-axis adjacent pair needs, whichever is larger. Exactly right for `grid`,
+ * whose `gridPositions` has no per-column-boundary mechanism, and the starting
+ * per-boundary value for `row`/`col` in `labelClearanceGaps`.
  */
 function labelClearanceGap(
   flowMode: FlowMode,
@@ -599,11 +579,10 @@ function labelClearanceGap(
 }
 
 /**
- * The center of `targetId` within `el`'s own local coordinate frame -
- * children's `x`/`y` are already relative to their parent, final by the
- * time the bottom-up sizing pass returns `el`, so this needs no layout
- * state beyond `el` itself. `el.id` resolves to `el`'s own center.
- * `undefined` if `targetId` is neither `el` nor a descendant of it.
+ * The center of `targetId` within `el`'s own local coordinate frame. Children's
+ * `x`/`y` are parent-relative and final by the time the bottom-up sizing pass
+ * returns `el`, so this needs no layout state beyond `el`. `el.id` resolves to
+ * `el`'s own center; `undefined` if `targetId` is neither `el` nor a descendant.
  */
 function localCenter(el: FlowEl, targetId: string): { x: number; y: number } | undefined {
   if (el.id === targetId) return { x: el.w / 2, y: el.h / 2 };
@@ -617,33 +596,24 @@ function localCenter(el: FlowEl, targetId: string): { x: number; y: number } | u
 }
 
 /**
- * Per-boundary clearance for `row`/`col`. Starts every boundary at
- * `labelClearanceGap`'s ordinary uniform result (bit-identical to pre-B14
- * behavior when nothing below fires - no diagram without a cross-container
- * edge should see so much as a rounding difference), then escalates only
- * the specific boundary a cross-container edge needs beyond that baseline.
+ * Per-boundary clearance for `row`/`col`. Every boundary starts at
+ * `labelClearanceGap`'s uniform result, and only the specific boundary a
+ * cross-container edge needs is escalated beyond that.
  *
- * The plain formula (line-height for `col`, label width for `row`) assumes
- * a flowed sibling's anchor sits centred on the container's cross axis, so
- * the chord runs along the main axis. That assumption can break when an
- * edge's endpoint was resolved up from a descendant nested in a *different*
- * sibling container (B14, e.g. a box inside a sibling `row` group) - it can
- * sit far off that sibling's center, so a `col` chord that's "supposed" to
- * be near-vertical ends up wider than it is tall, and tldraw squishes the
- * label on the axis this container never reserved space on (`arrowLabel.ts`
- * squishes based on the arrow's actual bounding-box orientation, not the
- * container's flow direction).
+ * The plain formula (line-height for `col`, label width for `row`) assumes a
+ * flowed sibling's anchor is centred on the cross axis, so the chord runs
+ * along the main axis. An endpoint resolved up from a descendant nested in a
+ * *different* sibling container can sit far off that sibling's center, so a
+ * `col` chord that should be near-vertical ends up wider than tall and tldraw
+ * squishes the label on the axis this container never reserved - it squishes
+ * by the arrow's actual bounding-box orientation, not the flow direction.
  *
- * Rather than guess, `elementById` (this container's flowed siblings, with
- * their own already-positioned subtrees) lets us reconstruct the two real
- * anchors' offsets from their owning sibling's center and estimate the
- * actual chord's width/height - the same comparison `arrowLabel.ts` makes.
- * Only escalate when that estimate says the chord would actually come out
- * width-dominant *and* squish (see `minGapToFlipDominance`); otherwise the
- * baseline is already correct and widening further would only move boxes
- * for no reason. `row` doesn't get this treatment: its plain formula
- * already reserves width, the axis a `row` chord is presumed to run along,
- * so a cross-container offset there doesn't undermine that assumption.
+ * `elementById` carries this container's flowed siblings with their own
+ * positioned subtrees, so the real anchor offsets are recoverable and the
+ * chord's width/height can be estimated directly. Escalate only when that
+ * estimate says the chord comes out width-dominant *and* squishes. `row` needs
+ * none of this: its plain formula already reserves width, the axis a `row`
+ * chord is presumed to run along.
  */
 function labelClearanceGaps(
   flowMode: "row" | "col",
@@ -686,22 +656,14 @@ function labelClearanceGaps(
 }
 
 /**
- * A small buffer over the exact flip point (see `minGapToFlipDominance`) to
- * absorb the gap between our center-to-center chord estimate and tldraw's
- * real anchor, which intersects the *bound shape's edge* along the line to
- * the other endpoint's center - always a little short of full center-to-
- * center distance. Kept to tldraw's own `MIN_ARROW_BEND` (8, see
- * `routing.ts`'s `MIN_BEND`) rather than something closer to
- * `ARROW_LABEL_MARGIN` (77.5): the estimate is symmetric per boundary (it
- * cannot tell a boundary whose only qualifying edges the router will
- * actually bend away from squish from one it won't - both feed it identical
- * numbers), so every extra pixel here is spent on *every* qualifying
- * boundary in a container, not just the one that needs it. A bigger buffer
- * bought a cleaner flip for this fix's own edges but pushed an unrelated
- * sibling boundary far enough to crowd two of *its* labels together
- * (verified against `tools/arrow-truth.mts` on `tcp-groups`) - 8 still
- * clears the intended flip with room to spare and leaves that boundary
- * alone.
+ * Buffer over `minGapToFlipDominance`'s exact flip point, absorbing the gap
+ * between the center-to-center chord estimate and tldraw's real anchor, which
+ * sits on the bound shape's edge and so is always a little short.
+ *
+ * Kept small (tldraw's own `MIN_ARROW_BEND`) because the estimate is symmetric
+ * per boundary: it cannot tell a boundary the router will bend away from
+ * squish from one it won't, so every extra pixel is spent on *every*
+ * qualifying boundary in the container, crowding labels elsewhere.
  */
 const CHORD_FLIP_BUFFER = 8;
 
@@ -711,19 +673,14 @@ const CHORD_FLIP_BUFFER = 8;
  * (inside/at `topOwnerId`) and `bottomTargetId` (inside/at `bottomOwnerId`)
  * stops coming out wider than tall - `arrowLabel.ts` only squishes on
  * `bodyBounds.width > bodyBounds.height`, so once the chord is at least as
- * tall as it is wide, this container's normal line-height reservation is
- * all a `col` edge ever needed.
+ * tall as it is wide, the normal line-height reservation is all a `col` edge
+ * ever needed.
  *
- * `undefined` (no escalation needed) when: the chord is already
- * height-dominant at width 0 (impossible: `dx` doesn't shrink, so it can
- * only ever need *more* gap, never a change in verdict); either owner is
- * missing from `elementById` (conservative: skip the extra reservation
- * rather than guess); or `dx` already clears `widthClearance` on its own -
- * even a width-dominant chord doesn't actually squish once its width alone
- * is enough for the label (`arrowLabel.ts`'s squish math is a no-op once
- * `bodyBounds.width - margin >= naturalWidth`), and `dx` is fixed by the
- * *other* container's own layout, not by this boundary's gap, so growing
- * this gap can never buy back a `dx` shortfall anyway.
+ * `undefined` (no escalation) when the chord is already height-dominant; when
+ * either owner is missing from `elementById` (skip rather than guess); or when
+ * `dx` already clears `widthClearance` on its own - tldraw's squish math is a
+ * no-op once the body is wide enough for the label, and `dx` is fixed by the
+ * *other* container's layout, so this gap could never buy back a shortfall.
  */
 function minGapToFlipDominance(
   elementById: ReadonlyMap<string, FlowEl>,
@@ -752,10 +709,9 @@ function minGapToFlipDominance(
 /**
  * True iff the direct children of a container form a chain: at least one
  * edge, every child has resolved in-/out-degree <= 1, and the edges cover
- * most of the container (`edges.length * 2 >= childIds.length`). Used to
- * gate the doc-root aspect wrap - a grid is topology-blind and turns a
- * chain's adjacent-pair edges into row-wrap diagonals (see B7/B20 in
- * docs/layout-hypotheses.md).
+ * most of the container (`edges.length * 2 >= childIds.length`). Gates the
+ * doc-root aspect wrap: a grid is topology-blind and turns a chain's
+ * adjacent-pair edges into row-wrap diagonals.
  */
 export function formsChain(
   childIds: readonly string[],
@@ -837,7 +793,7 @@ export function findFanGroups(
 /**
  * Replaces each fan group with one synthetic `Rect` at the source's index in
  * flowed order - source and its targets laid out left to right in a single
- * row (T6) - so every fan edge shares the source's axis and the parent flow
+ * row - so every fan edge shares the source's axis and the parent flow
  * lays the whole fan out as a single unit. Targets are dropped from the
  * collapsed list; `expandFanBlocks` puts them back.
  */
@@ -1006,9 +962,8 @@ function computeFlowPositions(
   rowGapBase: number,
   /**
    * Grid: one entry per row boundary (skip-row widening). Row/col: one entry
-   * per boundary between consecutive flowed elements - `labelClearanceGaps`
-   * widens only the boundary a qualifying labeled edge actually straddles
-   * (B14); a missing/undefined entry falls back to `gap`.
+   * per boundary between consecutive flowed elements. A missing entry falls
+   * back to `gap`.
    */
   rowGaps: readonly number[],
   padLeft: number,

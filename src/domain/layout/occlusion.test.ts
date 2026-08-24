@@ -78,8 +78,8 @@ describe("computeOcclusionDiagnostics", () => {
 
   it("does not warn about a skip edge the router can bend clear of the shape between its endpoints", () => {
     // a -> c skips over b, which sits on the midpoint of the straight chord.
-    // Before B5 the label landed on b and this warned; the router now bends
-    // the arc clear, so silence here is the fix working, not a missed defect.
+    // The router bends the arc clear, so silence here is correct, not a
+    // missed defect.
     const ir = doc([
       box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" }),
       box({ id: "b", x: 80, y: 0, w: 120, h: 62, label: "B" }),
@@ -129,7 +129,7 @@ describe("computeOcclusionDiagnostics", () => {
     expect(diags[0]!.message).toContain("long note");
   });
 
-  it("warns, naming the shape and the label, when a box's label doesn't fit its own box (D22)", () => {
+  it("warns, naming the shape and the label, when a box's label doesn't fit its own box", () => {
     const label =
       "DUMB ZONE do not put smart logic here this box explicitly pins its width so the label wraps onto far more lines than the box's auto-computed height accounts for";
     const ir = doc([box({ id: "dumb-zone", x: 0, y: 0, w: 160, h: 122, label })]);

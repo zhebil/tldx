@@ -1,10 +1,7 @@
 /**
- * Test-only AST builders. The text parser used to be the terse way to build
- * an AST in a unit test; this replaces it without depending on `src/runtime`
- * (domain may not import runtime - see CONTEXT.md dependency rules).
- *
- * The per-attribute column is synthetic (there's no source text to compute a
- * real one from) - it only exists so tests can tell attribute spans apart.
+ * Test-only AST builders. The per-attribute column is synthetic - there is no
+ * source text to compute a real one from, so it only exists to let tests tell
+ * attribute spans apart.
  */
 import type {
   AstBox,

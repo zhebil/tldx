@@ -1,14 +1,8 @@
 /**
- * Synthetic id scheme for non-addressable IR elements (ADR-12).
- *
- * Form: `<content-hash>-<n>` where:
- * - `content-hash` is FNV-1a 32-bit (8 hex chars) over `kind + ":" + key fields`.
- * - `n` is the 0-based occurrence index among elements with the same hash,
- *   computed in document order.
- *
- * Reordering siblings of differing content does not change any synthetic id.
- * The only ids that shift are those of identical anonymous elements when
- * they're reordered relative to each other - which is semantically a no-op.
+ * Synthetic ids for non-addressable IR elements: `<content-hash>-<n>`, where
+ * the hash is FNV-1a 32-bit over `kind + ":" + key fields` and `n` is the
+ * 0-based occurrence index among elements with the same hash, in document
+ * order. Reordering siblings of differing content never changes an id.
  */
 
 export function contentHash(kind: string, fields: readonly string[]): string {

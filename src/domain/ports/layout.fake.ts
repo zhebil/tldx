@@ -1,23 +1,11 @@
 /**
- * StubLayout: the deterministic fake for `LayoutPort`. Used by every test
- * that needs positioned IR without paying for ELK. The contract test
- * (`layout.contract.ts`) pins the universal guarantees; this implementation
- * additionally guarantees:
+ * StubLayout: the deterministic fake for `LayoutPort`, for every test that
+ * needs positioned IR without paying for ELK. `layout.contract.ts` pins the
+ * universal guarantees; on top of those, this lays children out left to right
+ * in document order and honours explicit `x`/`y`/`w`/`h` verbatim, so free
+ * placement and hard pins survive layout.
  *
- * - children are laid out left-to-right in document order at the top-left of
- *   their container, with the first row offset down by `FRAME_PAD_TOP` inside
- *   frames so children clear the tldraw frame title bar;
- * - frame width/height are computed as the bounding box of children plus
- *   asymmetric `FRAME_PAD_INNER`/`FRAME_PAD_TOP` so chrome never overlaps
- *   the first row;
- * - box and note default sizes come from `estimatedBoxSize` /
- *   `estimatedNoteSize` so labels don't clip in the absence of explicit `w`;
- * - explicit `x | y | w | h` from the IR are honored verbatim (free
- *   placement / hard pins survive layout).
- *
- * Direction is ignored: this fake is deterministic and 1D, not a router.
- *
- * Edges are connectors: they pass through unchanged.
+ * Direction is ignored: this is deterministic and 1D, not a router.
  */
 
 import {

@@ -14,8 +14,8 @@ import { applyOverlay } from "./apply.js";
 import { diffScenes } from "./diff.js";
 import { sceneHash } from "./hash.js";
 
-/** The load-bearing property from round-trip.md D1: replaying a diff against
- *  the scene it was diffed from reproduces the scene it was diffed against. */
+/** The load-bearing property: replaying a diff against the scene it was
+ *  diffed from reproduces the scene it was diffed against. */
 function assertRoundTrip(base: SceneJSON, current: SceneJSON): void {
   const overlay = { v: 1, basedOn: sceneHash(base), entries: diffScenes(base, current) };
   const { scene, diagnostics } = applyOverlay(overlay, base);

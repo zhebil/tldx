@@ -50,7 +50,7 @@ function edge(input: {
 }
 
 describe("computeEdgeRoutes", () => {
-  it("leaves an adjacent hop in a row straight (no shape crossed), attached face to face (B13)", () => {
+  it("leaves an adjacent hop in a row straight (no shape crossed), attached face to face", () => {
     const ir = doc("root", [
       box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
       box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
@@ -130,8 +130,8 @@ describe("computeEdgeRoutes", () => {
       edge({ id: "ab", from: "a", to: "b" }),
     ]);
     const routes = computeEdgeRoutes(ir);
-    // Straight, but no longer route-less: B13 attaches the facing edges
-    // explicitly rather than leaving tldraw to aim centre-to-centre.
+    // Straight, but not route-less: the facing edges are attached explicitly
+    // rather than left to tldraw to aim centre-to-centre.
     expect(routes.get("ab")!.bend).toBe(0);
     expect(routes.get("ab")!.startAnchor).toEqual({ x: 1, y: 0.5 });
     expect(routes.get("ab")!.endAnchor).toEqual({ x: 0, y: 0.5 });
@@ -155,17 +155,16 @@ describe("computeEdgeRoutes", () => {
     expect(route).toBeDefined();
     // Past `bottom`'s far edge (y 80) rather than the 13.5 the row alone wanted.
     expect(Math.abs(route!.bend)).toBeGreaterThan(60);
-    // B13 attaches the facing edges first; the detour grows the bend around
+    // The facing edges are attached first; the detour grows the bend around
     // that, it does not fall back to a centre-to-centre chord.
     expect(route!.startAnchor).toEqual({ x: 1, y: 0.5 });
   });
 
   it("signed clearance ignores a crossed shape sitting entirely on the far side of the anchored chord", () => {
     // a -> d skips both bNear (pokes above the top-anchored chord, y -10..10)
-    // and bFar (sits well below it, y 70..80). The old abs()-based clearance
-    // would have demanded sag for bFar too (abs(0-70)+12=82); the signed
-    // fix recognises bFar's far edge is already clear and contributes 0, so
-    // the bow is driven by bNear alone.
+    // and bFar (sits well below it, y 70..80). Clearance is signed, so bFar's
+    // far edge counts as already clear and contributes 0: the bow is driven by
+    // bNear alone, not by an unsigned abs(0-70)+12=82.
     const ir = doc("root", [
       box({ id: "a", x: 0, y: 0, w: 100, h: 100 }),
       box({ id: "bNear", x: 200, y: -10, w: 100, h: 20 }),
@@ -188,14 +187,11 @@ describe("computeEdgeRoutes", () => {
     // cases above, landing them in the same lane group. ce is shorter so it
     // sorts first and keeps rank 0 (sag 12, matching a lone c->e skip); ad is
     // longer, ranks above it - the candidate/lane pass alone would give it
-    // sag 13.5 + one 20px lane step = 33.5, but B12's final minimisation
-    // (`minimizeBends`) shrinks that back toward zero once it isn't needed:
-    // ad's own obstacle clearance only requires ~13.5, and the only other
-    // thing pinning it above that is staying clear of ce's own arc - which
-    // bottoms out at -19.03 (measured), still well clear of ce's -12 and of
-    // both boxes it skips, without paying for the full, un-minimised lane
-    // step. See the identically-shaped LCA-grouped test below for the same
-    // number under nested frames.
+    // sag 13.5 + one 20px lane step = 33.5, but `minimizeBends` shrinks that
+    // back toward zero once it isn't needed: ad's own obstacle clearance only
+    // requires ~13.5, and the only other thing pinning it above that is
+    // staying clear of ce's own arc, which bottoms out at -19.03 - still well
+    // clear of ce's -12 and of both boxes it skips.
     const ir = doc("root", [
       box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
       box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
@@ -244,9 +240,9 @@ describe("computeEdgeRoutes", () => {
     // "outer" frame alongside top-level b/c/d. ad's endpoints (f1, outer)
     // and ce's endpoints (outer, f5) both resolve to the same LCA, "outer",
     // so they land in the same lane group exactly as the flat case: ce
-    // (shorter span) keeps rank 0 (-12), ad ranks above it, then B12's final
-    // minimisation shrinks ad's un-minimised lane sag (33.5) down to the
-    // same measured -19.03 the flat case above settles on.
+    // (shorter span) keeps rank 0 (-12), ad ranks above it, then
+    // `minimizeBends` shrinks ad's lane sag (33.5) down to the same -19.03
+    // the flat case above settles on.
     const ir = doc("root", [
       frame({
         id: "outer",
@@ -352,7 +348,7 @@ describe("computeEdgeRoutes", () => {
     const ab2 = routes.get("ab2");
     expect(ab1).toBeDefined();
     expect(ab2).toBeDefined();
-    // The middle lane keeps zero offset; B13 still attaches it face to face.
+    // The middle lane keeps zero offset but is still attached face to face.
     expect(ba!.bend).toBe(0);
     expect(ab1!.bend).not.toBe(0);
     expect(ab2!.bend).not.toBe(0);
@@ -371,10 +367,9 @@ describe("computeEdgeRoutes", () => {
     expect(routes.get("ab")!.startAnchor).toEqual({ x: 1, y: 0.5 });
   });
 
-  describe("reciprocal pair label clearance (B1)", () => {
-    // Reproduces the tcp-groups.tldx.jsx defect: `A -> B` and `B -> A` on a
-    // short chord with long labels bow apart (T35's fan) but, at the bare
-    // fan step, still stamp their labels on the same spot (D14's other half).
+  describe("reciprocal pair label clearance", () => {
+    // `A -> B` and `B -> A` on a short chord with long labels bow apart via
+    // the fan, but at the bare fan step still stamp their labels on one spot.
     const LONG_LABEL_A = "active open / SYN";
     const LONG_LABEL_B = "close / timeout";
 
@@ -393,7 +388,7 @@ describe("computeEdgeRoutes", () => {
       expect(boxesOverlap(ab!.labelBox!, ba!.labelBox!)).toBe(false);
 
       // Wider than the bare (unlabelled) fan gives the same pair geometry -
-      // otherwise this is just re-testing T35's plain fan, not the label fix.
+      // otherwise this only re-tests the plain fan, not the label widening.
       const bareIr = doc("root", [
         box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
         box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),
@@ -491,12 +486,11 @@ describe("computeEdgeRoutes", () => {
     });
   });
 
-  describe("bend growth is capped by chord length, not obstacle size (B11)", () => {
-    // Two 120x62 boxes 280px apart, straddled by a tall obstacle - the
-    // router's own analytic sag formula has no upper bound of its own and
-    // used to grow past the chord itself (bend -1036 for a 2000px obstacle,
-    // -2036 for 4000px). The cap is a function of the endpoints' own
-    // separation, so both heights must land on the exact same bend.
+  describe("bend growth is capped by chord length, not obstacle size", () => {
+    // Two 120x62 boxes 280px apart, straddled by a tall obstacle. The analytic
+    // sag formula has no upper bound of its own, so an obstacle of any height
+    // could demand a bend far past the chord. The cap is a function of the
+    // endpoints' own separation, so both heights must land on the same bend.
     function repro(obstacleHeight: number) {
       const ir = doc("root", [
         box({ id: "a", x: 0, y: 0, w: 120, h: 62 }),
@@ -562,13 +556,12 @@ describe("computeEdgeRoutes", () => {
       expect(route === undefined || route.labelPosition === undefined || route.labelPosition === 0.5).toBe(true);
     });
 
-    it("places a diagonal edge's label using a diamond terminal's real outline, not its bounding box (B10)", () => {
+    it("places a diagonal edge's label using a diamond terminal's real outline, not its bounding box", () => {
       // Diagonal enough that neither `deriveAxis` nor `facingAnchors` finds a
       // shared axis, so the route falls through to the bare centre-to-centre
-      // ray (`bodyExitPoint`) on both ends - the one path a `geo` shape's
-      // real outline (inset from its bounding box on a diagonal) can still
-      // silently diverge from the render `tldx check` is validating against
-      // (cicd-pipeline.tldx.jsx's `approval -> notify` "rejected" label).
+      // ray (`bodyExitPoint`) on both ends - the one path where a `geo`
+      // shape's real outline, inset from its bounding box on a diagonal, can
+      // silently diverge from the render `tldx check` validates against.
       const ir = doc("root", [
         box({ id: "d", x: 0, y: 0, w: 200, h: 200, geo: "diamond" }),
         box({ id: "n", x: 500, y: 350, w: 100, h: 100 }),
@@ -590,8 +583,7 @@ describe("computeEdgeRoutes", () => {
     });
 
     it("grows the bend to pull a label off a shape no candidate `t` clears (B2/D11)", () => {
-      // Same shape of the tcp-groups.tldx.jsx repro: `fin1 -> timeWait` is a
-      // vertical-axis skip whose minimal (unlabelled) bend only has to clear
+      // A vertical-axis skip whose minimal (unlabelled) bend only has to clear
       // the two flanking shapes' *line*, not a label wide enough to still
       // cover one of them at every candidate `t` - sliding along the arc
       // can't fix that, only widening the arc can.
@@ -615,14 +607,13 @@ describe("computeEdgeRoutes", () => {
       expect(route?.labelBox).toBeDefined();
       expect(boxesOverlap(route!.labelBox!, fin2)).toBe(false);
       expect(boxesOverlap(route!.labelBox!, closing)).toBe(false);
-      // The fix widens the bend past what clearing the shapes' outlines
-      // alone would need - otherwise this is just re-testing the plain
-      // detour, not the label-driven growth.
+      // The bend must widen past what clearing the shapes' outlines alone
+      // needs, or this only re-tests the plain detour.
       expect(Math.abs(route!.bend)).toBeGreaterThan(bareBend);
     });
   });
 
-  describe("obstacle correction after candidate/lane (B5)", () => {
+  describe("obstacle correction after candidate/lane", () => {
     it("moves a candidate edge off its analytically-chosen side when that side actually crosses an off-axis shape invisible to computeCandidate (event-driven.tldx.jsx repro)", () => {
       // t-payments -> dlq is a vertical-axis skip; `notifications` is the one
       // shape computeCandidate's own `crossed` set finds (its y-centre sits
@@ -630,18 +621,15 @@ describe("computeEdgeRoutes", () => {
       // `bandMin`/`bandMax` for the "how far can we lean" check. `t-orders`
       // sits beside t-payments (same row, not between the endpoints, so
       // `crossed` never sees it) but its right edge (284) sits *inside* that
-      // band (181..440) rather than fully outside it - the one case the old
-      // `gap()` heuristic's "only shapes fully outside the band limit us"
-      // rule doesn't count as a limiter, so the analytic pass picks a side
-      // as if nothing were in the way there. The real arc, still ramping up
-      // its bow near t-payments, clips t-orders anyway - `computeCandidate`
-      // is unchanged by B5 and picks the identical side whether or not
-      // t-orders is even in the diagram, so the two variants below get the
-      // same bend from the analytic pass alone. `clearObstaclesOnEveryRoute`
-      // is the only pass that re-tests the *actual* rendered arc against
-      // every shape (not just `crossed`), so a materially different final
-      // bend once t-orders is added is only explainable by that correction
-      // actually firing.
+      // band (181..440) rather than fully outside it - and `gap()` only counts
+      // shapes fully outside the band as limiters, so the analytic pass picks
+      // a side as if nothing were in the way. The real arc, still ramping up
+      // its bow near t-payments, clips t-orders anyway. `computeCandidate`
+      // picks the identical side whether or not t-orders is in the diagram, so
+      // both variants below get the same bend from the analytic pass alone.
+      // `clearObstaclesOnEveryRoute` is the only pass that re-tests the actual
+      // rendered arc against every shape, so a materially different final bend
+      // once t-orders is added can only come from that correction firing.
       const tPayments = { id: "t-payments", x: 332, y: 238, w: 175, h: 62 };
       const dlq = { id: "dlq", x: 294, y: 653, w: 217, h: 62 };
       const tOrders = { id: "t-orders", x: 145, y: 238, w: 139, h: 62 };
@@ -664,15 +652,13 @@ describe("computeEdgeRoutes", () => {
       ]);
       const correctedBend = computeEdgeRoutes(withTOrders).get("e")!.bend;
 
-      // A blind correction pass would leave this identical to `bareBend`
-      // (same sign, same magnitude) since t-orders is invisible to the
-      // candidate/lane pass either way - the fix has to actually change the
-      // outcome once the obstacle is real.
+      // A blind correction pass would leave this identical to `bareBend`,
+      // since t-orders is invisible to the candidate/lane pass either way.
       expect(Math.sign(correctedBend)).not.toBe(Math.sign(bareBend));
     });
   });
 
-  describe("authored anchors win over the router (B9)", () => {
+  describe("authored anchors win over the router", () => {
     it("an authored fromSide/toSide overrides the candidate/lane pass's own anchor pick", () => {
       // Same shape as "bows a chord over two boxes in a row upward" - left
       // to itself the router ties to the top face ({0.5,0}) on both ends.
@@ -751,11 +737,10 @@ describe("computeEdgeRoutes", () => {
     });
   });
 
-  describe("label squish avoidance (B4)", () => {
+  describe("label squish avoidance", () => {
     it("grows the bend of a short diagonal skip so a long label stops wrapping to more lines than a box label would", () => {
-      // Mirrors tcp-groups.tldx.jsx's `listen -> syn_rcvd` defect: a short
-      // diagonal gap between two nested-container boxes with a label wide
-      // enough that tldraw's own arrowLabel.ts squishes it hard.
+      // A short diagonal gap between two nested-container boxes, with a label
+      // wide enough that tldraw squishes it hard.
       const LONG_LABEL = "recv SYN / SYN,ACK";
       const withLabel = doc("root", [
         box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
@@ -785,10 +770,8 @@ describe("computeEdgeRoutes", () => {
 
     it("leaves a reciprocal pair's fan step alone when both labels are short enough tldraw never squishes them", () => {
       // A label narrower than tldraw's own 64px squish floor renders at its
-      // natural width no matter how short the gap is - this must stay a
-      // pure no-op, the same guarantee the pre-existing fan-step test above
-      // already pins for the *fan* pass; this one pins it for the new
-      // squish pass specifically.
+      // natural width no matter how short the gap is, so the squish pass must
+      // be a pure no-op here.
       const ir = doc("root", [
         box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
         box({ id: "b", x: 150, y: 0, w: 100, h: 50 }),

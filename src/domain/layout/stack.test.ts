@@ -168,7 +168,7 @@ describe("hybridLayout", () => {
     expect(d.x).toBe(a.x);
   });
 
-  it("keeps an explicit h in col mode, where the width pass used to clobber it (A3)", async () => {
+  it("keeps an explicit h in col mode, where the width pass used to clobber it", async () => {
     const col = await layoutAst(
       doc({ layout: "col", gap: 40 }, [
         box({ id: "tall", label: "Tall", h: 200 }),
@@ -183,7 +183,7 @@ describe("hybridLayout", () => {
     expect(boxById(row.children, "solo").h).toBe(200);
   });
 
-  it("sets rowGap and colGap independently on a grid (D4)", async () => {
+  it("sets rowGap and colGap independently on a grid", async () => {
     const result = await layoutAst(
       doc({ layout: "grid", cols: 2, gap: 200, rowGap: 16 }, [
         box({ id: "a", label: "A", w: 40, h: 20 }),
@@ -270,7 +270,7 @@ describe("hybridLayout", () => {
     expect(inner.y).toBe(10); // pad only - a group draws no title, no clearance needed
   });
 
-  it("does not reserve title clearance above the first child when a nested frame has no name (D2)", async () => {
+  it("does not reserve title clearance above the first child when a nested frame has no name", async () => {
     const result = await layoutAst(
       doc({ layout: "col" }, [
         frame({ id: "outer", layout: "col", pad: 10, gap: 5 }, [
@@ -427,7 +427,7 @@ describe("hybridLayout", () => {
     expect(boxById(result.children, "b").x).toBe(20);
   });
 
-  it("stretches ragged tiers to equal width with align=stretch (D10)", async () => {
+  it("stretches ragged tiers to equal width with align=stretch", async () => {
     const result = await layoutAst(
       doc({ layout: "col", align: "stretch" }, [
         frame({ id: "narrow", layout: "row", pad: 0 }, [box({ id: "a", label: "A", w: 100, h: 20 })]),
@@ -505,7 +505,7 @@ describe("hybridLayout", () => {
     expect(b.y).toBe(0);
   });
 
-  it("passes edges declared outside the auto container to the placer (D7)", async () => {
+  it("passes edges declared outside the auto container to the placer", async () => {
     let seen: readonly { from: string; to: string }[] = [];
     const spy: AutoPlacer = async (req) => {
       if (req.nodes.length > 1) seen = req.edges;
@@ -525,7 +525,7 @@ describe("hybridLayout", () => {
   });
 });
 
-describe("hybridLayout: labeled-edge gap clearance (T12)", () => {
+describe("hybridLayout: labeled-edge gap clearance", () => {
   it("widens a row's gap to clear a labeled edge between adjacent siblings", async () => {
     const result = await layoutAst(
       doc({ layout: "row", gap: 10 }, [
@@ -534,7 +534,7 @@ describe("hybridLayout: labeled-edge gap clearance (T12)", () => {
         edge({ id: "e", from: "a", to: "b", label: "reads from cache" }),
       ]),
     );
-    // 64 is tldraw's squish margin, 13.5 the body the arrowhead end eats (D9).
+    // 64 is tldraw's squish margin, 13.5 the body the arrowhead end eats.
     expect(boxById(result.children, "b").x).toBe(50 + arrowLabelWidth("reads from cache") + 77.5);
   });
 
@@ -601,7 +601,7 @@ describe("hybridLayout: labeled-edge gap clearance (T12)", () => {
   });
 });
 
-describe("hybridLayout: cross-container labeled-edge gap clearance (B14)", () => {
+describe("hybridLayout: cross-container labeled-edge gap clearance", () => {
   it("widens only the col boundary a labeled edge crossing a <Group> actually spans", async () => {
     const LABEL = "reads from cache";
     const result = await layoutAst(
@@ -623,10 +623,9 @@ describe("hybridLayout: cross-container labeled-edge gap clearance (B14)", () =>
 
     // "right" (the edge's real, off-center anchor inside "g") sits 125px off
     // "g"'s own center: row width 50 + 200 + 50 = 300, "right"'s own center
-    // at local x=275, "g"'s center at 150. A uniform gap has no way to see
-    // this - it only ever measured same-container siblings (T12) - so
-    // without B14 this boundary gets the same baseline as every other gap
-    // in the container and the label above squishes into a multi-line wrap.
+    // at local x=275, "g"'s center at 150. A uniform gap only ever measures
+    // same-container siblings, so it would give this boundary the same
+    // baseline as every other and let the label squish into a multi-line wrap.
     const dx = 125;
     const widthClearance = arrowLabelWidth(LABEL) + 77.5;
     const baseline = Math.max(10, arrowLabelLineHeight() + 2 * 4.25);
@@ -698,7 +697,7 @@ describe("formsChain", () => {
   });
 });
 
-describe("hybridLayout doc-root aspect wrap (B20)", () => {
+describe("hybridLayout doc-root aspect wrap", () => {
   it("leaves a chain of children in a single column, unwrapped", async () => {
     const result = await layoutAst(
       doc({}, [
@@ -878,7 +877,7 @@ describe("findFanGroups", () => {
   });
 });
 
-describe("hybridLayout fan-group placement (T6)", () => {
+describe("hybridLayout fan-group placement", () => {
   it("collapses a fan at/above the threshold into a source + target-column block", async () => {
     const result = await layoutAst(
       doc({}, [
@@ -961,7 +960,7 @@ describe("hasSkipEdge", () => {
   });
 });
 
-describe("hybridLayout grid row gap (B25)", () => {
+describe("hybridLayout grid row gap", () => {
   it("doubles the row gap when children carry a skip edge, keeping the column gap plain", async () => {
     const result = await layoutAst(
       doc({ layout: "grid", cols: 2 }, [
@@ -1012,7 +1011,7 @@ describe("hybridLayout grid row gap (B25)", () => {
   });
 });
 
-describe("hybridLayout per-boundary skip row gap (B32)", () => {
+describe("hybridLayout per-boundary skip row gap", () => {
   it("scales each boundary by its own crossing count (gradient)", async () => {
     const result = await layoutAst(
       doc({ layout: "grid", cols: 2 }, [
@@ -1053,7 +1052,7 @@ describe("hybridLayout per-boundary skip row gap (B32)", () => {
   });
 });
 
-describe("skipRowGaps (B33)", () => {
+describe("skipRowGaps", () => {
   it("returns the plain gap per boundary when no edges skip", () => {
     expect(skipRowGaps(["a", "b", "c", "d"], [], 2, 40)).toEqual([40]);
   });
@@ -1091,7 +1090,7 @@ describe("skipRowGaps (B33)", () => {
   });
 });
 
-describe("hybridLayout container-aware box sizing (T0)", () => {
+describe("hybridLayout container-aware box sizing", () => {
   it("gives every col box child the same width and height", async () => {
     const result = await layoutAst(
       doc({ layout: "col" }, [
@@ -1174,8 +1173,8 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     const d = boxById(result.children, "d");
 
     // d is capped at maxW and legitimately taller than its own natural
-    // content height because of the diamond's outline (containment, T47's
-    // predecessor) - that stays.
+    // content height, because the diamond's outline has to contain the
+    // label - that stays.
     const dNatural = boxHeightForWidth(dLabel, fitBoxWidth(dLabel, 200));
     expect(d.w).toBe(200);
     expect(d.h).toBeGreaterThan(dNatural);
@@ -1192,7 +1191,7 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     expect(c.y).toBeGreaterThan(d.y);
   });
 
-  it("grows an explicit-w box's height to fit a label measured at that width, not its natural unconstrained width (A2)", async () => {
+  it("grows an explicit-w box's height to fit a label measured at that width, not its natural unconstrained width", async () => {
     const label = "A genuinely long label that will wrap onto many more lines once pinned to a narrow width";
     const result = await layoutAst(doc({ layout: "col" }, [box({ id: "narrow", label, w: 160 })]));
     const narrow = boxById(result.children, "narrow");
@@ -1204,7 +1203,7 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     expect(labelOverflow(label, narrow.w, narrow.h)).toBeUndefined();
   });
 
-  it("grows a maxW-capped diamond's height instead of clipping when the shared-width vote's k no longer applies at the capped width (A2)", async () => {
+  it("grows a maxW-capped diamond's height instead of clipping when the shared-width vote's k no longer applies at the capped width", async () => {
     const label = "Manual approval\nrelease manager signs off";
     const style = { geo: "diamond" as const };
     const result = await layoutAst(
@@ -1216,7 +1215,7 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     expect(labelOverflow(label, approval.w, approval.h, style)).toBeUndefined();
   });
 
-  it("keeps an author-pinned h even when the label needs more room, so check can still warn (A2 standing decision, tldx-4hz)", async () => {
+  it("keeps an author-pinned h even when the label needs more room, so check can still warn", async () => {
     const label = "This label will not fit no matter what, because the box height is explicitly pinned far too small for it";
     const result = await layoutAst(doc({ layout: "col" }, [box({ id: "pinned", label, w: 160, h: 40 })]));
     const pinned = boxById(result.children, "pinned");
@@ -1283,7 +1282,7 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
   });
 });
 
-describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX (D23, tldx-pnq)", () => {
+describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX", () => {
   it("sizes a lone <Text size=xl> to exactly what estimatedBoxSize(..., { standalone: true }) predicts", async () => {
     const label = "Phase 1 (non collaborative)";
     const result = await layoutAst(
@@ -1294,10 +1293,9 @@ describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX (D23, t
     expect(heading.w).toBe(expected.w);
     expect(heading.h).toBe(expected.h);
 
-    // The bug this pins: at this same width, the label table (what <Text>
-    // used to size off) reserves less height than tldraw's real `text`
-    // shape needs - that shortfall is what let a wrapped line spill onto
-    // whatever sat below it.
+    // At this same width the label table reserves less height than tldraw's
+    // real `text` shape needs, and that shortfall spills a wrapped line onto
+    // whatever sits below.
     const labelTableH = boxHeightForWidth(label, heading.w, { font: "sans", size: "xl" });
     expect(labelTableH).toBeLessThan(heading.h);
   });
@@ -1323,8 +1321,7 @@ describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX (D23, t
 
     // The heading's own final w/h - post shared-width vote, post
     // equalize-height vote - must still reserve at least as much as its
-    // standalone table demands, never the (shorter) label-table height a
-    // missed call site in the shared-size vote would silently fall back to.
+    // standalone table demands, never the shorter label-table height.
     const labelTableH = boxHeightForWidth(label, heading.w, { font: "sans", size: "xl" });
     expect(heading.h).toBeGreaterThanOrEqual(
       boxHeightForWidth(label, heading.w, { font: "sans", size: "xl", standalone: true }),

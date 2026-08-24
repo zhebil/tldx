@@ -1,39 +1,14 @@
 /**
  * `attachNotes`: places every `<Note on="...">` / `<Sticky on="...">` beside
- * the element it annotates, after `hybridLayout`'s normal flow/auto/free
- * placement has finished. Pure and stateless - no `node:*`, no `infra/`, no
- * `app/` imports.
+ * the element it annotates, after `hybridLayout`'s placement has finished.
+ * `stack.ts` sizes an attached note but leaves it out of the flow, so it
+ * arrives here correctly sized and parked at its parent's origin.
  *
- * An attached note is excluded from its container's flow in `stack.ts` (it
- * is still sized there, just not arranged or counted toward a bounding
- * box), so by the time this runs it is a correctly-sized, wrongly-placed
- * leaf sitting wherever `sizeElement` parked it (0,0 relative to its
- * declared parent). This pass:
- *
- *  1. Walks the positioned tree once to record every box/frame/note's
- *     absolute rect (child `x`/`y` are parent-relative; frames nest).
- *  2. Removes every attached note from wherever it was declared and
- *     re-parents it to the document root. Deliberate, not a bug: tldraw
- *     frames clip their children, so a note parented to a frame and placed
- *     beside that frame (outside its bounds) would be invisible.
- *  3. Picks a side (right/below/left/above, in that preference order),
- *     starting 24px off the target and centred on the target on the other
- *     axis, then slides that candidate further along the side's axis past
- *     any obstacle still in its way (`pushClear`) - a tightly-wrapped
- *     container is not "room" just because it's the nearest 24px gap.
- *     Rejects any pushed candidate with a negative x or y and prefers the
- *     first zero-overlap one against every other absolute rect in the
- *     document (excluding the note itself and its target).
- *
- * `on` naming an `<edge>` resolves to a degenerate 1x1 rect at the midpoint
- * of the two endpoint shapes' absolute centres. This deliberately ignores
- * the arc bow `routing.ts` (T3-T5) may add to a same-axis skip edge - a
- * cheap approximation that's fine because the note only has to land near
- * the edge, not trace its exact curve.
- *
- * Canvas bounds are computed downstream from whatever shapes exist (there
- * is no `w`/`h` stored on `IRDoc`), so re-parenting a note with its final
- * absolute rect is all that's needed for it to count.
+ * Every attached note is re-parented to the document root. Deliberate: tldraw
+ * frames clip their children, so a note parented to a frame but placed outside
+ * that frame's bounds would be invisible. `on` naming an `<edge>` resolves to a
+ * 1x1 rect at the midpoint of its endpoints' centres, ignoring any arc bow -
+ * the note only has to land near the edge, not trace its curve.
  */
 
 import type {
@@ -158,15 +133,12 @@ function rectsOverlap(a: Rect, b: Rect): boolean {
 }
 
 /**
- * A note's initial candidate (24px off the target, centred on the other
- * axis) is only "room" if the target happens to be isolated. When the
- * target sits inside a container sized tightly around it (a row's frame,
- * a stack of siblings), the immediate spot is inside that container's own
- * footprint too. Rather than accept the first obstacle in the way, slide
- * the candidate further along the side's axis - past whichever obstacles
- * it's still touching - until nothing's left in its way or it runs out of
- * obstacles to clear. Bounded by `obstacles.size` pushes: each push clears
- * at least the obstacle that triggered it, so it can't cycle.
+ * A note's initial candidate (24px off the target, centred on the other axis)
+ * is only room if the target is isolated - when it sits inside a tightly
+ * wrapped container, that spot is inside the container's footprint too. So
+ * slide the candidate along the side's axis past whatever it still touches.
+ * Bounded by `obstacles.size` pushes: each push clears at least the obstacle
+ * that triggered it, so it cannot cycle.
  */
 function pushClear(
   side: Side,

@@ -1,15 +1,12 @@
 /**
- * Shared scenarios that every `LayoutPort` adapter must satisfy. The fake
- * (`layout.fake.ts`) and the real ELK adapter (`infra/layout-elk/`, tracked
- * in tldx-gxl) both run this contract to guard against fake drift.
+ * Shared scenarios that every `LayoutPort` adapter must satisfy. Both the fake
+ * and the real ELK adapter run this to guard against fake drift; each invokes
+ * `runContract(make)` from its own test file.
  *
- * Per docs/testing.md: `runContract(make)` is invoked from the adapter's own
- * test file; the adapter supplies its constructor and (if needed) setup.
- *
- * The contract intentionally asserts only what is universal across layout
- * engines: ids and tree structure are preserved, every visual node ends up
- * with finite x/y/w/h, edges pass through unchanged. It does NOT pin specific
- * coordinates - that would couple the contract to the stub's grid policy.
+ * Asserts only what is universal across layout engines: ids and tree structure
+ * preserved, every visual node given finite x/y/w/h, edges passed through
+ * unchanged. It does NOT pin coordinates - that would couple the contract to
+ * the stub's grid policy.
  */
 
 import { describe, expect, it } from "vitest";

@@ -1,16 +1,12 @@
 /**
- * Records -> JSX text, plus the splice into a `.tldx.jsx` source file that
- * adds them as children of the root `<Doc>` (docs/round-trip.md D3, D5).
- * Pure: no I/O, never reformats anything it wasn't asked to touch. `app/
- * absorb.ts` calls this after partitioning the overlay into absorbable vs.
- * residual entries, and owns guardrails/writing/verification.
+ * Records -> JSX text, plus the splice into a `.tldx.jsx` source that adds them
+ * as children of the root `<Doc>`. Pure: no I/O, never reformats anything it
+ * wasn't asked to touch. `app/absorb.ts` owns guardrails, writing and
+ * verification.
  *
- * A `geo` record becomes `<Box>`; a `note` record becomes `<Sticky>` - the
- * only vocabulary left that `domain/emit/emit.ts` compiles to a `type:
- * "note"` tldraw record (C2, tldx-npd: the old plain `<Note>`, which
- * emitted a `geo` box pretending to be an annotation, is retired). Emitting
- * anything else here would recompile to the wrong tldraw type and fail
- * absorb's own verification step every time.
+ * A `geo` record becomes `<Box>`; a `note` record becomes `<Sticky>`, the only
+ * vocabulary `emit` compiles to a `type: "note"` tldraw record. Anything else
+ * would recompile to the wrong tldraw type and fail absorb's verification.
  */
 
 import type { TLRecord } from "../../contracts/scene-json.js";
@@ -19,9 +15,9 @@ import { richTextToPlain } from "../overlay/diff.js";
 
 const SHAPE_PREFIX = "shape:";
 
-/** Strips the `shape:` prefix `emit/` adds (never renames, D3) to recover
- *  the author-facing id for a JSX `id` attribute. The ugly id is kept
- *  verbatim - prettifying it would need a second naming scheme to undo. */
+/** Strips the `shape:` prefix `emit/` adds, recovering the author-facing id
+ *  for a JSX `id` attribute. An ugly id is kept verbatim - prettifying it
+ *  would need a second naming scheme to undo. */
 function authorId(record: TLRecord): string {
   return record.id.startsWith(SHAPE_PREFIX) ? record.id.slice(SHAPE_PREFIX.length) : record.id;
 }
@@ -71,10 +67,10 @@ function boxJsx(record: TLRecord): string {
   return `<Box ${geoAttrs(record).join(" ")}/>`;
 }
 
-/** `<Sticky>`'s `h` is the DSL's only handle on `growY` - tldraw stickies are
- *  always 200 wide (`NOTE_SIZE`) and `emit/` computes
- *  `growY = max(0, h - NOTE_SIZE)` (docs/dsl.md), so `h = NOTE_SIZE + growY`
- *  is the exact inverse (growY is never negative, so the max() never clips). */
+/** `<Sticky>`'s `h` is the DSL's only handle on `growY`: tldraw stickies are
+ *  always `NOTE_SIZE` wide and `emit/` computes `growY = max(0, h - NOTE_SIZE)`,
+ *  so `h = NOTE_SIZE + growY` is the exact inverse - `growY` is never negative,
+ *  so the `max()` never clips. */
 function stickyAttrs(record: TLRecord): { attrs: string[]; text: string } {
   const props = propsOf(record);
   const growY = typeof props.growY === "number" ? props.growY : 0;
@@ -112,11 +108,9 @@ export function elementJsx(record: TLRecord): string | null {
 
 type OpenTag = { tagEnd: number; selfClosing: boolean };
 
-/** Scans forward from `<Doc` to the end of its opening tag (`>` or `/>`),
- *  tracking quotes and `{}` expression depth so a `>` inside an attribute
- *  value or expression doesn't end the tag early. Exported for
- *  `domain/absorb/moves.ts`'s reorder/gap splicing, which locates elements
- *  by JSX source span rather than by scanning for `<Doc`. */
+/** Scans forward from an element's `<` to the end of its opening tag (`>` or
+ *  `/>`), tracking quotes and `{}` expression depth so a `>` inside an
+ *  attribute value or expression doesn't end the tag early. */
 export function scanOpenTag(source: string, start: number): OpenTag | null {
   let i = start;
   let depth = 0;
@@ -160,8 +154,7 @@ function indentOfLineAt(source: string, offset: number): string {
 }
 
 /** 1-based line/column (code points) -> 0-based char offset. Mirrors how
- *  `jsxDEV`'s dev-source (`runtime/components.ts`'s `JsxSource`) numbers a
- *  JSX element's position: it points at the element's own `<`. */
+ *  `jsxDEV`'s dev-source numbers a JSX element's position: at its own `<`. */
 export function offsetAt(source: string, line: number, column: number): number {
   const lines = source.split("\n");
   let offset = 0;
@@ -252,14 +245,11 @@ function skipBraceExpr(source: string, start: number): number | null {
 }
 
 /**
- * Rewrites a `row`/`col` container's flowed children into a new order
- * (`domain/absorb/moves.ts`'s reorder rung). `siblingSpans` are the
- * children's JSX spans in *current* source order; `draggedIndex` moves to
- * `toIndex`, keeping every other sibling's relative order. Assumes each
- * sibling starts its own line (the authoring style every corpus fixture
- * uses) - if that's not true the diff still round-trips through a normal
- * JSX formatter, but this function returns `error` rather than guess at
- * where a same-line sibling's block boundary is.
+ * Rewrites a `row`/`col` container's flowed children into a new order.
+ * `siblingSpans` are the children's JSX spans in *current* source order;
+ * `draggedIndex` moves to `toIndex`, keeping every other sibling's relative
+ * order. Assumes each sibling starts its own line, and returns `error` rather
+ * than guessing at a same-line sibling's block boundary.
  */
 export function spliceReorder(
   source: string,
@@ -299,9 +289,8 @@ export function spliceReorder(
 }
 
 /**
- * Sets (or adds) a `gap`/`colGap`/`rowGap` attribute on a container's
- * opening tag (`domain/absorb/moves.ts`'s gap rung). `containerSpan` points
- * at the container's own `<` (its IR span).
+ * Sets (or adds) a `gap`/`colGap`/`rowGap` attribute on a container's opening
+ * tag. `containerSpan` points at the container's own `<` (its IR span).
  */
 export function patchGapAttr(
   source: string,
@@ -322,11 +311,9 @@ export function patchGapAttr(
 
 const TLDX_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["']tldx["']/;
 
-/** `<Box>`/`<Sticky>` are only imports the source needs "touched" for when
- *  absorb actually introduces one it wasn't already using (D5: never touch
- *  an import it didn't need to touch). Adds missing names to the existing
- *  `import { ... } from "tldx"`; errors rather than guessing if there is
- *  no such import to extend. */
+/** Adds `Box`/`Sticky` to the existing `import { ... } from "tldx"`, but only
+ *  when absorb actually introduces one the source wasn't already using. Errors
+ *  rather than guessing if there is no such import to extend. */
 function ensureImports(source: string, records: readonly TLRecord[]): { source: string } | { error: string } {
   const needed: string[] = [];
   if (records.some((r) => r.type === "geo")) needed.push("Box");
@@ -361,10 +348,9 @@ export function absorbAdded(
   source: string,
   records: readonly TLRecord[],
 ): { source: string } | { error: string } {
-  // Nothing to splice - and the splice logic below always rewrites
-  // *something* around `</Doc>` (an empty block, a stray blank line) even
-  // for an empty list, which would touch a source that has nothing to
-  // absorb (D5: never touch what didn't need touching).
+  // The splice below always rewrites *something* around `</Doc>` (an empty
+  // block, a stray blank line) even for an empty list, which would touch a
+  // source that has nothing to absorb.
   if (records.length === 0) return { source };
 
   const sorted = [...records].sort((a, b) => {

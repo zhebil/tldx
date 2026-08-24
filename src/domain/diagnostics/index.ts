@@ -1,13 +1,8 @@
 /**
  * Domain-side surface for diagnostics. The wire-shape `Diagnostic` lives in
- * `contracts/` (so the viewer and the transport envelope can import it without
- * pulling in domain). Domain stages (parser/ir/layout/emit) build diagnostics
- * by calling `error()` / `warning()` here so severity stays consistent and
- * codes are the single asserted surface in tests.
- *
- * Formatting is intentionally absent: `cli/format-diagnostics.ts` (tldx-1il)
- * owns the plain-text rendering. Per CONTEXT.md, domain produces the data;
- * cli renders it.
+ * `contracts/` so the viewer and the transport envelope can import it without
+ * pulling in domain. Domain stages build diagnostics through `error()` /
+ * `warning()` here; rendering them is the CLI's job.
  */
 
 import type {

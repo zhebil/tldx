@@ -1,17 +1,13 @@
 /**
- * `applyOverlay`: `apply(overlay, scene) -> { scene, diagnostics }` from
- * round-trip.md D1. Pure, total, never throws - the overlay is user data
- * that may reference ids that no longer exist (D2: `basedOn` mismatching
- * only changes diagnostic wording, never behaviour), so every unresolved
- * entry becomes a warning rather than a thrown error.
+ * `applyOverlay`: `apply(overlay, scene) -> { scene, diagnostics }`. Pure,
+ * total, never throws - the overlay is user data that may reference ids that
+ * no longer exist, so an unresolved entry becomes a warning.
  *
- * Order, per D1: merge `added` records, apply `moved` / `restyled` /
- * `relabelled` field-wise onto the record they name (added records
- * included), then apply `deleted` last with a cascade to a fixpoint so the
- * store never comes out with dangling bindings or orphaned children.
- *
- * Never re-runs layout - this is a patch over the finished scene, not an
- * input to the layout engine (D1).
+ * Order: merge `added` records; apply `moved`/`restyled`/`relabelled`
+ * field-wise onto the record they name, added records included; then `deleted`
+ * last, cascading to a fixpoint so the store never comes out with dangling
+ * bindings or orphaned children. This is a patch over the finished scene, not
+ * an input to layout, so layout never re-runs.
  */
 
 import { richText } from "../../contracts/builders.js";
@@ -139,7 +135,7 @@ function applyRelabelled(record: TLRecord, label: string): boolean {
 }
 
 /**
- * Deletion cascades to a fixpoint (D1): a binding whose `toId` is removed is
+ * Deletion cascades to a fixpoint: a binding whose `toId` is removed is
  * removed, and its `fromId` (the arrow) is removed too; a binding whose
  * `fromId` is removed is removed with no cascade back to `toId`; any record
  * whose `parentId` is removed is removed. Repeating until nothing changes

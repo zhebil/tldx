@@ -66,10 +66,10 @@ describe("estimatedBoxSize", () => {
     expect(capped.h).toBeGreaterThan(unbounded.h);
   });
 
-  // D20/T47: geoScale inflates width and height together so a label fits
-  // inside a non-rect outline - that inflation used to run unchecked after
-  // fitBoxWidth had already respected maxW as a wrap budget, so a diamond's
-  // *scaled* width blew straight past its cap (492 against a 200 cap, 2.5x).
+  // geoScale inflates width and height together so a label fits inside a
+  // non-rect outline. `fitBoxWidth` respects maxW as a wrap budget, but that
+  // inflation is applied after it, so an unchecked scale would blow a
+  // diamond's width straight past its cap.
   it("holds maxW on a diamond the same way it holds on a rectangle (regression: diamond used to ignore maxW entirely)", () => {
     const label = "Health gate\nerror rate < 1% for 10 min";
     const diamond = estimatedBoxSize(label, 200, { geo: "diamond" });
@@ -83,10 +83,9 @@ describe("estimatedBoxSize", () => {
 
     // A 200-wide diamond has less inscribed room than a 200-wide rectangle
     // for the same label, so it must be taller, not shorter, to hold it -
-    // shrinking height to hit the cap (the first fix attempt) undoes the
-    // inflation that kept the label inside the outline. Taller is correct;
-    // unbounded is not (a sane ceiling, not a tuned ratio: this is a 3-line
-    // label in a 200px-wide diamond, genuinely a tall shape).
+    // shrinking height to hit the cap undoes the inflation that kept the
+    // label inside the outline. The ceiling is a sanity bound, not a tuned
+    // ratio: a 3-line label in a 200px diamond is genuinely a tall shape.
     expect(cappedDiamond.h).toBeGreaterThan(cappedRect.h);
     expect(cappedDiamond.h).toBeLessThan(600);
   });
@@ -105,7 +104,7 @@ describe("estimatedBoxSize", () => {
   });
 });
 
-describe("geo-aware sizing (T15)", () => {
+describe("geo-aware sizing", () => {
   const label = "Diamond";
 
   it("no geo prop is byte-identical to explicit geo=rectangle (regression: today's sizing unchanged)", () => {
@@ -129,9 +128,8 @@ describe("geo-aware sizing (T15)", () => {
   });
 
   // The containment predicate per outline, restated independently of
-  // `defaults.ts` - this is what caught the first cut, where `k` was solved
-  // once on the rectangle basis and the label (which does not scale with the
-  // box) still spilled past a triangle's slopes.
+  // `defaults.ts`: the label does not scale with the box, so a `k` solved on
+  // the rectangle basis alone still spills past a triangle's slopes.
   const fits: Record<string, (a: number, b: number) => boolean> = {
     rect: () => true,
     ellipse: (a, b) => Math.hypot(a, b) <= 1,
@@ -161,7 +159,7 @@ describe("geo-aware sizing (T15)", () => {
   });
 });
 
-describe("geo aspect ratio (C4)", () => {
+describe("geo aspect ratio", () => {
   it("a short diamond label reads closer to square than the rectangle aspect target allows", () => {
     const { w, h } = estimatedBoxSize("Health gate", undefined, { geo: "diamond" });
     expect(w / h).toBeLessThan(BOX_ASPECT_TARGET);
@@ -203,7 +201,7 @@ describe("geo aspect ratio (C4)", () => {
   });
 });
 
-describe("labelOverflow (D22)", () => {
+describe("labelOverflow", () => {
   it("is undefined for a box sized by estimatedBoxSize itself (the box always fits its own natural size)", () => {
     const label = "a much longer label that wraps onto more than one line";
     const { w, h } = estimatedBoxSize(label);
@@ -216,10 +214,9 @@ describe("labelOverflow (D22)", () => {
   });
 
   it("fires when a label is wrapped to a width narrower than the height was computed for (the explicit-w bug)", () => {
-    // This is D22 itself: estimatedBoxSize(label) picks a natural (wide,
-    // few-line) height; a box pinned to a much narrower width re-wraps the
-    // same label onto many more lines, and that height was never
-    // recomputed for it.
+    // estimatedBoxSize(label) picks a natural (wide, few-line) height; a box
+    // pinned to a much narrower width re-wraps the same label onto many more
+    // lines, and that height is never recomputed for it.
     const label =
       "DUMB ZONE do not put smart logic here this box explicitly pins its width so the label wraps onto far more lines than the box's auto-computed height accounts for";
     const natural = estimatedBoxSize(label);

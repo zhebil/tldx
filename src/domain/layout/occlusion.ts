@@ -1,19 +1,9 @@
 /**
  * IR-with-positions -> occlusion diagnostics. Scene-JSON-computable checks
- * only (geometry + glyph metrics already available at layout time - no
- * browser). See `docs/diagram-defects.md` D15: `check` validated the IR and
- * said nothing about the picture, so a `<Note>` could cover three of four
- * topics and `check` stayed silent.
- *
- * Three checks, all warnings (a deliberate overlap must still compile):
- * - a shape's rect covers another shape's rect, neither containing the other.
- * - a labelled edge's placed label rect (`routing.ts`'s `EdgeRoute.labelBox`,
- *   the same geometry `emit` uses) covers a shape the edge doesn't connect to.
- * - a box's label doesn't fit the box's own final size (D22).
- *
- * `walkShapes`/`isAncestor`/`overlapArea` are the geometry `tools/layout-report.mts`
- * already used to compute "overlapping shape pairs" - moved here so `check`
- * and the report share one implementation instead of two.
+ * only: geometry and glyph metrics already available at layout time, no
+ * browser. Everything here is a warning, since a deliberate overlap must still
+ * compile. `tools/layout-report.mts` shares `walkShapes`/`isAncestor`/
+ * `overlapArea` so the report and `check` agree.
  */
 
 import { warning } from "../diagnostics/index.js";
@@ -189,12 +179,10 @@ function collectBoxes(doc: IRDocPositioned): IRBoxPositioned[] {
 }
 
 /**
- * D22: a box's label can silently clip - `check` validates the IR, not the
- * rendered picture, and nothing before this re-measured a label against the
- * box's *final* size once something else (an explicit `w`/`h`, a container's
- * shared-size vote) had already decided it. `labelOverflow` is the same
- * containment math `estimatedBoxSize` uses to size a box from scratch, run
- * in reverse against a box that already has a size.
+ * A box's label clips silently when something other than the sizing pass
+ * decided the box's final size (an explicit `w`/`h`, a container's shared-size
+ * vote). `labelOverflow` is `estimatedBoxSize`'s containment math run in
+ * reverse, against a box that already has a size.
  */
 function labelOverflowDiagnostics(boxes: readonly IRBoxPositioned[]): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];

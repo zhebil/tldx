@@ -1,8 +1,8 @@
 /**
  * The overlay file sits beside its source: `x.tldx.jsx` -> the module,
- * `x.tldx.overlay.json` -> the canvas edits keyed against it (round-trip.md
- * D1). Pure string work - no `node:path`, since domain/ may not import
- * node built-ins and a suffix swap needs nothing path-aware.
+ * `x.tldx.overlay.json` -> the canvas edits keyed against it. Pure string work
+ * - domain/ may not import node built-ins, and a suffix swap needs nothing
+ * path-aware.
  */
 
 const JSX_SUFFIX = ".jsx";

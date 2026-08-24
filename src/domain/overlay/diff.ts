@@ -4,8 +4,7 @@
  * canvas, as the browser sees it after the user's edits) into the overlay
  * entries that reproduce `current` from `base`.
  *
- * The load-bearing property (round-trip.md D1, spelled out in diff.test.ts):
- * for scenes sharing a schema,
+ * The load-bearing property, for scenes sharing a schema:
  * `applyOverlay({ v: 1, basedOn: sceneHash(base), entries: diffScenes(base, current) }, base).scene`
  * deep-equals `current`.
  *
@@ -101,13 +100,11 @@ function diffPlacement(base: TLRecord, current: TLRecord): OverlayPlacement | un
     placement.parentId = current.parentId as TLRecordId;
     changed = true;
   }
-  // `index` is never recorded (docs/round-trip-scope.md §4, §7 F4.1): with
-  // R1 (emit assigns every shape a real index and parents each arrow to the
-  // common ancestor of its endpoints), a real drag never needs a z-order
-  // rewrite - the corpus showed every recorded `index` change was tldraw's
-  // own bookkeeping (`ArrowBindingUtil.reparentArrow`'s fractional-index
-  // bisection), never user intent. There is no JSX syntax for z-order and
-  // none is planned.
+  // `index` is never recorded. Emit assigns every shape a real index and
+  // parents each arrow to the common ancestor of its endpoints, so a real drag
+  // never needs a z-order rewrite - every recorded `index` change in the corpus
+  // was tldraw's own fractional-index bookkeeping, never user intent. There is
+  // no JSX syntax for z-order.
 
   const baseProps = (base.props as Record<string, unknown> | undefined) ?? {};
   const currentProps = (current.props as Record<string, unknown> | undefined) ?? {};

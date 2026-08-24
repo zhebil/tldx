@@ -12,10 +12,10 @@
 import type { StyleFont, StyleFontSize } from "../ir/styles.js";
 
 /**
- * Kept exactly as first measured, so every geometry baseline taken before
- * T11 still reproduces. A re-measurement disagrees on two glyphs only -
- * `" "` (7.62) and `"#"` (21.63) - both under-reserved here and both inside
- * `TEXT_SLACK_PX`. Do not "correct" them without re-rendering the corpus.
+ * Kept exactly as first measured, so every geometry baseline still reproduces.
+ * A re-measurement disagrees on two glyphs only - `" "` (7.62) and `"#"`
+ * (21.63) - both under-reserved here and both inside `TEXT_SLACK_PX`. Do not
+ * "correct" them without re-rendering the corpus.
  */
 const DRAW_ADVANCE: Record<string, number> = {
   " ": 7.15, "!": 6.41, "\"": 10.89, "#": 21.40, "$": 14.94, "%": 21.14,
@@ -93,7 +93,7 @@ const MONO_ADVANCE: Record<string, number> = {
   "z": 13.20, "{": 13.20, "|": 13.20, "}": 13.20, "~": 13.20,
 };
 
-/** Exported only so tests can assert every `FONTS`/`FONT_SIZES` enum value has a table (see glyph-metrics.test.ts). */
+/** Exported only so tests can assert every `FONTS`/`FONT_SIZES` enum value has a table. */
 export const ADVANCE: Record<StyleFont, Record<string, number>> = {
   draw: DRAW_ADVANCE,
   sans: SANS_ADVANCE,
@@ -106,14 +106,12 @@ const MAX_ADVANCE: Record<StyleFont, number> = Object.fromEntries(
   Object.entries(ADVANCE).map(([font, table]) => [font, Math.max(...Object.values(table))]),
 ) as Record<StyleFont, number>;
 
-/** tldraw's `LABEL_FONT_SIZES`, verified against `GeoShapeUtil`/`NoteShapeUtil` - a label drawn *inside* a geo box or note. Exported for the same test-coverage reason as `ADVANCE`. */
+/** tldraw's `LABEL_FONT_SIZES` - a label drawn *inside* a geo box or note. Exported for the same test-coverage reason as `ADVANCE`. */
 export const LABEL_FONT_PX: Record<StyleFontSize, number> = { s: 18, m: 22, l: 26, xl: 32 };
 /**
- * tldraw's `FONT_SIZES` (`default-shape-constants.ts`, verified against
- * `TextShapeUtil.getTextSize`, which reads `FONT_SIZES[size]`) - the
- * standalone `text` shape `<Text>` emits (`IRBox.text`), distinct from
- * `LABEL_FONT_PX` the same way `ARROW_LABEL_FONT_PX` is: same idea, third
- * table (D23, tldx-pnq).
+ * tldraw's `FONT_SIZES` - the standalone `text` shape `<Text>` emits
+ * (`IRBox.text`), a third table distinct from `LABEL_FONT_PX` the same way
+ * `ARROW_LABEL_FONT_PX` is.
  */
 export const TEXT_FONT_PX: Record<StyleFontSize, number> = { s: 18, m: 24, l: 36, xl: 44 };
 /** Every glyph table above was measured at this size; other sizes scale linearly off it. */
@@ -126,11 +124,10 @@ export interface TextStyle {
   font?: StyleFont;
   size?: StyleFontSize;
   /**
-   * True for a standalone tldraw `text` shape (`IRBox.text`, `<Text>`) -
-   * sizes off `TEXT_FONT_PX` instead of `LABEL_FONT_PX`. Named `standalone`
-   * rather than `text` because `IRNote.text` is that element's string
-   * content, not a style flag; reusing the name would collide when a note
-   * is passed here as its own style (`domain/layout/stack.ts` does this).
+   * True for a standalone tldraw `text` shape (`IRBox.text`, `<Text>`) - sizes
+   * off `TEXT_FONT_PX` instead of `LABEL_FONT_PX`. Named `standalone` rather
+   * than `text` because `IRNote.text` is string content, not a style flag, and
+   * a note is passed here as its own style.
    */
   standalone?: boolean;
 }
@@ -165,10 +162,10 @@ export function lineHeightPx(ts?: TextStyle): number {
   return Math.ceil(fontPxTable(ts)[ts?.size ?? DEFAULT_FONT_SIZE] * 1.35);
 }
 
-/** tldraw's `ARROW_LABEL_FONT_SIZES` (`default-shape-constants.ts:37`) - distinct from `LABEL_FONT_PX`, which is box/note only. */
+/** tldraw's `ARROW_LABEL_FONT_SIZES` - distinct from `LABEL_FONT_PX`, which is box/note only. */
 export const ARROW_LABEL_FONT_PX: Record<StyleFontSize, number> = { s: 18, m: 20, l: 24, xl: 28 };
 
-/** tldraw `ARROW_LABEL_PADDING` (`default-shape-constants.ts:55`), added on every side of the label box. */
+/** tldraw's `ARROW_LABEL_PADDING`, added on every side of the label box. */
 export const ARROW_LABEL_PADDING = 4.25;
 
 /** Same measurement as `textWidth`, scaled by the arrow label's own font-size table instead of `LABEL_FONT_PX`. */

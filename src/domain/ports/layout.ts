@@ -1,18 +1,12 @@
 /**
  * LayoutPort: the seam between the pure compiler core and the layout engine.
- *
  * The real adapter is `infra/layout-elk/` (elkjs); the deterministic fake is
- * `layout.fake.ts`. Domain stages depend on this interface only - direct
- * `elkjs` imports are lint-rejected outside `infra/layout-elk/`.
- *
- * Async because real layout engines are async. Returning a `Promise` keeps the
- * adapter free to call ELK's promise API without forcing the fake to fake-out
- * a sync codepath.
+ * `layout.fake.ts`. Direct `elkjs` imports are lint-rejected outside the
+ * adapter. Async because real layout engines are.
  *
  * Adapters MUST preserve every id, every kind, and the child order of the
- * input IR. They fill in `x | y | w | h` for visual elements; they do not
- * add, drop, or reorder elements. See `layout.contract.ts` for the assertions
- * every adapter is held to.
+ * input IR: they fill in `x | y | w | h` for visual elements and never add,
+ * drop, or reorder. `layout.contract.ts` holds them to it.
  */
 
 import type { IRDoc, IRDocPositioned } from "../ir/index.js";

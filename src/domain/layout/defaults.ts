@@ -1,19 +1,13 @@
 /**
- * Shared layout heuristics consumed by both layout adapters
- * (`StubLayout` fake and `ElkLayoutAdapter` real). Sharing them keeps
- * `tldx check` and `tldx serve` producing identical scene JSON for the
- * same input - the contract is "no DOM, deterministic, identical sizes".
+ * Shared layout heuristics consumed by both layout adapters, so `tldx check`
+ * and `tldx serve` produce identical scene JSON for the same input. The
+ * contract is: no DOM, deterministic, identical sizes.
  *
- * Box sizing is three passes against measured tldraw text metrics
- * (`glyph-metrics.ts`: per-(font, size) advance widths, `lineHeightPx`):
- * `fitBoxWidth` picks each label's natural, unwrapped width, bounded by
- * `BOX_ASPECT_TARGET` rather than a pixel cap so long labels wrap onto more
- * lines instead of growing arbitrarily wide; `layoutContainer` (in
- * `stack.ts`) then picks one shared width (`col`, `grid`) or height (`row`)
- * across a container's flowed boxes; and `boxHeightForWidth` re-wraps each
- * label to that shared width for its final height. A real greedy wrap never
- * splits a word mid-line. Browser-side re-measurement is deferred (issue
- * tldx-6ek out-of-scope).
+ * Box sizing runs in three passes over measured tldraw text metrics.
+ * `fitBoxWidth` picks a label's natural width, bounded by `BOX_ASPECT_TARGET`
+ * rather than a pixel cap; `stack.ts` picks one shared width or height across
+ * a container's flowed boxes; `boxHeightForWidth` re-wraps each label to that
+ * shared width. The greedy wrap never splits a word mid-line.
  */
 
 import { fontScale, lineHeightPx, textWidth, type TextStyle } from "./glyph-metrics.js";
@@ -42,21 +36,18 @@ const NOTE_LINE_H = 30;
  * Default reading measure for an attached `<Note>` (not `<Sticky>`), in px.
  * A note is placed beside a single target after layout, not shared across a
  * row/col like a box - `fitBoxWidth`'s `BOX_ASPECT_TARGET` (6:1) is tuned for
- * that flow case and given a free line budget produces a near-unwrapped
- * single line (D3: 549px for one sentence), which is both unreadable and too
- * wide to park next to anything. This caps the same wrap algorithm at a
- * paragraph-ish measure instead, same order as `NOTE_SIZE` so a plain note
- * reads like an annotation, not a banner.
+ * that flow case and, given a free line budget, produces a near-unwrapped
+ * single line (549px for one sentence), too wide to park next to anything.
+ * This caps the same wrap algorithm at a paragraph-ish measure, same order as
+ * `NOTE_SIZE`, so a plain note reads like an annotation, not a banner.
  */
 export const NOTE_MEASURE_PX = 260;
 
 /**
- * Tldraw draws the frame heading rect at y in [-30, -6] relative to the
- * frame's own top edge - outside the frame, not inside it. So this is the
- * clearance a frame needs *above* it, reserved only by a frame that contains
- * a nested frame that itself draws chrome (see `domain/ir/ir.ts`'s
- * `drawsChrome` - a chrome-free frame draws no heading, so nothing needs
- * clearance for it).
+ * Tldraw draws the frame heading rect at y in [-30, -6] relative to the frame's
+ * own top edge - outside the frame, not inside it. So this is clearance a frame
+ * needs *above* it, reserved only when it contains a nested frame that itself
+ * draws chrome; a chrome-free frame draws no heading to clear.
  */
 export const FRAME_TITLE_PX = 30;
 /** Inner padding inside a frame, applied uniformly except top (see below). */
@@ -199,12 +190,11 @@ const GEO_MODEL: Record<StyleGeo, GeoModel> = {
  * Target w:h ratio a non-rect geo's *natural* (unpinned) box is pulled
  * toward - a short label on a diamond/ellipse/hexagon otherwise inherits
  * `fitBoxWidth`'s rectangle-tuned `BOX_ASPECT_TARGET` (6:1) and comes out a
- * flat lozenge instead of reading as the shape it claims to be (C4). Tighter
- * for the pointier outlines (diamond, triangle - narrow tips eat more of a
- * tall box than a wide one), roomier for the ellipse family. Approximations,
- * same spirit as `GEO_MODEL`'s comment above; arrows and rectangles are
- * absent on purpose (`geoNaturalSize` falls back to `BOX_ASPECT_TARGET`,
- * i.e. unchanged - arrows are directional by design, not "square-ish").
+ * flat lozenge instead of reading as the shape it claims to be. Tighter for
+ * the pointier outlines (diamond, triangle - narrow tips eat more of a tall
+ * box than a wide one), roomier for the ellipse family. Approximations, same
+ * as `GEO_MODEL`. Arrows and rectangles are absent on purpose and fall back to
+ * `BOX_ASPECT_TARGET`: an arrow is directional by design, not square-ish.
  */
 const GEO_ASPECT_TARGET: Partial<Record<StyleGeo, number>> = {
   diamond: 1.6,
@@ -224,13 +214,10 @@ const GEO_ASPECT_TARGET: Partial<Record<StyleGeo, number>> = {
 /**
  * `rawH` (a label wrapped to some width `w`), grown - never shrunk, so this
  * can't clip a label that already wraps onto several lines - toward
- * `GEO_ASPECT_TARGET` for `geo`. Exported so `stack.ts`'s shared-width vote
- * (a `col`/`grid` box re-wrapped to the container's shared width, not its
- * own natural one) can apply the same target `geoNaturalSize` below does for
- * the natural-width case - without this, a non-rect box's height and its
- * `geoScale` factor `k` (which also moved once `geoNaturalSize` changed)
- * drift out of sync by rounding, and the label spills past its outline by a
- * pixel or two (regression caught by `tests/corpus/multi-file.test.ts`).
+ * `GEO_ASPECT_TARGET` for `geo`. Exported so `stack.ts`'s shared-width vote can
+ * apply the same target `geoNaturalSize` does for the natural-width case;
+ * otherwise a non-rect box's height and its `geoScale` factor `k` drift out of
+ * sync by rounding and the label spills past its outline by a pixel or two.
  */
 export function geoTargetHeight(rawH: number, w: number, geo: StyleGeo | undefined): number {
   const target = GEO_ASPECT_TARGET[geo ?? "rectangle"] ?? BOX_ASPECT_TARGET;
@@ -240,12 +227,10 @@ export function geoTargetHeight(rawH: number, w: number, geo: StyleGeo | undefin
 /**
  * The natural (pre-`geoScale`) box for a label: `fitBoxWidth`'s width, and a
  * height grown - never shrunk, so this can't clip a label that already wraps
- * onto several lines - toward `GEO_ASPECT_TARGET`. `geoScale` then scales
- * this pair uniformly by `k`, so whatever `rw`:`rh` ratio comes out of here
- * *is* the final box's ratio; a long label's own `rw` (already wide because
- * `fitBoxWidth` capped how many lines its word count can wrap onto) still
- * wins over the target, which is the point - the target is a floor on
- * height, not a ceiling on width.
+ * onto several lines - toward `GEO_ASPECT_TARGET`. `geoScale` then scales this
+ * pair uniformly by `k`, so the `rw`:`rh` ratio here *is* the final box's
+ * ratio. A long label's own `rw` still wins over the target: the target is a
+ * floor on height, not a ceiling on width.
  */
 function geoNaturalSize(
   label: string | undefined,
@@ -262,8 +247,8 @@ function geoNaturalSize(
  * means it exactly fits. `a`/`b` are the label's width and height as
  * fractions of the box's.
  *
- * `arrow` uses tldraw's own shaft geometry from `getGeoShapePath.ts`: the
- * shaft is 0.68 of the cross-axis, and the head eats 0.38 of the long axis,
+ * `arrow` uses tldraw's own shaft geometry: the shaft is 0.68 of the
+ * cross-axis, and the head eats 0.38 of the long axis,
  * leaving the centred label 0.24 of the box height before it hits the head.
  */
 const GEO_FIT: Record<Exclude<GeoModel, "rect">, (a: number, b: number) => number> = {
@@ -282,11 +267,9 @@ const GEO_FIT: Record<Exclude<GeoModel, "rect">, (a: number, b: number) => numbe
  * was never re-measured against what it actually got. Returns the room the
  * label needs, or `undefined` if it already fits.
  *
- * Same containment math as `geoScale`'s convergence check (`fit(wl/w, hl/h)`
- * for a non-rect outline); a `rect` box has no such formula in `GEO_FIT`
- * because a rectangle's fit is the padding arithmetic `boxHeightForWidth`
- * already does, so it's inlined here instead of extending that table for one
- * case that isn't a containment ratio.
+ * Same containment math as `geoScale`'s convergence check. `rect` has no
+ * `GEO_FIT` entry because a rectangle's fit is plain padding arithmetic, not a
+ * containment ratio, so it is inlined here.
  */
 export function labelOverflow(
   label: string | undefined,
@@ -313,11 +296,10 @@ export function labelOverflow(
 
 /**
  * Per-box scale `k >= 1` applied to both width and height so a label still
- * fits inside a non-rectangular outline, centred - tldraw's own label
- * measurement is geo-independent (`getUnscaledLabelSize` wraps at
- * `w - LABEL_PADDING * 2` for every geo and `getGeometry` centres the label
- * rect in the full bounding box), so without this a diamond or triangle
- * would draw its label spilling past the drawn shape.
+ * fits inside a non-rectangular outline, centred. Tldraw's own label
+ * measurement is geo-independent - it wraps at `w - LABEL_PADDING * 2` for
+ * every geo and centres the label rect in the full bounding box - so without
+ * this a diamond or triangle would draw its label spilling past the shape.
  *
  * Solved as a fixed point rather than in closed form: the box scales but the
  * label does not, so growing the box re-wraps the label onto fewer lines and

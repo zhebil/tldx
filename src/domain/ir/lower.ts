@@ -1,29 +1,10 @@
 /**
- * AST → IR lowering for the MVP grammar.
+ * AST to IR lowering: validates ids, references, numbers and style enums, and
+ * normalizes attributes into the IR shape.
  *
- * Validates and normalizes:
- * - root must be `<doc>` (parser-side: any single element is allowed; IR
- *   rejects non-doc roots so downstream stages don't need to special-case);
- * - addressable elements (`<box>`, `<frame>`) require an explicit `id`;
- * - non-addressable elements (`<note>`, `<edge>`) get a synthesized id per
- *   ADR-12 (`<content-hash>-<n>`) when none is authored;
- * - `id`s are unique across the document;
- * - `<edge from to>` reference real ids and use bare-id form (dotted
- *   `id.anchor` and free-endpoint syntaxes are phase 1, not MVP; an anchor
- *   is instead authored via the separate `fromSide`/`toSide` props, B9);
- * - `x | y | w | h` parse as finite numbers when present.
- * - attributes outside the fixed allowed set per element kind are rejected
- *   with `ir/unknown-prop` (replaces the type checker the MVP doesn't have).
- * - style props (`color`, `fill`, `dash`, `geo`, `arrowheadStart`, `arrowheadEnd`,
- *   `textAlign`, `verticalAlign`, `labelColor`, `font`, `size`) must be one
- *   of tldraw's fixed enum values (`ir/styles.ts`), or
- *   `ir/invalid-style-value`. `font`/`size` affect box/note sizing
- *   (`domain/layout/glyph-metrics.ts`); the rest are pure pass-through and
- *   never affect layout.
- *
- * Errors do not abort lowering; the IR is produced best-effort and the
- * caller decides what to do based on `hasErrors(diagnostics)`. Edges that
- * fail validation are dropped from the IR (layout shouldn't see broken refs).
+ * Errors do not abort lowering. The IR is produced best-effort and the caller
+ * decides what to do based on `hasErrors(diagnostics)`. Edges that fail
+ * validation are dropped so layout never sees a broken reference.
  */
 
 import {
@@ -113,11 +94,9 @@ const ALLOWED_PROPS = {
     "font",
     "size",
   ],
-  // <Text> is the same "box" IR kind as <Box> (see IRBox.text), but a
-  // deliberately narrower prop set: no border/fill props (fill, dash, geo),
-  // no verticalAlign/labelColor/h (tldraw's TLTextShapeProps has neither -
-  // there is no h at all, height is derived from wrapped content), no
-  // `label` (content is JSX children, like <Note>, not an attribute).
+  // <Text> is the same "box" IR kind as <Box> with a narrower prop set:
+  // tldraw's TLTextShapeProps has no border/fill props, no verticalAlign,
+  // labelColor or h, and the content comes from JSX children, not `label`.
   text: ["id", "x", "y", "w", "maxW", "color", "textAlign", "font", "size"],
   note: [
     "id",
@@ -151,12 +130,7 @@ const ALLOWED_PROPS = {
   ],
 } as const;
 
-/**
- * The JSX tag the author actually typed, for diagnostics. Container/note
- * aliases (`<Row>`, `<Group>`, `<Sticky>`, ...) all lower to the same IR kind
- * (`frame`/`note`); `AstFrame.tag`/`AstNote.tag` records which alias the
- * runtime component was, so an error can name it instead of the IR kind.
- */
+/** The JSX tag the author typed. Aliases like `<Row>`/`<Sticky>` all lower to one IR kind, so diagnostics name the alias instead. */
 function displayTag(node: AstNode): string {
   switch (node.kind) {
     case "doc":
@@ -172,12 +146,7 @@ function displayTag(node: AstNode): string {
   }
 }
 
-/**
- * Reject attributes outside the fixed allowed set for this element kind.
- * This is the safety net standing in for a type checker: unknown props
- * (typos, unimplemented DSL surface) become `ir/unknown-prop` diagnostics
- * but do not stop lowering.
- */
+/** Unknown props become `ir/unknown-prop` diagnostics but do not stop lowering. */
 function checkUnknownProps(
   kind: keyof typeof ALLOWED_PROPS,
   tag: string,
@@ -198,13 +167,10 @@ function checkUnknownProps(
 }
 
 /**
- * A JSX string-literal attribute (`label="a\nb"`) is raw text - it does not
- * process backslash escapes, so a literal `\n` in one stays two characters
- * (`\` and `n`) instead of becoming a line break (D19). Warn rather than
- * reject: it is valid JSX, just probably not what the author meant. The
- * working multiline form is the expression container, `label={"a\nb"}`,
- * which is ordinary JS and does process the escape before it ever reaches
- * the AST.
+ * A JSX string-literal attribute is raw text and does not process backslash
+ * escapes, so a literal `\n` stays two characters. Warn rather than reject:
+ * it is valid JSX, just probably not what the author meant. The working
+ * multiline form is the expression container, `label={"a\nb"}`.
  */
 function checkLiteralNewlineInLabel(attrs: Attrs, ctx: Ctx): void {
   const attr = attrs.label;
@@ -294,8 +260,7 @@ type Ctx = {
 function lowerNode(node: AstNode, ctx: Ctx): IRElement | null {
   switch (node.kind) {
     case "doc":
-      // doc nested under doc is illegal at the parser level (multiple-roots),
-      // but defend in depth.
+      // Nested <doc> is illegal at the parser level; defend in depth.
       ctx.diagnostics.push(
         error(
           "ir/nested-doc",
@@ -363,17 +328,15 @@ function lowerBox(node: AstBox, ctx: Ctx): IRBox {
   const labelColor = readEnum(node.attrs, "labelColor", COLORS, ctx);
   const font = readEnum(node.attrs, "font", FONTS, ctx);
   const size = readEnum(node.attrs, "size", FONT_SIZES, ctx);
-  // <Text>'s content is JSX children (node.body), like <Note>; <Box>'s is
-  // the `label` attribute. Both land in IRBox.label - emit/layout don't
-  // need to know which source it came from.
+  // <Text>'s content is JSX children; <Box>'s is the `label` attribute. Both
+  // land in IRBox.label.
   const label = node.text ? node.body : getRaw(node.attrs, "label");
   return {
     kind: "box",
     ...assignId(node.attrs, node.span, ctx, {
       kind: "box",
       tag,
-      // <Text> is an annotation like <Note> - anonymous is fine, an id is
-      // synthesized (ADR-12) when omitted. <Box> stays addressable-required.
+      // <Text> may be anonymous - an id is synthesized. <Box> may not.
       addressable: !node.text,
       contentFields: () => [label ?? ""],
     }),
@@ -480,10 +443,9 @@ function lowerEdge(node: AstEdge, ctx: Ctx): IREdge | null {
 }
 
 /**
- * Resolve the `id` attribute against the policy for this element kind:
- * record the explicit id (or diagnose duplicate / empty), or synthesize
- * per ADR-12. Also emits `ir/missing-id` for addressable elements that
- * arrive without one. This is the single place the id rules live.
+ * Resolve the `id` attribute: record an explicit id (diagnosing duplicates and
+ * empties), or synthesize one. Addressable elements arriving without an id get
+ * `ir/missing-id`. The single place the id rules live.
  */
 function assignId(
   attrs: Attrs,
@@ -491,7 +453,7 @@ function assignId(
   ctx: Ctx,
   spec: {
     kind: "doc" | "frame" | "box" | "note" | "edge";
-    /** The authored tag to name in diagnostics (see `displayTag`); `spec.kind` stays the structural IR kind, used for the synthetic-id content hash. */
+    /** The authored tag to name in diagnostics; `spec.kind` stays the structural IR kind, used for the synthetic-id content hash. */
     tag: string;
     addressable: boolean;
     contentFields: () => readonly string[];
@@ -540,12 +502,10 @@ function recordExplicit(id: string, span: SourceSpan, ctx: Ctx): void {
 }
 
 /**
- * 8 compass points + `center` (docs/jsx-pivot.md decision 4, ADR-6) -
- * fractions of the target shape's own bounding box, `0,0` top-left. An
- * author can also write the fraction directly (`fromSide="0.25,1"`) for
- * anything a name doesn't cover; `normalizedAnchor` is continuous, so a
- * bigger fixed table would buy nothing (same reasoning the ADR gives for
- * not enumerating more than 8+1 names).
+ * 8 compass points plus `center`, as fractions of the target shape's own
+ * bounding box, `0,0` top-left. An author can also write the fraction
+ * directly (`fromSide="0.25,1"`); `normalizedAnchor` is continuous, so a
+ * bigger fixed table would buy nothing.
  */
 const ANCHOR_SIDES: Record<string, IRAnchor> = {
   center: { x: 0.5, y: 0.5 },
@@ -559,15 +519,6 @@ const ANCHOR_SIDES: Record<string, IRAnchor> = {
   "bottom-right": { x: 1, y: 1 },
 };
 
-/**
- * `fromSide`/`toSide` (B9): separate props rather than the `id.anchor` dot
- * syntax the design doc originally sketched, which collides with an id that
- * happens to use `.` as a namespace separator (tldx-4s1) - `from`/`to` stay
- * plain id strings this way, so nothing about them needs to change, and a
- * dotted id (still discouraged, see `ir/anchor-not-supported` above) is no
- * longer even a *latent* conflict, since anchor syntax no longer lives
- * inside the endpoint string at all.
- */
 function parseAnchorSide(
   attr: AttrValue | undefined,
   attrName: "fromSide" | "toSide",
@@ -632,10 +583,7 @@ function validateEndpoint(
   return raw;
 }
 
-/**
- * Resolve `from`/`to` references to known ids. Drops edges whose endpoints
- * point at nothing; emits `ir/unknown-reference` for each.
- */
+/** Resolve `from`/`to` to known ids, dropping edges whose endpoints point at nothing. */
 function resolveEdges(doc: IRDoc, ctx: Ctx): void {
   const ids = collectIds(doc);
   walkAndFilter(doc, (el) => {
@@ -665,10 +613,9 @@ function resolveEdges(doc: IRDoc, ctx: Ctx): void {
 }
 
 /**
- * Drops an unresolvable `<Note on="...">` back to a plain flowed note
- * (leaves everything else about it intact) rather than dropping the note
- * itself - unlike an edge with a bad endpoint, a note is still meaningful
- * content without its attachment.
+ * An unresolvable `<Note on="...">` falls back to a plain flowed note rather
+ * than being dropped - unlike an edge with a bad endpoint, a note is still
+ * meaningful content without its attachment.
  */
 function resolveNoteTargets(doc: IRDoc, ctx: Ctx): void {
   const ids = collectAddressableIds(doc);
@@ -687,7 +634,7 @@ function resolveNoteTargets(doc: IRDoc, ctx: Ctx): void {
   });
 }
 
-/** Ids of every box/frame/note/edge in the document - valid `on` targets. Excludes the `<doc>` root itself. */
+/** Ids of every box/frame/note/edge in the document - the valid `on` targets. Excludes the `<doc>` root. */
 function collectAddressableIds(
   el: IRElement,
   into: Set<string> = new Set(),

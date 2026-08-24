@@ -1,55 +1,11 @@
 /**
- * IR-with-positions → tldraw scene JSON.
+ * Positioned IR to tldraw scene JSON. Pure; composes over
+ * `src/contracts/builders.ts` and never hand-rolls record JSON.
  *
- * Pure function that the compileFile / watchAndServe use cases call after
- * layout. Composes over `src/contracts/builders.ts`; never hand-rolls record
- * JSON. The wire shape (and the tldraw pin behind it) is documented in
- * `docs/scene-json.md`.
- *
- * MVP behavior:
- * - One `document` record + one `page:main` record per scene.
- * - Visual elements (`box`, `note`, `frame`) become tldraw shapes whose ids
- *   are `shape:<irId>`. Their `parentId` follows the IR tree: top-level
- *   shapes parent to `page:main`, frame children parent to the frame's
- *   shape id. Shape `x | y` is whatever layout produced (frame-relative when
- *   nested), preserved verbatim.
- * - `<Text>` (`box.text`, IRBox) emits as a real tldraw `text` shape - no
- *   border, no fill - instead of a `box`'s `geo` rectangle. It shares every
- *   box layout rule (sizing, flow, `w`/`maxW` wrap budget); only emit
- *   branches on `box.text` to pick the shape kind. There is no `h` on the
- *   wire - a text shape's height is derived from wrapped content.
- * - `<Sticky>` (`note.sticky`) is a real tldraw note shape: drops IR `w`
- *   (tldraw stickies are always 200 wide) and keeps `h` as `growY` above
- *   tldraw's 200 base height; `note.color` passes through. It is the only
- *   `kind: "note"` producer left (C2, tldx-npd) - the old plain `<Note>`,
- *   which emitted a hand-rolled `geo` rectangle pretending to be an
- *   annotation, is retired in favour of `<Text>` or `<Sticky>`.
- * - `box`/`frame`/`note`/`edge` also pass through the raw tldraw style props
- *   IR carries (`color`, `fill`, `dash`, `geo` (`box` only), `arrowheadStart`, `arrowheadEnd`,
- *   and on `box`/`note`/`edge` also `labelColor`, `font`, `size`, and on
- *   `box`/`note` also `textAlign`, `verticalAlign` - see `domain/ir/styles.ts`)
- *   verbatim onto the shape when present; `font`/`size` already fed sizing at
- *   layout time on `box`/`note` (`glyph-metrics.ts`), and on `edge` drive
- *   tldraw's own arrow stroke/label sizing directly - this is just the
- *   wire-format echo.
- * - Edges become an `arrow` shape (`x: 0, y: 0`) plus two `binding` records
- *   anchoring start/end to the referenced shapes with default-center attach.
- *   The arrow is parented to the common ancestor of its two endpoints (the
- *   page, or the nearest enclosing named `<Frame>` both endpoints share) -
- *   matching what tldraw's own `ArrowBindingUtil.reparentArrow` would parent
- *   it to on first touch, so it never rewrites `parentId` under us (R1). The
- *   13-anchor scheme is phase 1. A same-axis skip edge (see
- *   `domain/layout/routing.ts`) gets a non-zero `bend` so it bows around the
- *   shapes between its endpoints instead of drawing through them.
- *   `edge.label` becomes the arrow's `text` prop (empty string when absent).
- * - Synthetic-id elements (notes / edges that didn't author an `id`) inherit
- *   IR's content-hash ids (ADR-12), so emit is deterministic across reorder.
- * - Every shape gets a real `index`: non-arrow shapes get one per parent, in
- *   emit order, with a gap (`a1`, `a3`, `a5`, ...); each arrow gets the slot
- *   right above its higher-indexed endpoint sibling (`a4` between `a3`/`a5`).
- *   See the comment above `arrowPlacement` for why this satisfies tldraw's
- *   `reparentArrow` and never gets rewritten (R1, `docs/round-trip-scope.md`
- *   §7).
+ * Shape ids are `shape:<irId>` and `parentId` follows the IR tree. Edges
+ * become an arrow plus two bindings, parented to the common ancestor of their
+ * endpoints so tldraw's `reparentArrow` never rewrites them - see
+ * `arrowPlacement`.
  */
 
 import {
@@ -80,14 +36,11 @@ import type {
 const PAGE_ID = "page:main";
 
 /**
- * The digit alphabet tldraw's own fractional-index generator uses for a
- * single-character index slot (`fractional-indexing-jittered`'s
- * `base62CharSet`: `0-9A-Za-z`, ascending). Copied as a literal, not
- * imported - domain/contracts cannot depend on tldraw's runtime (see the
- * note on `richText` in `contracts/builders.ts`). We only need the ordering
- * guarantee it gives: fixed-length strings built from this alphabet compare
- * correctly with plain `<`/`>`, which is all `ArrowBindingUtil.reparentArrow`
- * ever does with `.index`.
+ * The digit alphabet tldraw's fractional-index generator uses for a
+ * single-character index slot (`base62CharSet`: `0-9A-Za-z`, ascending).
+ * Copied as a literal because domain cannot depend on tldraw's runtime. All
+ * that matters is the ordering guarantee: fixed-length strings built from it
+ * compare correctly with plain `<`/`>`.
  */
 const INDEX_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
@@ -154,12 +107,10 @@ export function emit(ir: IRDocPositioned): SceneJSON {
 }
 
 /**
- * `offsetX`/`offsetY` fold in the origin of any enclosing chrome-free-frame
- * ancestors between this element and its emitted parent - a chrome-free
- * frame draws no frame shape, so its children must carry its position into
- * their own coords. `chain` is the same idea for ancestry: it only grows at
- * a chrome-drawing frame (the ones that actually get a shape id an arrow
- * could be parented to).
+ * `offsetX`/`offsetY` fold in the origin of enclosing chrome-free frames -
+ * such a frame draws no shape, so its children must carry its position into
+ * their own coords. `chain` only grows at a chrome-drawing frame, the only
+ * kind with a shape id an arrow could be parented to.
  */
 function emitElement(
   el: IRElementPositioned,
@@ -246,13 +197,10 @@ function emitBox(
 }
 
 /**
- * Borderless caption (`<Text>`, `IRBox.text`): a real tldraw `text` shape,
- * not a `geo` rectangle. `box.w` is whatever `domain/layout/stack.ts` already
- * computed for this element - box sizing (`estimatedBoxSize`, aspect-bounded
- * by default per `BOX_ASPECT_TARGET`) is reused wholesale, so a `<Text>`
- * with no `w`/`maxW` still gets a bounded wrap width, never an unbounded
- * line. There is no `h` on the wire - a text shape's height is derived from
- * its wrapped content, not settable (see `contracts/builders.ts#textShape`).
+ * Borderless caption (`<Text>`): a real tldraw `text` shape, not a `geo`
+ * rectangle. `box.w` is the wrap width layout already computed, so a `<Text>`
+ * with no `w`/`maxW` still gets a bounded width. There is no `h` on the wire -
+ * a text shape's height is derived from its wrapped content.
  */
 function emitText(
   box: IRBoxPositioned,
@@ -276,12 +224,7 @@ function emitText(
   });
 }
 
-/**
- * Always a real tldraw sticky note. The fake-geo-rectangle branch for a
- * non-sticky `<Note>` is retired (C2, tldx-npd): `<Sticky>` is the only
- * runtime producer of `kind: "note"` left, so `note.sticky` is always true
- * on any IR that reaches here through the public authoring surface.
- */
+/** Always a real tldraw sticky note; `w` is dropped because tldraw stickies are a fixed 200 wide. */
 function emitNote(
   note: IRNotePositioned,
   parentId: string,
@@ -327,26 +270,15 @@ function emitFrame(
 }
 
 /**
- * Where an arrow belongs, mirroring `ArrowBindingUtil.reparentArrow`
- * (`node_modules/tldraw/src/lib/bindings/arrow/ArrowBindingUtil.ts`):
- *
- * - `parentId` is the closest common ancestor of the two endpoints (walking
- *   up through chrome-drawing frames only - a chrome-free frame never gets a
- *   shape id, so it's never anyone's parent on the wire).
- * - `index` must sit strictly above the higher-indexed of the two "nearest
- *   siblings" (the endpoint itself, or the ancestor frame that sits directly
- *   under the common ancestor on the way down to it) and strictly below the
- *   next non-arrow sibling above that. Because non-arrow shapes are indexed
- *   in emit order with a gap of 2 (`a1`, `a3`, `a5`, ...), the slot
- *   immediately above a sibling's index (`slotAfter`) always lands there:
- *   nothing else occupies it, and the next non-arrow shape at that parent
- *   (if any) got the next odd slot up.
- *
- * `reparentArrow`'s early-return check only runs once the arrow already has
- * a higher index than its highest-bound sibling (otherwise it takes the
- * unconditional `getIndexAbove` branch and always rewrites) - `slotAfter`
- * guarantees that. Two arrows sharing a highest sibling get the same index;
- * `reparentArrow` checks bounds, not uniqueness, so that's fine.
+ * Where an arrow belongs, mirroring tldraw's `ArrowBindingUtil.reparentArrow`.
+ * `parentId` is the closest common ancestor of the two endpoints, walking up
+ * chrome-drawing frames only. `index` must sit strictly above the higher-
+ * indexed of the two nearest siblings and strictly below the next non-arrow
+ * sibling above that; since non-arrow shapes are indexed in emit order with a
+ * gap of 2, `slotAfter` always lands there. That also keeps `reparentArrow` on
+ * its early-return path, so it never rewrites the arrow. Two arrows sharing a
+ * highest sibling get the same index, which it tolerates - it checks bounds,
+ * not uniqueness.
  */
 function arrowPlacement(edge: IREdge, ctx: EmitContext): { parentId: string; index: string } {
   const pathFrom = [...(ctx.chainOf.get(edge.from) ?? []), shapeId(edge.from)];
@@ -356,11 +288,9 @@ function arrowPlacement(edge: IREdge, ctx: EmitContext): { parentId: string; ind
   while (i < pathFrom.length && i < pathTo.length && pathFrom[i] === pathTo[i]) i++;
 
   const parentId = i > 0 ? pathFrom[i - 1]! : PAGE_ID;
-  // Nearest sibling of each endpoint under the common ancestor. Falls back
-  // to the endpoint's own shape id in the rare case one endpoint is an
-  // ancestor of the other (an edge into a frame it also lives inside) -
-  // `reparentArrow` special-cases that (no sibling at all) in a way not
-  // worth replicating for a shape that can't occur from tldx source today.
+  // Nearest sibling of each endpoint under the common ancestor. The fallback
+  // covers one endpoint being an ancestor of the other, which tldx source
+  // cannot produce today.
   const siblingFrom = pathFrom[i] ?? pathFrom[pathFrom.length - 1]!;
   const siblingTo = pathTo[i] ?? pathTo[pathTo.length - 1]!;
 
