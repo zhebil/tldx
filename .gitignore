@@ -24,3 +24,8 @@ build/
 
 # Local-only bug repros - a scratch ledger, not shipped source
 examples/repro/
+
+# Reports, baselines and scratch notes never belong in the repo
+docs/*-report.md
+docs/baseline*.md
+docs/plan.md
