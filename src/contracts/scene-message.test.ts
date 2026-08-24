@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  documentRecord,
-  pageRecord,
-  sceneJson,
-  sceneMessage,
-} from "./builders.js";
+import { documentRecord, pageRecord, sceneJson, sceneMessage } from "./builders.js";
 import type { SceneMessage } from "./scene-message.js";
 import { SCENE_MESSAGE_VERSION } from "./scene-message.js";
 
@@ -15,9 +10,7 @@ import { SCENE_MESSAGE_VERSION } from "./scene-message.js";
 
 describe("SceneMessage envelope", () => {
   it("scene messages stamp v=1", () => {
-    const msg = sceneMessage.scene(
-      sceneJson([documentRecord(), pageRecord({ id: "page:main" })]),
-    );
+    const msg = sceneMessage.scene(sceneJson([documentRecord(), pageRecord({ id: "page:main" })]));
     expect(msg.v).toBe(SCENE_MESSAGE_VERSION);
     expect(msg.kind).toBe("scene");
   });
@@ -33,9 +26,7 @@ describe("SceneMessage envelope", () => {
     ]);
     expect(msg.kind).toBe("error");
     if (msg.kind === "error") {
-      expect(msg.payload.diagnostics[0]?.code).toBe(
-        "parser/unexpected-token",
-      );
+      expect(msg.payload.diagnostics[0]?.code).toBe("parser/unexpected-token");
     }
   });
 

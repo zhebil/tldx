@@ -47,9 +47,8 @@ export default function Diagram() {
       ))}
 
       <Text id="n-failover" maxW="480">
-        GSLB health-checks each region's API tier. On failure it drains that
-        region and shifts traffic to us-east-1, which holds the primary
-        Postgres; the other regions run read replicas.
+        GSLB health-checks each region's API tier. On failure it drains that region and shifts
+        traffic to us-east-1, which holds the primary Postgres; the other regions run read replicas.
       </Text>
     </Doc>
   );

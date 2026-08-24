@@ -3,7 +3,15 @@ import { Doc, Frame, Box, Edge, Text } from "tldx";
 export default function Diagram() {
   return (
     <Doc id="order-states" layout="col" gap="56">
-      <Frame id="states" name="Order state machine" layout="auto" direction="DOWN" gap="96" pad="24" color="violet">
+      <Frame
+        id="states"
+        name="Order state machine"
+        layout="auto"
+        direction="DOWN"
+        gap="96"
+        pad="24"
+        color="violet"
+      >
         <Box id="draft" label="Draft" color="grey" fill="semi" />
         <Box id="submitted" label="Submitted" color="blue" fill="semi" />
         <Box id="awaiting" label="Awaiting payment" color="orange" fill="semi" />
@@ -26,14 +34,27 @@ export default function Diagram() {
         <Edge id="s-hold-awaiting" from="on-hold" to="awaiting" label="retry" color="orange" />
 
         <Edge id="s-hold-cancelled" from="on-hold" to="cancelled" label="expired" color="red" />
-        <Edge id="s-submitted-cancelled" from="submitted" to="cancelled" label="cancel" color="red" />
+        <Edge
+          id="s-submitted-cancelled"
+          from="submitted"
+          to="cancelled"
+          label="cancel"
+          color="red"
+        />
         <Edge id="s-paid-refunded" from="paid" to="refunded" label="refund" color="red" />
-        <Edge id="s-refunded-draft" from="refunded" to="draft" label="reorder" color="grey" dash="dashed" />
+        <Edge
+          id="s-refunded-draft"
+          from="refunded"
+          to="draft"
+          label="reorder"
+          color="grey"
+          dash="dashed"
+        />
       </Frame>
 
       <Text id="n-cycle" w="300">
-        Two cycles: on hold returns to awaiting payment on a retried card, and a
-        refunded order can be reordered back to draft.
+        Two cycles: on hold returns to awaiting payment on a retried card, and a refunded order can
+        be reordered back to draft.
       </Text>
     </Doc>
   );

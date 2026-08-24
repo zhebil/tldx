@@ -59,22 +59,22 @@ Rules that are not negotiable:
 
 All from `"tldx"`.
 
-| | |
-|---|---|
-| `<Doc title>` | Root. One per file, top level only. `title` names the page and the browser tab. |
-| `<Frame id name>` | Visual container - border and a title. `id` required. |
-| `<Row id> <Col id> <Grid id>` | `<Frame>` with `layout` preset. `<Grid cols="3">`. |
-| `<Group id>` | Container that draws no chrome - pure layout. **The main tool for controlling layout.** Never point an edge at a `<Group>` id. |
-| `<Pipeline id>` | Row whose children get wired in source order automatically. Every child needs an `id`. |
-| `<Layers id>` | Column of tiers; each child frame becomes a row. Unnamed tiers lose their chrome. |
-| `<Swimlanes id>` | Like `<Layers>` but lanes keep their border and title. |
-| `<Graph id>` | `layout="auto"` - hands this container to ELK. **Last resort**, see below. |
-| `<Box id label>` | A leaf with a border and fill. `id` required. |
-| `<Text>text</Text>` | Borderless, fill-less caption - just glyphs. No `id` required. Text is children, not a `label` prop. |
-| `<Sticky on>text</Sticky>` | A real tldraw sticky note, fixed 200px wide. `on` attaches it beside another element. |
-| `<Edges>` | One line per arrow, `a -> b: label`. **Default for more than a couple of edges.** See Edges below. |
-| `<Edge from to>` | One arrow, full props. Fallback for what `<Edges>` can't say: an explicit `id`, or a style that differs edge-by-edge within one batch. |
-| `flow("a","b","c")` | Unlabelled chain as a function call, no JSX. Still fine for a short plain sequence; carries no source span - prefer `<Edges>` when that matters. |
+|                               |                                                                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<Doc title>`                 | Root. One per file, top level only. `title` names the page and the browser tab.                                                                  |
+| `<Frame id name>`             | Visual container - border and a title. `id` required.                                                                                            |
+| `<Row id> <Col id> <Grid id>` | `<Frame>` with `layout` preset. `<Grid cols="3">`.                                                                                               |
+| `<Group id>`                  | Container that draws no chrome - pure layout. **The main tool for controlling layout.** Never point an edge at a `<Group>` id.                   |
+| `<Pipeline id>`               | Row whose children get wired in source order automatically. Every child needs an `id`.                                                           |
+| `<Layers id>`                 | Column of tiers; each child frame becomes a row. Unnamed tiers lose their chrome.                                                                |
+| `<Swimlanes id>`              | Like `<Layers>` but lanes keep their border and title.                                                                                           |
+| `<Graph id>`                  | `layout="auto"` - hands this container to ELK. **Last resort**, see below.                                                                       |
+| `<Box id label>`              | A leaf with a border and fill. `id` required.                                                                                                    |
+| `<Text>text</Text>`           | Borderless, fill-less caption - just glyphs. No `id` required. Text is children, not a `label` prop.                                             |
+| `<Sticky on>text</Sticky>`    | A real tldraw sticky note, fixed 200px wide. `on` attaches it beside another element.                                                            |
+| `<Edges>`                     | One line per arrow, `a -> b: label`. **Default for more than a couple of edges.** See Edges below.                                               |
+| `<Edge from to>`              | One arrow, full props. Fallback for what `<Edges>` can't say: an explicit `id`, or a style that differs edge-by-edge within one batch.           |
+| `flow("a","b","c")`           | Unlabelled chain as a function call, no JSX. Still fine for a short plain sequence; carries no source span - prefer `<Edges>` when that matters. |
 
 Reusable components are just functions that return JSX - no registration, no
 mechanism. Give them an `ns` prop and interpolate it into every `id` they
@@ -147,7 +147,7 @@ name a concept, put the boxes in it, and give it a `layout` and a `gap`:
 </Group>
 ```
 
-The nesting names the *concepts* - "opening", "handshake", "teardown" - not
+The nesting names the _concepts_ - "opening", "handshake", "teardown" - not
 positions. An eleven-state machine laid out this way needs about five `gap`
 values and no coordinates. That is the whole trick: decompose the picture into
 groups until each group is a plain row or column.
@@ -209,15 +209,15 @@ doc.
 On `<Box>` / `<Sticky>`:
 
 - `color`, `labelColor` - `black grey light-violet violet blue light-blue yellow
-  orange green light-green light-red red white`
+orange green light-green light-red red white`
 - `fill` (Box only) - `none semi solid pattern fill`
 - `dash` (Box only) - `draw solid dashed dotted`
 - `font` - `draw` (default) `sans serif mono`
 - `size` - `s m` (default) `l xl`
 - `textAlign`, `verticalAlign` - `start middle end`
 - `geo` (Box only) - `rectangle` (default) `ellipse oval diamond rhombus
-  hexagon octagon pentagon triangle trapezoid star cloud heart check-box x-box
-  arrow-up arrow-down arrow-left arrow-right`
+hexagon octagon pentagon triangle trapezoid star cloud heart check-box x-box
+arrow-up arrow-down arrow-left arrow-right`
 - `maxW` - caps how wide a label may run before wrapping. Works on `<Box>`;
   a `<Sticky>`'s width is fixed by tldraw at 200px, so `maxW` has no effect
   there.
@@ -321,7 +321,7 @@ Value is one of the 8 compass points plus `center` - `top`, `bottom`, `left`,
 or an exact `"x,y"` fraction of the target's own box, each `0..1`
 (`fromSide="0.25,1"` is 25% across, flush with the bottom). An authored side
 wins over anything the router would otherwise compute; the router still
-routes *around* it (bows the arrow clear of any shape in the way) rather
+routes _around_ it (bows the arrow clear of any shape in the way) rather
 than overriding it. Separate props, not `id.anchor` dotted syntax - `from`/
 `to` stay plain id strings, so this never collides with the `.`-is-reserved
 rule above. `<Edges>` doesn't have a per-line spelling for this yet - drop

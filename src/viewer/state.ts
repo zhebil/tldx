@@ -24,10 +24,7 @@ export function sceneTitle(scene: SceneJSON | null): string | null {
   return null;
 }
 
-export function applyMessage(
-  state: ViewerState,
-  message: SceneMessage,
-): ViewerState {
+export function applyMessage(state: ViewerState, message: SceneMessage): ViewerState {
   switch (message.kind) {
     case "scene":
       return { scene: message.payload, diagnostics: [] };

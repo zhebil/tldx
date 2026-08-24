@@ -39,10 +39,7 @@ export type CompileFileResult = {
   inputs: string[] | null;
 };
 
-export async function compileFile(
-  path: string,
-  deps: CompileFileDeps,
-): Promise<CompileFileResult> {
+export async function compileFile(path: string, deps: CompileFileDeps): Promise<CompileFileResult> {
   let source: string;
   try {
     source = await deps.fs.read(path);

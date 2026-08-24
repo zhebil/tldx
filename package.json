@@ -2,45 +2,48 @@
   "name": "@zhebil/tldx",
   "version": "0.0.3",
   "private": false,
-  "type": "module",
   "description": "Write architecture and flow diagrams as JSX and render them on a live tldraw canvas.",
-  "publishConfig": {
-    "access": "public"
+  "keywords": [
+    "architecture",
+    "claude-code",
+    "diagrams",
+    "jsx",
+    "tldraw"
+  ],
+  "homepage": "https://github.com/zhebil/tldx",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhebil/tldx.git"
   },
   "bin": {
     "tldx": "dist/cli/main.js"
   },
+  "files": [
+    "dist/",
+    "!dist/**/*.map",
+    "licenses/",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "lint": "eslint --max-warnings=0 --no-error-on-unmatched-pattern src",
-    "lint:deps": "depcruise --config .dependency-cruiser.cjs --no-progress src",
+    "lint": "oxlint --type-aware --report-unused-disable-directives --max-warnings=0 --no-error-on-unmatched-pattern src tests tools",
+    "lint:unused": "knip",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build:cli": "tsc -p tsconfig.build.json && chmod +x dist/cli/main.js",
     "build:viewer": "vite build",
     "build": "npm run build:cli && npm run build:viewer",
     "dev:cli": "tsx src/cli/main.ts",
-    "check": "npm run typecheck && npm run lint && npm run lint:deps && npm run test",
+    "check": "npm run typecheck && npm run format:check && npm run lint && npm run lint:unused && npm run test",
     "prepublishOnly": "npm run check && npm run build"
-  },
-  "devDependencies": {
-    "@types/node": "^26.2.0",
-    "@types/react": "^18.3.28",
-    "@types/react-dom": "^18.3.7",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
-    "@vitejs/plugin-react": "^6.1.0",
-    "dependency-cruiser": "^18.2.0",
-    "eslint": "^8.57.1",
-    "eslint-import-resolver-typescript": "^3.6.3",
-    "eslint-plugin-import": "^2.31.0",
-    "playwright": "^1.62.1",
-    "tsx": "^4.23.12",
-    "typescript": "^5.6.3",
-    "vite": "^8.2.2",
-    "vitest": "^4.1.11"
-  },
-  "engines": {
-    "node": ">=20"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
@@ -52,25 +55,28 @@
     "react-dom": "^18.3.1",
     "tldraw": "^3.15.6"
   },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/zhebil/tldx.git"
+  "devDependencies": {
+    "@tldraw/tlschema": "^3.15.6",
+    "@types/node": "^26.2.0",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.1.0",
+    "knip": "^6.32.2",
+    "oxfmt": "^0.65.0",
+    "oxlint": "^1.80.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "playwright": "^1.62.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   },
-  "homepage": "https://github.com/zhebil/tldx",
-  "keywords": [
-    "diagrams",
-    "tldraw",
-    "jsx",
-    "architecture",
-    "claude-code"
-  ],
-  "files": [
-    "dist/",
-    "!dist/**/*.map",
-    "licenses/",
-    "README.md",
-    "LICENSE",
-    "NOTICE"
-  ]
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.2": true,
+    "fsevents@2.3.3": true
+  }
 }

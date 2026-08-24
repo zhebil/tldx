@@ -5,29 +5,17 @@
  * `warning()` here; rendering them is the CLI's job.
  */
 
-import type {
-  Diagnostic,
-  DiagnosticSeverity,
-  SourceSpan,
-} from "../../contracts/diagnostic.js";
+import type { Diagnostic, SourceSpan } from "../../contracts/diagnostic.js";
 
-export type { Diagnostic, DiagnosticSeverity, SourceSpan };
+export type { Diagnostic, SourceSpan };
 
-export function error(
-  code: string,
-  message: string,
-  span?: SourceSpan,
-): Diagnostic {
+export function error(code: string, message: string, span?: SourceSpan): Diagnostic {
   return span === undefined
     ? { severity: "error", code, message }
     : { severity: "error", code, message, span };
 }
 
-export function warning(
-  code: string,
-  message: string,
-  span?: SourceSpan,
-): Diagnostic {
+export function warning(code: string, message: string, span?: SourceSpan): Diagnostic {
   return span === undefined
     ? { severity: "warning", code, message }
     : { severity: "warning", code, message, span };

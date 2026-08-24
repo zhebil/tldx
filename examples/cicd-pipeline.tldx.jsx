@@ -13,7 +13,11 @@ export default function CicdPipeline() {
         <Box id="commit" maxW="200" label={"Commit\ngit push to feature branch"} color="blue" />
         <Box id="build" maxW="200" label={"Build\ndocker build, push to registry"} />
         <Box id="unit" maxW="200" label={"Unit tests\n2,400 tests, ~4 min"} />
-        <Box id="integration" maxW="200" label={"Integration tests\nephemeral namespace, ~11 min"} />
+        <Box
+          id="integration"
+          maxW="200"
+          label={"Integration tests\nephemeral namespace, ~11 min"}
+        />
         <Box
           id="quality-gate"
           maxW="200"
@@ -32,10 +36,30 @@ export default function CicdPipeline() {
       />
 
       <Frame id="cd" name="Continuous delivery" layout="row" gap="64">
-        <Box id="deploy-staging" maxW="200" label={"Deploy to staging\nhelm upgrade, 1 replica"} color="light-blue" />
-        <Box id="smoke-staging" maxW="200" label={"Staging smoke tests\n18 journeys, ~2 min"} color="light-blue" />
-        <Box id="deploy-prod" maxW="200" label={"Deploy to production\ncanary 10%, then 100%"} color="light-green" />
-        <Box id="smoke-prod" maxW="200" label={"Production smoke tests\n6 read-only journeys"} color="light-green" />
+        <Box
+          id="deploy-staging"
+          maxW="200"
+          label={"Deploy to staging\nhelm upgrade, 1 replica"}
+          color="light-blue"
+        />
+        <Box
+          id="smoke-staging"
+          maxW="200"
+          label={"Staging smoke tests\n18 journeys, ~2 min"}
+          color="light-blue"
+        />
+        <Box
+          id="deploy-prod"
+          maxW="200"
+          label={"Deploy to production\ncanary 10%, then 100%"}
+          color="light-green"
+        />
+        <Box
+          id="smoke-prod"
+          maxW="200"
+          label={"Production smoke tests\n6 read-only journeys"}
+          color="light-green"
+        />
         <Box
           id="health-gate"
           maxW="200"
@@ -47,8 +71,20 @@ export default function CicdPipeline() {
 
       <Frame id="offramps" name="Off-ramps" layout="row" gap="96">
         <Box id="notify" maxW="200" label={"Notify author\nSlack #ci-failures"} color="red" />
-        <Box id="rollback" maxW="200" label={"Rollback\nre-deploy previous image tag"} color="red" dash="dashed" />
-        <Box id="released" maxW="200" label={"Released\ntag promoted to stable"} geo="ellipse" color="green" />
+        <Box
+          id="rollback"
+          maxW="200"
+          label={"Rollback\nre-deploy previous image tag"}
+          color="red"
+          dash="dashed"
+        />
+        <Box
+          id="released"
+          maxW="200"
+          label={"Released\ntag promoted to stable"}
+          geo="ellipse"
+          color="green"
+        />
       </Frame>
 
       {flow("commit", "build", "unit", "integration", "quality-gate")}
@@ -56,15 +92,39 @@ export default function CicdPipeline() {
 
       <Edge from="quality-gate" to="approval" label="pass" font="sans" size="s" color="green" />
       <Edge from="quality-gate" to="notify" label="fail" font="sans" size="s" color="red" />
-      <Edge from="approval" to="deploy-staging" label="approved" font="sans" size="s" color="green" />
+      <Edge
+        from="approval"
+        to="deploy-staging"
+        label="approved"
+        font="sans"
+        size="s"
+        color="green"
+      />
       <Edge from="approval" to="notify" label="rejected" font="sans" size="s" color="red" />
-      <Edge from="smoke-staging" to="notify" label="smoke failed" font="sans" size="s" color="red" />
+      <Edge
+        from="smoke-staging"
+        to="notify"
+        label="smoke failed"
+        font="sans"
+        size="s"
+        color="red"
+      />
       <Edge from="notify" to="commit" label="fix and re-push" font="sans" size="s" dash="dashed" />
       <Edge from="health-gate" to="released" label="healthy" font="sans" size="s" color="green" />
       <Edge from="health-gate" to="rollback" label="unhealthy" font="sans" size="s" color="red" />
-      <Edge from="rollback" to="deploy-prod" label="previous image tag" font="sans" size="s" dash="dashed" color="red" />
+      <Edge
+        from="rollback"
+        to="deploy-prod"
+        label="previous image tag"
+        font="sans"
+        size="s"
+        dash="dashed"
+        color="red"
+      />
 
-      <Sticky on="rollback">Rollback re-enters the pipeline at the deploy stage; it is not a separate release path.</Sticky>
+      <Sticky on="rollback">
+        Rollback re-enters the pipeline at the deploy stage; it is not a separate release path.
+      </Sticky>
     </Doc>
   );
 }

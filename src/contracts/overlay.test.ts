@@ -28,10 +28,7 @@ describe("isOverlay", () => {
     ["wrong v", { v: 2, basedOn: "a1b2c3d4", entries: {} }],
     ["non-string basedOn", { v: OVERLAY_VERSION, basedOn: 42, entries: {} }],
     ["missing entries", { v: OVERLAY_VERSION, basedOn: "a1b2c3d4" }],
-    [
-      "entries as an array",
-      { v: OVERLAY_VERSION, basedOn: "a1b2c3d4", entries: [] },
-    ],
+    ["entries as an array", { v: OVERLAY_VERSION, basedOn: "a1b2c3d4", entries: [] }],
     [
       "an entry that isn't an object",
       {

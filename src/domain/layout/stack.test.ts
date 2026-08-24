@@ -45,9 +45,7 @@ const stubPlaceAuto: AutoPlacer = async (req) => {
     cursor += n.w + req.gap;
     maxH = Math.max(maxH, n.h);
   }
-  const w = req.nodes.length === 0
-    ? req.padLeft + req.padRight
-    : cursor - req.gap + req.padRight;
+  const w = req.nodes.length === 0 ? req.padLeft + req.padRight : cursor - req.gap + req.padRight;
   const h = req.padTop + maxH + req.padBottom;
   return { positions, w, h };
 };
@@ -99,10 +97,7 @@ describe("hybridLayout", () => {
 
   it("defaults to col when layout is absent", async () => {
     const result = await layoutAst(
-      doc({}, [
-        box({ id: "a", label: "A" }),
-        box({ id: "b", label: "B" }),
-      ]),
+      doc({}, [box({ id: "a", label: "A" }), box({ id: "b", label: "B" })]),
     );
     const a = boxById(result.children, "a");
     const b = boxById(result.children, "b");
@@ -340,9 +335,7 @@ describe("hybridLayout", () => {
         frame({ id: "f1", layout: "col", pad: 10, gap: 5 }, [
           box({ id: "a", label: "A very long label indeed" }),
         ]),
-        frame({ id: "f2", layout: "col", pad: 10, gap: 5 }, [
-          box({ id: "b", label: "B" }),
-        ]),
+        frame({ id: "f2", layout: "col", pad: 10, gap: 5 }, [box({ id: "b", label: "B" })]),
       ]),
     );
     const f1 = frameById(result.children, "f1");
@@ -430,7 +423,9 @@ describe("hybridLayout", () => {
   it("stretches ragged tiers to equal width with align=stretch", async () => {
     const result = await layoutAst(
       doc({ layout: "col", align: "stretch" }, [
-        frame({ id: "narrow", layout: "row", pad: 0 }, [box({ id: "a", label: "A", w: 100, h: 20 })]),
+        frame({ id: "narrow", layout: "row", pad: 0 }, [
+          box({ id: "a", label: "A", w: 100, h: 20 }),
+        ]),
         frame({ id: "wide", layout: "row", pad: 0 }, [box({ id: "b", label: "B", w: 400, h: 20 })]),
       ]),
     );
@@ -477,9 +472,7 @@ describe("hybridLayout", () => {
         frame({ id: "narrow", layout: "row", pad: 0 }, [
           box({ id: "a", label: "A", w: 40, h: 20 }),
         ]),
-        frame({ id: "wide", layout: "row", pad: 0 }, [
-          box({ id: "b", label: "B", w: 400, h: 20 }),
-        ]),
+        frame({ id: "wide", layout: "row", pad: 0 }, [box({ id: "b", label: "B", w: 400, h: 20 })]),
       ]),
     );
     const narrow = frameById(result.children, "narrow");
@@ -609,7 +602,10 @@ describe("hybridLayout: cross-container labeled-edge gap clearance", () => {
         box({ id: "top", label: "TOP", w: 50, h: 50 }),
         frame(
           { id: "g", layout: "row", gap: 200, pad: 0 },
-          [box({ id: "left", label: "L", w: 50, h: 50 }), box({ id: "right", label: "R", w: 50, h: 50 })],
+          [
+            box({ id: "left", label: "L", w: 50, h: 50 }),
+            box({ id: "right", label: "R", w: 50, h: 50 }),
+          ],
           true,
         ),
         box({ id: "bottom", label: "BOTTOM", w: 50, h: 50 }),
@@ -630,7 +626,11 @@ describe("hybridLayout: cross-container labeled-edge gap clearance", () => {
     const widthClearance = arrowLabelWidth(LABEL) + 77.5;
     const baseline = Math.max(10, arrowLabelLineHeight() + 2 * 4.25);
     expect(dx).toBeLessThan(widthClearance);
-    const flipGap = dx - 25 /* top's own remaining half-height inside "g" */ - 25 /* bottom's own half-height */ + 8;
+    const flipGap =
+      dx -
+      25 /* top's own remaining half-height inside "g" */ -
+      25 /* bottom's own half-height */ +
+      8;
     expect(flipGap).toBeGreaterThan(baseline);
 
     // top -> g: no qualifying edge crosses this boundary, so it stays at
@@ -772,7 +772,7 @@ describe("hybridLayout doc-root aspect wrap", () => {
     expect(d.x).toBeGreaterThan(e.x);
   });
 
-  it("leaves an explicit layout=\"col\" doc unaffected even when its children fan out", async () => {
+  it('leaves an explicit layout="col" doc unaffected even when its children fan out', async () => {
     const result = await layoutAst(
       doc({ layout: "col" }, [
         box({ id: "hub", label: "hub" }),
@@ -1192,7 +1192,8 @@ describe("hybridLayout container-aware box sizing", () => {
   });
 
   it("grows an explicit-w box's height to fit a label measured at that width, not its natural unconstrained width", async () => {
-    const label = "A genuinely long label that will wrap onto many more lines once pinned to a narrow width";
+    const label =
+      "A genuinely long label that will wrap onto many more lines once pinned to a narrow width";
     const result = await layoutAst(doc({ layout: "col" }, [box({ id: "narrow", label, w: 160 })]));
     const narrow = boxById(result.children, "narrow");
 
@@ -1216,8 +1217,11 @@ describe("hybridLayout container-aware box sizing", () => {
   });
 
   it("keeps an author-pinned h even when the label needs more room, so check can still warn", async () => {
-    const label = "This label will not fit no matter what, because the box height is explicitly pinned far too small for it";
-    const result = await layoutAst(doc({ layout: "col" }, [box({ id: "pinned", label, w: 160, h: 40 })]));
+    const label =
+      "This label will not fit no matter what, because the box height is explicitly pinned far too small for it";
+    const result = await layoutAst(
+      doc({ layout: "col" }, [box({ id: "pinned", label, w: 160, h: 40 })]),
+    );
     const pinned = boxById(result.children, "pinned");
 
     expect(pinned.h).toBe(40);
@@ -1289,7 +1293,11 @@ describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX", () =>
       doc({ layout: "col" }, [text({ id: "heading", font: "sans", size: "xl" }, label)]),
     );
     const heading = boxById(result.children, "heading");
-    const expected = estimatedBoxSize(label, undefined, { font: "sans", size: "xl", standalone: true });
+    const expected = estimatedBoxSize(label, undefined, {
+      font: "sans",
+      size: "xl",
+      standalone: true,
+    });
     expect(heading.w).toBe(expected.w);
     expect(heading.h).toBe(expected.h);
 
@@ -1316,7 +1324,11 @@ describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX", () =>
     // sibling), so this pins the shared-width *vote* itself - a call site
     // in `applyContainerBoxSizing` that measured with the wrong table would
     // vote a narrower width in here.
-    const expectedW = estimatedBoxSize(label, undefined, { font: "sans", size: "xl", standalone: true }).w;
+    const expectedW = estimatedBoxSize(label, undefined, {
+      font: "sans",
+      size: "xl",
+      standalone: true,
+    }).w;
     expect(heading.w).toBe(expectedW);
 
     // The heading's own final w/h - post shared-width vote, post
@@ -1335,23 +1347,26 @@ describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX", () =>
 
 describe("note sizing: geo <Note> vs sticky <Sticky>", () => {
   it("a geo note sizes like a box - wraps to a readable measure, not a 200px sticky column or a banner-wide single line", async () => {
-    const text =
+    const noteText =
       "Two sentences of context about this diagram. It should read like an annotation, not a filing cabinet.";
-    const result = await layoutAst(doc({ layout: "col" }, [note({ id: "n" }, text)]));
+    const result = await layoutAst(doc({ layout: "col" }, [note({ id: "n" }, noteText)]));
     const n = noteById(result.children, "n");
-    const expectedW = fitBoxWidth(text, NOTE_MEASURE_PX);
+    const expectedW = fitBoxWidth(noteText, NOTE_MEASURE_PX);
     expect(n.w).toBe(expectedW);
-    expect(n.h).toBe(boxHeightForWidth(text, expectedW));
+    expect(n.h).toBe(boxHeightForWidth(noteText, expectedW));
     expect(n.w).not.toBe(200);
     expect(n.w).toBeLessThanOrEqual(NOTE_MEASURE_PX);
   });
 
   it("caps a standalone geo note's width at its own maxW (T45, D16)", async () => {
-    const text = "Checkout saga: orders, payments and shipping compensate back through orders.v1.";
-    const result = await layoutAst(doc({ layout: "col" }, [note({ id: "n", maxW: 160 }, text)]));
+    const noteText =
+      "Checkout saga: orders, payments and shipping compensate back through orders.v1.";
+    const result = await layoutAst(
+      doc({ layout: "col" }, [note({ id: "n", maxW: 160 }, noteText)]),
+    );
     const n = noteById(result.children, "n");
-    expect(n.w).toBe(fitBoxWidth(text, 160));
-    expect(n.w).toBeLessThan(fitBoxWidth(text));
+    expect(n.w).toBe(fitBoxWidth(noteText, 160));
+    expect(n.w).toBeLessThan(fitBoxWidth(noteText));
   });
 
   it("a geo note in a grid takes the shared box width but not the shared box height", async () => {

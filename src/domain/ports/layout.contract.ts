@@ -11,11 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import type {
-  IRDoc,
-  IRDocPositioned,
-  IRElementPositioned,
-} from "../ir/index.js";
+import type { IRDoc, IRDocPositioned, IRElementPositioned } from "../ir/index.js";
 
 import type { LayoutPort } from "./layout.js";
 
@@ -162,8 +158,7 @@ function span() {
 function rectsOf(
   doc: IRDocPositioned,
 ): Record<string, { x: number; y: number; w: number; h: number }> {
-  const out: Record<string, { x: number; y: number; w: number; h: number }> =
-    {};
+  const out: Record<string, { x: number; y: number; w: number; h: number }> = {};
   for (const c of doc.children) walk(c);
   return out;
 

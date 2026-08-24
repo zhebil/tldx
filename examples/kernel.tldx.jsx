@@ -18,7 +18,11 @@ const DRIVERS = [
 
 const HARDWARE = ["CPU / MMU", "RAM", "Disk", "NIC"];
 
-const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const slug = (s) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 function Layer({ id, name, children }) {
   return (
@@ -88,17 +92,35 @@ export default function KernelArchitecture() {
         <Tier labels={HARDWARE} tone="red" font="mono" />
       </Layer>
 
-      <Edge from="libc-language-runtime" to="syscall" label="trap / syscall" color="violet"
-            arrowheadEnd="triangle" font="sans" />
+      <Edge
+        from="libc-language-runtime"
+        to="syscall"
+        label="trap / syscall"
+        color="violet"
+        arrowheadEnd="triangle"
+        font="sans"
+      />
 
       {SYSCALLS.map(({ id, via }) => (
-        <Edge from="syscall" to={id} label={via} color="green"
-              arrowheadEnd="triangle" font="sans" size="s" />
+        <Edge
+          from="syscall"
+          to={id}
+          label={via}
+          color="green"
+          arrowheadEnd="triangle"
+          font="sans"
+          size="s"
+        />
       ))}
 
       {DRIVERS.map(({ id, from, optional }) => (
-        <Edge from={from} to={id} color="orange"
-              dash={optional ? "dotted" : "draw"} arrowheadEnd="triangle" />
+        <Edge
+          from={from}
+          to={id}
+          color="orange"
+          dash={optional ? "dotted" : "draw"}
+          arrowheadEnd="triangle"
+        />
       ))}
 
       {DRIVERS.map(({ id }) => (
@@ -120,8 +142,8 @@ export default function KernelArchitecture() {
       ))}
 
       <Sticky id="n-syscall" on="syscall" color="violet" font="sans" size="s">
-        The only legal way in. Privilege switches from ring 3 to ring 0 here, and every
-        argument crossing this line is untrusted until validated.
+        The only legal way in. Privilege switches from ring 3 to ring 0 here, and every argument
+        crossing this line is untrusted until validated.
       </Sticky>
 
       <Sticky id="n-sched" on="ipc" color="green" font="sans" size="s">

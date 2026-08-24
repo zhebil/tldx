@@ -268,9 +268,21 @@ describe("<Edges>", () => {
 
 describe("Row / Col / Grid shorthands", () => {
   it("set layout to row/col/grid respectively, overriding any layout prop passed in", () => {
-    const row = (<Row id="r" layout="grid">{[]}</Row>) as AstFrame;
-    const col = (<Col id="c" layout="grid">{[]}</Col>) as AstFrame;
-    const grid = (<Grid id="g" layout="row">{[]}</Grid>) as AstFrame;
+    const row = (
+      <Row id="r" layout="grid">
+        {[]}
+      </Row>
+    ) as AstFrame;
+    const col = (
+      <Col id="c" layout="grid">
+        {[]}
+      </Col>
+    ) as AstFrame;
+    const grid = (
+      <Grid id="g" layout="row">
+        {[]}
+      </Grid>
+    ) as AstFrame;
     expect(row.attrs.layout?.value).toBe("row");
     expect(col.attrs.layout?.value).toBe("col");
     expect(grid.attrs.layout?.value).toBe("grid");
@@ -317,13 +329,11 @@ describe("Pipeline", () => {
   });
 
   it("throws when a non-edge child has no id", () => {
-    expect(() =>
-      (
-        <Pipeline id="p">
-          <Box label="A" />
-        </Pipeline>
-      )
-    ).toThrow(/every child to have an id/);
+    expect(() => (
+      <Pipeline id="p">
+        <Box label="A" />
+      </Pipeline>
+    )).toThrow(/every child to have an id/);
   });
 });
 

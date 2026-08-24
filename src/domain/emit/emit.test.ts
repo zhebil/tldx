@@ -36,9 +36,7 @@ describe("domain/emit", () => {
   });
 
   it("emits a box as a geo shape parented to the page, with label as rich text", () => {
-    const scene = emit(
-      doc([box({ id: "login", x: 10, y: 20, w: 160, h: 80, label: "Login" })]),
-    );
+    const scene = emit(doc([box({ id: "login", x: 10, y: 20, w: 160, h: 80, label: "Login" })]));
     const shape = scene.store["shape:login"];
     expect(shape).toBeDefined();
     expect(shape?.typeName).toBe("shape");
@@ -46,7 +44,7 @@ describe("domain/emit", () => {
     expect(shape?.parentId).toBe("page:main");
     expect(shape?.x).toBe(10);
     expect(shape?.y).toBe(20);
-    const props = shape?.props as { w: number; h: number; richText: unknown };
+    const props = shape!.props as { w: number; h: number; richText: unknown };
     expect(props.w).toBe(160);
     expect(props.h).toBe(80);
     expect(props.richText).toEqual({
@@ -57,7 +55,7 @@ describe("domain/emit", () => {
 
   it("emits a label-less box with empty rich text rather than dropping the field", () => {
     const scene = emit(doc([box({ id: "blank", x: 0, y: 0, w: 80, h: 40 })]));
-    const props = scene.store["shape:blank"]?.props as { richText: unknown };
+    const props = scene.store["shape:blank"]!.props as { richText: unknown };
     expect(props.richText).toEqual({
       type: "doc",
       content: [{ type: "paragraph" }],
@@ -73,7 +71,7 @@ describe("domain/emit", () => {
     expect(shape?.parentId).toBe("page:main");
     expect(shape?.x).toBe(10);
     expect(shape?.y).toBe(20);
-    const props = shape?.props as Record<string, unknown>;
+    const props = shape!.props as Record<string, unknown>;
     // w is the fixed wrap budget layout already computed; there is no h at
     // all on the wire - a text shape's height is derived from content.
     expect(props.w).toBe(240);
@@ -87,13 +85,13 @@ describe("domain/emit", () => {
 
   it("emits a label-less <Text> box with empty rich text rather than dropping the field", () => {
     const scene = emit(doc([box({ id: "blank", x: 0, y: 0, w: 80, h: 20, text: true })]));
-    const props = scene.store["shape:blank"]?.props as { richText: unknown };
+    const props = scene.store["shape:blank"]!.props as { richText: unknown };
     expect(props.richText).toEqual({ type: "doc", content: [{ type: "paragraph" }] });
   });
 
   it("defaults <Text> color/textAlign/font/size to black/start/draw/m", () => {
     const scene = emit(doc([box({ id: "t", x: 0, y: 0, w: 80, h: 20, text: true })]));
-    const props = scene.store["shape:t"]?.props as Record<string, unknown>;
+    const props = scene.store["shape:t"]!.props as Record<string, unknown>;
     expect(props.color).toBe("black");
     expect(props.textAlign).toBe("start");
     expect(props.font).toBe("draw");
@@ -117,7 +115,7 @@ describe("domain/emit", () => {
         }),
       ]),
     );
-    const props = scene.store["shape:t"]?.props as Record<string, unknown>;
+    const props = scene.store["shape:t"]!.props as Record<string, unknown>;
     expect(props.color).toBe("blue");
     expect(props.textAlign).toBe("end");
     expect(props.font).toBe("mono");
@@ -284,7 +282,7 @@ describe("domain/emit", () => {
 
     expect(scene.store["shape:kernel"]).toBeDefined();
     expect(scene.store["shape:kernel"]?.type).toBe("frame");
-    expect((scene.store["shape:kernel"]?.props as Record<string, unknown>).name).toBe("Kernel");
+    expect((scene.store["shape:kernel"]!.props as Record<string, unknown>).name).toBe("Kernel");
     expect(scene.store["shape:a"]?.parentId).toBe("shape:kernel");
   });
 
@@ -306,14 +304,12 @@ describe("domain/emit", () => {
     expect(shape?.type).toBe("note");
     expect(shape?.x).toBe(5);
     expect(shape?.y).toBe(6);
-    const props = shape?.props as Record<string, unknown>;
+    const props = shape!.props as Record<string, unknown>;
     expect(props.w).toBeUndefined();
     expect(props.h).toBeUndefined();
     expect(props.richText).toEqual({
       type: "doc",
-      content: [
-        { type: "paragraph", content: [{ type: "text", text: "remember this" }] },
-      ],
+      content: [{ type: "paragraph", content: [{ type: "text", text: "remember this" }] }],
     });
   });
 
@@ -321,12 +317,12 @@ describe("domain/emit", () => {
     const tall = emit(
       doc([note({ id: "n2", text: "long", x: 0, y: 0, w: 200, h: 500, sticky: true })]),
     );
-    expect((tall.store["shape:n2"]?.props as Record<string, unknown>).growY).toBe(300);
+    expect((tall.store["shape:n2"]!.props as Record<string, unknown>).growY).toBe(300);
 
     const short = emit(
       doc([note({ id: "n3", text: "short", x: 0, y: 0, w: 200, h: 150, sticky: true })]),
     );
-    expect((short.store["shape:n3"]?.props as Record<string, unknown>).growY).toBe(0);
+    expect((short.store["shape:n3"]!.props as Record<string, unknown>).growY).toBe(0);
   });
 
   it("emits a non-sticky note IR as a real note shape too (no fake-geo path left)", () => {
@@ -337,7 +333,7 @@ describe("domain/emit", () => {
     expect(shape?.type).toBe("note");
     expect(shape?.x).toBe(5);
     expect(shape?.y).toBe(6);
-    const props = shape?.props as Record<string, unknown>;
+    const props = shape!.props as Record<string, unknown>;
     expect(props.w).toBeUndefined();
     expect(props.richText).toEqual({
       type: "doc",
@@ -369,17 +365,21 @@ describe("domain/emit", () => {
     expect(start?.["fromId"]).toBe("shape:e1");
     expect(start?.["toId"]).toBe("shape:a");
     expect(end?.["toId"]).toBe("shape:b");
-    expect((start?.props as { terminal: string }).terminal).toBe("start");
-    expect((end?.props as { terminal: string }).terminal).toBe("end");
+    expect((start!.props as { terminal: string }).terminal).toBe("start");
+    expect((end!.props as { terminal: string }).terminal).toBe("end");
     // Two boxes side by side attach on the facing edges, not centres.
-    expect((start?.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor).toEqual({
+    expect(
+      (start!.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor,
+    ).toEqual({
       x: 1,
       y: 0.5,
     });
-    expect((end?.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor).toEqual({
-      x: 0,
-      y: 0.5,
-    });
+    expect((end!.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor).toEqual(
+      {
+        x: 0,
+        y: 0.5,
+      },
+    );
   });
 
   it("gives a same-axis skip edge a non-zero bend", () => {
@@ -392,17 +392,19 @@ describe("domain/emit", () => {
         edge({ id: "ad", from: "a", to: "d" }),
       ]),
     );
-    const props = scene.store["shape:ad"]?.props as { bend: number };
+    const props = scene.store["shape:ad"]!.props as { bend: number };
     expect(props.bend).not.toBe(0);
 
     const start = scene.store["binding:ad-start"];
     const end = scene.store["binding:ad-end"];
-    expect((start?.props as { isPrecise: boolean }).isPrecise).toBe(true);
-    expect((end?.props as { isPrecise: boolean }).isPrecise).toBe(true);
-    expect((start?.props as { isExact: boolean }).isExact).toBe(true);
-    expect((end?.props as { isExact: boolean }).isExact).toBe(true);
-    const startAnchor = (start?.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor;
-    const endAnchor = (end?.props as { normalizedAnchor: { x: number; y: number } }).normalizedAnchor;
+    expect((start!.props as { isPrecise: boolean }).isPrecise).toBe(true);
+    expect((end!.props as { isPrecise: boolean }).isPrecise).toBe(true);
+    expect((start!.props as { isExact: boolean }).isExact).toBe(true);
+    expect((end!.props as { isExact: boolean }).isExact).toBe(true);
+    const startAnchor = (start!.props as { normalizedAnchor: { x: number; y: number } })
+      .normalizedAnchor;
+    const endAnchor = (end!.props as { normalizedAnchor: { x: number; y: number } })
+      .normalizedAnchor;
     expect(startAnchor).not.toEqual({ x: 0.5, y: 0.5 });
     expect(endAnchor).not.toEqual({ x: 0.5, y: 0.5 });
   });
@@ -549,16 +551,25 @@ describe("domain/emit: style pass-through", () => {
   it("passes box color/fill/dash through to props, defaulting when absent", () => {
     const scene = emit(
       doc([
-        box({ id: "styled", x: 0, y: 0, w: 100, h: 50, color: "blue", fill: "solid", dash: "dashed" }),
+        box({
+          id: "styled",
+          x: 0,
+          y: 0,
+          w: 100,
+          h: 50,
+          color: "blue",
+          fill: "solid",
+          dash: "dashed",
+        }),
         box({ id: "plain", x: 0, y: 0, w: 100, h: 50 }),
       ]),
     );
-    const styled = scene.store["shape:styled"]?.props as Record<string, unknown>;
+    const styled = scene.store["shape:styled"]!.props as Record<string, unknown>;
     expect(styled.color).toBe("blue");
     expect(styled.fill).toBe("solid");
     expect(styled.dash).toBe("dashed");
 
-    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    const plain = scene.store["shape:plain"]!.props as Record<string, unknown>;
     expect(plain.color).toBe("black");
     expect(plain.fill).toBe("none");
     expect(plain.dash).toBe("draw");
@@ -571,10 +582,10 @@ describe("domain/emit: style pass-through", () => {
         box({ id: "plain", x: 0, y: 0, w: 100, h: 50 }),
       ]),
     );
-    const hex = scene.store["shape:hex"]?.props as Record<string, unknown>;
+    const hex = scene.store["shape:hex"]!.props as Record<string, unknown>;
     expect(hex.geo).toBe("hexagon");
 
-    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    const plain = scene.store["shape:plain"]!.props as Record<string, unknown>;
     expect(plain.geo).toBe("rectangle");
   });
 
@@ -582,19 +593,21 @@ describe("domain/emit: style pass-through", () => {
     const scene = emit(
       doc([frame({ id: "f", x: 0, y: 0, w: 100, h: 50, name: "F", color: "green", children: [] })]),
     );
-    expect((scene.store["shape:f"]?.props as Record<string, unknown>).color).toBe("green");
+    expect((scene.store["shape:f"]!.props as Record<string, unknown>).color).toBe("green");
 
     const defaulted = emit(
       doc([frame({ id: "g", x: 0, y: 0, w: 100, h: 50, name: "G", children: [] })]),
     );
-    expect((defaulted.store["shape:g"]?.props as Record<string, unknown>).color).toBe("black");
+    expect((defaulted.store["shape:g"]!.props as Record<string, unknown>).color).toBe("black");
   });
 
   it("passes sticky color through", () => {
     const scene = emit(
-      doc([note({ id: "s", text: "hi", x: 0, y: 0, w: 200, h: 200, sticky: true, color: "orange" })]),
+      doc([
+        note({ id: "s", text: "hi", x: 0, y: 0, w: 200, h: 200, sticky: true, color: "orange" }),
+      ]),
     );
-    expect((scene.store["shape:s"]?.props as Record<string, unknown>).color).toBe("orange");
+    expect((scene.store["shape:s"]!.props as Record<string, unknown>).color).toBe("orange");
   });
 
   it("passes edge color/dash/arrowheadStart/arrowheadEnd through, defaulting when absent", () => {
@@ -613,7 +626,7 @@ describe("domain/emit: style pass-through", () => {
         }),
       ]),
     );
-    const props = scene.store["shape:e"]?.props as Record<string, unknown>;
+    const props = scene.store["shape:e"]!.props as Record<string, unknown>;
     expect(props.color).toBe("red");
     expect(props.dash).toBe("dotted");
     expect(props.arrowheadStart).toBe("square");
@@ -626,7 +639,7 @@ describe("domain/emit: style pass-through", () => {
         edge({ id: "e2", from: "a", to: "b" }),
       ]),
     );
-    const defaultProps = defaulted.store["shape:e2"]?.props as Record<string, unknown>;
+    const defaultProps = defaulted.store["shape:e2"]!.props as Record<string, unknown>;
     expect(defaultProps.color).toBe("black");
     expect(defaultProps.dash).toBe("draw");
     expect(defaultProps.arrowheadStart).toBe("none");
@@ -651,12 +664,12 @@ describe("domain/emit: text align / label color pass-through", () => {
         box({ id: "plain", x: 0, y: 0, w: 100, h: 50 }),
       ]),
     );
-    const styled = scene.store["shape:styled"]?.props as Record<string, unknown>;
+    const styled = scene.store["shape:styled"]!.props as Record<string, unknown>;
     expect(styled.align).toBe("end");
     expect(styled.verticalAlign).toBe("start");
     expect(styled.labelColor).toBe("red");
 
-    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    const plain = scene.store["shape:plain"]!.props as Record<string, unknown>;
     expect(plain.align).toBe("middle");
     expect(plain.verticalAlign).toBe("middle");
     expect(plain.labelColor).toBe("black");
@@ -690,12 +703,12 @@ describe("domain/emit: text align / label color pass-through", () => {
         }),
       ]),
     );
-    const nonStickyProps = scene.store["shape:n"]?.props as Record<string, unknown>;
+    const nonStickyProps = scene.store["shape:n"]!.props as Record<string, unknown>;
     expect(nonStickyProps.align).toBe("start");
     expect(nonStickyProps.verticalAlign).toBe("end");
     expect(nonStickyProps.labelColor).toBe("blue");
 
-    const stickyProps = scene.store["shape:s"]?.props as Record<string, unknown>;
+    const stickyProps = scene.store["shape:s"]!.props as Record<string, unknown>;
     expect(stickyProps.align).toBe("start");
     expect(stickyProps.verticalAlign).toBe("end");
     expect(stickyProps.labelColor).toBe("blue");
@@ -710,11 +723,11 @@ describe("domain/emit: font / size pass-through", () => {
         box({ id: "plain", x: 0, y: 0, w: 100, h: 50 }),
       ]),
     );
-    const styled = scene.store["shape:styled"]?.props as Record<string, unknown>;
+    const styled = scene.store["shape:styled"]!.props as Record<string, unknown>;
     expect(styled.font).toBe("serif");
     expect(styled.size).toBe("xl");
 
-    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    const plain = scene.store["shape:plain"]!.props as Record<string, unknown>;
     expect(plain.font).toBe("draw");
     expect(plain.size).toBe("m");
   });
@@ -737,15 +750,15 @@ describe("domain/emit: font / size pass-through", () => {
         note({ id: "s2", text: "hi", x: 0, y: 0, w: 200, h: 200, sticky: true }),
       ]),
     );
-    const nonStickyProps = scene.store["shape:n"]?.props as Record<string, unknown>;
+    const nonStickyProps = scene.store["shape:n"]!.props as Record<string, unknown>;
     expect(nonStickyProps.font).toBe("mono");
     expect(nonStickyProps.size).toBe("l");
 
-    const stickyProps = scene.store["shape:s"]?.props as Record<string, unknown>;
+    const stickyProps = scene.store["shape:s"]!.props as Record<string, unknown>;
     expect(stickyProps.font).toBe("sans");
     expect(stickyProps.size).toBe("s");
 
-    const plainSticky = scene.store["shape:s2"]?.props as Record<string, unknown>;
+    const plainSticky = scene.store["shape:s2"]!.props as Record<string, unknown>;
     expect(plainSticky.font).toBe("draw");
     expect(plainSticky.size).toBe("m");
   });
@@ -760,7 +773,7 @@ describe("domain/emit: arrow labels", () => {
         edge({ id: "e", from: "a", to: "b", label: "publishes" }),
       ]),
     );
-    const props = scene.store["shape:e"]?.props as Record<string, unknown>;
+    const props = scene.store["shape:e"]!.props as Record<string, unknown>;
     expect(props.text).toBe("publishes");
   });
 
@@ -772,7 +785,7 @@ describe("domain/emit: arrow labels", () => {
         edge({ id: "e", from: "a", to: "b" }),
       ]),
     );
-    const props = scene.store["shape:e"]?.props as Record<string, unknown>;
+    const props = scene.store["shape:e"]!.props as Record<string, unknown>;
     expect(props.text).toBe("");
   });
 
@@ -793,12 +806,12 @@ describe("domain/emit: arrow labels", () => {
         edge({ id: "plain", from: "a", to: "b" }),
       ]),
     );
-    const styled = scene.store["shape:styled"]?.props as Record<string, unknown>;
+    const styled = scene.store["shape:styled"]!.props as Record<string, unknown>;
     expect(styled.labelColor).toBe("red");
     expect(styled.font).toBe("mono");
     expect(styled.size).toBe("xl");
 
-    const plain = scene.store["shape:plain"]?.props as Record<string, unknown>;
+    const plain = scene.store["shape:plain"]!.props as Record<string, unknown>;
     expect(plain.labelColor).toBe("black");
     expect(plain.font).toBe("draw");
     expect(plain.size).toBe("m");

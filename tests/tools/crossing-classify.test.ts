@@ -19,9 +19,9 @@ describe("classifyCrossing", () => {
     const a = shape("a", "row1", 0, 0);
     const b = shape("b", "row1", 100, 0);
     const c = shape("c", "row1", 200, 0);
-    expect(
-      classifyCrossing({ from: "a", to: "c", crossedId: "b" }, ctx([a, b, c])),
-    ).toBe("same-axis skip");
+    expect(classifyCrossing({ from: "a", to: "c", crossedId: "b" }, ctx([a, b, c]))).toBe(
+      "same-axis skip",
+    );
   });
 
   it("not a same-axis skip when the crossed box is not between the endpoints", () => {
@@ -29,18 +29,18 @@ describe("classifyCrossing", () => {
     const b = shape("b", "row1", 100, 0);
     const c = shape("c", "row1", 200, 0);
     // b crosses a->c fine, but here we ask whether c (outside a..b) qualifies for a->b
-    expect(
-      classifyCrossing({ from: "a", to: "b", crossedId: "c" }, ctx([a, b, c])),
-    ).not.toBe("same-axis skip");
+    expect(classifyCrossing({ from: "a", to: "b", crossedId: "c" }, ctx([a, b, c]))).not.toBe(
+      "same-axis skip",
+    );
   });
 
   it("cross-container: endpoints live in different containers", () => {
     const a = shape("a", "left", 0, 0);
     const b = shape("b", "right", 300, 0);
     const c = shape("c", "middle", 150, 0);
-    expect(
-      classifyCrossing({ from: "a", to: "b", crossedId: "c" }, ctx([a, b, c])),
-    ).toBe("cross-container");
+    expect(classifyCrossing({ from: "a", to: "b", crossedId: "c" }, ctx([a, b, c]))).toBe(
+      "cross-container",
+    );
   });
 
   it("fan: source has out-degree >= 4 within its container", () => {
@@ -48,7 +48,10 @@ describe("classifyCrossing", () => {
     const b = shape("leaf-2", "row1", 100, 0);
     const c = shape("leaf-5", "row1", 400, 100); // not collinear with a/b
     expect(
-      classifyCrossing({ from: "hub", to: "leaf-5", crossedId: "leaf-2" }, ctx([a, b, c], { hub: 4 })),
+      classifyCrossing(
+        { from: "hub", to: "leaf-5", crossedId: "leaf-2" },
+        ctx([a, b, c], { hub: 4 }),
+      ),
     ).toBe("fan");
   });
 
@@ -56,16 +59,14 @@ describe("classifyCrossing", () => {
     const a = shape("a", "row1", 0, 0);
     const b = shape("b", "row1", 400, 100);
     const c = shape("c", "row1", 200, 300);
-    expect(
-      classifyCrossing({ from: "a", to: "b", crossedId: "c" }, ctx([a, b, c], { a: 1 })),
-    ).toBe("other");
+    expect(classifyCrossing({ from: "a", to: "b", crossedId: "c" }, ctx([a, b, c], { a: 1 }))).toBe(
+      "other",
+    );
   });
 
   it("other: an id that doesn't resolve to any shape", () => {
     const a = shape("a", "row1", 0, 0);
     const b = shape("b", "row1", 100, 0);
-    expect(
-      classifyCrossing({ from: "a", to: "b", crossedId: "ghost" }, ctx([a, b])),
-    ).toBe("other");
+    expect(classifyCrossing({ from: "a", to: "b", crossedId: "ghost" }, ctx([a, b]))).toBe("other");
   });
 });

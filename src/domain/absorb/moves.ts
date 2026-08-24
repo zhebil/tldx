@@ -66,10 +66,7 @@ function stripShapePrefix(id: string): string {
 }
 
 function locate(irBase: IRDoc, positionedBase: IRDocPositioned, targetId: string): Located | null {
-  function walk(
-    node: IRContainer,
-    posNode: IRDocPositioned | IRFramePositioned,
-  ): Located | null {
+  function walk(node: IRContainer, posNode: IRDocPositioned | IRFramePositioned): Located | null {
     for (let i = 0; i < node.children.length; i++) {
       const child = node.children[i] as IRElement;
       if (child.kind === "edge" || child.kind === "doc") continue;
@@ -126,10 +123,12 @@ export function planMoveCandidates(
   const targetId = stripShapePrefix(targetShapeId);
 
   if (placement.rotation !== undefined) {
-    return unabsorbable('rotation has no JSX equivalent');
+    return unabsorbable("rotation has no JSX equivalent");
   }
   if (placement.parentId !== undefined) {
-    return unabsorbable("shape was reparented into a different container - absorb only handles moves within a container");
+    return unabsorbable(
+      "shape was reparented into a different container - absorb only handles moves within a container",
+    );
   }
   if (placement.w !== undefined || placement.h !== undefined) {
     return unabsorbable("resize has no absorbable form yet - absorb only handles moves");
@@ -145,7 +144,9 @@ export function planMoveCandidates(
   const { element, parent, parentPositioned } = located;
 
   if (isHardPinned(element)) {
-    return unabsorbable(`"${targetId}" already has an explicit x/y pin - F4 doesn't rewrite pinned coordinates`);
+    return unabsorbable(
+      `"${targetId}" already has an explicit x/y pin - F4 doesn't rewrite pinned coordinates`,
+    );
   }
 
   const mode = parentPositioned.layout;
@@ -189,9 +190,17 @@ export function planMoveCandidates(
     const deltaY = placement.y === undefined ? 0 : placement.y - baseXY.y;
     const axisDelta = mode === "row" ? deltaX : deltaY;
     const attr: "gap" | "colGap" | "rowGap" =
-      mode === "row" ? (parent.colGap !== undefined ? "colGap" : "gap") : parent.rowGap !== undefined ? "rowGap" : "gap";
+      mode === "row"
+        ? parent.colGap !== undefined
+          ? "colGap"
+          : "gap"
+        : parent.rowGap !== undefined
+          ? "rowGap"
+          : "gap";
     const currentGap =
-      mode === "row" ? parent.colGap ?? parent.gap ?? DEFAULT_GAP : parent.rowGap ?? parent.gap ?? DEFAULT_GAP;
+      mode === "row"
+        ? (parent.colGap ?? parent.gap ?? DEFAULT_GAP)
+        : (parent.rowGap ?? parent.gap ?? DEFAULT_GAP);
     candidates.push({
       rung: "gap",
       containerSpan: parent.span,

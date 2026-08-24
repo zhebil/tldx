@@ -85,7 +85,9 @@ export function buildMutatedScene(name: string, base: SceneJSON): SceneJSON {
     .sort((a, b) => b.cascade.size - a.cascade.size);
   const deleteChoice = deleteCandidates[0];
   if (deleteChoice === undefined) {
-    throw new Error(`${name}: no fourth shape available to delete without touching the other mutated shapes`);
+    throw new Error(
+      `${name}: no fourth shape available to delete without touching the other mutated shapes`,
+    );
   }
 
   const pageRecord = Object.values(base.store).find((r) => r.typeName === "page");

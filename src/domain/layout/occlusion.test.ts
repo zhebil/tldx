@@ -17,11 +17,25 @@ function doc(children: IRElementPositioned[]): IRDocPositioned {
   return { kind: "doc", id: "root", idExplicit: false, span: SPAN, children };
 }
 
-function box(input: { id: string; x: number; y: number; w: number; h: number; label?: string }): IRBoxPositioned {
+function box(input: {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label?: string;
+}): IRBoxPositioned {
   return { kind: "box", idExplicit: true, span: SPAN, ...input };
 }
 
-function note(input: { id: string; x: number; y: number; w: number; h: number; text: string }): IRNotePositioned {
+function note(input: {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text: string;
+}): IRNotePositioned {
   return { kind: "note", idExplicit: true, span: SPAN, ...input };
 }
 
@@ -86,9 +100,9 @@ describe("computeOcclusionDiagnostics", () => {
       box({ id: "c", x: 160, y: 0, w: 120, h: 62, label: "C" }),
       edge({ id: "ac", from: "a", to: "c", label: "skip" }),
     ]);
-    expect(computeOcclusionDiagnostics(ir).filter((d) => d.code === "layout/label-overlap")).toEqual(
-      [],
-    );
+    expect(
+      computeOcclusionDiagnostics(ir).filter((d) => d.code === "layout/label-overlap"),
+    ).toEqual([]);
   });
 
   it("warns, naming the covered shape, when no bend can clear the label", () => {
@@ -143,6 +157,8 @@ describe("computeOcclusionDiagnostics", () => {
 
   it("does not warn when a box's label fits its box", () => {
     const ir = doc([box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" })]);
-    expect(computeOcclusionDiagnostics(ir).filter((d) => d.code === "layout/label-overflow")).toEqual([]);
+    expect(
+      computeOcclusionDiagnostics(ir).filter((d) => d.code === "layout/label-overflow"),
+    ).toEqual([]);
   });
 });

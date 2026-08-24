@@ -54,15 +54,10 @@ function makeRes(): FakeRes {
   return res;
 }
 
-function connect(
-  transport: ReturnType<typeof createSseTransport>,
-): { req: FakeReq; res: FakeRes } {
+function connect(transport: ReturnType<typeof createSseTransport>): { req: FakeReq; res: FakeRes } {
   const req = makeReq();
   const res = makeRes();
-  transport.handler(
-    req as unknown as IncomingMessage,
-    res as unknown as ServerResponse,
-  );
+  transport.handler(req as unknown as IncomingMessage, res as unknown as ServerResponse);
   return { req, res };
 }
 

@@ -42,8 +42,8 @@ export default function Diagram() {
       <Edge id="e-smoke-notify" from="smoke" to="notify" />
 
       <Text id="note-rollback" maxW="420">
-        Rollback re-deploys the previously published image rather than
-        rebuilding, so it skips every stage up to the registry push.
+        Rollback re-deploys the previously published image rather than rebuilding, so it skips every
+        stage up to the registry push.
       </Text>
     </Doc>
   );

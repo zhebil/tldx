@@ -35,14 +35,19 @@ function truncateRelabels(overlay: Overlay): Overlay {
   const entries: Record<string, OverlayEntry> = {};
   for (const [id, entry] of Object.entries(overlay.entries)) {
     entries[id] =
-      entry.relabelled !== undefined ? { ...entry, relabelled: entry.relabelled.slice(0, 1) } : entry;
+      entry.relabelled !== undefined
+        ? { ...entry, relabelled: entry.relabelled.slice(0, 1) }
+        : entry;
   }
   return { ...overlay, entries };
 }
 
 const LOSSY_APPLIES: { name: string; apply: ApplyFn }[] = [
   { name: "identity", apply: (_overlay, scene) => ({ scene, diagnostics: [] }) },
-  { name: "drops moved", apply: (overlay, scene) => applyOverlay(stripField(overlay, "moved"), scene) },
+  {
+    name: "drops moved",
+    apply: (overlay, scene) => applyOverlay(stripField(overlay, "moved"), scene),
+  },
   {
     name: "drops restyled",
     apply: (overlay, scene) => applyOverlay(stripField(overlay, "restyled"), scene),
@@ -55,7 +60,10 @@ const LOSSY_APPLIES: { name: string; apply: ApplyFn }[] = [
     name: "ignores deleted",
     apply: (overlay, scene) => applyOverlay(stripField(overlay, "deleted"), scene),
   },
-  { name: "drops added", apply: (overlay, scene) => applyOverlay(stripField(overlay, "added"), scene) },
+  {
+    name: "drops added",
+    apply: (overlay, scene) => applyOverlay(stripField(overlay, "added"), scene),
+  },
   {
     name: "truncates relabels",
     apply: (overlay, scene) => applyOverlay(truncateRelabels(overlay), scene),
@@ -63,27 +71,19 @@ const LOSSY_APPLIES: { name: string; apply: ApplyFn }[] = [
 ];
 
 describe("fidelity harness: goes red on a lossy apply", () => {
-  it(
-    "positive control: the real applyOverlay round-trips this fixture cleanly",
-    async () => {
-      expect(await checkFidelity(FIXTURE)).toEqual([]);
-    },
-    30_000,
-  );
+  it("positive control: the real applyOverlay round-trips this fixture cleanly", async () => {
+    expect(await checkFidelity(FIXTURE)).toEqual([]);
+  }, 30_000);
 
   for (const { name, apply } of LOSSY_APPLIES) {
-    it(
-      `${name}: reported as an apply-stage failure`,
-      async () => {
-        const failures = await checkFidelity(FIXTURE, apply);
-        expect(failures.length).toBeGreaterThan(0);
-        expect(failures.every((f) => f.stage === "apply")).toBe(true);
+    it(`${name}: reported as an apply-stage failure`, async () => {
+      const failures = await checkFidelity(FIXTURE, apply);
+      expect(failures.length).toBeGreaterThan(0);
+      expect(failures.every((f) => f.stage === "apply")).toBe(true);
 
-        const joined = failures.map((f) => f.message).join(" ");
-        expect(joined).toContain(basename(FIXTURE));
-        expect(joined).toMatch(/shape:/);
-      },
-      30_000,
-    );
+      const joined = failures.map((f) => f.message).join(" ");
+      expect(joined).toContain(basename(FIXTURE));
+      expect(joined).toMatch(/shape:/);
+    }, 30_000);
   }
 });

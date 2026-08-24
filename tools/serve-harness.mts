@@ -23,10 +23,14 @@ export async function withServedDiagram<T>(
     await run("npm", ["run", "build:viewer"], REPO_ROOT);
   }
 
-  const child = spawn(resolve(REPO_ROOT, "node_modules", ".bin", "tsx"), ["src/cli/main.ts", "serve", file, "--no-open"], {
-    cwd: REPO_ROOT,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const child = spawn(
+    resolve(REPO_ROOT, "node_modules", ".bin", "tsx"),
+    ["src/cli/main.ts", "serve", file, "--no-open"],
+    {
+      cwd: REPO_ROOT,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
 
   try {
     const url = await waitForServeUrl(child);
@@ -40,7 +44,11 @@ function waitForServeUrl(child: ReturnType<typeof spawn>): Promise<string> {
   return new Promise((resolvePromise, reject) => {
     let stderr = "";
     const timer = setTimeout(() => {
-      reject(new Error(`tldx serve did not print a URL within ${SERVE_READY_TIMEOUT_MS}ms; stderr: ${stderr}`));
+      reject(
+        new Error(
+          `tldx serve did not print a URL within ${SERVE_READY_TIMEOUT_MS}ms; stderr: ${stderr}`,
+        ),
+      );
     }, SERVE_READY_TIMEOUT_MS);
 
     child.stdout?.on("data", (chunk: Buffer) => {

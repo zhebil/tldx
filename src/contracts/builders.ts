@@ -67,10 +67,7 @@ export const sceneMessage = {
  * Build a SceneJSON from a flat list of records, keyed by each record's own
  * `id`. Duplicate ids overwrite silently - callers must pass unique ids.
  */
-export function sceneJson(
-  records: TLRecord[],
-  schema: TLStoreSchema = DEFAULT_SCHEMA,
-): SceneJSON {
+export function sceneJson(records: TLRecord[], schema: TLStoreSchema = DEFAULT_SCHEMA): SceneJSON {
   const store: Record<string, TLRecord> = {};
   for (const r of records) store[r.id] = r;
   return { store, schema };
@@ -90,11 +87,7 @@ export function documentRecord(
   };
 }
 
-export function pageRecord(input: {
-  id: string;
-  name?: string;
-  index?: string;
-}): TLRecord {
+export function pageRecord(input: { id: string; name?: string; index?: string }): TLRecord {
   return {
     id: input.id,
     typeName: "page",
@@ -335,8 +328,7 @@ export function arrowBinding(input: {
 export type RichTextDoc = {
   type: "doc";
   content: Array<
-    | { type: "paragraph" }
-    | { type: "paragraph"; content: Array<{ type: "text"; text: string }> }
+    { type: "paragraph" } | { type: "paragraph"; content: Array<{ type: "text"; text: string }> }
   >;
 };
 

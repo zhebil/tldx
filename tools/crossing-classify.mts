@@ -74,7 +74,9 @@ function pairwiseOverlap(
   overlaps: (a: AbsShape, b: AbsShape) => boolean,
 ): boolean {
   return (
-    overlaps(shapes[0], shapes[1]) && overlaps(shapes[0], shapes[2]) && overlaps(shapes[1], shapes[2])
+    overlaps(shapes[0], shapes[1]) &&
+    overlaps(shapes[0], shapes[2]) &&
+    overlaps(shapes[1], shapes[2])
   );
 }
 
@@ -86,9 +88,11 @@ function pairwiseOverlap(
 function isSameAxisSkip(from: AbsShape, to: AbsShape, crossed: AbsShape): boolean {
   const triple: [AbsShape, AbsShape, AbsShape] = [from, to, crossed];
   const xAxisQualifies =
-    pairwiseOverlap(triple, yOverlap) && isStrictlyBetween(centerX(from), centerX(to), centerX(crossed));
+    pairwiseOverlap(triple, yOverlap) &&
+    isStrictlyBetween(centerX(from), centerX(to), centerX(crossed));
   const yAxisQualifies =
-    pairwiseOverlap(triple, xOverlap) && isStrictlyBetween(centerY(from), centerY(to), centerY(crossed));
+    pairwiseOverlap(triple, xOverlap) &&
+    isStrictlyBetween(centerY(from), centerY(to), centerY(crossed));
   return xAxisQualifies || yAxisQualifies;
 }
 
@@ -163,13 +167,22 @@ async function classifyFile(file: string): Promise<FileResult> {
     const from = byId.get(r.from);
     const to = byId.get(r.to);
     const crossed = byId.get(r.crossedId);
-    if (from?.ancestorFrameIds.includes(r.crossedId) || to?.ancestorFrameIds.includes(r.crossedId)) {
+    if (
+      from?.ancestorFrameIds.includes(r.crossedId) ||
+      to?.ancestorFrameIds.includes(r.crossedId)
+    ) {
       ancestorFrameNote++;
     }
     if (r.bucket === "same-axis skip" && (outDegreeInContainer.get(r.from) ?? 0) >= 4) {
       fanSkipNote++;
     }
-    if (r.bucket !== "same-axis skip" && from && to && crossed && isSameAxisSkip(from, to, crossed)) {
+    if (
+      r.bucket !== "same-axis skip" &&
+      from &&
+      to &&
+      crossed &&
+      isSameAxisSkip(from, to, crossed)
+    ) {
       skipShapedNote++;
     }
   }
@@ -187,7 +200,9 @@ async function classifyFile(file: string): Promise<FileResult> {
 function printFileReport(result: FileResult): void {
   process.stdout.write(`== ${result.name} ==\n`);
   for (const r of result.rows) {
-    process.stdout.write(`${r.arrowId} from=${r.from} to=${r.to} crosses=${r.crossedId} class=${r.bucket}\n`);
+    process.stdout.write(
+      `${r.arrowId} from=${r.from} to=${r.to} crosses=${r.crossedId} class=${r.bucket}\n`,
+    );
   }
   const counts = bucketCounts(result.rows);
   process.stdout.write(`  same-axis skip: ${counts["same-axis skip"]}\n`);
@@ -208,7 +223,12 @@ function printFileReport(result: FileResult): void {
 
 function printTotal(perFile: FileResult[]): void {
   process.stdout.write(`== TOTAL ==\n`);
-  const grand: Record<Bucket, number> = { "same-axis skip": 0, "cross-container": 0, fan: 0, other: 0 };
+  const grand: Record<Bucket, number> = {
+    "same-axis skip": 0,
+    "cross-container": 0,
+    fan: 0,
+    other: 0,
+  };
   let grandTotal = 0;
   let grandAncestorNote = 0;
   let grandFanSkipNote = 0;

@@ -7,12 +7,7 @@
  * validation are dropped so layout never sees a broken reference.
  */
 
-import {
-  error,
-  warning,
-  type Diagnostic,
-  type SourceSpan,
-} from "../diagnostics/index.js";
+import { error, warning, type Diagnostic, type SourceSpan } from "../diagnostics/index.js";
 import {
   ALIGNS,
   DIRECTIONS,
@@ -45,19 +40,23 @@ import type {
   Attrs,
 } from "../parser/index.js";
 
-import type {
-  IRAnchor,
-  IRBox,
-  IRDoc,
-  IREdge,
-  IRElement,
-  IRFrame,
-  IRNote,
-} from "./ir.js";
+import type { IRAnchor, IRBox, IRDoc, IREdge, IRElement, IRFrame, IRNote } from "./ir.js";
 import { contentHash, SyntheticIdAllocator } from "./synthetic-id.js";
 
 const ALLOWED_PROPS = {
-  doc: ["id", "title", "direction", "layout", "gap", "rowGap", "colGap", "pad", "cols", "align", "equalize"],
+  doc: [
+    "id",
+    "title",
+    "direction",
+    "layout",
+    "gap",
+    "rowGap",
+    "colGap",
+    "pad",
+    "cols",
+    "align",
+    "equalize",
+  ],
   frame: [
     "id",
     "title",
@@ -284,11 +283,7 @@ function lowerNode(node: AstNode, ctx: Ctx): IRElement | null {
     case "doc":
       // Nested <doc> is illegal at the parser level; defend in depth.
       ctx.diagnostics.push(
-        error(
-          "ir/nested-doc",
-          "'<doc>' may only appear at the top level",
-          node.span,
-        ),
+        error("ir/nested-doc", "'<doc>' may only appear at the top level", node.span),
       );
       return null;
     case "frame":
@@ -489,9 +484,7 @@ function assignId(
   }
 
   if (attr !== undefined && attr.value === "") {
-    ctx.diagnostics.push(
-      error("ir/missing-id", "'id' attribute is empty", attr.span),
-    );
+    ctx.diagnostics.push(error("ir/missing-id", "'id' attribute is empty", attr.span));
   } else if (spec.addressable) {
     ctx.diagnostics.push(
       error(
@@ -570,11 +563,7 @@ function parseAnchorSide(
   return undefined;
 }
 
-function validateEndpoint(
-  attr: AttrValue,
-  attrName: "from" | "to",
-  ctx: Ctx,
-): string | null {
+function validateEndpoint(attr: AttrValue, attrName: "from" | "to", ctx: Ctx): string | null {
   const raw = attr.value;
   if (raw.startsWith("x:") || raw.startsWith("y:")) {
     ctx.diagnostics.push(
@@ -597,9 +586,7 @@ function validateEndpoint(
     return null;
   }
   if (raw === "") {
-    ctx.diagnostics.push(
-      error("ir/missing-edge-endpoint", `'${attrName}' is empty`, attr.span),
-    );
+    ctx.diagnostics.push(error("ir/missing-edge-endpoint", `'${attrName}' is empty`, attr.span));
     return null;
   }
   return raw;
@@ -614,20 +601,12 @@ function resolveEdges(doc: IRDoc, ctx: Ctx): void {
     const toOk = ids.has(el.to);
     if (!fromOk) {
       ctx.diagnostics.push(
-        error(
-          "ir/unknown-reference",
-          `edge 'from' references unknown id '${el.from}'`,
-          el.span,
-        ),
+        error("ir/unknown-reference", `edge 'from' references unknown id '${el.from}'`, el.span),
       );
     }
     if (!toOk) {
       ctx.diagnostics.push(
-        error(
-          "ir/unknown-reference",
-          `edge 'to' references unknown id '${el.to}'`,
-          el.span,
-        ),
+        error("ir/unknown-reference", `edge 'to' references unknown id '${el.to}'`, el.span),
       );
     }
     return fromOk && toOk;
@@ -644,11 +623,7 @@ function resolveNoteTargets(doc: IRDoc, ctx: Ctx): void {
   walkNotes(doc, (note) => {
     if (note.on === undefined || ids.has(note.on)) return note;
     ctx.diagnostics.push(
-      error(
-        "ir/note-target-not-found",
-        `note 'on' references unknown id '${note.on}'`,
-        note.span,
-      ),
+      error("ir/note-target-not-found", `note 'on' references unknown id '${note.on}'`, note.span),
     );
     const { on: _on, ...rest } = note;
     void _on;
@@ -657,10 +632,7 @@ function resolveNoteTargets(doc: IRDoc, ctx: Ctx): void {
 }
 
 /** Ids of every box/frame/note/edge in the document - the valid `on` targets. Excludes the `<doc>` root. */
-function collectAddressableIds(
-  el: IRElement,
-  into: Set<string> = new Set(),
-): Set<string> {
+function collectAddressableIds(el: IRElement, into: Set<string> = new Set()): Set<string> {
   if (el.kind !== "doc") into.add(el.id);
   if (el.kind === "doc" || el.kind === "frame") {
     for (const c of el.children) collectAddressableIds(c, into);
@@ -668,10 +640,7 @@ function collectAddressableIds(
   return into;
 }
 
-function walkNotes(
-  container: IRDoc | IRFrame,
-  fix: (note: IRNote) => IRNote,
-): void {
+function walkNotes(container: IRDoc | IRFrame, fix: (note: IRNote) => IRNote): void {
   container.children = container.children.map((c) => (c.kind === "note" ? fix(c) : c));
   for (const c of container.children) {
     if (c.kind === "doc" || c.kind === "frame") walkNotes(c, fix);
@@ -686,10 +655,7 @@ function collectIds(el: IRElement, into: Set<string> = new Set()): Set<string> {
   return into;
 }
 
-function walkAndFilter(
-  container: IRDoc | IRFrame,
-  keep: (el: IRElement) => boolean,
-): void {
+function walkAndFilter(container: IRDoc | IRFrame, keep: (el: IRElement) => boolean): void {
   container.children = container.children.filter(keep);
   for (const c of container.children) {
     if (c.kind === "doc" || c.kind === "frame") walkAndFilter(c, keep);
@@ -736,11 +702,7 @@ function readAlign(attrs: Attrs, ctx: Ctx): Align | undefined {
   const raw = attr.value;
   if (isAlign(raw)) return raw;
   ctx.diagnostics.push(
-    error(
-      "ir/bad-align",
-      `'align' must be one of ${ALIGNS.join(", ")} (got '${raw}')`,
-      attr.span,
-    ),
+    error("ir/bad-align", `'align' must be one of ${ALIGNS.join(", ")} (got '${raw}')`, attr.span),
   );
   return undefined;
 }
@@ -802,11 +764,7 @@ function numericAttrs<K extends string>(
     const n = Number(v.value);
     if (!Number.isFinite(n)) {
       ctx.diagnostics.push(
-        error(
-          "ir/invalid-numeric-attr",
-          `'${key}' is not a finite number: '${v.value}'`,
-          v.span,
-        ),
+        error("ir/invalid-numeric-attr", `'${key}' is not a finite number: '${v.value}'`, v.span),
       );
       continue;
     }

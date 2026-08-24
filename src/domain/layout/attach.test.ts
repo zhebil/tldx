@@ -67,7 +67,10 @@ function overlaps(
 
 describe("attachNotes", () => {
   it("places an attached note within 24-40px of its target, overlapping nothing", async () => {
-    const ast = doc({ layout: "col" }, [box({ id: "a", label: "Target box" }), note({ on: "a" }, "annotation text")]);
+    const ast = doc({ layout: "col" }, [
+      box({ id: "a", label: "Target box" }),
+      note({ on: "a" }, "annotation text"),
+    ]);
     const result = await layoutAst(ast);
     const a = byId(result.children, "a");
     const n = noteById(result.children, findNoteId(result.children));
@@ -95,7 +98,7 @@ describe("attachNotes", () => {
     const withNote = await layoutAst(
       doc({ layout: "col" }, [
         box({ id: "a", label: "A" }),
-        note({ on: "a" }, "annotation") ,
+        note({ on: "a" }, "annotation"),
         box({ id: "b", label: "B" }),
       ]),
     );

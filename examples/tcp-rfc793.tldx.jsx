@@ -14,13 +14,21 @@ export default function TcpRfc793() {
   return (
     <Doc id="tcp-rfc793" layout="col" gap="100" align="center" pad="24">
       <Group id="legend" layout="col" gap="4" align="start">
-        <Text id="legend-1" color="black" font="sans" size="s">dotted = unusual event</Text>
-        <Text id="legend-2" color="red" font="sans" size="s">red = client/receiver path</Text>
-        <Text id="legend-3" color="blue" font="sans" size="s">blue = server/sender path</Text>
+        <Text id="legend-1" color="black" font="sans" size="s">
+          dotted = unusual event
+        </Text>
+        <Text id="legend-2" color="red" font="sans" size="s">
+          red = client/receiver path
+        </Text>
+        <Text id="legend-3" color="blue" font="sans" size="s">
+          blue = server/sender path
+        </Text>
       </Group>
 
       <Group id="start-band" layout="row" gap="16" align="center">
-        <Text id="n-start" color="black" font="sans" size="s">(Start)</Text>
+        <Text id="n-start" color="black" font="sans" size="s">
+          (Start)
+        </Text>
         {S("closed_start", "CLOSED", "orange")}
       </Group>
 
@@ -32,7 +40,9 @@ export default function TcpRfc793() {
       </Group>
 
       <Group id="established-band" layout="col" gap="8" align="center">
-        <Text id="n-data" color="black" font="sans" size="s">Data exchange occurs</Text>
+        <Text id="n-data" color="black" font="sans" size="s">
+          Data exchange occurs
+        </Text>
         {S("established", "ESTABLISHED", "green")}
       </Group>
 
@@ -52,11 +62,21 @@ export default function TcpRfc793() {
 
       <Group id="end-band" layout="row" gap="16" align="center">
         {S("closed_end", "CLOSED", "orange")}
-        <Text id="n-end" color="black" font="sans" size="s">(Go back to start)</Text>
+        <Text id="n-end" color="black" font="sans" size="s">
+          (Go back to start)
+        </Text>
       </Group>
 
-      <Edge from="closed_start" to="listen" label="LISTEN/-" color="blue" font="sans" size="s"
-            fromSide="bottom-left" toSide="top-left" />
+      <Edge
+        from="closed_start"
+        to="listen"
+        label="LISTEN/-"
+        color="blue"
+        font="sans"
+        size="s"
+        fromSide="bottom-left"
+        toSide="top-left"
+      />
 
       <Edges color="blue" font="sans" size="s">{`
         listen -> syn_received: SYN/SYN+ACK
@@ -74,8 +94,16 @@ export default function TcpRfc793() {
         fin_wait_2 -> time_wait: FIN/ACK
       `}</Edges>
 
-      <Edge from="listen" to="closed_start" label="CLOSE/-" color="black" font="sans" size="s"
-            fromSide="top-right" toSide="bottom-right" />
+      <Edge
+        from="listen"
+        to="closed_start"
+        label="CLOSE/-"
+        color="black"
+        font="sans"
+        size="s"
+        fromSide="top-right"
+        toSide="bottom-right"
+      />
 
       <Edges color="black" font="sans" size="s">{`
         syn_sent -> closed_start: CLOSE/-

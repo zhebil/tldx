@@ -15,13 +15,7 @@
       "repository": "https://github.com/zhebil/tldx",
       "license": "MIT",
       "category": "development",
-      "tags": [
-        "diagrams",
-        "tldraw",
-        "jsx",
-        "architecture",
-        "claude-code-plugin"
-      ],
+      "tags": ["diagrams", "tldraw", "jsx", "architecture", "claude-code-plugin"],
       "source": "./plugin"
     }
   ]

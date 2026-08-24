@@ -106,10 +106,51 @@ describe("e2e: tldx:sync workflow - overlay show -> absorb -> verify", () => {
     const pageId = pageIdOf(base);
 
     const records: TLRecord[] = [
-      boxShape({ id: "shape:abs-move", x: 0, y: 0, w: 100, h: 50, color: "red", fill: "solid", parentId: pageId, text: "One", index: "a1" }),
-      boxShape({ id: "shape:abs-restyle", x: 200, y: 0, w: 80, h: 40, color: "blue", parentId: pageId, text: "Two", index: "a3" }),
-      boxShape({ id: "shape:abs-label", x: 400, y: 0, w: 80, h: 40, color: "green", parentId: pageId, text: "Three", index: "a5" }),
-      boxShape({ id: "shape:abs-delete", x: 600, y: 0, w: 80, h: 40, color: "orange", parentId: pageId, text: "Four", index: "a7" }),
+      boxShape({
+        id: "shape:abs-move",
+        x: 0,
+        y: 0,
+        w: 100,
+        h: 50,
+        color: "red",
+        fill: "solid",
+        parentId: pageId,
+        text: "One",
+        index: "a1",
+      }),
+      boxShape({
+        id: "shape:abs-restyle",
+        x: 200,
+        y: 0,
+        w: 80,
+        h: 40,
+        color: "blue",
+        parentId: pageId,
+        text: "Two",
+        index: "a3",
+      }),
+      boxShape({
+        id: "shape:abs-label",
+        x: 400,
+        y: 0,
+        w: 80,
+        h: 40,
+        color: "green",
+        parentId: pageId,
+        text: "Three",
+        index: "a5",
+      }),
+      boxShape({
+        id: "shape:abs-delete",
+        x: 600,
+        y: 0,
+        w: 80,
+        h: 40,
+        color: "orange",
+        parentId: pageId,
+        text: "Four",
+        index: "a7",
+      }),
     ];
     const entries: Record<string, OverlayEntry> = {};
     for (const record of records) entries[record.id] = { added: record };
@@ -118,7 +159,11 @@ describe("e2e: tldx:sync workflow - overlay show -> absorb -> verify", () => {
 
     // 1. overlay show - reports every pending shape.
     const showIo = makeCaptureIo();
-    const showExit = await runOverlayCli({ argv: ["show", path], deps: verifyDeps(deps), io: showIo });
+    const showExit = await runOverlayCli({
+      argv: ["show", path],
+      deps: verifyDeps(deps),
+      io: showIo,
+    });
     expect(showExit).toBe(0);
     for (const record of records) {
       expect(showIo.stdout).toContain(record.id);

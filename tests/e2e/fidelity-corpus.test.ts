@@ -30,13 +30,9 @@ describe("overlay corpus: real-server round-trip is lossless", () => {
   });
 
   for (const name of fixtures) {
-    it(
-      `${name}: served scene and applyOverlay both reproduce the mutated canvas`,
-      async () => {
-        const failures = await checkFidelity(join(CORPUS_DIR, name));
-        expect(failures).toEqual([]);
-      },
-      30_000,
-    );
+    it(`${name}: served scene and applyOverlay both reproduce the mutated canvas`, async () => {
+      const failures = await checkFidelity(join(CORPUS_DIR, name));
+      expect(failures).toEqual([]);
+    }, 30_000);
   }
 });

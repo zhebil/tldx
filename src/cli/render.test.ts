@@ -10,9 +10,22 @@ import { InMemoryFs } from "../app/ports/fs.fake.js";
 import { CaptureLog } from "../app/ports/log.fake.js";
 import { FakeWatch } from "../app/ports/watch.fake.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
-import { hashSource, recordServe, type ServeRecord } from "../infra/serve-registry/serve-registry.js";
+import {
+  hashSource,
+  recordServe,
+  type ServeRecord,
+} from "../infra/serve-registry/serve-registry.js";
 
-import { describeReused, isCodeStale, isStale, parseArgs, runRender, staleReason, withCompiledContext, withoutFsWrite } from "./render.js";
+import {
+  describeReused,
+  isCodeStale,
+  isStale,
+  parseArgs,
+  runRender,
+  staleReason,
+  withCompiledContext,
+  withoutFsWrite,
+} from "./render.js";
 import type { ServeDeps, ServeIo } from "./serve.js";
 
 describe("parseArgs", () => {
@@ -61,13 +74,15 @@ describe("parseArgs", () => {
   });
 
   it("rejects an unknown --format value", () => {
-    expect(() => parseArgs(["a.tldx.jsx", "out.png", "--format", "gif"])).toThrow(/--format must be one of/);
+    expect(() => parseArgs(["a.tldx.jsx", "out.png", "--format", "gif"])).toThrow(
+      /--format must be one of/,
+    );
   });
 
   it("rejects --frame and --shapes together", () => {
-    expect(() =>
-      parseArgs(["a.tldx.jsx", "out.png", "--frame", "f1", "--shapes", "a,b"]),
-    ).toThrow(/mutually exclusive/);
+    expect(() => parseArgs(["a.tldx.jsx", "out.png", "--frame", "f1", "--shapes", "a,b"])).toThrow(
+      /mutually exclusive/,
+    );
   });
 
   it("parses --reuse-only", () => {
@@ -91,8 +106,15 @@ describe("parseArgs", () => {
 
 describe("describeReused", () => {
   it("formats as :port (file @ hash)", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://127.0.0.1:60278/", file: "board.tldx.jsx", hash: "a848f56a" };
-    expect(describeReused("/some/dir/board.tldx.jsx", reused)).toBe(":60278 (board.tldx.jsx @ a848f56a)");
+    const reused: ServeRecord = {
+      pid: 1,
+      url: "http://127.0.0.1:60278/",
+      file: "board.tldx.jsx",
+      hash: "a848f56a",
+    };
+    expect(describeReused("/some/dir/board.tldx.jsx", reused)).toBe(
+      ":60278 (board.tldx.jsx @ a848f56a)",
+    );
   });
 
   it("omits the hash when the registry record predates compile tracking", () => {
@@ -138,24 +160,48 @@ describe("isCodeStale", () => {
 
 describe("staleReason", () => {
   it("is undefined when neither source nor code has changed", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
+    const reused: ServeRecord = {
+      pid: 1,
+      url: "http://x",
+      file: "f",
+      hash: "aaaaaaaa",
+      codeFingerprint: 1000,
+    };
     expect(staleReason("aaaaaaaa", 1000, reused)).toBeUndefined();
   });
 
   it("reports source staleness alone", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
+    const reused: ServeRecord = {
+      pid: 1,
+      url: "http://x",
+      file: "f",
+      hash: "aaaaaaaa",
+      codeFingerprint: 1000,
+    };
     expect(staleReason("bbbbbbbb", 1000, reused)).toBe("source has changed since that compile");
   });
 
   it("reports code staleness alone", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
+    const reused: ServeRecord = {
+      pid: 1,
+      url: "http://x",
+      file: "f",
+      hash: "aaaaaaaa",
+      codeFingerprint: 1000,
+    };
     expect(staleReason("aaaaaaaa", 2000, reused)).toBe(
       "the code that compiled it (src/domain, src/app, ...) has changed since that server started",
     );
   });
 
   it("reports both when source and code have both changed", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
+    const reused: ServeRecord = {
+      pid: 1,
+      url: "http://x",
+      file: "f",
+      hash: "aaaaaaaa",
+      codeFingerprint: 1000,
+    };
     expect(staleReason("bbbbbbbb", 2000, reused)).toBe(
       "source and the code that compiled it have both changed since that compile",
     );
@@ -165,7 +211,10 @@ describe("staleReason", () => {
 describe("withCompiledContext", () => {
   it("annotates an unknown --frame error with when the reused scene was compiled", () => {
     const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", compiledAt: 0 };
-    const annotated = withCompiledContext(new Error('unknown --frame id "ctx". Valid ids: a, b'), reused);
+    const annotated = withCompiledContext(
+      new Error('unknown --frame id "ctx". Valid ids: a, b'),
+      reused,
+    );
     expect(annotated.message).toBe(
       'unknown --frame id "ctx". Valid ids: a, b (reused server\'s scene was compiled 1970-01-01T00:00:00.000Z)',
     );
@@ -237,7 +286,11 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
     const file = tempFile(content);
     const io = makeIo();
 
-    const code = await runRender({ argv: [file, `${file}.png`, "--reuse-only"], deps: makeDeps(file, content), io });
+    const code = await runRender({
+      argv: [file, `${file}.png`, "--reuse-only"],
+      deps: makeDeps(file, content),
+      io,
+    });
 
     expect(code).toBe(1);
     expect(io.stderr.join("")).toMatch(/no running `tldx serve`/);
@@ -270,7 +323,11 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
     const content = "export default function Diagram() { return null; }";
     const file = tempFile(content);
     // codeFingerprint 0 predates any real file's mtime, so isCodeStale trips.
-    const forget = recordServe(file, "http://127.0.0.1:9999", { hash: hashSource(content), at: 0, codeFingerprint: 0 });
+    const forget = recordServe(file, "http://127.0.0.1:9999", {
+      hash: hashSource(content),
+      at: 0,
+      codeFingerprint: 0,
+    });
     const io = makeIo();
 
     try {

@@ -80,9 +80,7 @@ export function ViewerApp(): JSX.Element {
   return (
     <div style={{ position: "fixed", inset: 0 }}>
       <Tldraw onMount={handleMount} />
-      {state.diagnostics.length > 0 ? (
-        <DiagnosticBanner diagnostics={state.diagnostics} />
-      ) : null}
+      {state.diagnostics.length > 0 ? <DiagnosticBanner diagnostics={state.diagnostics} /> : null}
     </div>
   );
 }

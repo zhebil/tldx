@@ -1,0 +1,261 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "import/no-cycle": ["error", { "maxDepth": 10 }],
+
+    // Two rules pulled out of `suspicious`; the rest of that category is noise
+    // on this codebase (`unicorn/no-array-sort`, `consistent-function-scoping`).
+    "no-shadow": "error",
+    "preserve-caught-error": "error",
+
+    // Both fire on idioms this codebase uses deliberately:
+    // `new Array<T>(n).fill(v)` is unambiguous once the type argument is
+    // spelled out, and `for (const x of [...set])` snapshots a collection
+    // that the loop body mutates - dropping the spread would be a bug.
+    "unicorn/no-new-array": "off",
+    "unicorn/no-useless-spread": "off",
+
+    // ponytail: off because the three sites it flags all want a real fix, not
+    // a cast - `runtime/components.ts` turns an object-valued JSX prop into
+    // the literal string "[object Object]" instead of a diagnostic. Turn back
+    // on once the runtime can reject non-primitive props.
+    "typescript/no-base-to-string": "off",
+
+    // Node built-ins that need to sit behind a port. Adapters and the cli
+    // wiring site get them back in the overrides below.
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          { "name": "node:fs", "message": "Use FsReadPort. Real impl lives in infra/fs/." },
+          {
+            "name": "node:fs/promises",
+            "message": "Use FsReadPort. Real impl lives in infra/fs/."
+          },
+          { "name": "node:child_process", "message": "Wrap in a port under infra/." },
+          { "name": "node:http", "message": "Only allowed under infra/devserver/." }
+        ],
+        "patterns": [
+          { "group": ["chokidar"], "message": "Only allowed under infra/fs/." },
+          { "group": ["elkjs", "elkjs/**"], "message": "Only allowed under infra/layout-elk/." },
+          {
+            "group": ["esbuild", "esbuild/**"],
+            "message": "Only allowed under infra/execute-jsx/."
+          },
+          { "group": ["tldraw", "@tldraw/**"], "message": "Only allowed under viewer/." }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/domain/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "node:fs", "message": "domain/ is pure - no node built-ins." },
+              { "name": "node:fs/promises", "message": "domain/ is pure - no node built-ins." },
+              { "name": "node:path", "message": "domain/ is pure - no node built-ins." },
+              { "name": "node:child_process", "message": "domain/ is pure - no node built-ins." },
+              { "name": "node:http", "message": "domain/ is pure - no node built-ins." }
+            ],
+            "patterns": [
+              {
+                "group": ["**/infra/**", "**/app/**", "**/cli/**", "**/viewer/**", "**/runtime/**"],
+                "message": "domain/ depends on ports and contracts/ only."
+              },
+              {
+                "group": [
+                  "chokidar",
+                  "elkjs",
+                  "elkjs/**",
+                  "esbuild",
+                  "esbuild/**",
+                  "tldraw",
+                  "@tldraw/**"
+                ],
+                "message": "domain/ is pure - adapter libraries live under infra/."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/app/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "node:fs", "message": "Use FsReadPort. Real impl lives in infra/fs/." },
+              {
+                "name": "node:fs/promises",
+                "message": "Use FsReadPort. Real impl lives in infra/fs/."
+              },
+              { "name": "node:child_process", "message": "Wrap in a port under infra/." },
+              { "name": "node:http", "message": "Only allowed under infra/devserver/." }
+            ],
+            "patterns": [
+              {
+                "group": ["**/infra/**", "**/cli/**", "**/viewer/**", "**/runtime/**"],
+                "message": "app/ depends on ports, not adapters. Wire adapters in cli/."
+              },
+              {
+                "group": [
+                  "chokidar",
+                  "elkjs",
+                  "elkjs/**",
+                  "esbuild",
+                  "esbuild/**",
+                  "tldraw",
+                  "@tldraw/**"
+                ],
+                "message": "Adapter libraries belong under infra/."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/contracts/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/infra/**",
+                  "**/app/**",
+                  "**/domain/**",
+                  "**/cli/**",
+                  "**/viewer/**",
+                  "**/runtime/**"
+                ],
+                "message": "contracts/ is the shared wire surface and depends on nothing inside the project."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/runtime/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/infra/**", "**/app/**", "**/cli/**", "**/viewer/**"],
+                "message": "runtime/ is bundled and executed standalone alongside user code."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/infra/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/app/**", "!**/app/ports/**"],
+                "message": "Infra may only import from app/ports/, not from other parts of app/."
+              },
+              {
+                "group": ["**/cli/**", "**/viewer/**", "**/runtime/**"],
+                "message": "Infra sits below cli/ and viewer/, and runtime/ is a leaf."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/viewer/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/infra/**", "**/app/**", "**/domain/**", "**/cli/**", "**/runtime/**"],
+                "message": "Viewer is a separate bundle; only contracts/ is shared."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/cli/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/runtime/**"],
+                "message": "runtime/ is a leaf - only its own worker imports it."
+              },
+              { "group": ["chokidar"], "message": "Only allowed under infra/fs/." },
+              {
+                "group": ["elkjs", "elkjs/**"],
+                "message": "Only allowed under infra/layout-elk/."
+              },
+              {
+                "group": ["esbuild", "esbuild/**"],
+                "message": "Only allowed under infra/execute-jsx/."
+              },
+              { "group": ["tldraw", "@tldraw/**"], "message": "Only allowed under viewer/." }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/infra/fs/**"],
+      "rules": { "no-restricted-imports": "off" }
+    },
+    {
+      // `expect(port.method)` reads a method without calling it, which is the
+      // whole point of the assertion. The rule still guards product code,
+      // where the 11 real classes live.
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": { "typescript/unbound-method": "off" }
+    },
+    {
+      // tests/ and tools/ sit outside the layered architecture: harnesses and
+      // one-off scripts drive the real thing from the outside, so they get the
+      // filesystem, subprocesses and tldraw directly.
+      "files": ["tests/**", "tools/**"],
+      "rules": { "no-restricted-imports": "off" }
+    },
+    {
+      "files": [
+        "src/infra/git/**",
+        "src/infra/layout-elk/**",
+        "src/infra/execute-jsx/**",
+        "src/infra/transport/**",
+        "src/infra/devserver/**",
+        "src/infra/log/**",
+        "src/infra/open-browser/**",
+        "src/infra/render/**",
+        "src/infra/serve-registry/**"
+      ],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
+}

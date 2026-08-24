@@ -18,4 +18,3 @@ export type SceneMessage =
   | { v: 1; kind: "ping"; payload: Record<string, never> };
 
 export const SCENE_MESSAGE_VERSION = 1 as const;
-export type SceneMessageVersion = typeof SCENE_MESSAGE_VERSION;

@@ -172,29 +172,25 @@ function expectedScene(): SceneJSON {
 }
 
 describe("e2e fixture: auth.tldx.jsx", () => {
-  it(
-    "executes cleanly and produces the expected element counts",
-    async () => {
-      const path = join(FIXTURES, "auth.tldx.jsx");
-      const source = readFixture("auth.tldx.jsx");
-      const result = await createJsxExecute().execute(source, path);
+  it("executes cleanly and produces the expected element counts", async () => {
+    const path = join(FIXTURES, "auth.tldx.jsx");
+    const source = readFixture("auth.tldx.jsx");
+    const result = await createJsxExecute().execute(source, path);
 
-      expect("diagnostics" in result).toBe(false);
-      if ("diagnostics" in result) throw new Error("unreachable");
-      expect(result.ast.kind).toBe("doc");
-      if (result.ast.kind !== "doc") throw new Error("expected doc");
+    expect("diagnostics" in result).toBe(false);
+    if ("diagnostics" in result) throw new Error("unreachable");
+    expect(result.ast.kind).toBe("doc");
+    if (result.ast.kind !== "doc") throw new Error("expected doc");
 
-      const frame = result.ast.children[0];
-      if (frame?.kind !== "frame") throw new Error("expected frame at root");
+    const frame = result.ast.children[0];
+    if (frame?.kind !== "frame") throw new Error("expected frame at root");
 
-      const elementKinds = frame.children.map((c) => c.kind);
-      // 5 boxes + 1 <Text> (also IR/AST kind "box" - see IRBox.text).
-      expect(elementKinds.filter((k) => k === "box")).toHaveLength(6);
-      expect(elementKinds.filter((k) => k === "edge")).toHaveLength(4);
-      expect(elementKinds.filter((k) => k === "note")).toHaveLength(0);
-    },
-    30_000,
-  );
+    const elementKinds = frame.children.map((c) => c.kind);
+    // 5 boxes + 1 <Text> (also IR/AST kind "box" - see IRBox.text).
+    expect(elementKinds.filter((k) => k === "box")).toHaveLength(6);
+    expect(elementKinds.filter((k) => k === "edge")).toHaveLength(4);
+    expect(elementKinds.filter((k) => k === "note")).toHaveLength(0);
+  }, 30_000);
 });
 
 describe("e2e fixture: auth scene spec", () => {
@@ -213,12 +209,8 @@ describe("e2e fixture: auth scene spec", () => {
   });
 
   it("has exactly one document and one page", () => {
-    const docs = Object.values(scene.store).filter(
-      (r) => r.typeName === "document",
-    );
-    const pages = Object.values(scene.store).filter(
-      (r) => r.typeName === "page",
-    );
+    const docs = Object.values(scene.store).filter((r) => r.typeName === "document");
+    const pages = Object.values(scene.store).filter((r) => r.typeName === "page");
     expect(docs).toHaveLength(1);
     expect(pages).toHaveLength(1);
   });

@@ -17,9 +17,7 @@ describe("formatDiagnostics", () => {
         column: 7,
       }),
     ]);
-    expect(out).toBe(
-      "auth.tldx:3:7: error[parser/unexpected-token]: expected '>'",
-    );
+    expect(out).toBe("auth.tldx:3:7: error[parser/unexpected-token]: expected '>'");
   });
 
   it("formats a warning with span using the warning prefix", () => {

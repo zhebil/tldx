@@ -71,13 +71,9 @@ runTransportContract(
                     resolveReady();
                   }
                 } else {
-                  const dataLines = event
-                    .split("\n")
-                    .filter((l) => l.startsWith("data: "));
+                  const dataLines = event.split("\n").filter((l) => l.startsWith("data: "));
                   if (dataLines.length > 0) {
-                    const data = dataLines
-                      .map((l) => l.slice("data: ".length))
-                      .join("\n");
+                    const data = dataLines.map((l) => l.slice("data: ".length)).join("\n");
                     received.push(JSON.parse(data) as SceneMessage);
                   }
                 }

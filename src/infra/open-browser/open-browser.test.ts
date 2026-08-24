@@ -55,12 +55,10 @@ describe("openBrowser", () => {
     expect(calls).toEqual([{ cmd: "xdg-open", args: ["http://example/"] }]);
   });
 
-  it("uses `cmd /c start \"\" <url>` on win32", () => {
+  it('uses `cmd /c start "" <url>` on win32', () => {
     const { spawn, calls } = fakeSpawn();
     openBrowser("http://example/", { spawn, platform: "win32" });
-    expect(calls).toEqual([
-      { cmd: "cmd", args: ["/c", "start", "", "http://example/"] },
-    ]);
+    expect(calls).toEqual([{ cmd: "cmd", args: ["/c", "start", "", "http://example/"] }]);
   });
 
   it("unrefs the child so it does not hold the event loop open", () => {

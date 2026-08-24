@@ -12,11 +12,7 @@
 
 import { richText } from "../../contracts/builders.js";
 import { RESTYLE_RECORD_FIELDS } from "../../contracts/overlay.js";
-import type {
-  Overlay,
-  OverlayEntry,
-  OverlayPlacement,
-} from "../../contracts/overlay.js";
+import type { Overlay, OverlayEntry, OverlayPlacement } from "../../contracts/overlay.js";
 import type { SceneJSON, TLRecord, TLRecordId } from "../../contracts/scene-json.js";
 import { warning } from "../diagnostics/index.js";
 import type { Diagnostic } from "../diagnostics/index.js";

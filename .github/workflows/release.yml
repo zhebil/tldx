@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: lts/*
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       # A release tag that disagrees with package.json publishes a version
       # nobody can find from the tag. Fail before anything reaches the registry.
