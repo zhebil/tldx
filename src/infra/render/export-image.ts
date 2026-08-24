@@ -22,6 +22,11 @@ export type RenderOptions = {
   format: RenderFormat;
   dark: boolean;
   background: boolean;
+  /**
+   * Page to export, on a server sharing one viewer between several diagrams.
+   * Omit for a private single-diagram server.
+   */
+  pageKey?: string | undefined;
 };
 
 // tldraw's own default, pinned so PNG dimensions cannot shift under us if
@@ -68,7 +73,23 @@ export async function exportImage(
     const page = await browser.newPage({ viewport: { width: 1600, height: 1200 } });
     // Not `networkidle`: the viewer holds an SSE connection open, so idle is
     // never reliably reached - the selector wait below is the real gate.
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+    const target = opts.pageKey === undefined ? url : `${url}#page=${opts.pageKey}`;
+    await page.goto(target, { waitUntil: "domcontentloaded" });
+    // Wait for the editor to be ON the requested page before waiting for
+    // shapes. `[data-shape-id]` is satisfied by whichever page is showing, so
+    // on a shared server the shape wait alone would happily export a different
+    // diagram - and even on a private one it can match mid-load.
+    if (opts.pageKey !== undefined) {
+      const expected = `page:${opts.pageKey}`;
+      await page.waitForFunction(
+        (id) => {
+          const editor = (window as unknown as { editor?: { getCurrentPageId(): string } }).editor;
+          return editor !== undefined && editor.getCurrentPageId() === id;
+        },
+        expected,
+        { timeout: 15_000 },
+      );
+    }
     // `state: "attached"` because a perfectly vertical arrow has a zero-width
     // bounding box, which playwright's default visibility check never passes.
     await page.waitForSelector("[data-shape-id]", { timeout: 15_000, state: "attached" });
