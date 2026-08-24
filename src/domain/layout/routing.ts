@@ -183,7 +183,7 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
     routes.set(candidate.edgeId, finalizeRoute(candidate, rankOf.get(candidate.edgeId) ?? 0));
   }
 
-  fanSharedPairs(otherEdges, byId, shapes, routes);
+  const fanned = fanSharedPairs(otherEdges, byId, shapes, routes);
 
   attachFacingProximity(otherEdges, byId, routes);
 
@@ -193,7 +193,7 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
 
   placeLabels(edges, byId, shapes, routes);
 
-  minimizeBends(otherEdges, byId, shapes, routes);
+  minimizeBends(otherEdges, byId, shapes, routes, fanned);
 
   return routes;
 }
@@ -418,10 +418,17 @@ function fanSharedPairs(
   byId: Map<string, AbsShape>,
   shapes: AbsShape[],
   routes: Map<string, EdgeRoute>,
-): void {
+): Set<string> {
+  const fanned = new Set<string>();
   const groups = new Map<string, { loId: string; lo: AbsShape; hi: AbsShape; edges: IREdge[] }>();
   for (const edge of edges) {
-    if (routes.has(edge.id)) continue;
+    // Only an authored anchor is off limits. A route the candidate/lane pass
+    // already committed is not: that pass groups by container/axis/side, so a
+    // reciprocal pair lands in one lane group bowing the *same* way, and
+    // skipping such edges here left the pair to overlap. Fanning wins over
+    // that, and `clearObstaclesOnEveryRoute` re-grows whichever half the
+    // symmetric bend no longer clears.
+    if (edge.fromAnchor !== undefined || edge.toAnchor !== undefined) continue;
     const from = byId.get(edge.from);
     const to = byId.get(edge.to);
     if (!from || !to) continue;
@@ -455,8 +462,10 @@ function fanSharedPairs(
       const bend = round1(offset * (edge.from === loId ? 1 : -1));
       if (Math.abs(bend) < MIN_BEND) return;
       routes.set(edge.id, { bend });
+      fanned.add(edge.id);
     });
   }
+  return fanned;
 }
 
 /**
@@ -894,6 +903,7 @@ function minimizeBends(
   byId: Map<string, AbsShape>,
   shapes: AbsShape[],
   routes: Map<string, EdgeRoute>,
+  fanned: ReadonlySet<string>,
 ): void {
   const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
   const snapshot = new Map<string, { bend: number; labelBox?: LabelBox }>();
@@ -905,6 +915,14 @@ function minimizeBends(
   for (const edge of edges) {
     const route = routes.get(edge.id);
     if (!route || route.bend === 0) continue;
+    // A fan bend is already the minimum separation `fanSharedPairs` chose, so
+    // there is nothing here to give back. It also cannot be judged by
+    // `arcsTooClose` alone: the pair shares both terminals, so two arcs that
+    // meet at the ends stay under the fraction even when the whole middle is
+    // one line, and `snapshot` would score each half against the other's
+    // pre-shrink bend anyway - both halves shrink to zero and the pair lands
+    // back on the same line.
+    if (fanned.has(edge.id)) continue;
     // `approxLabelBox`'s parabola stands in for the real circular arc, and it
     // gets less trustworthy the further `t` sits from the midpoint it was
     // validated at. Shrinking a bend under an already-slid label risks a

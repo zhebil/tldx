@@ -435,6 +435,82 @@ describe("computeEdgeRoutes", () => {
     expect(routes.get("ab")!.startAnchor).toEqual({ x: 1, y: 0.5 });
   });
 
+  // Both halves of a reciprocal pair route independently and land on one
+  // line unless every pass keeps them apart - the fan has to see them, and
+  // nothing downstream may hand the separation back. #33.
+  describe("reciprocal pairs stay fanned end to end", () => {
+    it("keeps the fan on a long unlabelled chord instead of minimizing both halves to straight", () => {
+      // Far enough apart that only a fraction of each arc sits within
+      // `arcsTooClose`'s window, which is what let `minimizeBends` shrink
+      // both back to zero and re-stack them.
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 60, w: 120, h: 80 }),
+        box({ id: "b", x: 520, y: 60, w: 120, h: 80 }),
+        edge({ id: "ab", from: "a", to: "b" }),
+        edge({ id: "ba", from: "b", to: "a" }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      const ab = routes.get("ab")!;
+      const ba = routes.get("ba")!;
+      // Equal and same-signed: `bend` is relative to each arrow's own
+      // direction, so this is one arc each side of the chord.
+      expect(Math.abs(ab.bend)).toBeGreaterThanOrEqual(8);
+      expect(ab.bend).toBeCloseTo(ba.bend, 5);
+    });
+
+    it("fans a pair the obstacle pass already claimed (an endpoint frame's own children sit on the chord)", () => {
+      // `computeCandidate`'s band test counts `inner` as crossed even though
+      // it is inside the endpoint `outer`, so both halves arrive at the fan
+      // already routed. Skipping routed edges left each in a group of one.
+      const ir = doc("root", [
+        frame({
+          id: "outer",
+          x: 0,
+          y: 0,
+          w: 400,
+          h: 200,
+          children: [box({ id: "inner", x: 250, y: 60, w: 120, h: 80 })],
+        }),
+        box({ id: "side", x: 520, y: 60, w: 120, h: 80 }),
+        edge({ id: "out-side", from: "outer", to: "side" }),
+        edge({ id: "side-out", from: "side", to: "outer" }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      const there = routes.get("out-side")!;
+      const back = routes.get("side-out")!;
+      expect(Math.abs(there.bend)).toBeGreaterThanOrEqual(8);
+      expect(there.bend).toBeCloseTo(back.bend, 5);
+      // The candidate pass's shared perpendicular-face anchors go with it -
+      // both halves started and ended on the same two points.
+      expect(there.startAnchor).toBeUndefined();
+      expect(back.startAnchor).toBeUndefined();
+    });
+
+    it("spreads four edges on one pair over four distinct lanes, whichever way each points", () => {
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 60, w: 120, h: 80 }),
+        box({ id: "b", x: 520, y: 60, w: 120, h: 80 }),
+        edge({ id: "e1", from: "a", to: "b" }),
+        edge({ id: "e2", from: "b", to: "a" }),
+        edge({ id: "e3", from: "a", to: "b" }),
+        edge({ id: "e4", from: "b", to: "a" }),
+      ]);
+      const routes = computeEdgeRoutes(ir);
+      // Page-space offset, so the two directions are comparable: a `b -> a`
+      // edge travels the other way, which flips what its `bend` sign means.
+      const lanes = ["e1", "e2", "e3", "e4"].map((id) => {
+        const r = routes.get(id)!;
+        const e = id === "e2" || id === "e4" ? -1 : 1;
+        return Math.round(r.bend * e * 10) / 10;
+      });
+      expect(new Set(lanes).size).toBe(4);
+      const sorted = [...lanes].sort((x, y) => x - y);
+      // Evenly spaced, and symmetric about the chord.
+      expect(sorted[1]! - sorted[0]!).toBeCloseTo(sorted[3]! - sorted[2]!, 5);
+      expect(sorted[0]! + sorted[3]!).toBeCloseTo(0, 5);
+    });
+  });
+
   describe("reciprocal pair label clearance", () => {
     // `A -> B` and `B -> A` on a short chord with long labels bow apart via
     // the fan, but at the bare fan step still stamp their labels on one spot.
