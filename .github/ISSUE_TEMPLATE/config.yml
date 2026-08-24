@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Component and prop reference
+    url: https://github.com/zhebil/tldx/blob/main/docs/reference.md
+    about: Every component, prop and enum - check here before filing "X is not supported".
+  - name: How the compiler works
+    url: https://github.com/zhebil/tldx/blob/main/docs/architecture.md
+    about: The pipeline and the layer rules, if you want to know which stage owns your problem.
