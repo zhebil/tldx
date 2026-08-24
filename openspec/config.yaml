@@ -1,0 +1,33 @@
+schema: spec-driven
+
+context: |
+  tldx compiles `.tldx.jsx` diagram sources to a laid-out tldraw canvas.
+  Stack: TypeScript (ESM, strict), React 19 + tldraw 5 in the viewer, esbuild,
+  elkjs for layout, hono for the dev server, vitest for tests.
+
+  Layered architecture, enforced by dependency-cruiser (`npm run lint:deps`):
+  runtime -> domain (ir, layout, emit, overlay) -> app -> infra/cli/viewer.
+  Domain is pure; adapters live in infra behind ports. Read docs/architecture.md
+  before proposing anything that crosses a layer.
+
+  Tests go at the layer that owns the behaviour: unit tests co-located in
+  domain/, integration tests in app/ against the fakes, real adapter behaviour
+  in the port's `.contract.ts` suite, end to end under tests/e2e/.
+  Fakes are canonical - the contract suite runs against fake and adapter both.
+
+  `npm run check` (typecheck + lint + dep-lint + vitest) must pass.
+  `main` is protected; changes land through a PR.
+  Prose uses hyphens, never em dashes.
+
+rules:
+  proposal:
+    - State which architectural layers the change touches, and name the ports it crosses.
+    - Include a "Non-goals" section.
+  tasks:
+    - Every task that changes behaviour names the test layer that pins it.
+
+operations:
+  apply:
+    guidance:
+      - Run `npm run check` before marking the change applied; paste failures verbatim.
+      - Never `git add .` - stage hunks, one concern per commit.
