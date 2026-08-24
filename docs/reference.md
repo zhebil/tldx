@@ -110,10 +110,11 @@ them.
 
 `bend` pins the curve. It is the same signed pixel offset tldraw itself
 stores, so a bend dragged into shape on the canvas can be read off
-`tldx overlay show` and written straight into the source. Unlike `fromSide` /
-`toSide`, which the router routes _around_, an authored `bend` takes the edge
-out of routing entirely: no obstacle avoidance, no fanning, no cap. `bend="0"`
-forces a straight line the router would otherwise bow.
+`tldx overlay show` and written straight into the source. It overrides the
+arc only - the router still picks the attachment faces, so the pasted number
+draws the arc it drew on the canvas. Nothing later shrinks it: no chord cap,
+no bend minimizing. `bend="0"` forces a straight line the router would
+otherwise bow.
 
 ## Sizing
 

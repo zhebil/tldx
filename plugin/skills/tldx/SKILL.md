@@ -338,13 +338,12 @@ on the canvas:
 <Edge from="domain" to="infra" bend="-105" />
 ```
 
-Unlike `fromSide`/`toSide`, an authored `bend` doesn't just win - it takes the
-edge out of routing altogether: no obstacle avoidance, no fanning against a
-reciprocal sibling, no chord-length cap. That is the point (it is the escape
-hatch for an arc the router got wrong), but it also means a later box move
-won't re-route it. `bend="0"` forces a straight line the router would
-otherwise bow. Prefer fixing the layout first; reach for `bend` when the
-router's answer is wrong rather than merely unlucky.
+It overrides the arc and nothing else - the router still chooses which faces
+the arrow leaves and arrives at, so the number reproduces the arc you bent on
+the canvas. No chord cap and no bend-minimizing pass will shrink it after the
+fact. `bend="0"` forces a straight line the router would otherwise bow. Prefer
+fixing the layout first; reach for `bend` when the router's answer is wrong
+rather than merely unlucky.
 
 ## Title
 
