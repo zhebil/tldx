@@ -42,6 +42,7 @@
     "build:viewer": "vite build",
     "build": "npm run build:cli && npm run build:viewer",
     "dev:cli": "tsx src/cli/main.ts",
+    "diagrams": "for f in docs/diagrams/*.tldx.jsx; do tsx src/cli/main.ts render \"$f\" \"${f%.tldx.jsx}.svg\"; done",
     "check": "npm run typecheck && npm run format:check && npm run lint && npm run lint:unused && npm run test",
     "prepublishOnly": "npm run check && npm run build"
   },
