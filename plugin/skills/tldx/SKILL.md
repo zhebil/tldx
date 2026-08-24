@@ -174,7 +174,7 @@ Put these on `<Doc>`, `<Frame>` and its aliases:
 - `layout` - `col` (default) `row` `grid` `auto` `free`
 - `gap` `pad` - numeric strings
 - `cols` - grid column count
-- `align` - `start` `center` (default) `end`, cross-axis
+- `align` - `start` `center` (default) `end` `stretch`, cross-axis
 - `direction` - `RIGHT` `DOWN` `LEFT` `UP`; only affects `layout="auto"`
 
 Every container lays out independently of its parent's axis. Nest freely -
@@ -213,8 +213,8 @@ On `<Box>` / `<Sticky>`:
 
 - `color`, `labelColor` - `black grey light-violet violet blue light-blue yellow
   orange green light-green light-red red white`
-- `fill` - `none semi solid pattern fill`
-- `dash` - `draw solid dashed dotted`
+- `fill` (Box only) - `none semi solid pattern fill`
+- `dash` (Box only) - `draw solid dashed dotted`
 - `font` - `draw` (default) `sans serif mono`
 - `size` - `s m` (default) `l xl`
 - `textAlign`, `verticalAlign` - `start middle end`
@@ -288,10 +288,9 @@ applies to every edge the block produces:
 `<Edges>` does not cover an explicit `id` on an edge, or a style that needs
 to differ edge-by-edge within one block - drop to a hand-written `<Edge>`
 for those, right alongside the `<Edges>` block if the rest of the batch is
-still compact. `examples/tcp-states.tldx.jsx` shows the mix: two
-same-styled runs of eight and ten transitions as `<Edges>` blocks, plus two
-individual `<Edge>` tags for the two transitions that don't fit either
-block's color.
+still compact. `examples/tcp-rfc793.tldx.jsx` shows the mix: four
+`<Edges>` blocks, one per transition style, plus two individual `<Edge>` tags
+for the transitions that need their own `fromSide`/`toSide` anchors.
 
 `from` and `to` are ids, resolved across the whole document - a frame does not
 scope them. `<Edge from="lb" to="app" label="tls" color="blue" />`.
@@ -369,9 +368,14 @@ and do not restart it per change - one server per file, running until the work i
 done. `--no-open` suppresses the tab; use it only when the user already has one.
 
 ```bash
-tldx check  diagram.tldx.jsx          # parse + validate. Fast, no browser.
-tldx render diagram.tldx.jsx out.png  # export, cropped to content
+tldx check   diagram.tldx.jsx          # parse + validate. Fast, no browser.
+tldx render  diagram.tldx.jsx out.png  # export, cropped to content
+tldx measure diagram.tldx.jsx          # every shape's id, size and position
 ```
+
+`measure` is the cheap way to answer "is this box big enough / are these two
+overlapping" without exporting a PNG and eyeballing it. Reach for it before
+`render`.
 
 - **`check`, then render and look.** `check` catches parse and validation
   errors - every diagnostic carries a code and a source location - but it
@@ -393,10 +397,14 @@ tldx render diagram.tldx.jsx out.png  # export, cropped to content
 - **Do not offer the user a screenshot.** They have the live diagram. Describe
   what changed and let them look.
 
-`render` writes a `*.tldx.overlay.json` sidecar next to the diagram. A stale one
-silently changes later renders. Delete sidecars before measuring anything.
+`render` never writes a `*.tldx.overlay.json` sidecar - it is read-only. A
+running `serve` does write one, so if a diagram has unabsorbed canvas edits they
+will show up in a render that reuses that server.
 
-In this repo, unbuilt: `npm run dev:cli -- serve diagram.tldx.jsx`.
+If `tldx` is not on `PATH`, none of the above works - tell the user to
+install the CLI (see the tldx README) rather than trying another route.
+Inside a checkout of the tldx repo itself, `npm run dev:cli -- <args>` runs
+the CLI from source without building.
 
 ## What `check` will reject
 
