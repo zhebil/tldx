@@ -1,10 +1,8 @@
 /**
- * Factories for the typical wire shapes. Tests use them today; domain/emit
- * will compose over them when the emit pipeline lands. Defaults track the
- * tldraw@^3.15 pin documented in docs/scene-json.md.
+ * Factories for the typical wire shapes. Defaults track the tldraw ^3.15 pin.
  *
- * Keep these PURE: no I/O, no randomness, no Date.now. Caller passes ids;
- * id-generation policy is owned by domain/ir, not here.
+ * Keep these PURE: no I/O, no randomness, no Date.now. Callers pass ids;
+ * id-generation policy is owned by domain/ir.
  */
 
 import type { Diagnostic } from "./diagnostic.js";
@@ -12,10 +10,9 @@ import type { SceneJSON, TLRecord, TLStoreSchema } from "./scene-json.js";
 import type { SceneMessage } from "./scene-message.js";
 
 /**
- * Tracks `createTLSchema().serialize()` from tldraw@^3.15. Schema is opaque
- * to us (docs/scene-json.md): if tldraw ticks one of these on a point release,
- * bump in lockstep. The round-trip test in tests/e2e/scene-roundtrip.test.ts
- * pins this against the live schema so drift fails CI rather than the viewer.
+ * Tracks `createTLSchema().serialize()` from tldraw ^3.15. If tldraw ticks one
+ * of these on a point release, bump in lockstep. An e2e test pins this against
+ * the live schema so drift fails CI rather than the viewer.
  */
 const DEFAULT_SCHEMA: TLStoreSchema = {
   schemaVersion: 2,
@@ -67,9 +64,8 @@ export const sceneMessage = {
 // ----------------------------------------------------------------- payload --
 
 /**
- * Build a SceneJSON from a flat list of records. Records are keyed by their
- * own `id` field; duplicate ids overwrite (last wins), which is *not* a
- * defensive check - callers must pass unique ids. emit/ owns id uniqueness.
+ * Build a SceneJSON from a flat list of records, keyed by each record's own
+ * `id`. Duplicate ids overwrite silently - callers must pass unique ids.
  */
 export function sceneJson(
   records: TLRecord[],
@@ -218,14 +214,10 @@ export function noteShape(
 }
 
 /**
- * A borderless, fill-less tldraw `text` shape (`com.tldraw.shape.text`,
- * registered in `DEFAULT_SCHEMA` above). Unlike `boxShape`/`noteShape`, wire
- * field is `textAlign` (not `align`) and there is no `h` at all - height is
- * derived from wrapped content, never sent. `w` is always the fixed wrap
- * budget (`autoSize: false`); `domain/emit/emit.ts` always has a concrete
- * `w` by the time it calls this (layout already sized the box the `<Text>`
- * element travels as - see `IRBox.text`), so autoSize never needs to be true
- * on the wire.
+ * A borderless, fill-less tldraw `text` shape. Unlike `boxShape`/`noteShape`
+ * the wire field is `textAlign` (not `align`) and there is no `h` at all -
+ * height is derived from the wrapped content, never sent. `w` is the fixed
+ * wrap budget, so `autoSize` is always false.
  */
 export function textShape(
   input: ShapeBase & {
@@ -350,13 +342,11 @@ export type RichTextDoc = {
 
 /**
  * Minimal ProseMirror-style rich-text doc, the shape tldraw expects on
- * geo/note `props.richText`. Empty string emits an empty paragraph (which is
- * what tldraw's `toRichText("")` produces). Multi-line input splits on `\n`
- * into separate paragraphs.
+ * geo/note `props.richText`. Empty string emits an empty paragraph, matching
+ * tldraw's `toRichText("")`. Multi-line input splits on `\n` into paragraphs.
  *
- * Hand-rolled because contracts/ + domain/ cannot import tldraw's runtime
- * `toRichText`. Equivalence with tldraw's runtime is pinned by
- * `tests/e2e/rich-text-roundtrip.test.ts` so drift surfaces in CI.
+ * Hand-rolled because contracts/ and domain/ cannot import tldraw's runtime
+ * `toRichText`. An e2e test pins the equivalence so drift surfaces in CI.
  */
 export function richText(text: string): RichTextDoc {
   if (text === "") {

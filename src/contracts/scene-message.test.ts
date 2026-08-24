@@ -9,9 +9,8 @@ import type { SceneMessage } from "./scene-message.js";
 import { SCENE_MESSAGE_VERSION } from "./scene-message.js";
 
 /**
- * Type-system smoke tests for the envelope. The bulk of constructor logic
- * lives in builders.test.ts; this file pins the discriminated-union shape
- * so a refactor that drops `v` or widens `kind` fails to compile.
+ * Type-system smoke tests: pins the discriminated-union shape so a refactor
+ * that drops `v` or widens `kind` fails to compile.
  */
 
 describe("SceneMessage envelope", () => {

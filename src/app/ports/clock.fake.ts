@@ -1,8 +1,7 @@
 /**
  * `FakeClock` - canonical fake for `ClockPort`. Time is a manual cursor;
  * `advance(ms)` moves it forward and fires every timer whose deadline has
- * elapsed, in the order they were scheduled. Used by app integration tests
- * for `watchAndServe`'s debounce window.
+ * elapsed, in the order they were scheduled.
  */
 
 import type { ClockPort, TimerHandle } from "./clock.js";
@@ -44,9 +43,9 @@ export class FakeClock implements ClockPort {
 
   /**
    * Move the cursor forward by `ms`, firing each pending timer at its own
-   * deadline (cursor is set to `fireAt` before the callback runs). Timers
-   * scheduled inside callbacks therefore see the deadline, not the final
-   * cursor, as their base - matching real `setTimeout` semantics.
+   * deadline (the cursor is set to `fireAt` before the callback runs), so a
+   * timer scheduled inside a callback bases off the deadline, not the final
+   * cursor - matching real `setTimeout` semantics.
    */
   advance(ms: number): void {
     if (ms < 0) throw new Error("FakeClock.advance: ms must be non-negative");
@@ -74,7 +73,7 @@ export class FakeClock implements ClockPort {
     return chosen;
   }
 
-  /** Test helper - count timers that are still scheduled (not fired or cancelled). */
+  /** Timers still scheduled - neither fired nor cancelled. */
   pendingTimers(): number {
     return this.timers.filter((t) => !t.cancelled).length;
   }

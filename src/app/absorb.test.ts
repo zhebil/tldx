@@ -1,11 +1,10 @@
 /**
- * `runAbsorb` never grows the overlay's entry set (tldx-mid) - every id
- * left in the overlay after a run was already a key in the overlay it
- * started from. Uses fakes throughout: an entry that resolves as
- * "already satisfied" (tldx-d3o's move ladder, no source edit needed) is
- * the cheapest way to reach `runAbsorb`'s "absorbed" branch without
- * exercising the codegen/recompile text-splicing machinery, which needs a
- * real JSX executor to round-trip generated source through `ExecutePort`.
+ * `runAbsorb` never grows the overlay's entry set: every id left in the
+ * overlay after a run was already a key in the overlay it started from.
+ *
+ * An "already satisfied" move entry is the cheapest way to reach the
+ * "absorbed" branch without a real JSX executor to round-trip generated
+ * source through `ExecutePort`.
  */
 
 import { describe, expect, it } from "vitest";

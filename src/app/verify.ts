@@ -1,15 +1,11 @@
 /**
- * `verify`: does this file's JSX source alone reproduce what the overlay
- * says the canvas looked like? Backs both `tldx verify` (pass/fail) and
- * `tldx overlay show` (a report) - docs/plan.md T26.
+ * `verify`: does this file's JSX source alone reproduce what the overlay says
+ * the canvas looked like? Backs `tldx verify` and `tldx overlay show`.
  *
- * For each overlay entry, apply *only that entry* to the freshly compiled
- * base scene and compare against the base: if nothing changes, the source
- * already expresses that edit (a candidate for `absorb`, or evidence a
- * hand-rewrite of the JSX already covers it).
+ * Each overlay entry is applied *alone* to the freshly compiled base scene: if
+ * nothing changes, the source already expresses that edit.
  *
- * Never prints, never exits - `cli/verify.ts` and `cli/overlay.ts` own
- * stdio and the exit code.
+ * Never prints, never exits - the CLI owns stdio and the exit code.
  */
 
 import { OVERLAY_VERSION, type Overlay, type OverlayEntry, type OverlayPlacement } from "../contracts/overlay.js";
@@ -26,12 +22,12 @@ export type VerifyDeps = { fs: FsReadPort; layout: LayoutPort; execute: ExecuteP
 
 export type OverlayEntryReport = {
   id: string;
-  /** which op keys the entry carries, e.g. ["moved", "restyled"] */
+  /** Which op keys the entry carries, e.g. ["moved", "restyled"]. */
   ops: string[];
-  /** one-line human summary of the entry, e.g. `moved to (900, 120)` or `relabelled to "Gateway"` */
+  /** One-line human summary, e.g. `moved to (900, 120)`. */
   detail: string;
-  /** false => applying this entry alone to the compiled scene changes nothing,
-   *  i.e. the source already expresses it */
+  /** False means applying this entry alone changes nothing: the source
+   *  already expresses it. */
   changesScene: boolean;
 };
 

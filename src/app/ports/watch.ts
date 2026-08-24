@@ -1,15 +1,10 @@
 /**
- * Filesystem watch port. The watcher in `watchAndServe` calls
- * `watch(paths, …)` with the current module-graph input set and recompiles
- * on every change event. After each compile it calls `handle.update(paths)`
- * to re-subscribe to the (possibly changed) input set - re-running a JSX
- * entry can add or drop imports. The real adapter wraps chokidar; the
- * colocated `FakeWatch` lets tests drive events synthetically.
+ * Filesystem watch port. `update(paths)` re-subscribes to a changed input set,
+ * since re-running a JSX entry can add or drop imports.
  *
- * Scope for MVP: a single change event signal. Add/unlink are folded into
- * "change" - the use case re-reads via FsReadPort and surfaces any ENOENT
- * as a diagnostic. We do not distinguish event kinds at the port surface
- * because the use case's response is the same: recompile.
+ * There is one event signal: add and unlink are folded into `onChange`,
+ * because the consumer's response to all three is the same - recompile, and
+ * let `FsReadPort` surface a now-missing file as a diagnostic.
  */
 
 export interface WatchHandle {
@@ -25,9 +20,9 @@ export interface WatchHandle {
 }
 
 export interface WatchListener {
-  /** Fires when a watched path changes. The argument is the absolute path that changed. */
+  /** The argument is the absolute path that changed. */
   onChange(path: string): void;
-  /** Optional: fires on watcher-level errors (permissions, EMFILE, etc.). */
+  /** Watcher-level errors (permissions, EMFILE, etc.). */
   onError?(error: Error): void;
 }
 

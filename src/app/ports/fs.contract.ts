@@ -1,13 +1,10 @@
 /**
- * Contract suite for `FsReadPort`. Both the colocated `InMemoryFs` fake and
- * the real `infra/fs/` adapter run this same battery of scenarios against
- * their own constructor. If the fake drifts from real-adapter behavior, the
- * scenarios fail. This is the mechanism `docs/testing.md` relies on to keep
- * fakes honest without coupling tests to a specific implementation.
+ * Contract suite for `FsReadPort`, run by both the `InMemoryFs` fake and the
+ * real adapter, so a fake that drifts fails.
  *
- * The harness is responsible for the path namespace: the fake can use any
- * keys, while the real adapter must hand back absolute paths under a
- * temp directory it cleans up in `dispose`.
+ * The harness owns the path namespace: the fake can use any keys, the real
+ * adapter hands back absolute paths under a temp dir it cleans up in
+ * `dispose`.
  */
 
 import { describe, it, expect } from "vitest";
@@ -18,9 +15,8 @@ export interface FsReadHarness {
   port: FsReadPort;
   /** Create a file at `relPath`; returns the absolute path the port will read. */
   writeFile(relPath: string, content: string): Promise<string>;
-  /** Resolve a relative path that does NOT exist (for not-found scenarios). */
+  /** Resolve a relative path that does NOT exist. */
   pathFor(relPath: string): string;
-  /** Tear down any setup (temp dir, watchers, etc.). */
   dispose(): Promise<void>;
 }
 

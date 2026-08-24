@@ -1,32 +1,11 @@
 /**
- * `absorb`: fold a diagram's overlay back into its JSX source
- * (docs/round-trip.md D3, D5; docs/plan.md T22; docs/round-trip-scope.md §2,
- * §7 F4 - `bd show tldx-d3o`).
+ * `absorb`: fold a diagram's overlay back into its JSX source.
  *
- * 1. Read overlay + compile the source (`base`); `target = applyOverlay(overlay,
- *    base).scene` is "the scene the canvas showed".
- * 2. Partition overlay entries into absorbable (bare `added` geo/note shapes),
- *    move-ladder candidates (entries carrying a `moved` placement - see
- *    `runMoveLadder` below), and residual (everything else). Residual
- *    entries are never touched.
- * 3. Generate JSX for the absorbable records (`domain/absorb/codegen.ts`) and
- *    splice them into the source as children of the root `<Doc>`.
- * 4. Run the move ladder (`runMoveLadder`) over the result of step 3: for
- *    each moved entry, try a reorder of its container's JSX children, then
- *    (only for the last flowed child) a `gap` adjustment - each candidate is
- *    compiled *in memory* (no disk writes) and compared against `target`;
- *    the first that reproduces the target's position for every sibling in
- *    that container wins. An entry that verifies has its `moved` field
- *    dropped (the rest of the entry, if any, stays residual); one that
- *    doesn't stays in the overlay untouched, with a reason recorded.
- * 5. Guardrail (D5) before any write: a dirty git file refuses without
- *    `--force`; a file outside a repo (or no `gitStatus` at all) gets a
- *    `.bak` of the original written first.
- * 6. Write the rewrite, recompile, apply the residual overlay to the fresh
- *    compile, and verify the result deep-equals `target`. Only on a match is
- *    the residual overlay written to disk - the only destructive step, and
- *    it happens last (D5). On any mismatch the original source is restored
- *    and the overlay file is left untouched.
+ * Guardrails run before any write: a dirty git file refuses without `--force`,
+ * and a file outside a repo gets a `.bak` of the original first. The overlay
+ * file is rewritten last, only once the rewritten source recompiles into the
+ * scene the canvas showed; on any mismatch the source is restored and the
+ * overlay left untouched.
  *
  * Never prints, never exits - `cli/absorb.ts` owns stdio and the exit code.
  */
@@ -63,7 +42,7 @@ export type AbsorbDeps = {
   fsWrite: FsWritePort;
   layout: LayoutPort;
   execute: ExecutePort;
-  /** Optional - absent is treated the same as `"no-repo"` (D5). */
+  /** Optional - absent is treated the same as `"no-repo"`. */
   gitStatus?: (path: string) => Promise<GitStatus>;
 };
 
@@ -84,8 +63,7 @@ export type AbsorbResult =
       residualCount: number;
       backupPath?: string;
       /** One line per `moved` entry the ladder looked at but couldn't
-       *  absorb (docs/round-trip-scope.md §7 F4: "say precisely which
-       *  element and why, not fail silently"). Empty when there was
+       *  absorb, naming the element and the reason. Empty when there was
        *  nothing to explain. Printed by `cli/absorb.ts`. */
       moveNotes?: string[];
     };
@@ -197,24 +175,16 @@ export async function runAbsorb(args: AbsorbArgs, deps: AbsorbDeps): Promise<Abs
 }
 
 /**
- * The move ladder (docs/round-trip-scope.md §2, §7 F4.4): for each `moved`
- * entry, try to express it as a JSX reorder or `gap` change instead of a
- * raw coordinate. Every candidate is compiled *in memory*
- * (`deps.execute`/`deps.layout`/`emit` - no disk I/O) and compared against
- * `target`'s positions for every shape the candidate could have moved; the
- * first candidate that matches wins and becomes the new baseline for the
- * next entry.
+ * For each `moved` entry, try to express it as a JSX reorder or `gap` change
+ * instead of a raw coordinate. Candidates are compiled in memory (no disk
+ * I/O) and compared against `target`; the first that matches wins and becomes
+ * the baseline for the next entry.
  *
- * Runs to a fixed point over `movedEntries`, not a single pass: a session
- * where the user rearranged several siblings of one container records one
- * `moved` entry per shape, and absorbing *any one* of them as a reorder can
- * reposition the others too - whichever entry ends up satisfied by the
- * current source (with no edit needed) is dropped for free, regardless of
- * processing order. A pass that resolves nothing ends it; whatever's left
- * gets one line in `notes` saying which element and why.
+ * Runs to a fixed point, not a single pass: absorbing one entry as a reorder
+ * can reposition its siblings, satisfying their entries for free regardless
+ * of processing order. A pass that resolves nothing ends it.
  *
- * Never writes to `path` - the caller (`runAbsorb`) does exactly one write
- * of the returned `source`, after its own guardrails have already run.
+ * Never writes to `path` - `runAbsorb` does the single write.
  */
 async function runMoveLadder(
   startSource: string,
@@ -255,11 +225,9 @@ async function runMoveLadder(
 }
 
 /**
- * One `moved` entry against the current source: `null` means "couldn't
- * resolve it this pass" (leave it for the next pass, or report it once none
- * are left). `{ source }` present means an edit won; `{ source: undefined }`
- * means it was already satisfied (an earlier entry's edit fixed it too) and
- * nothing needs to change.
+ * One `moved` entry against the current source. `null` means "couldn't
+ * resolve it this pass"; `{ source }` means an edit won; `{}` means it was
+ * already satisfied and nothing needs to change.
  */
 async function resolveOneMove(
   current: string,
@@ -354,10 +322,8 @@ async function compileScene(source: string, path: string, deps: AbsorbDeps): Pro
   return safeEmit(compiled.positioned);
 }
 
-/** Position-relevant fields only (x, y, parentId, props.w/h) - `index` is
- *  never compared: a reorder legitimately changes emit order, and
- *  `index`'s wire value is refused/derived, not a thing a move needs to
- *  reproduce (docs/round-trip-scope.md §4). */
+/** Position-relevant fields only (x, y, parentId, props.w/h). `index` is
+ *  never compared: a reorder legitimately changes emit order. */
 function positionsMatch(candidate: SceneJSON, target: SceneJSON, ids: readonly string[]): boolean {
   return ids.every((id) => {
     const a = candidate.store[id];
@@ -370,8 +336,7 @@ function positionsMatch(candidate: SceneJSON, target: SceneJSON, ids: readonly s
   });
 }
 
-/** Shared with `app/verify.ts` (`tldx verify` / `tldx overlay show`) -
- *  missing file -> null, unparseable or wrong shape -> null. */
+/** Missing file, unparseable JSON and wrong shape all return null. */
 export async function readOverlay(fs: FsReadPort, overlayPath: string): Promise<Overlay | null> {
   let raw: string;
   try {
@@ -416,15 +381,10 @@ function partition(overlay: Overlay): {
   return { absorbable, residual };
 }
 
-/** Ids that are missing, unexpected, or differ between the pre-absorb applied
- *  scene and the post-absorb one - the divergence report D5 requires on a
- *  failed verification. */
-/** `index` never factors into the divergence check: it's an emit-order
- *  artifact, not user data (docs/round-trip-scope.md §4 - refused, not
- *  round-tripped), and a reorder the move ladder absorbs *necessarily*
- *  reassigns it for the whole container (emit hands out indices in JSX
- *  order). Comparing it here would make every successful reorder look like
- *  a failed verification. */
+/** `index` never factors into the divergence check: emit hands out indices in
+ *  JSX order, so a reorder the move ladder absorbs necessarily reassigns them
+ *  for the whole container. Comparing it would make every successful reorder
+ *  look like a failed verification. */
 function withoutIndex(record: TLRecord): TLRecord {
   if (!("index" in record)) return record;
   return Object.fromEntries(Object.entries(record).filter(([key]) => key !== "index")) as TLRecord;

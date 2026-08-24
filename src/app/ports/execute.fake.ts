@@ -1,8 +1,7 @@
 /**
- * `FakeExecute` - canonical fake for `ExecutePort`. No worker, no esbuild,
- * no parsing of `source`: it is a lookup table keyed by the exact source
- * string, programmed via `setResult()`. The real worker adapter is held to
- * the same scenarios in `execute.contract.ts`.
+ * `FakeExecute` - canonical fake for `ExecutePort`. No worker, no esbuild, no
+ * parsing of `source`: a lookup table keyed by the exact source string,
+ * programmed via `setResult()`.
  */
 
 import type { AstDoc } from "../../domain/parser/ast.js";

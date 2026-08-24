@@ -252,7 +252,7 @@ describe("compileFile", () => {
   });
 });
 
-describe("compileFile: geo (T15)", () => {
+describe("compileFile: geo", () => {
   it.each(GEOS)("round-trips geo=%s to scene JSON without a diagnostic", async (geo) => {
     const path = "geo.tldx.jsx";
     const { doc, box } = astBuilders(path);

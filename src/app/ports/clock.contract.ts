@@ -1,8 +1,7 @@
 /**
- * Contract suite for `ClockPort`. Both `FakeClock` and the real
- * `infra/clock/` adapter run this against their own constructors. The
- * harness owns time-advancement semantics: the fake calls `advance()`
- * directly; the real-adapter harness waits actual wall-clock milliseconds.
+ * Contract suite for `ClockPort`, run by both `FakeClock` and the real
+ * adapter. The harness owns time advancement: the fake steps a cursor, the
+ * real one waits actual wall-clock milliseconds.
  */
 
 import { describe, it, expect } from "vitest";
@@ -12,12 +11,10 @@ import type { ClockPort } from "./clock.js";
 export interface ClockHarness {
   port: ClockPort;
   /**
-   * Move time forward by `ms`. For the fake this calls `advance()`; for the
-   * real adapter this waits `ms` milliseconds (plus a small slack so timers
-   * actually fire before the assertion).
+   * Move time forward by `ms`. The real adapter must add a small slack so
+   * timers actually fire before the assertion.
    */
   advance(ms: number): Promise<void>;
-  /** Tear down (cancel any straggler timers, etc.). */
   dispose(): Promise<void>;
 }
 

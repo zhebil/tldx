@@ -1,13 +1,10 @@
 /**
- * Contract suite for `TransportPort`. Both the colocated `InMemoryTransport`
- * fake and the real SSE adapter run this against their own constructors,
- * so a fake that drifts from real-adapter behavior fails the same scenarios
- * its real counterpart passes.
+ * Contract suite for `TransportPort`, run by both the `InMemoryTransport`
+ * fake and the real SSE adapter, so a fake that drifts fails.
  *
- * The harness owns the subscriber side: the fake's harness calls
- * `transport.subscribe()` directly, while the SSE harness opens an HTTP
- * stream to the test server. Both shapes return a `received` array that is
- * appended-to as messages arrive.
+ * The harness owns the subscriber side: the fake calls `subscribe()`
+ * directly, the SSE harness opens an HTTP stream. Both return a `received`
+ * array appended to as messages arrive.
  */
 
 import { describe, it, expect } from "vitest";
@@ -31,7 +28,6 @@ export interface TransportHarness {
    * guaranteed to reach this subscriber.
    */
   subscribe(): Promise<TransportSubscription>;
-  /** Tear down. */
   dispose(): Promise<void>;
 }
 

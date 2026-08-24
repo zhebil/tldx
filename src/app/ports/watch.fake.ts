@@ -1,7 +1,6 @@
 /**
- * `FakeWatch` - canonical fake for `WatchPort`. Tests drive change events
- * via `emitChange(path)`. The real chokidar adapter is held to the same
- * scenarios in `watch.contract.ts`.
+ * `FakeWatch` - canonical fake for `WatchPort`. Tests drive change events via
+ * `emitChange(path)`.
  */
 
 import type { WatchHandle, WatchListener, WatchPort } from "./watch.js";
@@ -47,7 +46,7 @@ export class FakeWatch implements WatchPort {
     }
   }
 
-  /** Test helper - count active (un-closed) subscriptions watching `path`. */
+  /** Active (un-closed) subscriptions watching `path`. */
   activeSubscribers(path: string): number {
     return this.subs.filter((s) => !s.closed && s.paths.has(path)).length;
   }

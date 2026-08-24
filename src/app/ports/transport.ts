@@ -1,16 +1,11 @@
 /**
- * Transport port. The use case (`watchAndServe`) calls `push(message)` on
- * every successful compile (`kind="scene"`) or build failure
- * (`kind="error"`). The viewer subscribes to the underlying transport (SSE
- * for MVP) and renders each message as it arrives.
+ * Transport port: broadcasts `SceneMessage`s to subscribed viewers.
  *
- * Last-message replay: implementations cache the most recently pushed
- * message and deliver it to new subscribers immediately on connect, so a
- * viewer that opens after the first compile still sees the current scene
- * without waiting for the next file change. Already-connected subscribers
- * receive every message in push order. Per-subscriber transport failures
- * (broken pipe, slow consumer) are absorbed by the implementation; the use
- * case does not see them.
+ * Implementations must cache the most recently pushed message and deliver it
+ * to new subscribers on connect, so a viewer that opens after the first
+ * compile still sees the current scene. Already-connected subscribers receive
+ * every message in push order. Per-subscriber failures (broken pipe, slow
+ * consumer) are absorbed by the implementation, never seen by the caller.
  */
 
 import type { SceneMessage } from "../../contracts/scene-message.js";

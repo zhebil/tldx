@@ -1,8 +1,7 @@
 /**
  * `InMemoryTransport` - canonical fake for `TransportPort`. Records every
- * pushed message for assertions and exposes a synthetic `subscribe()` so
- * integration tests can verify what the viewer would have observed. The
- * real SSE adapter is held to the same scenarios in `transport.contract.ts`.
+ * pushed message and exposes a synthetic `subscribe()` that reproduces the
+ * real adapter's last-message replay.
  */
 
 import type { SceneMessage } from "../../contracts/scene-message.js";
@@ -14,7 +13,6 @@ interface FakeSubscription {
   closed: boolean;
 }
 
-/** Handle returned by `InMemoryTransport.subscribe`. */
 export interface InMemorySubscription {
   /** Messages received in push order, including any cached replay on connect. */
   readonly received: SceneMessage[];
@@ -22,7 +20,7 @@ export interface InMemorySubscription {
 }
 
 export class InMemoryTransport implements TransportPort {
-  /** Every message ever pushed, in order. Test assertions read this directly. */
+  /** Every message ever pushed, in order. */
   readonly pushed: SceneMessage[] = [];
   private readonly subs: FakeSubscription[] = [];
   private last: SceneMessage | undefined;
@@ -44,9 +42,8 @@ export class InMemoryTransport implements TransportPort {
   }
 
   /**
-   * Test helper - simulate a viewer connecting. Returns a handle whose
-   * `received` array grows as messages are pushed; the cached most-recent
-   * message is delivered immediately on connect.
+   * Simulate a viewer connecting. The returned `received` array grows as
+   * messages are pushed, starting with the cached most-recent message.
    */
   subscribe(): InMemorySubscription {
     const sub: FakeSubscription = { received: [], closed: this.closed };
@@ -62,12 +59,10 @@ export class InMemoryTransport implements TransportPort {
     };
   }
 
-  /** Test helper - count active (un-closed) subscribers. */
   activeSubscribers(): number {
     return this.subs.filter((s) => !s.closed).length;
   }
 
-  /** Test helper - the most recent message, if any. */
   lastMessage(): SceneMessage | undefined {
     return this.last;
   }

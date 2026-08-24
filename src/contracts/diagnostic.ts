@@ -1,10 +1,6 @@
 /**
- * Wire-shape diagnostic. Lives in contracts/ because both the producer
- * (domain/diagnostics, surfaced through app/) and the consumer (viewer/)
- * need the same shape on the wire. domain/ may extend this internally,
- * but what crosses the transport is exactly this.
- *
- * NB: contracts/ imports nothing - this file declares types only.
+ * Wire-shape diagnostic. `domain/` may extend this internally, but what
+ * crosses the transport is exactly this.
  */
 
 export type SourceSpan = {
@@ -21,9 +17,8 @@ export type SourceSpan = {
 export type DiagnosticSeverity = "error" | "warning";
 
 /**
- * A single diagnostic. `code` is the stable surface (e.g. "parser/unexpected-token",
- * "ir/missing-id"); `message` is human-readable and may change without notice.
- * Tests assert on `code`, not `message`.
+ * `code` is the stable surface (e.g. "parser/unexpected-token"); `message` is
+ * human-readable and may change without notice. Tests assert on `code`.
  */
 export type Diagnostic = {
   severity: DiagnosticSeverity;

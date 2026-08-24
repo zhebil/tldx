@@ -1,12 +1,10 @@
 /**
- * Contract suite for `ExecutePort`. Both `FakeExecute` and the real
- * worker-based adapter (A3) run this against their own constructors.
+ * Contract suite for `ExecutePort`, run by both `FakeExecute` and the real
+ * worker-based adapter.
  *
- * The harness owns how `source` maps to a result. The fake's harness
- * generates a unique marker string per call and pre-programs `setResult()`
- * for it before handing it back - `execute()` itself never parses `source`.
- * The real adapter's harness (A3) instead returns actual `.tldx.jsx` source
- * text that the worker bundles and runs for real.
+ * The harness owns how `source` maps to a result: the fake's harness returns
+ * a pre-programmed marker string, the real one returns actual `.tldx.jsx`
+ * source the worker bundles and runs.
  */
 
 import { describe, it, expect } from "vitest";
@@ -29,7 +27,6 @@ export interface ExecuteHarness {
   dispose(): Promise<void>;
 }
 
-/** Depth-first search for a box node whose `attrs.id.value` matches `id`. */
 function findBox(node: AstNode, id: string): boolean {
   if (node.kind === "box" && node.attrs.id?.value === id) return true;
   if ("children" in node) {

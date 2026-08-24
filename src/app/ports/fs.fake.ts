@@ -1,9 +1,4 @@
-/**
- * `InMemoryFs` - canonical fake for `FsReadPort` and `FsWritePort`. Used by
- * app integration tests that exercise use cases without touching disk.
- * Real-adapter parity is enforced by `fs.contract.ts`, which both this fake
- * and the chokidar adapter run against.
- */
+/** `InMemoryFs` - canonical fake for `FsReadPort` and `FsWritePort`. */
 
 import { FileNotFoundError, type FsReadPort, type FsWritePort } from "./fs.js";
 
@@ -28,17 +23,15 @@ export class InMemoryFs implements FsReadPort, FsWritePort {
     this.files.set(path, content);
   }
 
-  /** Test helper - seed or overwrite a file. */
   setFile(path: string, content: string): void {
     this.files.set(path, content);
   }
 
-  /** Test helper - remove a file (subsequent reads will throw ENOENT). */
+  /** Subsequent reads of `path` throw ENOENT. */
   deleteFile(path: string): void {
     this.files.delete(path);
   }
 
-  /** Test helper - inspect what has been seeded. */
   has(path: string): boolean {
     return this.files.has(path);
   }

@@ -218,7 +218,7 @@ describe("watchAndServe", () => {
     expect(transport.pushed).toHaveLength(1);
   });
 
-  describe("putOverlay merge (tldx-j3q)", () => {
+  describe("putOverlay merge", () => {
     const SRC_WITH_DASH = "src-with-dash";
     const SRC_DASH_REMOVED = "src-dash-removed";
     const AST_WITH_DASH = doc({ id: "auth" }, [
@@ -285,8 +285,8 @@ describe("watchAndServe", () => {
       expect(pushedAfterRecompile.payload.store["shape:dash"]).toBeUndefined();
       await handle.putOverlay(pushedAfterRecompile.payload);
 
-      // Before the fix this overwrite dropped shape:dash for good - a
-      // source edit elsewhere silently destroying real canvas work.
+      // The entry must survive the overwrite: a source edit elsewhere must
+      // not silently destroy real canvas work.
       const afterSecondPut = JSON.parse(await fs.read(overlayPath)) as {
         entries: Record<string, unknown>;
       };
@@ -299,7 +299,7 @@ describe("watchAndServe", () => {
     });
   });
 
-  describe("putOverlay clears a stale entry (tldx-z2j)", () => {
+  describe("putOverlay clears a stale entry", () => {
     it("drops an entry when the snapshot's record matches the compiled base again", async () => {
       const execute = new FakeExecute();
       execute.setResult(VALID_SRC, { ast: VALID_AST, inputs: [AUTH_PATH] });
@@ -346,7 +346,7 @@ describe("watchAndServe", () => {
 
       const afterUndo = JSON.parse(await fs.read(overlayPath)) as { entries: Record<string, unknown> };
       expect(afterUndo.entries["shape:dash"]).toBeUndefined();
-      // Not the j3q "invalidated id" path - nothing should be preserved.
+      // Not the "invalidated id" path - nothing should be preserved.
       expect(log.byCode("overlay/preserved")).toHaveLength(0);
 
       await handle.close();
@@ -396,9 +396,8 @@ describe("watchAndServe", () => {
     });
 
     it("a failed compile keeps the previous watch set", async () => {
-      // The WatchPort contract can't express this - the port knows nothing
-      // about compiles. This pins watchAndServe's response to compileFile's
-      // `inputs: null` arm, the nasty failure mode the plan calls out.
+      // The WatchPort contract can't express this: the port knows nothing
+      // about compiles. Pins watchAndServe's response to `inputs: null`.
       const fs = new InMemoryFs({ [ENTRY]: SRC_OK });
       const watch = new FakeWatch();
       const transport = new InMemoryTransport();

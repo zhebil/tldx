@@ -1,17 +1,12 @@
 /**
- * Idle-TTL reaper for `tldx serve` (tldx-kts). Activity is an event, not
- * an open connection - an abandoned browser tab holds its SSE connection
- * open forever, so "a client is connected" is not a liveness signal. The
- * reaper instead tracks discrete activity events (`bump()`) and fires
- * `onExpire` once `ttlMs` elapses with no bump in between.
+ * Idle-TTL reaper for `tldx serve`. Activity is an event, not an open
+ * connection - an abandoned browser tab holds its SSE connection open
+ * forever, so "a client is connected" is not a liveness signal. Callers
+ * decide what counts as activity and call `bump()`; `onExpire` fires once
+ * `ttlMs` elapses with no bump in between.
  *
- * Callers own what counts as activity (HTTP requests, a successful
- * file-triggered recompile, a visible-tab heartbeat - see `cli/serve.ts`);
- * this module only knows how to re-arm a one-shot `ClockPort.setTimer`,
- * matching the "no `setInterval` on the port" note in `app/ports/clock.ts`.
- *
- * `ttlMs <= 0` disables the reaper entirely - `bump()`/`stop()` remain
- * safe no-ops and `onExpire` never fires.
+ * `ttlMs <= 0` disables the reaper entirely: `bump()`/`stop()` stay safe
+ * no-ops and `onExpire` never fires.
  */
 
 import type { ClockPort, TimerHandle } from "./ports/clock.js";

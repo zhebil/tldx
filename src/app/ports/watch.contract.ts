@@ -1,12 +1,10 @@
 /**
- * Contract suite for `WatchPort`. Both `FakeWatch` and the real chokidar
- * adapter run this against their own constructors, ensuring the fake's
- * synthetic events match what real chokidar emits in the scenarios that
- * actually matter to `watchAndServe`.
+ * Contract suite for `WatchPort`, run by both `FakeWatch` and the real
+ * chokidar adapter, so the fake's synthetic events stay in step with what
+ * chokidar actually emits.
  *
- * The harness owns event-trigger semantics: the fake calls `emitChange()`
- * directly, while the real-adapter harness writes to disk and waits for
- * chokidar to fire.
+ * The harness owns event triggering: the fake calls `emitChange()` directly,
+ * the real one writes to disk and waits for chokidar to fire.
  */
 
 import { describe, it, expect } from "vitest";
@@ -24,20 +22,14 @@ export interface WatchHarness {
    */
   triggerChange(absPath: string, content: string): Promise<void>;
   /**
-   * Remove `absPath` so watchers on it observe the disappearance. The contract
-   * folds delete into the same `onChange` signal as a modify - the use case
-   * recompiles, re-reads via `FsReadPort`, and surfaces ENOENT as a
-   * diagnostic. Resolves once the delete has been flushed.
+   * Remove `absPath` so watchers on it observe the disappearance. Resolves
+   * once the delete has been flushed.
    */
   deleteFile(absPath: string): Promise<void>;
-  /** Tear down. */
   dispose(): Promise<void>;
 }
 
-/**
- * Wait for `predicate` to become true, polling every 10ms up to `timeoutMs`.
- * Used to drain async event delivery without coupling tests to a fixed delay.
- */
+/** Poll `predicate` every 10ms up to `timeoutMs`, then throw. */
 async function waitFor(
   predicate: () => boolean,
   timeoutMs: number,
@@ -120,12 +112,8 @@ export function runWatchContract(
     });
 
     it("delivers a change event when the watched file is deleted", async () => {
-      // Pins the unlink-folding policy: the WatchPort surface exposes a
-      // single `onChange` signal, so adapters fold chokidar's `unlink` into
-      // it. The use case recompiles and `FsReadPort` translates the now-
-      // missing file into a `FileNotFoundError` diagnostic. Adding a
-      // dedicated `onDisappear` would split a concern the consumer has
-      // unified - if that ever changes, this test will need to as well.
+      // Pins the unlink-folding policy: adapters fold chokidar's `unlink`
+      // into the single `onChange` signal.
       const h = await make();
       try {
         const path = await h.writeFile("doc.tldx", "v1");

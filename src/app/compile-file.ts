@@ -1,14 +1,11 @@
 /**
  * `compileFile`: read a `.tldx.jsx` file and run the pure compiler pipeline
- * (JSX executor → ir → layout → emit). The JSX executor (via `ExecutePort` -
- * see `docs/jsx-pivot.md` decision 8) is the only front end; it produces the
- * `AstNode` shape `lower`/`layout`/`emit` expect. Returns the produced
- * `SceneJSON` (or null when there are errors) plus the merged diagnostics.
+ * (JSX executor via `ExecutePort`, then ir, layout, emit). Returns the
+ * produced `SceneJSON` (null when there are errors) plus the merged
+ * diagnostics.
  *
- * Per ADR-13, the caller decides what to do on error: `cli/check` formats
- * diagnostics and exits non-zero; `watchAndServe` pushes only an error
- * envelope and leaves the viewer's last-good scene rendered. This use case
- * does no I/O beyond `fs.read` and never logs - rendering is the CLI's job.
+ * Does no I/O beyond `fs.read` and never logs - the caller decides what to do
+ * on error.
  */
 
 import { dirname, join, relative, resolve } from "node:path";
@@ -36,9 +33,8 @@ export type CompileFileResult = {
   diagnostics: Diagnostic[];
   /**
    * Every file that contributed to this compile, in `path`'s style. Null
-   * means "unknown, keep whatever you had" - the fs-read-error and JSX
-   * diagnostics-only arms don't know the input set, so a watcher should
-   * leave its existing subscriptions alone rather than dropping them.
+   * means "unknown, keep whatever you had": a watcher should leave its
+   * existing subscriptions alone rather than dropping them.
    */
   inputs: string[] | null;
 };
@@ -88,10 +84,9 @@ function readErrorDiag(path: string, err: unknown): Diagnostic {
 }
 
 /**
- * Every diagnostic's `span.file` is expressed the same way the caller
- * expressed `path`. JSX spans from `jsxDEV` are basenames relative to the
- * entry file's directory, and the execute adapter's own diagnostics carry
- * absolute paths - both get rewritten here to match `path`'s style.
+ * Rewrite every diagnostic's `span.file` into `path`'s style. `jsxDEV` spans
+ * are basenames relative to the entry file's directory and the execute
+ * adapter's own diagnostics carry absolute paths.
  */
 function normaliseSpans(path: string, diagnostics: readonly Diagnostic[]): Diagnostic[] {
   return diagnostics.map((d) =>
