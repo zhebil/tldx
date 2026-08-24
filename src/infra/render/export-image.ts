@@ -39,7 +39,7 @@ async function loadChromium(): Promise<(typeof import("playwright"))["chromium"]
     const code = (err as NodeJS.ErrnoException).code;
     const msg = err instanceof Error ? err.message : String(err);
     if (code === "ERR_MODULE_NOT_FOUND" || msg.includes("Cannot find")) {
-      throw new Error("tldx render needs playwright: npm i -D playwright && npx playwright install chromium");
+      throw new Error("tldx render needs playwright: npm i playwright && npx playwright install chromium");
     }
     throw err;
   }
