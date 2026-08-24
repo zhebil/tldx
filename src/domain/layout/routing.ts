@@ -6,7 +6,9 @@
  * anchors; edges needing neither are absent from the returned map. The
  * analytic candidate/lane pass only sees shapes its own band test finds, so
  * `clearObstaclesOnEveryRoute` re-checks each route against its real arc, and
- * `minimizeBends` runs last to shrink what the earlier passes each grew alone.
+ * `minimizeBends` shrinks what the earlier passes each grew alone.
+ * `slotSharedFaces` runs after all of them, because where an arc meets a shape
+ * is only knowable once its bend has stopped moving.
  */
 
 import type { IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
@@ -213,6 +215,17 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
   placeLabels(edges, byId, shapes, routes);
 
   minimizeBends(otherEdges, byId, shapes, routes, keepBend);
+
+  // Last of the anchor passes, and after `minimizeBends` on purpose. Which
+  // face an unanchored arc arrives on, and where on it, are properties of the
+  // arc: read them any earlier and every later pass that grows or shrinks a
+  // bend moves the answer. In `layers.tldx.jsx` the two edges into `domain`
+  // sit 39px apart before `minimizeBends` and 7px apart after it - only the
+  // second number is what gets drawn. Labels are re-placed when it moves
+  // something, since they were positioned against the anchors it replaced.
+  if (slotSharedFaces(otherEdges, byId, routes, fanned)) {
+    placeLabels(edges, byId, shapes, routes);
+  }
 
   return routes;
 }
@@ -594,6 +607,181 @@ function centreY(s: AbsShape): number {
 
 function clampTo(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
+}
+
+type Face = "top" | "bottom" | "left" | "right";
+
+/**
+ * Two terminals landing on one face closer together than this read as a single
+ * attachment: the arrowheads merge and the labels print over each other. About
+ * one arrowhead across. Wider than this and the earlier passes have already
+ * separated them - `facingAnchors` in particular aligns a drop over its target,
+ * and an even split would only undo that. The example corpus splits either side
+ * of it, though not by much: every face that needs slotting is 17px or tighter,
+ * every face that does not is 21px or wider.
+ */
+const FACE_SLOT_MIN_GAP = 20;
+
+/**
+ * Spreads the terminals crowding one face of one shape into even slots at
+ * `(i + 1) / (n + 1)` along it, ordered by the far endpoint's position along
+ * that same axis so the arrows arrive in the order they left and do not cross
+ * on the approach. A face carrying a single terminal, or terminals the earlier
+ * passes already left `FACE_SLOT_MIN_GAP` apart, is untouched - including a
+ * plain centre binding, which is what a lone facing edge is meant to keep.
+ *
+ * Three terminals never take part: a `fanned` edge, which already separates
+ * itself by bend and would only fight a second strategy; an authored anchor
+ * naming anything but a face midpoint (`fromSide="0.25,1"`, `"top-right"`,
+ * `"center"`), which is an exact instruction rather than a face; and a
+ * terminal on a diamond or ellipse, whose face has no interior - a slot a
+ * third of the way along its bounding box sits off the body.
+ *
+ * Mutates `routes` in place and reports whether it moved anything; `edges`
+ * already excludes self-edges.
+ */
+function slotSharedFaces(
+  edges: IREdge[],
+  byId: Map<string, AbsShape>,
+  routes: Map<string, EdgeRoute>,
+  fanned: Set<string>,
+): boolean {
+  type Slot = { edgeId: string; terminal: "start" | "end"; at: number; order: number };
+  const faces = new Map<string, { face: Face; span: number; slots: Slot[] }>();
+
+  for (const edge of edges) {
+    if (fanned.has(edge.id)) continue;
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (!from || !to) continue;
+    const route = routes.get(edge.id);
+    const arc = arcSampler(
+      bindPoint(from, route?.startAnchor),
+      bindPoint(to, route?.endAnchor),
+      route?.bend ?? 0,
+    );
+
+    for (const terminal of ["start", "end"] as const) {
+      const shape = terminal === "start" ? from : to;
+      const other = terminal === "start" ? to : from;
+      if (shape.geo === "diamond" || shape.geo === "ellipse") continue;
+      const authored = terminal === "start" ? edge.fromAnchor : edge.toAnchor;
+      if (authored !== undefined && !isFaceMidpoint(authored)) continue;
+      const anchor = terminal === "start" ? route?.startAnchor : route?.endAnchor;
+      const exit = anchor ? anchorExit(anchor) : arcExit(shape, arc, terminal);
+      if (exit === null) continue;
+      const { face, at } = exit;
+      const horizontal = face === "top" || face === "bottom";
+      const slot: Slot = {
+        edgeId: edge.id,
+        terminal,
+        at,
+        order: horizontal ? centreX(other) : centreY(other),
+      };
+      const key = [shape.id, face].join("|");
+      const group = faces.get(key);
+      if (group) group.slots.push(slot);
+      else faces.set(key, { face, span: horizontal ? shape.w : shape.h, slots: [slot] });
+    }
+  }
+
+  let moved = false;
+  for (const { face, span, slots } of faces.values()) {
+    if (slots.length < 2) continue;
+    const spread = [...slots].sort((a, b) => a.at - b.at);
+    const crowded = spread.some(
+      (s, i) => i > 0 && (s.at - spread[i - 1]!.at) * span < FACE_SLOT_MIN_GAP,
+    );
+    if (!crowded) continue;
+
+    slots.sort((a, b) => a.order - b.order || a.edgeId.localeCompare(b.edgeId));
+    slots.forEach(({ edgeId, terminal }, i) => {
+      const anchor = anchorOnFace(face, (i + 1) / (slots.length + 1));
+      routes.set(edgeId, {
+        bend: 0,
+        ...routes.get(edgeId),
+        ...(terminal === "start" ? { startAnchor: anchor } : { endAnchor: anchor }),
+      });
+    });
+    moved = true;
+  }
+  return moved;
+}
+
+type FaceExit = { face: Face; at: number };
+
+/** Where a committed `normalizedAnchor` sits; `null` for an interior point. */
+function anchorExit(a: Point): FaceExit | null {
+  if (a.y === 0) return { face: "top", at: a.x };
+  if (a.y === 1) return { face: "bottom", at: a.x };
+  if (a.x === 0) return { face: "left", at: a.y };
+  if (a.x === 1) return { face: "right", at: a.y };
+  return null;
+}
+
+/**
+ * True for the four anchors `fromSide="top"|"bottom"|"left"|"right"` lower to.
+ * The IR does not record which spelling an author used, so this is a geometric
+ * test: someone writing `"0,0.5"` reads as `"left"` and gets slotted. Naming a
+ * face is naming a face; `"top-right"` and `"center"` are not faces.
+ */
+function isFaceMidpoint(a: Point): boolean {
+  const exit = anchorExit(a);
+  return exit !== null && exit.at === 0.5;
+}
+
+function anchorOnFace(face: Face, t: number): Point {
+  if (face === "top") return { x: t, y: 0 };
+  if (face === "bottom") return { x: t, y: 1 };
+  return { x: face === "left" ? 0 : 1, y: t };
+}
+
+/** Where tldraw puts a terminal: its anchor when one is committed, else the centre it clips from. */
+function bindPoint(s: AbsShape, anchor: Point | undefined): Point {
+  return anchor
+    ? { x: s.x + anchor.x * s.w, y: s.y + anchor.y * s.h }
+    : { x: s.x + s.w / 2, y: s.y + s.h / 2 };
+}
+
+/**
+ * Where a centre-bound terminal actually meets the shape. tldraw clips the arc
+ * to the outline, so this is a property of the arc and not of the chord between
+ * centres - in `layers.tldx.jsx` bends of -130 and +93 carry both edges out of
+ * the faces their chords name. Walks the sampled arc outward from the terminal,
+ * bisects the crossing and reports the nearest side; `null` when the arc never
+ * leaves the shape. The bounding box stands in for the outline, which is why
+ * `slotSharedFaces` keeps diamonds and ellipses out of it.
+ */
+function arcExit(
+  s: AbsShape,
+  arc: (t: number) => Point,
+  terminal: "start" | "end",
+): FaceExit | null {
+  const origin = terminal === "start" ? 0 : 1;
+  const dir = terminal === "start" ? 1 : -1;
+  const inside = (p: Point): boolean =>
+    p.x >= s.x && p.x <= s.x + s.w && p.y >= s.y && p.y <= s.y + s.h;
+
+  for (let i = 1; i <= DETOUR_SAMPLES; i++) {
+    let hi = origin + (dir * i) / DETOUR_SAMPLES;
+    if (inside(arc(hi))) continue;
+    let lo = origin + (dir * (i - 1)) / DETOUR_SAMPLES;
+    for (let k = 0; k < 12; k++) {
+      const mid = (lo + hi) / 2;
+      if (inside(arc(mid))) lo = mid;
+      else hi = mid;
+    }
+    const p = arc(hi);
+    const sides: [Face, number, number][] = [
+      ["left", Math.abs(p.x - s.x), (p.y - s.y) / s.h],
+      ["right", Math.abs(p.x - (s.x + s.w)), (p.y - s.y) / s.h],
+      ["top", Math.abs(p.y - s.y), (p.x - s.x) / s.w],
+      ["bottom", Math.abs(p.y - (s.y + s.h)), (p.x - s.x) / s.w],
+    ];
+    const [face, , at] = sides.reduce((best, cur) => (cur[1] < best[1] ? cur : best));
+    return { face, at: clampTo(at, 0, 1) };
+  }
+  return null;
 }
 
 /**

@@ -1048,4 +1048,102 @@ describe("computeEdgeRoutes", () => {
       expect(route?.bend ?? 0).toBe(0);
     });
   });
+
+  describe("terminals sharing a face", () => {
+    // A tall hub with two peers stacked to its left: both edges name the hub's
+    // left face, so both terminals land on it.
+    const hub = (edges: IREdge[]): IRDocPositioned =>
+      doc("root", [
+        box({ id: "up", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "down", x: 0, y: 200, w: 100, h: 50 }),
+        box({ id: "hub", x: 400, y: 0, w: 100, h: 300 }),
+        ...edges,
+      ]);
+
+    it("leaves a face with one terminal exactly as the earlier passes made it", () => {
+      // Diagonal peers: no crossed shape and no facing pair, so #45's fallback
+      // is a plain centre binding on both ends. A lone terminal keeps it.
+      const ir = doc("root", [
+        box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+        box({ id: "b", x: 300, y: 300, w: 100, h: 50 }),
+        edge({ id: "ab", from: "a", to: "b" }),
+      ]);
+      const route = computeEdgeRoutes(ir).get("ab");
+      expect(route?.startAnchor).toBeUndefined();
+      expect(route?.endAnchor).toBeUndefined();
+    });
+
+    it("spreads two terminals sharing a face to 1/3 and 2/3 along it", () => {
+      const routes = computeEdgeRoutes(
+        hub([
+          edge({ id: "in", from: "up", to: "hub", toAnchor: { x: 0, y: 0.5 } }),
+          edge({ id: "out", from: "hub", to: "down", fromAnchor: { x: 0, y: 0.5 } }),
+        ]),
+      );
+      expect(routes.get("in")?.endAnchor).toEqual({ x: 0, y: 1 / 3 });
+      expect(routes.get("out")?.startAnchor).toEqual({ x: 0, y: 2 / 3 });
+    });
+
+    it("orders the slots by the far endpoint, not by declaration, so the arrows do not cross", () => {
+      const routes = computeEdgeRoutes(
+        hub([
+          // Declared low-peer-first; the slots must still follow geometry.
+          edge({ id: "out", from: "hub", to: "down", fromAnchor: { x: 0, y: 0.5 } }),
+          edge({ id: "in", from: "up", to: "hub", toAnchor: { x: 0, y: 0.5 } }),
+        ]),
+      );
+      const toUp = routes.get("in")?.endAnchor?.y ?? 0;
+      const toDown = routes.get("out")?.startAnchor?.y ?? 0;
+      expect(toUp).toBeLessThan(toDown);
+    });
+
+    it("honours an authored anchor that is not a face midpoint", () => {
+      const routes = computeEdgeRoutes(
+        hub([
+          edge({ id: "in", from: "up", to: "hub", toAnchor: { x: 0, y: 0.25 } }),
+          edge({ id: "out", from: "hub", to: "down", fromAnchor: { x: 0, y: 0.5 } }),
+        ]),
+      );
+      // The exact anchor stays put, and takes no slot - which leaves the face
+      // midpoint alone on its face, so it keeps the centre too.
+      expect(routes.get("in")?.endAnchor).toEqual({ x: 0, y: 0.25 });
+      expect(routes.get("out")?.startAnchor).toEqual({ x: 0, y: 0.5 });
+    });
+
+    it("leaves terminals the earlier passes already spread out alone", () => {
+      // `facingAnchors` drops each peer straight down onto its own x. They
+      // share `sink`'s top face but are nowhere near each other, so an even
+      // split would only bend two straight arrows for nothing.
+      const routes = computeEdgeRoutes(
+        doc("root", [
+          box({ id: "left", x: 0, y: 0, w: 100, h: 50 }),
+          box({ id: "right", x: 400, y: 0, w: 100, h: 50 }),
+          box({ id: "sink", x: 0, y: 300, w: 500, h: 50 }),
+          edge({ id: "l", from: "left", to: "sink" }),
+          edge({ id: "r", from: "right", to: "sink" }),
+        ]),
+      );
+      expect(routes.get("l")?.endAnchor).toEqual({ x: 0.1, y: 0 });
+      expect(routes.get("r")?.endAnchor).toEqual({ x: 0.9, y: 0 });
+    });
+
+    it("leaves a self-loop pinned even when its shape's face is crowded", () => {
+      const routes = computeEdgeRoutes(
+        doc("root", [
+          box({ id: "left", x: 0, y: 0, w: 100, h: 50 }),
+          box({ id: "right", x: 400, y: 0, w: 100, h: 50 }),
+          box({ id: "sink", x: 150, y: 300, w: 200, h: 50 }),
+          edge({ id: "loop", from: "sink", to: "sink" }),
+          edge({ id: "l", from: "left", to: "sink", toAnchor: { x: 0.5, y: 0 } }),
+          edge({ id: "r", from: "right", to: "sink", toAnchor: { x: 0.5, y: 0 } }),
+        ]),
+      );
+      // The loop is pinned to (0.75,0)/(0.25,0) on the same top face and takes
+      // no part: the two arrivals split the face as if it were not there.
+      expect(routes.get("loop")?.startAnchor).toEqual({ x: 0.75, y: 0 });
+      expect(routes.get("loop")?.endAnchor).toEqual({ x: 0.25, y: 0 });
+      expect(routes.get("l")?.endAnchor).toEqual({ x: 1 / 3, y: 0 });
+      expect(routes.get("r")?.endAnchor).toEqual({ x: 2 / 3, y: 0 });
+    });
+  });
 });
