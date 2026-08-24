@@ -36,7 +36,9 @@ x.tldx.jsx
   ├─ overlay      domain/overlay/      applies canvas edits on top. Pure, and it
   │                                    never re-runs layout.
   │
-  └─ transport    infra/transport/     SSE to the viewer (src/viewer/, tldraw)
+  └─ transport    infra/transport/     SSE to the viewer (src/viewer/, tldraw).
+                                       One message per diagram, last one per page
+                                       replayed to a client on connect.
 ```
 
 ELK is opt-in. `layout="auto"` hands ELK a _flat_ graph of one container's
@@ -69,6 +71,45 @@ asserts the lint still catches it. Add a case there whenever you add a rule.
 Every port in `app/ports/` has a colocated `.fake.ts` and `.contract.ts`. The
 contract suite runs against both the fake and the real adapter, so the fake
 can't drift into lying.
+
+## One server, many diagrams
+
+`tldx serve` is one server per project root - the first directory at or above
+the file with a `.git` (dir or worktree file), else the nearest `package.json`,
+else the file's own directory. A second `tldx serve` in that project finds the
+running one in the registry, `POST`s its file to `/diagrams`, prints where it
+landed, and exits; the first process keeps every watcher and owns the terminal.
+
+The registry is one JSON record per server under the temp dir, keyed by a hash
+of the project root, holding `{pid, url, token, codeFingerprint, diagrams}`.
+Writes go through a temp file and `rename`, so a torn write can't lose every
+diagram's discovery info. The slot is claimed with an exclusive `wx` create
+_before_ the port is bound, so two `serve` invocations racing from cold resolve
+to one owner and the loser takes the handoff path. A slot held by a dead pid is
+stale and gets cleared.
+
+Each diagram is a tldraw page, keyed by `sha256(realpath).slice(0, 8)`. `emit`
+knows nothing about this: it still produces a standalone `page:main` scene, and
+`domain/multipage/` rewrites ids to `page:<key>` / `shape:<key>_<local>` on the
+way out and reverses that before the overlay diff. So sidecars, `absorb`,
+`verify` and every domain test keep seeing single-page scenes.
+
+The viewer holds all of them in one tldraw document, merging each page slice
+with put plus a page-scoped remove - never `loadSnapshot`, which would reload
+every other page on every keystroke in any one of them. It can't import
+`domain/`, so the page-membership rule it shares with the server lives in
+`contracts/page-scope.ts`: an id belongs to a page if it carries the key, or
+transitively points at something that does (a shape you draw gets an id tldraw
+chose, and belongs by its `parentId`).
+
+Both write endpoints - `POST /diagrams` and `PUT /overlay` - are gated on a
+per-server token (`GET /token`, same-origin only), a same-origin `Origin` and a
+JSON content type. Binding to 127.0.0.1 keeps the LAN out but not a browser
+tab, and `/diagrams` runs a JSX file: arbitrary code execution one cross-site
+`fetch` away without the gate.
+
+Nothing removes a page: they live until the server exits or the idle TTL reaps
+it.
 
 ## Round trip
 

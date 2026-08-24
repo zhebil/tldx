@@ -61,6 +61,9 @@ file: `auth.tldx.jsx` becomes `auth`.
 <Doc title="Auth flow">…</Doc>
 ```
 
+With several diagrams on one server the page name is the only thing telling
+them apart in tldraw's page menu, so give each `<Doc>` a `title`.
+
 `title` is also allowed on `<Frame>` and its aliases, so an imported component
 can name the sub-diagram it draws. Only one title reaches the page: the
 shallowest one wins, ties within a level going to source order. A `<Doc title>`
@@ -132,12 +135,15 @@ These produce no error, or a confusing one:
 tldx check   <file>                        parse + validate; exit non-zero on error.
                                            Files not ending .tldx.jsx exit 0 silently.
 tldx serve   <file> [--no-open] [--ttl m]  watch the module graph, recompile, push over
-                                           SSE. Idle-exits after --ttl minutes
-                                           (default 60, 0 disables). Won't open a
-                                           second tab for an already-live server.
+                                           SSE, and open the tab. One server per
+                                           project: a second `serve` hands its file
+                                           to the running one, which serves it as
+                                           another page, and exits. Idle-exits after
+                                           --ttl minutes (default 60, 0 disables);
+                                           the first --ttl wins.
 tldx render  <file> <out>                  export cropped to content. Reuses a running
-             [--frame id | --shapes a,b]   serve if one is recorded.
-             [--padding px] [--scale n]    Read-only: never writes an overlay.
+             [--frame id | --shapes a,b]   serve that serves this file, targeting its
+             [--padding px] [--scale n]    page. Read-only: never writes an overlay.
              [--format png|svg|jpeg|webp]
              [--dark] [--no-background] [--reuse-only]
 tldx measure <file> [--frame id]           every shape's id, size and position
