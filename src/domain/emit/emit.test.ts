@@ -746,7 +746,7 @@ describe("domain/emit: font / size pass-through", () => {
 });
 
 describe("domain/emit: arrow labels", () => {
-  it("forwards edge label as arrow text", () => {
+  it("forwards edge label as arrow rich text", () => {
     const scene = emit(
       doc([
         box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
@@ -755,10 +755,13 @@ describe("domain/emit: arrow labels", () => {
       ]),
     );
     const props = scene.store["shape:e"]?.props as Record<string, unknown>;
-    expect(props.text).toBe("publishes");
+    expect(props.richText).toEqual({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "publishes" }] }],
+    });
   });
 
-  it("emits an empty text when the edge has no label", () => {
+  it("emits empty rich text when the edge has no label", () => {
     const scene = emit(
       doc([
         box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
@@ -767,7 +770,7 @@ describe("domain/emit: arrow labels", () => {
       ]),
     );
     const props = scene.store["shape:e"]?.props as Record<string, unknown>;
-    expect(props.text).toBe("");
+    expect(props.richText).toEqual({ type: "doc", content: [{ type: "paragraph" }] });
   });
 
   it("passes edge labelColor/font/size through, defaulting to black/draw/m", () => {

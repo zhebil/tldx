@@ -104,12 +104,15 @@ describe("applyOverlay", () => {
     );
   });
 
-  it("applies relabelled to props.text for an arrow", () => {
+  it("applies relabelled to props.richText for an arrow", () => {
     const scene = baseScene();
     const overlay = overlayWith({ "shape:edge1": { relabelled: "go" } });
     const { scene: out, diagnostics } = applyOverlay(overlay, scene);
     expect(diagnostics).toEqual([]);
-    expect((out.store["shape:edge1"]?.props as { text: string }).text).toBe("go");
+    expect((out.store["shape:edge1"]?.props as { richText: unknown }).richText).toEqual({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "go" }] }],
+    });
   });
 
   it("emits overlay/unlabellable and skips when the record has neither text nor richText", () => {
