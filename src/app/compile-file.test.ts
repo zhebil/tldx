@@ -59,6 +59,31 @@ describe("compileFile", () => {
       expect(recordsByType(scene, "binding")).toHaveLength(2);
     });
 
+    it("names the page after the file when the doc has no title", async () => {
+      const path = "diagrams/auth.tldx.jsx";
+      const { doc, box } = astBuilders(path);
+      const execute = new FakeExecute();
+      execute.setResult(SRC, { ast: doc({}, [box({ id: "b" })]), inputs: [path] });
+
+      const result = await compileFile(path, deps({ [path]: SRC }, new StubLayout(), execute));
+
+      expect(result.sceneJson!.store["page:main"]?.name).toBe("auth");
+    });
+
+    it("lets a doc title win over the file name", async () => {
+      const path = "diagrams/auth.tldx.jsx";
+      const { doc, box } = astBuilders(path);
+      const execute = new FakeExecute();
+      execute.setResult(SRC, {
+        ast: doc({ title: "Auth flow" }, [box({ id: "b" })]),
+        inputs: [path],
+      });
+
+      const result = await compileFile(path, deps({ [path]: SRC }, new StubLayout(), execute));
+
+      expect(result.sceneJson!.store["page:main"]?.name).toBe("Auth flow");
+    });
+
     it("invokes the layout port with the lowered IR", async () => {
       const path = "x.tldx.jsx";
       const { doc, box } = astBuilders(path);
