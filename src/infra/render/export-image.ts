@@ -1,12 +1,12 @@
 /**
- * `editor.toImage` export adapter behind `tldsl render`. Drives headless
+ * `editor.toImage` export adapter behind `tldx render`. Drives headless
  * chromium against a served diagram URL and writes the resulting image to
  * disk. Per CONTEXT.md "boundaries that don't vary" there is no port here -
  * one implementation, wired directly from `cli/render.ts`.
  *
  * playwright is a devDependency (it pulls browser binaries) but this file
  * ships in `dist/cli`, so the import is dynamic and optional: a missing
- * install fails with an actionable message instead of crashing every `tldsl`
+ * install fails with an actionable message instead of crashing every `tldx`
  * invocation that never calls `render`.
  */
 
@@ -39,7 +39,7 @@ async function loadChromium(): Promise<(typeof import("playwright"))["chromium"]
     const code = (err as NodeJS.ErrnoException).code;
     const msg = err instanceof Error ? err.message : String(err);
     if (code === "ERR_MODULE_NOT_FOUND" || msg.includes("Cannot find")) {
-      throw new Error("tldsl render needs playwright: npm i -D playwright && npx playwright install chromium");
+      throw new Error("tldx render needs playwright: npm i -D playwright && npx playwright install chromium");
     }
     throw err;
   }

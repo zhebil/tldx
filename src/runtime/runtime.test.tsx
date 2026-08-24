@@ -121,7 +121,7 @@ describe("JSX runtime - AST shape", () => {
   });
 });
 
-describe("<Text> (C1, tldsl-b8v)", () => {
+describe("<Text> (C1, tldx-b8v)", () => {
   it("builds a box AST node with text: true and its children joined as the label field", () => {
     const node = (<Text id="heading">Phase 1 (non collaborative)</Text>) as AstNode;
     expect(stripSpans(node)).toEqual({
@@ -149,7 +149,7 @@ describe("flow()", () => {
   });
 });
 
-describe("<Edges> (tldsl-2rr)", () => {
+describe("<Edges> (tldx-2rr)", () => {
   it("builds edges from one line per hop, with an optional trailing label", () => {
     const edges = (
       <Edges>{`
@@ -233,7 +233,7 @@ describe("<Edges> (tldsl-2rr)", () => {
     expect(() => Edges({ children: 42 }, undefined)).toThrow(/single string of edge specs/);
   });
 
-  it("gives every edge a real, non-zero per-line span - not the zero span flow() carries (tldsl-7kx)", () => {
+  it("gives every edge a real, non-zero per-line span - not the zero span flow() carries (tldx-7kx)", () => {
     const edges = (
       <Edges>{`
         a -> b

@@ -1,7 +1,7 @@
 /**
  * Shared layout heuristics consumed by both layout adapters
  * (`StubLayout` fake and `ElkLayoutAdapter` real). Sharing them keeps
- * `tldsl check` and `tldsl serve` producing identical scene JSON for the
+ * `tldx check` and `tldx serve` producing identical scene JSON for the
  * same input - the contract is "no DOM, deterministic, identical sizes".
  *
  * Box sizing is three passes against measured tldraw text metrics
@@ -13,7 +13,7 @@
  * across a container's flowed boxes; and `boxHeightForWidth` re-wraps each
  * label to that shared width for its final height. A real greedy wrap never
  * splits a word mid-line. Browser-side re-measurement is deferred (issue
- * tldsl-6ek out-of-scope).
+ * tldx-6ek out-of-scope).
  */
 
 import { fontScale, lineHeightPx, textWidth, type TextStyle } from "./glyph-metrics.js";

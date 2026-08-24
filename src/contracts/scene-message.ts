@@ -12,7 +12,7 @@ import type { SceneJSON } from "./scene-json.js";
  * - "scene": a successful compile; payload is the full document snapshot.
  *   The viewer applies it via tldraw's `loadSnapshot(store, { document })`.
  * - "error": the compile failed. The viewer keeps its previous scene
- *   (decision still open in tldsl-8mu) and surfaces the diagnostics.
+ *   (decision still open in tldx-8mu) and surfaces the diagnostics.
  * - "ping":  keepalive. EventSource reconnects on its own, but a periodic
  *   ping lets the server detect dead connections and lets the viewer
  *   distinguish "idle" from "disconnected".

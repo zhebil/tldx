@@ -13,7 +13,7 @@ describe("error()", () => {
   });
 
   it("includes a source span when given", () => {
-    const span = { file: "a.tldsl", line: 3, column: 7, length: 1 };
+    const span = { file: "a.tldx", line: 3, column: 7, length: 1 };
     const d = error("parser/unexpected-token", "expected '>'", span);
     expect(d.span).toEqual(span);
   });

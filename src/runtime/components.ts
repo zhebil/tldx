@@ -1,5 +1,5 @@
 /**
- * The `"tldsl"` component library. Each component is a plain function that
+ * The `"tldx"` component library. Each component is a plain function that
  * builds the exact AST node shape `domain/parser/ast.ts` already defines -
  * no React, no reconciler (see docs/jsx-pivot.md decision 1). `jsx`/`jsxs`/
  * `jsxDEV` call these functions directly and return whatever they return.
@@ -111,7 +111,7 @@ export function invokeComponent(
   source: JsxSource | undefined,
 ): unknown {
   if (typeof type !== "function") {
-    throw new Error(`unknown element <${String(type)}> - not a tldsl component`);
+    throw new Error(`unknown element <${String(type)}> - not a tldx component`);
   }
   return (type as (props: Props, source?: JsxSource) => unknown)(props, source);
 }
@@ -230,7 +230,7 @@ export function Box(props: Props, source?: JsxSource): AstBox {
 }
 
 /** A real tldraw sticky note - fixed 200px wide, self-growing height. The
- * only surviving "note" alias (C2, tldsl-npd): the old plain `<Note>`, which
+ * only surviving "note" alias (C2, tldx-npd): the old plain `<Note>`, which
  * emitted a hand-rolled geo-rectangle imitation, is retired in favour of
  * this (attached or free-floating annotation) or `<Text>` (borderless,
  * unstyled caption). Same AST node kind as the old `<Note>` (`"note"`),
@@ -271,7 +271,7 @@ export function Edge(props: Props, source?: JsxSource): AstEdge {
 
 /**
  * `<Edges>{`a -> b\nb -> c: label`}</Edges>` - a compact multi-line
- * alternative to a block of hand-written `<Edge>` tags (tldsl-2rr). Each
+ * alternative to a block of hand-written `<Edge>` tags (tldx-2rr). Each
  * non-blank line is `id ("->" id)+ (":" label)?`; a chain of N ids expands
  * to N-1 edges, mirroring `flow()`'s pairwise semantics with an optional
  * shared label. Props other than `children` (the same style set `<Edge>`
@@ -284,7 +284,7 @@ export function Edge(props: Props, source?: JsxSource): AstEdge {
  * the (source-preserved) string, offset from the `<Edges>` tag's own line.
  * That is a real per-line span, finer than `<Edge>`'s existing
  * shared-per-element span - not the zero span `flow()`'s edges carry
- * (tldsl-7kx; left open here, see design note on tldsl-2rr for why).
+ * (tldx-7kx; left open here, see design note on tldx-2rr for why).
  *
  * Children must be a single string expression (`{`...`}`), not bare JSX
  * text: esbuild's automatic JSX transform collapses newlines in JSX text

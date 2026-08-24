@@ -13,11 +13,11 @@
  *    the internal transport, which would leak abstraction. Catching the
  *    propagated error here at least guarantees the error path is wired.
  * 3. `ServeHandle.compile` carries the initial compile's source hash
- *    (tldsl-usr/tldsl-46n).
- * 4. Omitting `fsWrite` disables the overlay round-trip entirely (tldsl-jwh:
+ *    (tldx-usr/tldx-46n).
+ * 4. Omitting `fsWrite` disables the overlay round-trip entirely (tldx-jwh:
  *    `render`'s read-only ephemeral server must never write a sidecar).
  * 5. A registered server's serve-registry record picks up the new hash
- *    after a recompile (tldsl-46n's staleness detection depends on this).
+ *    after a recompile (tldx-46n's staleness detection depends on this).
  *
  * Real adapters are used for the dev server + SSE transport (port 0 keeps
  * the bind ephemeral); domain ports are stubbed via the colocated fakes.
@@ -54,7 +54,7 @@ function makeIo(): ServeIo {
 }
 
 function makeDeps(): ServeDeps {
-  const fs = new InMemoryFs({ "doc.tldsl.jsx": SRC });
+  const fs = new InMemoryFs({ "doc.tldx.jsx": SRC });
   return {
     fs,
     fsWrite: fs,
@@ -82,14 +82,14 @@ describe("runServe", () => {
   });
 
   it("close() is idempotent", async () => {
-    started = await runServe({ path: "doc.tldsl.jsx", deps: makeDeps(), io: makeIo() });
+    started = await runServe({ path: "doc.tldx.jsx", deps: makeDeps(), io: makeIo() });
     await started.close();
     // Second close must not throw and must not reject (single-flight).
     await expect(started.close()).resolves.toBeUndefined();
   });
 
   it("close() resolves while an SSE client is connected", async () => {
-    started = await runServe({ path: "doc.tldsl.jsx", deps: makeDeps(), io: makeIo() });
+    started = await runServe({ path: "doc.tldx.jsx", deps: makeDeps(), io: makeIo() });
     const controller = new AbortController();
     try {
       const res = await fetch(`${started.url}events`, { signal: controller.signal });
@@ -115,19 +115,19 @@ describe("runServe", () => {
   });
 
   it("exposes the source hash of the initial compile on the handle", async () => {
-    started = await runServe({ path: "doc.tldsl.jsx", deps: makeDeps(), io: makeIo() });
+    started = await runServe({ path: "doc.tldx.jsx", deps: makeDeps(), io: makeIo() });
     expect(started.compile.hash).toBe(hashSource(SRC));
   });
 
-  it("exposes a non-zero code fingerprint on the handle (tldsl-rab: this checkout has a real src/ tree)", async () => {
-    started = await runServe({ path: "doc.tldsl.jsx", deps: makeDeps(), io: makeIo() });
+  it("exposes a non-zero code fingerprint on the handle (tldx-rab: this checkout has a real src/ tree)", async () => {
+    started = await runServe({ path: "doc.tldx.jsx", deps: makeDeps(), io: makeIo() });
     expect(started.compile.codeFingerprint).toBeGreaterThan(0);
   });
 
   it("omitting fsWrite disables the overlay round-trip - PUT /overlay is accepted but writes nothing", async () => {
     const deps = makeDeps();
     delete deps.fsWrite;
-    started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+    started = await runServe({ path: "doc.tldx.jsx", deps, io: makeIo() });
 
     const res = await fetch(`${started.url}overlay`, {
       method: "PUT",
@@ -137,13 +137,13 @@ describe("runServe", () => {
     expect(res.status).toBe(204);
 
     const fs = deps.fs as InMemoryFs;
-    expect(fs.has(overlayPathFor("doc.tldsl.jsx"))).toBe(false);
+    expect(fs.has(overlayPathFor("doc.tldx.jsx"))).toBe(false);
   });
 
   it("touches the serve registry's compile hash after a recompile, for a registered file", async () => {
     const deps = makeDeps();
     const watch = deps.watch as FakeWatch;
-    const path = "doc.tldsl.jsx";
+    const path = "doc.tldx.jsx";
     started = await runServe({ path, deps, io: makeIo() });
     const forget = recordServe(path, started.url, started.compile);
 
@@ -165,7 +165,7 @@ describe("runServe", () => {
     }
   });
 
-  describe("idle-TTL reaper (tldsl-kts)", () => {
+  describe("idle-TTL reaper (tldx-kts)", () => {
     // FakeClock.advance() drives every TTL scenario below - never a real
     // elapsed-time wait.
 
@@ -174,7 +174,7 @@ describe("runServe", () => {
       deps.ttlMinutes = 1;
       const clock = deps.clock as FakeClock;
       const log = deps.log as CaptureLog;
-      started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+      started = await runServe({ path: "doc.tldx.jsx", deps, io: makeIo() });
 
       clock.advance(59_000);
       expect(log.byCode("serve/idle-timeout")).toHaveLength(0);
@@ -188,7 +188,7 @@ describe("runServe", () => {
       const deps = makeDeps();
       deps.ttlMinutes = 1;
       const clock = deps.clock as FakeClock;
-      started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+      started = await runServe({ path: "doc.tldx.jsx", deps, io: makeIo() });
 
       clock.advance(59_000);
       await fetch(started.url);
@@ -211,7 +211,7 @@ describe("runServe", () => {
       const clock = deps.clock as FakeClock;
       const watch = deps.watch as FakeWatch;
       const log = deps.log as CaptureLog;
-      started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+      started = await runServe({ path: "doc.tldx.jsx", deps, io: makeIo() });
 
       // The initial compile already logged one "watch/recompile-ok" during
       // boot (trigger: "initial") - it must not itself re-arm the reaper a
@@ -219,7 +219,7 @@ describe("runServe", () => {
       expect(log.byCode("watch/recompile-ok")).toHaveLength(1);
 
       clock.advance(59_000);
-      watch.emitChange("doc.tldsl.jsx");
+      watch.emitChange("doc.tldx.jsx");
 
       // Wait for the async recompile pipeline (real timers - FakeExecute
       // resolves on a microtask/macrotask, not on the fake clock) to log
@@ -248,7 +248,7 @@ describe("runServe", () => {
       const deps = makeDeps();
       deps.ttlMinutes = 0;
       const clock = deps.clock as FakeClock;
-      started = await runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() });
+      started = await runServe({ path: "doc.tldx.jsx", deps, io: makeIo() });
 
       clock.advance(1_000 * 60 * 60 * 24 * 365);
 
@@ -277,7 +277,7 @@ describe("runServe", () => {
       const deps = makeDeps();
       deps.port = blockedPort;
       await expect(
-        runServe({ path: "doc.tldsl.jsx", deps, io: makeIo() }),
+        runServe({ path: "doc.tldx.jsx", deps, io: makeIo() }),
       ).rejects.toBeDefined();
     } finally {
       await new Promise<void>((resolve) => {
@@ -289,7 +289,7 @@ describe("runServe", () => {
   });
 });
 
-describe("viewerStalenessWarning (tldsl-rab)", () => {
+describe("viewerStalenessWarning (tldx-rab)", () => {
   const dirs: string[] = [];
 
   afterEach(() => {
@@ -297,7 +297,7 @@ describe("viewerStalenessWarning (tldsl-rab)", () => {
   });
 
   function makeCheckout(): { distViewer: string; srcViewer: string } {
-    const root = mkdtempSync(join(tmpdir(), "tldsl-viewer-staleness-test-"));
+    const root = mkdtempSync(join(tmpdir(), "tldx-viewer-staleness-test-"));
     dirs.push(root);
     const distViewer = join(root, "dist", "viewer");
     const srcViewer = join(root, "src", "viewer");
@@ -325,7 +325,7 @@ describe("viewerStalenessWarning (tldsl-rab)", () => {
   });
 
   it("is silent when src/viewer doesn't exist next to dist/ (an installed package)", () => {
-    const root = mkdtempSync(join(tmpdir(), "tldsl-viewer-staleness-test-"));
+    const root = mkdtempSync(join(tmpdir(), "tldx-viewer-staleness-test-"));
     dirs.push(root);
     const distViewer = join(root, "dist", "viewer");
     mkdirSync(distViewer, { recursive: true });
@@ -335,7 +335,7 @@ describe("viewerStalenessWarning (tldsl-rab)", () => {
   });
 
   it("is silent when the bundle dir isn't inside a dist/ directory (custom bundle dir)", () => {
-    const root = mkdtempSync(join(tmpdir(), "tldsl-viewer-staleness-test-"));
+    const root = mkdtempSync(join(tmpdir(), "tldx-viewer-staleness-test-"));
     dirs.push(root);
     const customDir = join(root, "custom", "viewer");
     mkdirSync(customDir, { recursive: true });

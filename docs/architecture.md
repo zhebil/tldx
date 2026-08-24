@@ -1,7 +1,7 @@
 # Architecture
 
-`tldsl` turns a JSX authoring surface into a live tldraw canvas. An agent
-writes `.tldsl.jsx` files with normal Edit/Write; the CLI executes them,
+`tldx` turns a JSX authoring surface into a live tldraw canvas. An agent
+writes `.tldx.jsx` files with normal Edit/Write; the CLI executes them,
 lays them out, and pushes tldraw scene JSON to a browser viewer. This doc
 covers the pipeline, the CLI surface, the round-trip status, and the hook
 loop that gets errors back to the agent in-session. For the enforced
@@ -11,7 +11,7 @@ system, it does not restate the rule table.
 ## Pipeline
 
 ```
-x.tldsl.jsx
+x.tldx.jsx
   → esbuild bundle + worker_threads execution   (infra/execute-jsx/)
   → AST                                          (domain/parser/ast.ts)
   → IR (lower)                                   (domain/ir/lower.ts)
@@ -23,7 +23,7 @@ x.tldsl.jsx
 ```
 
 There is no text parser. The file is a real JS/JSX module: `infra/execute-jsx/`
-bundles it with esbuild (aliasing the `"tldsl"` import to the bundled
+bundles it with esbuild (aliasing the `"tldx"` import to the bundled
 `src/runtime/` component library) and runs the bundle in a fresh
 `worker_threads` Worker, hard-terminated at a 2s budget - an infinite loop in
 user JSX cannot hang the process. The component functions (`Doc`, `Frame`,
@@ -60,7 +60,7 @@ Full rules and rationale live in `CONTEXT.md`. For orientation:
   `overlay.ts`). Imports nothing.
 - **`viewer/`** - separate Vite bundle: tldraw + the transport client.
   Imports only `contracts/`.
-- **`runtime/`** - the `"tldsl"` module itself (`Doc`, `Frame`, `Box`, `Note`,
+- **`runtime/`** - the `"tldx"` module itself (`Doc`, `Frame`, `Box`, `Note`,
   `Edge`, `flow`, plus the `jsx`/`jsxs`/`jsxDEV` functions esbuild's
   automatic JSX transform targets). Bundled into the user's entry by
   `infra/execute-jsx/`; not imported anywhere else.
@@ -93,7 +93,7 @@ Named-anchor syntax (`from="api.right"`) and free-endpoint syntax
 for what should eventually replace default-center (8 compass points +
 `center`, plus arbitrary `0..1` fractions) is written down in
 `docs/jsx-pivot.md` decision 4 and `docs/decisions.md` ADR-6, but it is
-design only - nothing has shipped, and `tldsl-4s1` (open) blocks it on
+design only - nothing has shipped, and `tldx-4s1` (open) blocks it on
 picking a separator that doesn't collide with the `ns.id` dot convention.
 Read `docs/dsl.md`'s "Edges" section for the syntax as it actually behaves
 today.
@@ -131,28 +131,28 @@ for absorb - see D5's arithmetic note in `docs/round-trip-scope.md`).
 
 Six subcommands, wired in `src/cli/main.ts`:
 
-- `tldsl check <file>` - one-shot validation. Exits non-zero on error. Files
-  not ending in `.tldsl.jsx` are accepted silently with exit 0 (so the
+- `tldx check <file>` - one-shot validation. Exits non-zero on error. Files
+  not ending in `.tldx.jsx` are accepted silently with exit 0 (so the
   PostToolUse hook, which fires on every `Edit`/`Write`, stays quiet on
   unrelated files).
-- `tldsl serve <file> [--no-open] [--ttl <minutes>]` - watches the file and
+- `tldx serve <file> [--no-open] [--ttl <minutes>]` - watches the file and
   every file it imports (esbuild's `metafile.inputs`, re-subscribed after
   every compile), recompiles on save, pushes scene JSON to the bundled
   viewer over SSE. Exits itself after `--ttl` minutes with no activity
   (default 60; `0` disables) - an HTTP request, a file-change-triggered
   recompile, or a visible-tab heartbeat from the viewer all count as
   activity, but an abandoned tab's idle SSE connection does not
-  (tldsl-kts).
-- `tldsl render <file> <out.png> [options]` - exports the compiled diagram
-  as a cropped PNG. Reuses a running `tldsl serve` for the file if one is
+  (tldx-kts).
+- `tldx render <file> <out.png> [options]` - exports the compiled diagram
+  as a cropped PNG. Reuses a running `tldx serve` for the file if one is
   recorded in `infra/serve-registry/`, otherwise boots an ephemeral one.
   Read-only: it never wires a write port, so it never writes an overlay
   sidecar.
-- `tldsl verify <file>` - pass/fail: does the JSX source alone reproduce
+- `tldx verify <file>` - pass/fail: does the JSX source alone reproduce
   what the overlay says the canvas looked like?
-- `tldsl overlay show <file>` - reports what's pending in a diagram's
+- `tldx overlay show <file>` - reports what's pending in a diagram's
   overlay.
-- `tldsl absorb <file> [--force]` - folds a diagram's overlay back into its
+- `tldx absorb <file> [--force]` - folds a diagram's overlay back into its
   JSX source. See "Round-trip", below.
 
 All six share the same compiler pipeline through per-use-case dependency
@@ -165,13 +165,13 @@ Design is settled in `docs/round-trip.md` (D1-D5, landed as ADR-22) and
 `docs/round-trip-scope.md` (the field-tested scoping pass, F5). Status is
 **partially built, by design, not by omission**:
 
-- **The lossless half is built.** Canvas edits land in `x.tldsl.overlay.json`
+- **The lossless half is built.** Canvas edits land in `x.tldx.overlay.json`
   keyed by tldraw record id (`domain/overlay/diff.ts`); the render is
   `applyOverlay(overlay, compile(jsx))` (`domain/overlay/apply.ts`) - pure,
   total, and it never re-runs layout. The viewer PUTs its snapshot to
   `/overlay` on the same dev server (no second transport; SSE stays
   one-way).
-- **`tldsl absorb` is mechanical and narrow, on purpose.** It rewrites JSX
+- **`tldx absorb` is mechanical and narrow, on purpose.** It rewrites JSX
   only for the overlay ops it can express *exactly and verifiably* - today
   that's `added` geo/note shapes, spliced into the root `<Doc>`
   (`domain/absorb/codegen.ts`). Before it touches the overlay it recompiles
@@ -181,7 +181,7 @@ Design is settled in `docs/round-trip.md` (D1-D5, landed as ADR-22) and
   leaves the overlay alone. Everything else - moved shapes, restyles,
   relabels, deletes, added arrows - stays in the overlay as a legitimate
   resting state, not a pending migration.
-- **`tldsl-d3o` (F4, "absorb handles moves") is open**, not shipped. It's
+- **`tldx-d3o` (F4, "absorb handles moves") is open**, not shipped. It's
   scoped in `docs/round-trip-scope.md`: reorder/gap intent-recovery for
   moves inside flow containers, restyle/relabel/delete round-trip for
   *existing* shapes, and a `--pin` escape hatch for `layout="free"`. Do not
@@ -190,19 +190,19 @@ Design is settled in `docs/round-trip.md` (D1-D5, landed as ADR-22) and
   model's job**, not the compiler's. `absorb` is deterministic codegen, not
   an agent restructuring a diagram.
 
-Given this, `tldsl absorb $1` → `tldsl overlay show` → hand-edit the residual
-→ `tldsl verify $1` is the actual round-trip workflow today, packaged as the
-`/tldsl:sync` slash command (`commands/sync.md`).
+Given this, `tldx absorb $1` → `tldx overlay show` → hand-edit the residual
+→ `tldx verify $1` is the actual round-trip workflow today, packaged as the
+`/tldx:sync` slash command (`commands/sync.md`).
 
 ## The hook feedback loop
 
-`tldsl` ships as a Claude Code plugin (`.claude-plugin/plugin.json`,
+`tldx` ships as a Claude Code plugin (`.claude-plugin/plugin.json`,
 `hooks/hooks.json`), not a snippet a user pastes into `.claude/settings.json`.
 Two hooks:
 
 - **`PostToolUse` on `Edit|Write`** → `hooks/on-edit.sh`. It filters to
-  `*.tldsl.jsx` paths, shells out to `tldsl check`, and on success also
-  tries `tldsl render --reuse-only` (only renders if a `tldsl serve` for
+  `*.tldx.jsx` paths, shells out to `tldx check`, and on success also
+  tries `tldx render --reuse-only` (only renders if a `tldx serve` for
   that file is already running - it never boots one). The hook emits
   **structured JSON**, not plain stdout:
   `{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"..."}}`.
@@ -213,12 +213,12 @@ Two hooks:
   calls the difference between what `check` catches and what only a render
   catches, e.g. label clipping).
 - **`UserPromptSubmit`** → `hooks/on-prompt.sh`. Scans the cwd for
-  `*.tldsl.overlay.json` files with pending entries and nudges the agent to
-  run `/tldsl:sync` when the canvas and the source disagree.
+  `*.tldx.overlay.json` files with pending entries and nudges the agent to
+  run `/tldx:sync` when the canvas and the source disagree.
 
 Both scripts are pinned end-to-end by `tests/e2e/hooks-fixture.test.ts`,
 which spawns them for real (`spawnSync("sh", ...)`) against the CLI run from
-source. `tests/e2e/sync-fixture.test.ts` pins the `/tldsl:sync` workflow.
+source. `tests/e2e/sync-fixture.test.ts` pins the `/tldx:sync` workflow.
 
 This was a deliberate design choice over a polling sidecar: hooks are
 synchronous, so errors land in-session, including for the last edit before

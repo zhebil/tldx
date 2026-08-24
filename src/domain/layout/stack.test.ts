@@ -1216,7 +1216,7 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
     expect(labelOverflow(label, approval.w, approval.h, style)).toBeUndefined();
   });
 
-  it("keeps an author-pinned h even when the label needs more room, so check can still warn (A2 standing decision, tldsl-4hz)", async () => {
+  it("keeps an author-pinned h even when the label needs more room, so check can still warn (A2 standing decision, tldx-4hz)", async () => {
     const label = "This label will not fit no matter what, because the box height is explicitly pinned far too small for it";
     const result = await layoutAst(doc({ layout: "col" }, [box({ id: "pinned", label, w: 160, h: 40 })]));
     const pinned = boxById(result.children, "pinned");
@@ -1283,7 +1283,7 @@ describe("hybridLayout container-aware box sizing (T0)", () => {
   });
 });
 
-describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX (D23, tldsl-pnq)", () => {
+describe("hybridLayout: <Text> sizes off TEXT_FONT_PX, not LABEL_FONT_PX (D23, tldx-pnq)", () => {
   it("sizes a lone <Text size=xl> to exactly what estimatedBoxSize(..., { standalone: true }) predicts", async () => {
     const label = "Phase 1 (non collaborative)";
     const result = await layoutAst(

@@ -1,6 +1,6 @@
 /**
- * `tldsl overlay show <file>`: report what's pending in a diagram's overlay
- * (`src/app/verify.ts`, same result `tldsl verify` uses - a different
+ * `tldx overlay show <file>`: report what's pending in a diagram's overlay
+ * (`src/app/verify.ts`, same result `tldx verify` uses - a different
  * presenter). Unlike `verify`, this always exits 0 unless the subcommand or
  * args are wrong, or the file fails to compile.
  */
@@ -21,7 +21,7 @@ export type RunOverlayCliArgs = {
   io: OverlayIo;
 };
 
-const USAGE = "usage: tldsl overlay show <file>";
+const USAGE = "usage: tldx overlay show <file>";
 
 export async function runOverlayCli(args: RunOverlayCliArgs): Promise<number> {
   const { argv, deps, io } = args;
@@ -32,7 +32,7 @@ export async function runOverlayCli(args: RunOverlayCliArgs): Promise<number> {
     return 1;
   }
   if (path === undefined) {
-    io.writeStderr("tldsl overlay show: missing <file> argument\n");
+    io.writeStderr("tldx overlay show: missing <file> argument\n");
     return 1;
   }
 

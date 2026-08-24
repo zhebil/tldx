@@ -1,18 +1,18 @@
-# tldsl
+# tldx
 
 A JSX authoring surface for [tldraw](https://tldraw.dev) scenes, designed so AI agents (Claude Code et al.) can drive a live canvas by editing plain files.
 
-The agent edits a `.tldsl.jsx` file with normal `Edit` / `Write` tools, importing `Doc`, `Frame`, `Box`, `Text`, `Edge`, and `flow` from the `"tldsl"` module. The CLI executes the file in a Node worker, lowers the resulting AST through layout, and pushes tldraw scene JSON to a browser viewer. No MCP, no special API - just files, a watcher, and a CLI.
+The agent edits a `.tldx.jsx` file with normal `Edit` / `Write` tools, importing `Doc`, `Frame`, `Box`, `Text`, `Edge`, and `flow` from the `"tldx"` module. The CLI executes the file in a Node worker, lowers the resulting AST through layout, and pushes tldraw scene JSON to a browser viewer. No MCP, no special API - just files, a watcher, and a CLI.
 
-**Accepted cost**: unlike a plain-text DSL, a `.tldsl.jsx` file needs the CLI to run - it isn't self-contained portable text. See `docs/jsx-pivot.md` for the trade-off this bought (JSX composition, props, `.map()`) and the full reasoning.
+**Accepted cost**: unlike a plain-text DSL, a `.tldx.jsx` file needs the CLI to run - it isn't self-contained portable text. See `docs/jsx-pivot.md` for the trade-off this bought (JSX composition, props, `.map()`) and the full reasoning.
 
 ## Status
 
-`tldsl check <file>` and `tldsl serve <file>` both work end to end: execute → lower → layout → emit → scene JSON, pushed live to the viewer over SSE. Design for the remaining phase-1/phase-2 surface is settled (see `docs/`); this is not a finished product - see `docs/roadmap.md` for what's still ahead.
+`tldx check <file>` and `tldx serve <file>` both work end to end: execute → lower → layout → emit → scene JSON, pushed live to the viewer over SSE. Design for the remaining phase-1/phase-2 surface is settled (see `docs/`); this is not a finished product - see `docs/roadmap.md` for what's still ahead.
 
 ## Phase 1 in one paragraph
 
-Write-only. Agent edits the DSL, user watches the canvas. Two CLI modes: `tldsl serve <file>` runs the watcher + viewer for interactive use; `tldsl check <file>` is the one-shot validator wired into a Claude Code `PostToolUse` hook so syntax / layout errors land back in the agent's context inline with the failing edit. No round-trip from canvas back to DSL in phase 1.
+Write-only. Agent edits the DSL, user watches the canvas. Two CLI modes: `tldx serve <file>` runs the watcher + viewer for interactive use; `tldx check <file>` is the one-shot validator wired into a Claude Code `PostToolUse` hook so syntax / layout errors land back in the agent's context inline with the failing edit. No round-trip from canvas back to DSL in phase 1.
 
 ## Why this shape
 
@@ -28,23 +28,23 @@ Sits in the "AI tools should be plug-and-play, not frameworks to learn" lane.
 ```bash
 npm install
 npm run build                                          # dist/cli/ + dist/viewer/
-node dist/cli/main.js serve tests/e2e/fixtures/auth.tldsl.jsx
+node dist/cli/main.js serve tests/e2e/fixtures/auth.tldx.jsx
 # or, after `npm link`:
-tldsl serve tests/e2e/fixtures/auth.tldsl.jsx
+tldx serve tests/e2e/fixtures/auth.tldx.jsx
 ```
 
 For an inner dev loop without rebuilding:
 
 ```bash
-npm run dev:cli -- serve tests/e2e/fixtures/auth.tldsl.jsx
+npm run dev:cli -- serve tests/e2e/fixtures/auth.tldx.jsx
 ```
 
-`tldsl check <file>` is the one-shot validator (exit 0 = clean, 1 = compile errors); `tldsl serve <file>` watches the file (and every file it imports), recompiles on save, and pushes scene JSON to the bundled viewer over SSE.
+`tldx check <file>` is the one-shot validator (exit 0 = clean, 1 = compile errors); `tldx serve <file>` watches the file (and every file it imports), recompiles on save, and pushes scene JSON to the bundled viewer over SSE.
 
 ## What a diagram looks like
 
 ```jsx
-import { Doc, Frame, Box, Edge, Text } from "tldsl";
+import { Doc, Frame, Box, Edge, Text } from "tldx";
 
 export default function Diagram() {
   return (
@@ -64,7 +64,7 @@ export default function Diagram() {
 }
 ```
 
-Based on `tests/e2e/fixtures/auth.tldsl.jsx`. Edges reference other elements by `id`; `<Doc>` is always the root.
+Based on `tests/e2e/fixtures/auth.tldx.jsx`. Edges reference other elements by `id`; `<Doc>` is always the root.
 
 ## Documents
 
@@ -76,4 +76,4 @@ Based on `tests/e2e/fixtures/auth.tldsl.jsx`. Edges reference other elements by 
 
 ## Naming
 
-`tldsl` is the working name and the CLI binary. Folder named to match. The project name is not finalised - alternatives considered: `scenefile`, `canvas-dsl`. Revisit before any public release.
+`tldx` is the working name and the CLI binary. Folder named to match. The project name is not finalised - alternatives considered: `scenefile`, `canvas-dsl`. Revisit before any public release.

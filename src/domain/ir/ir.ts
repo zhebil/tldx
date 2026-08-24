@@ -134,7 +134,7 @@ export type IRNote = IRBase & {
   text: string;
   /**
    * True for `<Sticky>` (real tldraw sticky, `noteShape`). `<Sticky>` is the
-   * only runtime producer left (C2, tldsl-npd) - the old `<Note>` that left
+   * only runtime producer left (C2, tldx-npd) - the old `<Note>` that left
    * this unset and emitted a fake geo-rectangle "note" is retired in favour
    * of `<Text>` (borderless annotation) or `<Box>` (bordered). The field
    * stays optional rather than required `true`: `domain/layout/stack.ts` and
@@ -181,7 +181,7 @@ export type IREdge = IRBase & {
    * Authored exit/entry side (`fromSide`/`toSide`), separate props rather
    * than dotted `id.anchor` syntax to avoid colliding with the `-`/`_`
    * namespace convention some ids already use a `.` for by mistake
-   * (tldsl-4s1) - see `lower.ts`'s `parseAnchorSide`. Wins over anything
+   * (tldx-4s1) - see `lower.ts`'s `parseAnchorSide`. Wins over anything
    * `domain/layout/routing.ts` would otherwise compute; routing works
    * around a set anchor (grows bend to clear obstacles from it) rather than
    * overriding it.

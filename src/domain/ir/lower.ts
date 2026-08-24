@@ -562,7 +562,7 @@ const ANCHOR_SIDES: Record<string, IRAnchor> = {
 /**
  * `fromSide`/`toSide` (B9): separate props rather than the `id.anchor` dot
  * syntax the design doc originally sketched, which collides with an id that
- * happens to use `.` as a namespace separator (tldsl-4s1) - `from`/`to` stay
+ * happens to use `.` as a namespace separator (tldx-4s1) - `from`/`to` stay
  * plain id strings this way, so nothing about them needs to change, and a
  * dotted id (still discouraged, see `ir/anchor-not-supported` above) is no
  * longer even a *latent* conflict, since anchor syntax no longer lives

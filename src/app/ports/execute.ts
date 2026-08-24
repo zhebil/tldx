@@ -1,5 +1,5 @@
 /**
- * JSX execution port. `execute(source, path)` runs a `.tldsl.jsx` module and
+ * JSX execution port. `execute(source, path)` runs a `.tldx.jsx` module and
  * hands back the `AstNode` it produced plus every file that contributed to
  * the bundle. The real adapter (`infra/execute-jsx/`, A3) bundles with
  * esbuild and runs the module in a fresh `worker_threads` worker per

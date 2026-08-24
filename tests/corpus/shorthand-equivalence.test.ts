@@ -33,7 +33,7 @@ const LAYOUT_TO_COMPONENT: Record<string, string> = { row: "Row", col: "Col", gr
 
 function discoverCorpusFixtures(): string[] {
   return readdirSync(HERE)
-    .filter((name) => name.endsWith(".tldsl.jsx"))
+    .filter((name) => name.endsWith(".tldx.jsx"))
     .sort();
 }
 
@@ -80,11 +80,11 @@ function rewriteFrameShorthands(source: string): { rewritten: string; rewriteCou
   return { rewritten: result, rewriteCount };
 }
 
-/** Adds any shorthand names actually used to the `import { ... } from "tldsl"` line. */
+/** Adds any shorthand names actually used to the `import { ... } from "tldx"` line. */
 function fixImports(source: string, usedNames: readonly string[]): string {
   if (usedNames.length === 0) return source;
   return source.replace(
-    /import\s*\{([^}]*)\}\s*from\s*["']tldsl["'];/,
+    /import\s*\{([^}]*)\}\s*from\s*["']tldx["'];/,
     (full: string, names: string) => {
       const existing = names
         .split(",")
@@ -92,7 +92,7 @@ function fixImports(source: string, usedNames: readonly string[]): string {
         .filter(Boolean);
       const merged = [...existing];
       for (const n of usedNames) if (!merged.includes(n)) merged.push(n);
-      return `import { ${merged.join(", ")} } from "tldsl";`;
+      return `import { ${merged.join(", ")} } from "tldx";`;
     },
   );
 }
@@ -120,9 +120,9 @@ describe("shorthand-equivalence: Row/Col/Grid produce identical scene JSON to Fr
           expect(fixture.fixedSource).not.toBe(fixture.original);
         }
 
-        const tmpDir = mkdtempSync(join(tmpdir(), "tldsl-shorthand-"));
+        const tmpDir = mkdtempSync(join(tmpdir(), "tldx-shorthand-"));
         // A fixture may relatively import sibling modules (T16b's
-        // c4-context.tldsl.jsx -> ./lib/c4.jsx) - copy them alongside so the
+        // c4-context.tldx.jsx -> ./lib/c4.jsx) - copy them alongside so the
         // rewritten copy resolves the same imports the original does.
         const libDir = join(HERE, "lib");
         if (existsSync(libDir)) cpSync(libDir, join(tmpDir, "lib"), { recursive: true });

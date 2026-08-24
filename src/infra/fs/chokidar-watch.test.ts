@@ -12,7 +12,7 @@ import { createChokidarWatch } from "./chokidar-watch.js";
 runWatchContract(
   "createChokidarWatch",
   async (): Promise<WatchHarness> => {
-    const dir = await mkdtemp(join(tmpdir(), "tldsl-watch-"));
+    const dir = await mkdtemp(join(tmpdir(), "tldx-watch-"));
     const port = createChokidarWatch();
     return {
       port,

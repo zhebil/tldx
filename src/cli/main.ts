@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 /**
- * `tldsl` CLI entry point. Composition root: wires real adapters
+ * `tldx` CLI entry point. Composition root: wires real adapters
  * (NodeFs, ChokidarWatch, ElkLayoutAdapter, JsxExecute, SystemClock,
  * StderrLog, openBrowser) and dispatches subcommands. Per CONTEXT.md, this
  * is the ONLY place real adapters meet use cases.
  *
  * Subcommands:
- *   tldsl check <file>   Validate a single `.tldsl.jsx` file. Exits non-zero
- *                        on compile errors. Files not ending in `.tldsl.jsx`
+ *   tldx check <file>   Validate a single `.tldx.jsx` file. Exits non-zero
+ *                        on compile errors. Files not ending in `.tldx.jsx`
  *                        are accepted silently with exit 0 (PostToolUse
  *                        hook).
- *   tldsl serve <file>   Watch the file, recompile on save, push the scene
+ *   tldx serve <file>   Watch the file, recompile on save, push the scene
  *                        to a local viewer over SSE. Stays alive until
  *                        SIGINT/SIGTERM.
- *   tldsl render <file> <out.png>   Export the compiled diagram as an
+ *   tldx render <file> <out.png>   Export the compiled diagram as an
  *                        image, cropped to content. Reuses a running
- *                        `tldsl serve` for the file if one is recorded,
+ *                        `tldx serve` for the file if one is recorded,
  *                        otherwise boots an ephemeral one.
- *   tldsl verify <file>  Pass/fail: does the JSX source alone reproduce
+ *   tldx verify <file>  Pass/fail: does the JSX source alone reproduce
  *                        what the overlay says the canvas looked like?
- *   tldsl overlay show <file>   Report what's pending in a diagram's
+ *   tldx overlay show <file>   Report what's pending in a diagram's
  *                        overlay.
  */
 
@@ -72,8 +72,8 @@ function defaultViewerBundleDir(): string {
 }
 
 /**
- * A restart shouldn't pile up browser tabs (tldsl-69w): if a live
- * `tldsl serve` is already recorded for this file, a tab already points at
+ * A restart shouldn't pile up browser tabs (tldx-69w): if a live
+ * `tldx serve` is already recorded for this file, a tab already points at
  * it, so this invocation should not open a second one - independent of
  * whether the user passed `--no-open`.
  */
@@ -83,7 +83,7 @@ export function shouldOpenBrowser(noOpen: boolean, live: { readonly pid: number 
 
 /**
  * Detects a `dist/` built from an older `src/` than what's on disk - the
- * failure mode behind tldsl-ppj: `overlay`/`verify` existed in source but a
+ * failure mode behind tldx-ppj: `overlay`/`verify` existed in source but a
  * stale build made them print "unknown command" instead of running. Only
  * fires when actually running the compiled `dist/cli/main.js` (not `tsx
  * src/cli/main.ts` in dev, where "stale" would be a false positive since
@@ -113,7 +113,7 @@ export function distStalenessHint(
 
 /**
  * Parked-process resolver. `runServe` returns a handle but the CLI must
- * stay alive until the user signals shutdown, OR (tldsl-kts) the handle's
+ * stay alive until the user signals shutdown, OR (tldx-kts) the handle's
  * idle-TTL reaper decides no one's home. Either way the outcome is the
  * same: close the handle and exit 0 - the reaper has already logged its
  * own reason by the time `idleExpired` resolves.
@@ -136,7 +136,7 @@ async function awaitShutdown(handle: { close(): Promise<void>; idleExpired: Prom
 }
 
 /**
- * Parse `tldsl serve`'s args: `<file> [--no-open] [--ttl <minutes>]`.
+ * Parse `tldx serve`'s args: `<file> [--no-open] [--ttl <minutes>]`.
  * `--ttl` takes its value from the following token so the plain positional
  * scan for `path` (any non-`--` token) must skip it explicitly.
  */
@@ -157,7 +157,7 @@ export function parseServeArgs(rest: readonly string[]): {
       i++;
       const n = raw === undefined ? NaN : Number(raw);
       if (!Number.isFinite(n) || n < 0) {
-        error = "tldsl serve: --ttl requires a non-negative number of minutes";
+        error = "tldx serve: --ttl requires a non-negative number of minutes";
       } else {
         ttlMinutes = n;
       }
@@ -173,11 +173,11 @@ const commands: readonly Command[] = [
   {
     name: "check",
     args: "<file>",
-    description: "parse and validate a single .tldsl.jsx file",
+    description: "parse and validate a single .tldx.jsx file",
     run: (rest, io) => {
       const path = rest[0];
       if (path === undefined) {
-        io.writeStderr("tldsl check: missing <file> argument\n");
+        io.writeStderr("tldx check: missing <file> argument\n");
         return 1;
       }
       return runCheck({
@@ -199,7 +199,7 @@ const commands: readonly Command[] = [
       const force = rest.includes("--force");
       const path = rest.find((arg) => !arg.startsWith("--"));
       if (path === undefined) {
-        io.writeStderr("tldsl absorb: missing <file> argument\n");
+        io.writeStderr("tldx absorb: missing <file> argument\n");
         return 1;
       }
       return runAbsorbCli({
@@ -219,7 +219,7 @@ const commands: readonly Command[] = [
   {
     name: "serve",
     args: "<file> [--no-open] [--ttl <minutes>]",
-    description: "watch a .tldsl or .tldsl.jsx file and serve the live viewer locally (default --ttl 60; 0 disables)",
+    description: "watch a .tldx or .tldx.jsx file and serve the live viewer locally (default --ttl 60; 0 disables)",
     run: async (rest, io) => {
       const { path, noOpen, ttlMinutes, error } = parseServeArgs(rest);
       if (error !== undefined) {
@@ -227,14 +227,14 @@ const commands: readonly Command[] = [
         return 1;
       }
       if (path === undefined) {
-        io.writeStderr("tldsl serve: missing <file> argument\n");
+        io.writeStderr("tldx serve: missing <file> argument\n");
         return 1;
       }
       try {
         const live = findServe(path);
         const openThisTime = shouldOpenBrowser(noOpen, live);
         if (!openThisTime && !noOpen && live !== undefined) {
-          io.writeStdout(`tldsl serve: a server for ${path} is already live at ${live.url}; not opening another tab\n`);
+          io.writeStdout(`tldx serve: a server for ${path} is already live at ${live.url}; not opening another tab\n`);
         }
         const handle = await runServe({
           path,
@@ -262,7 +262,7 @@ const commands: readonly Command[] = [
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        io.writeStderr(`tldsl serve: ${msg}\n`);
+        io.writeStderr(`tldx serve: ${msg}\n`);
         return 1;
       }
     },
@@ -277,7 +277,7 @@ const commands: readonly Command[] = [
         deps: {
           fs: createNodeFsRead(),
           // No fsWrite: render is read-only and must never write an overlay
-          // sidecar (tldsl-jwh). runRender strips it defensively too, since
+          // sidecar (tldx-jwh). runRender strips it defensively too, since
           // a reused server is a separate process this deps object doesn't
           // reach anyway.
           watch: createChokidarWatch(),
@@ -297,7 +297,7 @@ const commands: readonly Command[] = [
     run: (rest, io) => {
       const path = rest[0];
       if (path === undefined) {
-        io.writeStderr("tldsl verify: missing <file> argument\n");
+        io.writeStderr("tldx verify: missing <file> argument\n");
         return 1;
       }
       return runVerifyCli({
@@ -351,7 +351,7 @@ function parseArgs(argv: readonly string[]): ParsedInvocation {
 }
 
 function buildUsage(cmds: readonly Command[]): string {
-  const lines = ["usage: tldsl <command> [args]", "", "commands:"];
+  const lines = ["usage: tldx <command> [args]", "", "commands:"];
   const width = Math.max(...cmds.map((c) => `${c.name} ${c.args}`.length));
   for (const c of cmds) {
     const head = `${c.name} ${c.args}`.padEnd(width);
@@ -373,7 +373,7 @@ export async function main(argv: readonly string[], io: CliIo): Promise<number> 
   if (cmd === undefined) {
     const hint = distStalenessHint();
     const hintLine = hint !== undefined ? `${hint}\n` : "";
-    io.writeStderr(`tldsl: unknown command: ${parsed.name}\n${hintLine}${usage}\n`);
+    io.writeStderr(`tldx: unknown command: ${parsed.name}\n${hintLine}${usage}\n`);
     return 1;
   }
 

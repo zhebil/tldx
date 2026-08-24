@@ -63,7 +63,7 @@ export function runWatchContract(
     it("delivers a change event after the file is modified", async () => {
       const h = await make();
       try {
-        const path = await h.writeFile("doc.tldsl", "first");
+        const path = await h.writeFile("doc.tldx", "first");
         const changes: string[] = [];
         const handle = h.port.watch([path], {
           onChange: (p) => changes.push(p),
@@ -83,7 +83,7 @@ export function runWatchContract(
     it("delivers multiple change events for repeated modifications", async () => {
       const h = await make();
       try {
-        const path = await h.writeFile("doc.tldsl", "v1");
+        const path = await h.writeFile("doc.tldx", "v1");
         const changes: string[] = [];
         const handle = h.port.watch([path], {
           onChange: (p) => changes.push(p),
@@ -105,7 +105,7 @@ export function runWatchContract(
     it("stops delivering events after close()", async () => {
       const h = await make();
       try {
-        const path = await h.writeFile("doc.tldsl", "v1");
+        const path = await h.writeFile("doc.tldx", "v1");
         const changes: string[] = [];
         const handle = h.port.watch([path], {
           onChange: (p) => changes.push(p),
@@ -128,7 +128,7 @@ export function runWatchContract(
       // unified - if that ever changes, this test will need to as well.
       const h = await make();
       try {
-        const path = await h.writeFile("doc.tldsl", "v1");
+        const path = await h.writeFile("doc.tldx", "v1");
         const changes: string[] = [];
         const handle = h.port.watch([path], {
           onChange: (p) => changes.push(p),
@@ -148,7 +148,7 @@ export function runWatchContract(
     it("close() is idempotent", async () => {
       const h = await make();
       try {
-        const path = await h.writeFile("doc.tldsl", "v1");
+        const path = await h.writeFile("doc.tldx", "v1");
         const handle = h.port.watch([path], { onChange: () => undefined });
         await handle.close();
         await expect(handle.close()).resolves.toBeUndefined();
@@ -160,8 +160,8 @@ export function runWatchContract(
     it("watches every path in the initial set", async () => {
       const h = await make();
       try {
-        const a = await h.writeFile("a.tldsl", "v1");
-        const b = await h.writeFile("b.tldsl", "v1");
+        const a = await h.writeFile("a.tldx", "v1");
+        const b = await h.writeFile("b.tldx", "v1");
         const changes: string[] = [];
         const handle = h.port.watch([a, b], {
           onChange: (p) => changes.push(p),
@@ -182,8 +182,8 @@ export function runWatchContract(
     it("update() adds a path", async () => {
       const h = await make();
       try {
-        const a = await h.writeFile("a.tldsl", "v1");
-        const b = await h.writeFile("b.tldsl", "v1");
+        const a = await h.writeFile("a.tldx", "v1");
+        const b = await h.writeFile("b.tldx", "v1");
         const changes: string[] = [];
         const handle = h.port.watch([a], {
           onChange: (p) => changes.push(p),
@@ -203,8 +203,8 @@ export function runWatchContract(
     it("update() drops a path", async () => {
       const h = await make();
       try {
-        const a = await h.writeFile("a.tldsl", "v1");
-        const b = await h.writeFile("b.tldsl", "v1");
+        const a = await h.writeFile("a.tldx", "v1");
+        const b = await h.writeFile("b.tldx", "v1");
         const changes: string[] = [];
         const handle = h.port.watch([a, b], {
           onChange: (p) => changes.push(p),
@@ -228,7 +228,7 @@ export function runWatchContract(
     it("update() with an unchanged set delivers no event by itself", async () => {
       const h = await make();
       try {
-        const a = await h.writeFile("a.tldsl", "v1");
+        const a = await h.writeFile("a.tldx", "v1");
         const changes: string[] = [];
         const handle = h.port.watch([a], {
           onChange: (p) => changes.push(p),

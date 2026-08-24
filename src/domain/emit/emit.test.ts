@@ -323,7 +323,7 @@ describe("domain/emit", () => {
     expect((short.store["shape:n3"]?.props as Record<string, unknown>).growY).toBe(0);
   });
 
-  // C2 (tldsl-npd): the fake-geo branch for a non-sticky note is retired.
+  // C2 (tldx-npd): the fake-geo branch for a non-sticky note is retired.
   // Any note IR that reaches emit without `sticky: true` (impossible through
   // the public authoring surface now that <Note> is gone - only <Sticky>
   // produces `kind: "note"`) still emits as a real tldraw note, same as a
@@ -806,7 +806,7 @@ describe("domain/emit: arrow labels (T12)", () => {
 
 // -- helpers ------------------------------------------------------------------
 
-const SPAN = { file: "test.tldsl", line: 1, column: 1 };
+const SPAN = { file: "test.tldx", line: 1, column: 1 };
 
 function doc(children: IRElementPositioned[]): IRDocPositioned {
   return {

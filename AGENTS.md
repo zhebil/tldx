@@ -17,11 +17,11 @@ Other docs (`scene-json.md`, `lint-config.md`, `architecture.md`, `dsl.md`, `dec
 ```bash
 npm run check        # typecheck + lint + dep-lint + vitest (full automated suite)
 npm run build        # dist/cli/ (tsc) + dist/viewer/ (vite); ship-ready artifacts
-npm run dev:cli -- <args>   # run CLI from source via tsx, e.g. `-- serve fixtures/x.tldsl`
+npm run dev:cli -- <args>   # run CLI from source via tsx, e.g. `-- serve fixtures/x.tldx`
 node dist/cli/main.js <args>  # run the built CLI
 ```
 
-The CLI is wired as `bin.tldsl → dist/cli/main.js` (with shebang). After `npm link`, `tldsl serve <file>` and `tldsl check <file>` work like an installed binary.
+The CLI is wired as `bin.tldx → dist/cli/main.js` (with shebang). After `npm link`, `tldx serve <file>` and `tldx check <file>` work like an installed binary.
 
 `tsconfig.build.json` is the emit config (extends the root `tsconfig.json`, flips `noEmit`, narrows includes). Tests/fakes/contract suites and `src/viewer/` are excluded from the CLI build.
 

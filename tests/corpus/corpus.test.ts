@@ -1,6 +1,6 @@
 /**
  * Corpus-driven compile check for the Phase B layout bench (see
- * docs/plan.md). Every `*.tldsl.jsx` fixture in this directory
+ * docs/plan.md). Every `*.tldx.jsx` fixture in this directory
  * must compile clean through the real pipeline (esbuild/worker execute +
  * real ELK layout) - these diagrams are the fixed test bench a long-running
  * layout-tuning loop judges against, so this test only pins "still
@@ -23,7 +23,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 function discoverCorpusFixtures(): string[] {
   return readdirSync(HERE)
-    .filter((name) => name.endsWith(".tldsl.jsx"))
+    .filter((name) => name.endsWith(".tldx.jsx"))
     .sort();
 }
 

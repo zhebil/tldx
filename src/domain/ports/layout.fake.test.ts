@@ -123,5 +123,5 @@ describe("StubLayout: deterministic policy", () => {
 });
 
 function span() {
-  return { file: "test.tldsl", line: 1, column: 1 };
+  return { file: "test.tldx", line: 1, column: 1 };
 }

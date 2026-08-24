@@ -1,8 +1,8 @@
 /**
- * `runAbsorb` never grows the overlay's entry set (tldsl-mid) - every id
+ * `runAbsorb` never grows the overlay's entry set (tldx-mid) - every id
  * left in the overlay after a run was already a key in the overlay it
  * started from. Uses fakes throughout: an entry that resolves as
- * "already satisfied" (tldsl-d3o's move ladder, no source edit needed) is
+ * "already satisfied" (tldx-d3o's move ladder, no source edit needed) is
  * the cheapest way to reach `runAbsorb`'s "absorbed" branch without
  * exercising the codegen/recompile text-splicing machinery, which needs a
  * real JSX executor to round-trip generated source through `ExecutePort`.
@@ -20,7 +20,7 @@ import { compileFile } from "./compile-file.js";
 import { FakeExecute } from "./ports/execute.fake.js";
 import { InMemoryFs } from "./ports/fs.fake.js";
 
-const PATH = "diagram.tldsl.jsx";
+const PATH = "diagram.tldx.jsx";
 const SRC = "export default function Diagram() { return null; }";
 
 describe("runAbsorb - entries never grow", () => {

@@ -32,7 +32,7 @@ export function runFsReadContract(
     it("reads UTF-8 content of an existing file", async () => {
       const h = await make();
       try {
-        const path = await h.writeFile("hello.tldsl", "<doc>\n  <box id=a/>\n</doc>\n");
+        const path = await h.writeFile("hello.tldx", "<doc>\n  <box id=a/>\n</doc>\n");
         expect(await h.port.read(path)).toBe("<doc>\n  <box id=a/>\n</doc>\n");
       } finally {
         await h.dispose();
@@ -42,7 +42,7 @@ export function runFsReadContract(
     it("preserves non-ASCII content round-trip", async () => {
       const h = await make();
       try {
-        const path = await h.writeFile("emoji.tldsl", "<note>café — naïve</note>");
+        const path = await h.writeFile("emoji.tldx", "<note>café — naïve</note>");
         expect(await h.port.read(path)).toBe("<note>café — naïve</note>");
       } finally {
         await h.dispose();
@@ -52,7 +52,7 @@ export function runFsReadContract(
     it("throws ENOENT when the file does not exist", async () => {
       const h = await make();
       try {
-        const missing = h.pathFor("nope.tldsl");
+        const missing = h.pathFor("nope.tldx");
         await expect(h.port.read(missing)).rejects.toMatchObject({
           code: "ENOENT",
         });
@@ -64,9 +64,9 @@ export function runFsReadContract(
     it("returns the latest content after the file is overwritten", async () => {
       const h = await make();
       try {
-        const path = await h.writeFile("doc.tldsl", "first");
+        const path = await h.writeFile("doc.tldx", "first");
         expect(await h.port.read(path)).toBe("first");
-        await h.writeFile("doc.tldsl", "second");
+        await h.writeFile("doc.tldx", "second");
         expect(await h.port.read(path)).toBe("second");
       } finally {
         await h.dispose();

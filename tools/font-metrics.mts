@@ -5,7 +5,7 @@
  *
  * `tools/text-metrics.mts` measures *labels a diagram already contains*;
  * this measures the *font itself*, which is what the layout engine's wrap
- * budget is built on. It starts `tldsl serve` (the only place tldraw's
+ * budget is built on. It starts `tldx serve` (the only place tldraw's
  * `--tl-font-*` CSS variables are defined - they live on `.tl-container`,
  * not on `document.body`, and measuring outside it silently resolves all
  * four fonts to Times), then renders each printable ASCII character 20 times
@@ -29,7 +29,7 @@ const SERVE_URL_RE = /on (https?:\/\/\S+)/;
 const SERVE_READY_TIMEOUT_MS = 20_000;
 
 /** Any diagram works - `serve` is only here to provide a page with tldraw's fonts loaded. */
-const PROBE_FILE = resolve(REPO_ROOT, "tests/corpus/hexagonal.tldsl.jsx");
+const PROBE_FILE = resolve(REPO_ROOT, "tests/corpus/hexagonal.tldx.jsx");
 
 interface Combo {
   glyphs: Record<string, number>;
@@ -109,7 +109,7 @@ function waitForServeUrl(child: ReturnType<typeof spawn>): Promise<string> {
   return new Promise((res, rej) => {
     let stderr = "";
     const timer = setTimeout(() => {
-      rej(new Error(`tldsl serve did not print a URL within ${SERVE_READY_TIMEOUT_MS}ms; stderr: ${stderr}`));
+      rej(new Error(`tldx serve did not print a URL within ${SERVE_READY_TIMEOUT_MS}ms; stderr: ${stderr}`));
     }, SERVE_READY_TIMEOUT_MS);
 
     child.stdout?.on("data", (chunk: Buffer) => {
@@ -124,7 +124,7 @@ function waitForServeUrl(child: ReturnType<typeof spawn>): Promise<string> {
     });
     child.on("exit", (code) => {
       clearTimeout(timer);
-      rej(new Error(`tldsl serve exited early (code ${code}); stderr: ${stderr}`));
+      rej(new Error(`tldx serve exited early (code ${code}); stderr: ${stderr}`));
     });
     child.on("error", rej);
   });

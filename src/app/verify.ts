@@ -1,7 +1,7 @@
 /**
  * `verify`: does this file's JSX source alone reproduce what the overlay
- * says the canvas looked like? Backs both `tldsl verify` (pass/fail) and
- * `tldsl overlay show` (a report) - docs/plan.md T26.
+ * says the canvas looked like? Backs both `tldx verify` (pass/fail) and
+ * `tldx overlay show` (a report) - docs/plan.md T26.
  *
  * For each overlay entry, apply *only that entry* to the freshly compiled
  * base scene and compare against the base: if nothing changes, the source

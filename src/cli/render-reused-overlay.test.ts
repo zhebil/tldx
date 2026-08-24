@@ -1,7 +1,7 @@
 /**
  * Pins the guarantee `render.ts`'s module docs describe for the *reuse*
- * branch specifically (tldsl-mid): a reused server legitimately has
- * `fsWrite` wired (it's a real, independently-started `tldsl serve`), but
+ * branch specifically (tldx-mid): a reused server legitimately has
+ * `fsWrite` wired (it's a real, independently-started `tldx serve`), but
  * `runRender` itself must never use that capability - the only thing it does
  * with a reused server is call `exportImage` against its URL.
  *
@@ -43,9 +43,9 @@ afterEach(() => {
 });
 
 function tempFile(content: string): string {
-  const dir = mkdtempSync(join(tmpdir(), "tldsl-render-reuse-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "tldx-render-reuse-test-"));
   dirs.push(dir);
-  const file = join(dir, "diagram.tldsl.jsx");
+  const file = join(dir, "diagram.tldx.jsx");
   writeFileSync(file, content);
   return file;
 }
@@ -61,7 +61,7 @@ function makeIo(): ServeIo & { stdout: string[]; stderr: string[] } {
   };
 }
 
-describe("runRender - reusing a serve that has fsWrite never writes an overlay (tldsl-mid)", () => {
+describe("runRender - reusing a serve that has fsWrite never writes an overlay (tldx-mid)", () => {
   it("leaves the overlay file absent after a successful --reuse-only render", async () => {
     const content = "export default function Diagram() { return null; }";
     const file = tempFile(content);
@@ -69,7 +69,7 @@ describe("runRender - reusing a serve that has fsWrite never writes an overlay (
     const deps: ServeDeps = {
       fs,
       // The reused server legitimately has this wired - it's a real,
-      // independently-started `tldsl serve`, not render's own boot.
+      // independently-started `tldx serve`, not render's own boot.
       fsWrite: fs,
       watch: new FakeWatch(),
       layout: new StubLayout(),

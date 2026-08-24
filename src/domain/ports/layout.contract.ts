@@ -1,7 +1,7 @@
 /**
  * Shared scenarios that every `LayoutPort` adapter must satisfy. The fake
  * (`layout.fake.ts`) and the real ELK adapter (`infra/layout-elk/`, tracked
- * in tldsl-gxl) both run this contract to guard against fake drift.
+ * in tldx-gxl) both run this contract to guard against fake drift.
  *
  * Per docs/testing.md: `runContract(make)` is invoked from the adapter's own
  * test file; the adapter supplies its constructor and (if needed) setup.
@@ -159,7 +159,7 @@ export function runContract(label: string, make: () => LayoutPort): void {
 }
 
 function span() {
-  return { file: "test.tldsl", line: 1, column: 1 };
+  return { file: "test.tldx", line: 1, column: 1 };
 }
 
 function rectsOf(

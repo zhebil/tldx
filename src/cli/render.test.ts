@@ -17,87 +17,87 @@ import type { ServeDeps, ServeIo } from "./serve.js";
 
 describe("parseArgs", () => {
   it("resolves positional file/out and defaults", () => {
-    const { file, out, opts } = parseArgs(["diagram.tldsl.jsx", "out.png"]);
-    expect(file).toBe(resolve(process.cwd(), "diagram.tldsl.jsx"));
+    const { file, out, opts } = parseArgs(["diagram.tldx.jsx", "out.png"]);
+    expect(file).toBe(resolve(process.cwd(), "diagram.tldx.jsx"));
     expect(out).toBe(resolve(process.cwd(), "out.png"));
     expect(opts).toEqual({ dark: false, background: true, format: "png" });
   });
 
   it("parses --frame", () => {
-    const { opts } = parseArgs(["a.tldsl.jsx", "out.png", "--frame", "checkout"]);
+    const { opts } = parseArgs(["a.tldx.jsx", "out.png", "--frame", "checkout"]);
     expect(opts.frame).toBe("checkout");
   });
 
   it("parses --shapes as a comma-separated, trimmed list", () => {
-    const { opts } = parseArgs(["a.tldsl.jsx", "out.png", "--shapes", "a, b ,c"]);
+    const { opts } = parseArgs(["a.tldx.jsx", "out.png", "--shapes", "a, b ,c"]);
     expect(opts.shapes).toEqual(["a", "b", "c"]);
   });
 
   it("parses --padding and --scale as numbers", () => {
-    const { opts } = parseArgs(["a.tldsl.jsx", "out.png", "--padding", "10", "--scale", "2"]);
+    const { opts } = parseArgs(["a.tldx.jsx", "out.png", "--padding", "10", "--scale", "2"]);
     expect(opts.padding).toBe(10);
     expect(opts.scale).toBe(2);
   });
 
   it("parses --dark and --no-background", () => {
-    const { opts } = parseArgs(["a.tldsl.jsx", "out.png", "--dark", "--no-background"]);
+    const { opts } = parseArgs(["a.tldx.jsx", "out.png", "--dark", "--no-background"]);
     expect(opts.dark).toBe(true);
     expect(opts.background).toBe(false);
   });
 
   it("infers format from the out extension", () => {
-    expect(parseArgs(["a.tldsl.jsx", "out.svg"]).opts.format).toBe("svg");
-    expect(parseArgs(["a.tldsl.jsx", "out.jpeg"]).opts.format).toBe("jpeg");
-    expect(parseArgs(["a.tldsl.jsx", "out.webp"]).opts.format).toBe("webp");
+    expect(parseArgs(["a.tldx.jsx", "out.svg"]).opts.format).toBe("svg");
+    expect(parseArgs(["a.tldx.jsx", "out.jpeg"]).opts.format).toBe("jpeg");
+    expect(parseArgs(["a.tldx.jsx", "out.webp"]).opts.format).toBe("webp");
   });
 
   it("defaults to png for an unrecognized extension", () => {
-    expect(parseArgs(["a.tldsl.jsx", "out.bmp"]).opts.format).toBe("png");
+    expect(parseArgs(["a.tldx.jsx", "out.bmp"]).opts.format).toBe("png");
   });
 
   it("--format overrides the inferred extension", () => {
-    const { opts } = parseArgs(["a.tldsl.jsx", "out.png", "--format", "svg"]);
+    const { opts } = parseArgs(["a.tldx.jsx", "out.png", "--format", "svg"]);
     expect(opts.format).toBe("svg");
   });
 
   it("rejects an unknown --format value", () => {
-    expect(() => parseArgs(["a.tldsl.jsx", "out.png", "--format", "gif"])).toThrow(/--format must be one of/);
+    expect(() => parseArgs(["a.tldx.jsx", "out.png", "--format", "gif"])).toThrow(/--format must be one of/);
   });
 
   it("rejects --frame and --shapes together", () => {
     expect(() =>
-      parseArgs(["a.tldsl.jsx", "out.png", "--frame", "f1", "--shapes", "a,b"]),
+      parseArgs(["a.tldx.jsx", "out.png", "--frame", "f1", "--shapes", "a,b"]),
     ).toThrow(/mutually exclusive/);
   });
 
   it("parses --reuse-only", () => {
-    const { reuseOnly } = parseArgs(["a.tldsl.jsx", "out.png", "--reuse-only"]);
+    const { reuseOnly } = parseArgs(["a.tldx.jsx", "out.png", "--reuse-only"]);
     expect(reuseOnly).toBe(true);
   });
 
   it("defaults --reuse-only to false", () => {
-    const { reuseOnly } = parseArgs(["a.tldsl.jsx", "out.png"]);
+    const { reuseOnly } = parseArgs(["a.tldx.jsx", "out.png"]);
     expect(reuseOnly).toBe(false);
   });
 
   it("throws when the file positional is missing", () => {
-    expect(() => parseArgs([])).toThrow(/usage: tldsl render/);
+    expect(() => parseArgs([])).toThrow(/usage: tldx render/);
   });
 
   it("throws when the out positional is missing", () => {
-    expect(() => parseArgs(["a.tldsl.jsx"])).toThrow(/usage: tldsl render/);
+    expect(() => parseArgs(["a.tldx.jsx"])).toThrow(/usage: tldx render/);
   });
 });
 
 describe("describeReused", () => {
-  it("formats as :port (file @ hash) - tldsl-usr's exact acceptance format", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://127.0.0.1:60278/", file: "board.tldsl.jsx", hash: "a848f56a" };
-    expect(describeReused("/some/dir/board.tldsl.jsx", reused)).toBe(":60278 (board.tldsl.jsx @ a848f56a)");
+  it("formats as :port (file @ hash) - tldx-usr's exact acceptance format", () => {
+    const reused: ServeRecord = { pid: 1, url: "http://127.0.0.1:60278/", file: "board.tldx.jsx", hash: "a848f56a" };
+    expect(describeReused("/some/dir/board.tldx.jsx", reused)).toBe(":60278 (board.tldx.jsx @ a848f56a)");
   });
 
   it("omits the hash when the registry record predates compile tracking", () => {
-    const reused: ServeRecord = { pid: 1, url: "http://127.0.0.1:60278/", file: "board.tldsl.jsx" };
-    expect(describeReused("/some/dir/board.tldsl.jsx", reused)).toBe(":60278 (board.tldsl.jsx)");
+    const reused: ServeRecord = { pid: 1, url: "http://127.0.0.1:60278/", file: "board.tldx.jsx" };
+    expect(describeReused("/some/dir/board.tldx.jsx", reused)).toBe(":60278 (board.tldx.jsx)");
   });
 });
 
@@ -118,7 +118,7 @@ describe("isStale", () => {
   });
 });
 
-describe("isCodeStale (tldsl-rab)", () => {
+describe("isCodeStale (tldx-rab)", () => {
   it("is stale when the current code fingerprint is newer than the reused server's boot fingerprint", () => {
     const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", codeFingerprint: 1000 };
     expect(isCodeStale(2000, reused)).toBe(true);
@@ -136,7 +136,7 @@ describe("isCodeStale (tldsl-rab)", () => {
   });
 });
 
-describe("staleReason (tldsl-rab)", () => {
+describe("staleReason (tldx-rab)", () => {
   it("is undefined when neither source nor code has changed", () => {
     const reused: ServeRecord = { pid: 1, url: "http://x", file: "f", hash: "aaaaaaaa", codeFingerprint: 1000 };
     expect(staleReason("aaaaaaaa", 1000, reused)).toBeUndefined();
@@ -200,9 +200,9 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
   });
 
   function tempFile(content: string): string {
-    const dir = mkdtempSync(join(tmpdir(), "tldsl-render-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "tldx-render-test-"));
     dirs.push(dir);
-    const file = join(dir, "diagram.tldsl.jsx");
+    const file = join(dir, "diagram.tldx.jsx");
     writeFileSync(file, content);
     return file;
   }
@@ -240,7 +240,7 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
     const code = await runRender({ argv: [file, `${file}.png`, "--reuse-only"], deps: makeDeps(file, content), io });
 
     expect(code).toBe(1);
-    expect(io.stderr.join("")).toMatch(/no running `tldsl serve`/);
+    expect(io.stderr.join("")).toMatch(/no running `tldx serve`/);
   });
 
   it("refuses with a stale message (not the generic 'no running serve' one) when the registered server predates the current source", async () => {
@@ -260,13 +260,13 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
       const stderr = io.stderr.join("");
       expect(stderr).toMatch(/is stale/);
       expect(stderr).toMatch(/--reuse-only/);
-      expect(stderr).not.toMatch(/no running `tldsl serve`/);
+      expect(stderr).not.toMatch(/no running `tldx serve`/);
     } finally {
       forget();
     }
   });
 
-  it("refuses with a stale message when the registered server's code fingerprint predates the current tree, even though the source hash matches (tldsl-rab)", async () => {
+  it("refuses with a stale message when the registered server's code fingerprint predates the current tree, even though the source hash matches (tldx-rab)", async () => {
     const content = "export default function Diagram() { return null; }";
     const file = tempFile(content);
     // codeFingerprint: 0 is older than any real file's mtime in this
@@ -312,8 +312,8 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
       expect(code).toBe(1);
       const stderr = io.stderr.join("");
       expect(stderr).not.toMatch(/is stale/);
-      expect(stderr).not.toMatch(/no running `tldsl serve`/);
-      expect(io.stdout.join("")).toMatch(/reusing serve on :9999 \(diagram\.tldsl\.jsx @ /);
+      expect(stderr).not.toMatch(/no running `tldx serve`/);
+      expect(io.stdout.join("")).toMatch(/reusing serve on :9999 \(diagram\.tldx\.jsx @ /);
     } finally {
       forget();
     }

@@ -12,7 +12,7 @@ import { InMemoryFs } from "./ports/fs.fake.js";
 import { InMemoryTransport } from "./ports/transport.fake.js";
 import { watchAndServe, type WatchAndServeDeps } from "./watch-and-serve.js";
 
-const AUTH_PATH = "auth.tldsl.jsx";
+const AUTH_PATH = "auth.tldx.jsx";
 const VALID_SRC = "valid-source";
 const ANOTHER_VALID_SRC = "another-valid-source";
 const COMPILE_BROKEN_SRC = "compile-broken-source";
@@ -218,7 +218,7 @@ describe("watchAndServe", () => {
     expect(transport.pushed).toHaveLength(1);
   });
 
-  describe("putOverlay merge (tldsl-j3q)", () => {
+  describe("putOverlay merge (tldx-j3q)", () => {
     const SRC_WITH_DASH = "src-with-dash";
     const SRC_DASH_REMOVED = "src-dash-removed";
     const AST_WITH_DASH = doc({ id: "auth" }, [
@@ -244,7 +244,7 @@ describe("watchAndServe", () => {
         layout: new StubLayout(),
         execute,
       };
-      const overlayPath = "auth.tldsl.overlay.json";
+      const overlayPath = "auth.tldx.overlay.json";
 
       const handle = watchAndServe(AUTH_PATH, deps);
       await handle.ready;
@@ -299,7 +299,7 @@ describe("watchAndServe", () => {
     });
   });
 
-  describe("putOverlay clears a stale entry (tldsl-z2j)", () => {
+  describe("putOverlay clears a stale entry (tldx-z2j)", () => {
     it("drops an entry when the snapshot's record matches the compiled base again", async () => {
       const execute = new FakeExecute();
       execute.setResult(VALID_SRC, { ast: VALID_AST, inputs: [AUTH_PATH] });
@@ -316,7 +316,7 @@ describe("watchAndServe", () => {
         layout: new StubLayout(),
         execute,
       };
-      const overlayPath = "auth.tldsl.overlay.json";
+      const overlayPath = "auth.tldx.overlay.json";
 
       const handle = watchAndServe(AUTH_PATH, deps);
       await handle.ready;
@@ -354,7 +354,7 @@ describe("watchAndServe", () => {
   });
 
   describe("module graph re-subscription", () => {
-    const ENTRY = "a.tldsl.jsx";
+    const ENTRY = "a.tldx.jsx";
     const SRC_OK = "ok-source";
     const SRC_BROKEN = "broken-source";
 
@@ -363,7 +363,7 @@ describe("watchAndServe", () => {
       const execute = new FakeExecute();
       execute.setResult(SRC_OK, {
         ast: entryDoc({}, [entryBox({ id: "b" })]),
-        inputs: [ENTRY, "parts.tldsl.jsx"],
+        inputs: [ENTRY, "parts.tldx.jsx"],
       });
       return execute;
     }
@@ -384,10 +384,10 @@ describe("watchAndServe", () => {
       const handle = watchAndServe(ENTRY, deps);
       await handle.ready;
 
-      expect(watch.activeSubscribers("parts.tldsl.jsx")).toBe(1);
+      expect(watch.activeSubscribers("parts.tldx.jsx")).toBe(1);
       expect(transport.pushed).toHaveLength(1);
 
-      watch.emitChange("parts.tldsl.jsx");
+      watch.emitChange("parts.tldx.jsx");
       await handle.idle();
 
       expect(transport.pushed).toHaveLength(2);
@@ -417,7 +417,7 @@ describe("watchAndServe", () => {
 
       const handle = watchAndServe(ENTRY, deps);
       await handle.ready;
-      expect(watch.activeSubscribers("parts.tldsl.jsx")).toBe(1);
+      expect(watch.activeSubscribers("parts.tldx.jsx")).toBe(1);
 
       fs.setFile(ENTRY, SRC_BROKEN);
       watch.emitChange(ENTRY);
@@ -425,9 +425,9 @@ describe("watchAndServe", () => {
 
       expect(transport.pushed).toHaveLength(2);
       expect(transport.pushed[1]!.kind).toBe("error");
-      expect(watch.activeSubscribers("parts.tldsl.jsx")).toBe(1);
+      expect(watch.activeSubscribers("parts.tldx.jsx")).toBe(1);
 
-      watch.emitChange("parts.tldsl.jsx");
+      watch.emitChange("parts.tldx.jsx");
       await handle.idle();
       expect(transport.pushed).toHaveLength(3);
 

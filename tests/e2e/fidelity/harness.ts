@@ -1,6 +1,6 @@
 /**
  * Fidelity harness (docs/plan.md T21): compile a fixture through a real
- * `tldsl serve`, PUT a mutated snapshot over `/overlay` the way a browser
+ * `tldx serve`, PUT a mutated snapshot over `/overlay` the way a browser
  * would, reload (a fresh SSE connection), and check that both the served
  * scene and a direct `applyOverlay` call reproduce the mutation exactly.
  *
@@ -122,10 +122,10 @@ export async function checkFidelity(
   let bundleDir: string | undefined;
 
   try {
-    workDir = await mkdtemp(join(tmpdir(), "tldsl-fidelity-"));
-    bundleDir = await mkdtemp(join(tmpdir(), "tldsl-fidelity-bundle-"));
+    workDir = await mkdtemp(join(tmpdir(), "tldx-fidelity-"));
+    bundleDir = await mkdtemp(join(tmpdir(), "tldx-fidelity-bundle-"));
     // Recursive, not a single-file copy: some corpus fixtures (e.g.
-    // c4-context.tldsl.jsx) import a sibling module (./lib/c4.jsx), which
+    // c4-context.tldx.jsx) import a sibling module (./lib/c4.jsx), which
     // esbuild resolves against the entry's real directory.
     await cp(dirname(fixturePath), workDir, { recursive: true });
     const filePath = join(workDir, name);

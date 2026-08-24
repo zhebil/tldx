@@ -1,15 +1,15 @@
 /**
  * `mergeOverlayEntries`: guards the overlay write-back path against
- * silently losing entries a human created (tldsl-j3q), while still letting
+ * silently losing entries a human created (tldx-j3q), while still letting
  * a canvas edit that undoes an entry back to its source value remove it
- * (tldsl-z2j half 2).
+ * (tldx-z2j half 2).
  *
  * `diffScenes` only knows the two scenes it is given, so an id whose
  * current record equals its base record is absent from the diff either way
  * - there is no way to tell "the browser doesn't have this shape anymore"
- * (a source edit invalidated the id - tldsl-j3q) apart from "the browser
+ * (a source edit invalidated the id - tldx-j3q) apart from "the browser
  * has this shape and it now matches base again" (the user undid the edit -
- * tldsl-z2j) from the diff alone. `snapshotIds` (every id in the browser's
+ * tldx-z2j) from the diff alone. `snapshotIds` (every id in the browser's
  * current scene) is what makes the two distinguishable: an id absent from
  * `fresh` is only preserved when it is *also* absent from `snapshotIds`.
  *

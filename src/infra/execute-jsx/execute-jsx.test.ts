@@ -13,7 +13,7 @@ import {
 import { createJsxExecute } from "./execute-jsx.js";
 
 function okSource(boxId: string): string {
-  return `import { Doc, Box } from "tldsl";
+  return `import { Doc, Box } from "tldx";
 export default function Diagram() {
   return <Doc><Box id="${boxId}" label="${boxId}"/></Doc>;
 }
@@ -22,7 +22,7 @@ export default function Diagram() {
 
 // Line 3 is asserted directly by the "thrown error line" test below - keep
 // the throw on that exact line if this template changes.
-const THROWING_SOURCE = `import { Doc, Box } from "tldsl";
+const THROWING_SOURCE = `import { Doc, Box } from "tldx";
 export default function Diagram() {
   throw new Error("boom");
 }
@@ -34,7 +34,7 @@ const INFINITE_SOURCE = `export default function Diagram() {
 `;
 
 // Mismatched JSX tag - fails to build, never reaches the worker.
-const COMPILE_ERROR_SOURCE = `import { Doc, Box } from "tldsl";
+const COMPILE_ERROR_SOURCE = `import { Doc, Box } from "tldx";
 export default function Diagram() {
   return <Doc><Box id="a" label="a" </Doc>;
 }
@@ -43,8 +43,8 @@ export default function Diagram() {
 runExecuteContract(
   "createJsxExecute",
   async (): Promise<ExecuteHarness> => {
-    const dir = await mkdtemp(join(tmpdir(), "tldsl-execute-jsx-"));
-    const path = join(dir, "diagram.tldsl.jsx");
+    const dir = await mkdtemp(join(tmpdir(), "tldx-execute-jsx-"));
+    const path = join(dir, "diagram.tldx.jsx");
     const port = createJsxExecute();
     return {
       port,
@@ -78,20 +78,20 @@ describe("createJsxExecute: adapter-specific behavior", () => {
   it(
     "inputs includes transitively-imported files",
     async () => {
-      const dir = await mkdtemp(join(tmpdir(), "tldsl-execute-jsx-transitive-"));
+      const dir = await mkdtemp(join(tmpdir(), "tldx-execute-jsx-transitive-"));
       try {
-        const path = join(dir, "diagram.tldsl.jsx");
+        const path = join(dir, "diagram.tldx.jsx");
         const partsPath = join(dir, "parts.jsx");
         await writeFile(
           partsPath,
-          `import { Box } from "tldsl";
+          `import { Box } from "tldx";
 export function Part({ id }) {
   return <Box id={id} label={id} />;
 }
 `,
           "utf8",
         );
-        const source = `import { Doc } from "tldsl";
+        const source = `import { Doc } from "tldx";
 import { Part } from "./parts.jsx";
 export default function Diagram() {
   return <Doc><Part id="p" /></Doc>;
@@ -114,9 +114,9 @@ export default function Diagram() {
   it(
     "runtime/compile diagnostic's span points at the entry file",
     async () => {
-      const dir = await mkdtemp(join(tmpdir(), "tldsl-execute-jsx-compile-"));
+      const dir = await mkdtemp(join(tmpdir(), "tldx-execute-jsx-compile-"));
       try {
-        const path = join(dir, "diagram.tldsl.jsx");
+        const path = join(dir, "diagram.tldx.jsx");
         const result = await createJsxExecute().execute(COMPILE_ERROR_SOURCE, path);
         if (!("diagnostics" in result)) throw new Error("expected diagnostics result");
         const compileError = result.diagnostics.find((d) => d.code === "runtime/compile");
@@ -131,9 +131,9 @@ export default function Diagram() {
   it(
     "accepts a relative entry path and reports absolute spans",
     async () => {
-      const dir = await mkdtemp(join(process.cwd(), "tldsl-execute-jsx-relative-"));
+      const dir = await mkdtemp(join(process.cwd(), "tldx-execute-jsx-relative-"));
       try {
-        const path = join(dir, "diagram.tldsl.jsx");
+        const path = join(dir, "diagram.tldx.jsx");
         const relPath = relative(process.cwd(), path);
         expect(isAbsolute(relPath)).toBe(false);
 
@@ -155,9 +155,9 @@ export default function Diagram() {
   it(
     "runtime/threw diagnostic's span.line is the actual throw line",
     async () => {
-      const dir = await mkdtemp(join(tmpdir(), "tldsl-execute-jsx-throw-line-"));
+      const dir = await mkdtemp(join(tmpdir(), "tldx-execute-jsx-throw-line-"));
       try {
-        const path = join(dir, "diagram.tldsl.jsx");
+        const path = join(dir, "diagram.tldx.jsx");
         const port = createJsxExecute();
         const result = await port.execute(THROWING_SOURCE, path);
         expect("diagnostics" in result).toBe(true);
@@ -179,7 +179,7 @@ export default function Diagram() {
       // path when building the sourcemap's `sources`; on macOS `tmpdir()`
       // sits under a `/var` -> `/private/var` symlink, so the temp dir is
       // realpath'd up front to keep every path comparison below exact.
-      const dir = await realpath(await mkdtemp(join(tmpdir(), "tldsl-execute-jsx-imported-throw-")));
+      const dir = await realpath(await mkdtemp(join(tmpdir(), "tldx-execute-jsx-imported-throw-")));
       try {
         const libDir = join(dir, "lib");
         await mkdir(libDir);
@@ -188,7 +188,7 @@ export default function Diagram() {
         // line if this template changes.
         await writeFile(
           brokenPath,
-          `import { Box } from "tldsl";
+          `import { Box } from "tldx";
 
 export function Safe({ id, label }) {
   return <Box id={id} label={label} />;
@@ -200,10 +200,10 @@ export function Broken() {
 `,
           "utf8",
         );
-        const path = join(dir, "diagram.tldsl.jsx");
+        const path = join(dir, "diagram.tldx.jsx");
         const port = createJsxExecute();
 
-        const okDiagramSource = `import { Doc } from "tldsl";
+        const okDiagramSource = `import { Doc } from "tldx";
 import { Safe } from "./lib/broken.jsx";
 export default function Diagram() {
   return <Doc><Safe id="w" label="w" /></Doc>;
@@ -214,7 +214,7 @@ export default function Diagram() {
         expect(ok.inputs).toContain(path);
         expect(ok.inputs).toContain(brokenPath);
 
-        const throwingDiagramSource = `import { Doc } from "tldsl";
+        const throwingDiagramSource = `import { Doc } from "tldx";
 import { Broken } from "./lib/broken.jsx";
 export default function Diagram() {
   return <Doc><Broken /></Doc>;

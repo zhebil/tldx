@@ -1,6 +1,6 @@
 /**
  * `planMoveCandidates`: the escalation ladder for a `moved` overlay entry
- * (`docs/round-trip-scope.md` §2, §7 F4.4; `bd show tldsl-d3o`).
+ * (`docs/round-trip-scope.md` §2, §7 F4.4; `bd show tldx-d3o`).
  *
  * Cheapest rung first, returned as an ordered list of candidates for
  * `app/absorb.ts` to try in order (write, recompile, compare to the target

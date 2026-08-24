@@ -1,5 +1,5 @@
 /**
- * E2E for `tldsl absorb` (docs/plan.md T22, docs/round-trip.md D3/D5).
+ * E2E for `tldx absorb` (docs/plan.md T22, docs/round-trip.md D3/D5).
  *
  * The acceptance criterion, verbatim from docs/plan.md: the canvas-first
  * case works end to end - a stub `<Doc/>` plus an overlay of hand-added
@@ -33,7 +33,7 @@ import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
 import { checkFidelity } from "./fidelity/harness.js";
 
 const STUB_SOURCE = [
-  'import { Doc } from "tldsl";',
+  'import { Doc } from "tldx";',
   "",
   "export default function Diagram() {",
   "  return <Doc/>;",
@@ -48,7 +48,7 @@ afterEach(async () => {
 });
 
 async function makeWorkDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "tldsl-absorb-"));
+  const dir = await mkdtemp(join(tmpdir(), "tldx-absorb-"));
   workDirs.push(dir);
   return dir;
 }
@@ -95,10 +95,10 @@ async function writeOverlay(deps: AbsorbDeps, path: string, overlay: Overlay): P
   await deps.fsWrite.write(overlayPathFor(path), `${JSON.stringify(overlay, null, 2)}\n`);
 }
 
-describe("e2e: tldsl absorb - canvas-first case (T22 acceptance criterion)", () => {
+describe("e2e: tldx absorb - canvas-first case (T22 acceptance criterion)", () => {
   it("a stub <Doc/> plus an overlay of added shapes absorbs into JSX that compiles to the same scene, on its own and with an empty overlay", async () => {
     const dir = await makeWorkDir();
-    const path = join(dir, "diagram.tldsl.jsx");
+    const path = join(dir, "diagram.tldx.jsx");
     const deps = makeDeps();
     await deps.fsWrite.write(path, STUB_SOURCE);
 
@@ -138,7 +138,7 @@ describe("e2e: tldsl absorb - canvas-first case (T22 acceptance criterion)", () 
 
   it("absorbs what it can express and leaves the rest in the overlay (residual moved/added-arrow entries)", async () => {
     const dir = await makeWorkDir();
-    const path = join(dir, "diagram.tldsl.jsx");
+    const path = join(dir, "diagram.tldx.jsx");
     const deps = makeDeps();
     await deps.fsWrite.write(path, STUB_SOURCE);
 
@@ -175,7 +175,7 @@ describe("e2e: tldsl absorb - canvas-first case (T22 acceptance criterion)", () 
 
   it("refuses (exit 1) and leaves source + overlay byte-identical when the rewrite can't verifiably reproduce the render", async () => {
     const dir = await makeWorkDir();
-    const path = join(dir, "diagram.tldsl.jsx");
+    const path = join(dir, "diagram.tldx.jsx");
     const deps = makeDeps();
     await deps.fsWrite.write(path, STUB_SOURCE);
 
@@ -210,15 +210,15 @@ describe("e2e: tldsl absorb - canvas-first case (T22 acceptance criterion)", () 
 });
 
 /**
- * E2E for the move ladder (tldsl-d3o, docs/round-trip-scope.md §2, §7 F4.4).
+ * E2E for the move ladder (tldx-d3o, docs/round-trip-scope.md §2, §7 F4.4).
  * Each test builds the *ground truth* by compiling a second, already-edited
  * source (reordered children / a wider gap) and reads the dragged shape's
  * real coordinates back off that compile - so the overlay entry under test
  * is exactly what a real drag would produce, not a hand-guessed number.
  */
-describe("e2e: tldsl absorb - move ladder (tldsl-d3o)", () => {
+describe("e2e: tldx absorb - move ladder (tldx-d3o)", () => {
   const ROW_SOURCE = [
-    'import { Doc, Box } from "tldsl";',
+    'import { Doc, Box } from "tldx";',
     "",
     "export default function Diagram() {",
     "  return (",
@@ -233,7 +233,7 @@ describe("e2e: tldsl absorb - move ladder (tldsl-d3o)", () => {
   ].join("\n");
 
   const REORDERED_SOURCE = [
-    'import { Doc, Box } from "tldsl";',
+    'import { Doc, Box } from "tldx";',
     "",
     "export default function Diagram() {",
     "  return (",
@@ -269,14 +269,14 @@ describe("e2e: tldsl absorb - move ladder (tldsl-d3o)", () => {
     // entries, one per shape, all pointing at where a `(c, a, b)` reorder
     // would put them.
     const dir = await makeWorkDir();
-    const path = join(dir, "diagram.tldsl.jsx");
+    const path = join(dir, "diagram.tldx.jsx");
     const deps = makeDeps();
     await deps.fsWrite.write(path, ROW_SOURCE);
 
     const base = (await compileFile(path, compileFileDeps(deps))).sceneJson;
     if (base === null) throw new Error("row fixture failed to compile");
 
-    const reorderedPath = join(dir, "reordered.tldsl.jsx");
+    const reorderedPath = join(dir, "reordered.tldx.jsx");
     await deps.fsWrite.write(reorderedPath, REORDERED_SOURCE);
     const reordered = (await compileFile(reorderedPath, compileFileDeps(deps))).sceneJson;
     if (reordered === null) throw new Error("reordered ground-truth fixture failed to compile");
@@ -312,10 +312,10 @@ describe("e2e: tldsl absorb - move ladder (tldsl-d3o)", () => {
 
   it("absorbs dragging the last child further away as a wider gap", async () => {
     const dir = await makeWorkDir();
-    const path = join(dir, "diagram.tldsl.jsx");
+    const path = join(dir, "diagram.tldx.jsx");
     const deps = makeDeps();
     const source = [
-      'import { Doc, Box } from "tldsl";',
+      'import { Doc, Box } from "tldx";',
       "",
       "export default function Diagram() {",
       "  return (",
@@ -356,7 +356,7 @@ describe("e2e: tldsl absorb - move ladder (tldsl-d3o)", () => {
 
   it("leaves an unreproducible drag in the overlay and says which shape and why", async () => {
     const dir = await makeWorkDir();
-    const path = join(dir, "diagram.tldsl.jsx");
+    const path = join(dir, "diagram.tldx.jsx");
     const deps = makeDeps();
     await deps.fsWrite.write(path, ROW_SOURCE);
 

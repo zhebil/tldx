@@ -1,6 +1,6 @@
 /**
  * Fidelity harness (docs/plan.md T21) run over the whole corpus: compile a
- * fixture through a real `tldsl serve`, PUT a mutated snapshot, reload, and
+ * fixture through a real `tldx serve`, PUT a mutated snapshot, reload, and
  * check the served scene and `applyOverlay`'s own output both reproduce the
  * mutation exactly. Supersedes `tests/e2e/overlay-corpus.test.ts` (same
  * mutation generator, plus real disk serialization and a real serve
@@ -21,7 +21,7 @@ const CORPUS_DIR = join(HERE, "..", "corpus");
 
 function discoverCorpusFixtures(): string[] {
   return readdirSync(CORPUS_DIR)
-    .filter((name) => name.endsWith(".tldsl.jsx"))
+    .filter((name) => name.endsWith(".tldx.jsx"))
     .sort();
 }
 

@@ -12,25 +12,25 @@ describe("formatDiagnostics", () => {
   it("formats an error with span as <file>:<line>:<col>: error[<code>]: <message>", () => {
     const out = formatDiagnostics([
       error("parser/unexpected-token", "expected '>'", {
-        file: "auth.tldsl",
+        file: "auth.tldx",
         line: 3,
         column: 7,
       }),
     ]);
     expect(out).toBe(
-      "auth.tldsl:3:7: error[parser/unexpected-token]: expected '>'",
+      "auth.tldx:3:7: error[parser/unexpected-token]: expected '>'",
     );
   });
 
   it("formats a warning with span using the warning prefix", () => {
     const out = formatDiagnostics([
       warning("layout/overlap", "two boxes overlap", {
-        file: "auth.tldsl",
+        file: "auth.tldx",
         line: 5,
         column: 1,
       }),
     ]);
-    expect(out).toBe("auth.tldsl:5:1: warning[layout/overlap]: two boxes overlap");
+    expect(out).toBe("auth.tldx:5:1: warning[layout/overlap]: two boxes overlap");
   });
 
   it("omits the location prefix when no span is given", () => {
@@ -41,19 +41,19 @@ describe("formatDiagnostics", () => {
   it("joins multiple diagnostics with newlines and no trailing newline", () => {
     const out = formatDiagnostics([
       error("parser/unexpected-token", "expected '>'", {
-        file: "a.tldsl",
+        file: "a.tldx",
         line: 1,
         column: 1,
       }),
       warning("layout/overlap", "two boxes overlap", {
-        file: "a.tldsl",
+        file: "a.tldx",
         line: 2,
         column: 1,
       }),
     ]);
     expect(out).toBe(
-      "a.tldsl:1:1: error[parser/unexpected-token]: expected '>'\n" +
-        "a.tldsl:2:1: warning[layout/overlap]: two boxes overlap",
+      "a.tldx:1:1: error[parser/unexpected-token]: expected '>'\n" +
+        "a.tldx:2:1: warning[layout/overlap]: two boxes overlap",
     );
     expect(out.endsWith("\n")).toBe(false);
   });

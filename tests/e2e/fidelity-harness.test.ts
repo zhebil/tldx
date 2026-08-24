@@ -23,7 +23,7 @@ const CORPUS_DIR = join(HERE, "..", "corpus");
 // Large enough (frame nesting, bindings, multiple labellable/colorable
 // shapes) that all seven mutations below bite - verified by running this
 // file.
-const FIXTURE = join(CORPUS_DIR, "checkout-services.tldsl.jsx");
+const FIXTURE = join(CORPUS_DIR, "checkout-services.tldx.jsx");
 
 function stripField<K extends keyof OverlayEntry>(overlay: Overlay, field: K): Overlay {
   const entries: Record<string, OverlayEntry> = {};

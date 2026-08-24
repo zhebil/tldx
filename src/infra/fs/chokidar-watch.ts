@@ -12,7 +12,7 @@
  *
  * `awaitWriteFinish` is left off for MVP: editor saves on dev workflows are
  * atomic enough that the extra latency is not worth it. Debounce belongs in
- * the use case layer when `tldsl-2lu` lands a clock port.
+ * the use case layer when `tldx-2lu` lands a clock port.
  */
 
 import { watch as chokidarWatch, type FSWatcher } from "chokidar";

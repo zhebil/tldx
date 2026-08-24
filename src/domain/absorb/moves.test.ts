@@ -11,7 +11,7 @@ import type {
 
 import { planMoveCandidates } from "./moves.js";
 
-const FILE = "test.tldsl.jsx";
+const FILE = "test.tldx.jsx";
 
 function span(line: number) {
   return { file: FILE, line, column: 7 };

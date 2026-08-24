@@ -1,5 +1,5 @@
 /**
- * Dev HTTP server for `tldsl serve`. Owns the HTTP listener that hosts both
+ * Dev HTTP server for `tldx serve`. Owns the HTTP listener that hosts both
  * the static viewer bundle and the SSE endpoint at `/events` fed by the
  * passed `TransportPort`. Per CONTEXT.md there is intentionally no
  * `DevServerPort` - one impl, no test variation. The CLI composes this
@@ -76,15 +76,15 @@ export interface StartDevServerOptions {
    * Handler for `PUT /overlay` - the viewer's canvas-edit round-trip
    * (docs/round-trip.md D4: "the viewer writes the overlay over a plain
    * `PUT /overlay`, not a websocket"). Omit to 404 the route entirely
-   * (e.g. `tldsl check` never boots a dev server that needs this).
+   * (e.g. `tldx check` never boots a dev server that needs this).
    */
   onOverlayPut?: (snapshot: SceneJSON) => Promise<void>;
   /**
    * Called once per incoming request, before routing - page loads, static
    * assets, `PUT /overlay`, `/events` SSE connects, and `/heartbeat` pings
-   * all go through here. Feeds `tldsl-kts`'s idle-TTL reaper (`cli/serve.ts`):
+   * all go through here. Feeds `tldx-kts`'s idle-TTL reaper (`cli/serve.ts`):
    * "any HTTP request" is one of the activity kinds that defers server
-   * exit. Omit to skip activity tracking entirely (e.g. `tldsl render`'s
+   * exit. Omit to skip activity tracking entirely (e.g. `tldx render`'s
    * ephemeral server, which has no reaper).
    */
   onActivity?: () => void;

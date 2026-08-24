@@ -4,7 +4,7 @@ import type { AstDoc } from "../../domain/parser/ast.js";
 import { FakeExecute } from "./execute.fake.js";
 import { runExecuteContract, type ExecuteHarness } from "./execute.contract.js";
 
-const PATH = "/fake/doc.tldsl.jsx";
+const PATH = "/fake/doc.tldx.jsx";
 
 function docWithBox(path: string, boxId: string): AstDoc {
   return {
@@ -87,16 +87,16 @@ runExecuteContract("FakeExecute", async (): Promise<ExecuteHarness> => {
 describe("FakeExecute (fake-specific affordances)", () => {
   it("returns the default empty-doc result for an unprogrammed source", async () => {
     const fake = new FakeExecute();
-    const result = await fake.execute("never programmed", "/a/b.tldsl.jsx");
+    const result = await fake.execute("never programmed", "/a/b.tldx.jsx");
     expect("ast" in result).toBe(true);
     if (!("ast" in result)) throw new Error("expected ast result");
     expect(result.ast).toEqual({
       kind: "doc",
       attrs: {},
       children: [],
-      span: { file: "/a/b.tldsl.jsx", line: 1, column: 1 },
+      span: { file: "/a/b.tldx.jsx", line: 1, column: 1 },
     });
-    expect(result.inputs).toEqual(["/a/b.tldsl.jsx"]);
+    expect(result.inputs).toEqual(["/a/b.tldx.jsx"]);
   });
 
   it("records calls in order with source and path", async () => {

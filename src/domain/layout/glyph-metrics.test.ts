@@ -62,7 +62,7 @@ describe("arrowLabelWidth: uses ARROW_LABEL_FONT_SIZES, not LABEL_FONT_PX (T12)"
   });
 });
 
-describe("TEXT_FONT_PX: the standalone tldraw `text` shape's own table (D23, tldsl-pnq)", () => {
+describe("TEXT_FONT_PX: the standalone tldraw `text` shape's own table (D23, tldx-pnq)", () => {
   it("pins the three tables against tldraw's own values, so a future edit can't silently collapse them back into one", () => {
     // LABEL_FONT_PX: label inside a geo/note. TEXT_FONT_PX: standalone
     // `text` shape. ARROW_LABEL_FONT_PX: label on an arrow. All three agree

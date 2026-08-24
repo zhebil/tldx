@@ -1,5 +1,5 @@
 /**
- * `c4-context.tldsl.jsx` imports `./lib/c4.jsx` (T16b) - the first
+ * `c4-context.tldx.jsx` imports `./lib/c4.jsx` (T16b) - the first
  * multi-file diagram in the corpus. This pins that a fixture composed of
  * more than one file compiles clean through the real pipeline, and that the
  * watch set (`result.inputs`) includes the imported module - the coverage
@@ -21,9 +21,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 describe("corpus: multi-file diagram pulls its imported module into the watch set", () => {
   it(
-    "c4-context.tldsl.jsx compiles clean and result.inputs includes lib/c4.jsx",
+    "c4-context.tldx.jsx compiles clean and result.inputs includes lib/c4.jsx",
     async () => {
-      const path = join(HERE, "c4-context.tldsl.jsx");
+      const path = join(HERE, "c4-context.tldx.jsx");
       const result = await compileFile(path, {
         fs: createNodeFsRead(),
         layout: new ElkLayoutAdapter(),

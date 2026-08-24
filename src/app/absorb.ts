@@ -1,7 +1,7 @@
 /**
  * `absorb`: fold a diagram's overlay back into its JSX source
  * (docs/round-trip.md D3, D5; docs/plan.md T22; docs/round-trip-scope.md §2,
- * §7 F4 - `bd show tldsl-d3o`).
+ * §7 F4 - `bd show tldx-d3o`).
  *
  * 1. Read overlay + compile the source (`base`); `target = applyOverlay(overlay,
  *    base).scene` is "the scene the canvas showed".
@@ -370,7 +370,7 @@ function positionsMatch(candidate: SceneJSON, target: SceneJSON, ids: readonly s
   });
 }
 
-/** Shared with `app/verify.ts` (`tldsl verify` / `tldsl overlay show`) -
+/** Shared with `app/verify.ts` (`tldx verify` / `tldx overlay show`) -
  *  missing file -> null, unparseable or wrong shape -> null. */
 export async function readOverlay(fs: FsReadPort, overlayPath: string): Promise<Overlay | null> {
   let raw: string;

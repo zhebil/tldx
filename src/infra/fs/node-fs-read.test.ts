@@ -10,7 +10,7 @@ import {
 import { createNodeFsRead } from "./node-fs-read.js";
 
 runFsReadContract("createNodeFsRead", async (): Promise<FsReadHarness> => {
-  const dir = await mkdtemp(join(tmpdir(), "tldsl-fs-read-"));
+  const dir = await mkdtemp(join(tmpdir(), "tldx-fs-read-"));
   return {
     port: createNodeFsRead(),
     writeFile: async (relPath, content) => {
