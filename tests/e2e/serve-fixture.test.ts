@@ -1,19 +1,8 @@
 /**
- * E2E smoke for `tldx serve`. Drives `runServe` with the same real
- * adapters the CLI wires (NodeFs, ChokidarWatch, ElkLayoutAdapter,
- * SystemClock, SseTransport, dev server) against a tldx fixture, then
- * connects to the dev server's `/events` endpoint and confirms a
- * SceneMessage with `kind: "scene"` arrives.
- *
- * Per the issue and CONTEXT.md "Lifecycle: `tldx check` is directly
- * testable from e2e tests without spawning a child process" - we drive
- * `runServe` in-process. The child-process spawn is unnecessary ceremony:
- * every adapter is real, the HTTP server is real, the file watcher is
- * real. The only injected stub is `openBrowser`, so the test does not
- * launch a browser.
- *
- * SSE parsing is hand-rolled (no EventSource in node) and mirrors the
- * approach used in `infra/devserver/dev-server.test.ts`.
+ * E2E smoke for `tldx serve`. Drives `runServe` in-process with the real
+ * adapters the CLI wires, then reads a scene message off the dev server's
+ * `/events` endpoint. `openBrowser` is the only stub, so no browser
+ * launches. SSE parsing is hand-rolled because node has no EventSource.
  */
 
 import { mkdtemp, copyFile, rm } from "node:fs/promises";
@@ -105,7 +94,6 @@ async function bootServe(
       log,
       clock: createSystemClock(),
       viewerBundleDir: bundleDir,
-      // Suppress real browser launch in tests.
       openBrowser: () => {},
     },
     io,
@@ -120,10 +108,9 @@ async function teardown(setup: Setup | undefined): Promise<void> {
 }
 
 /**
- * Read a single `data:` SSE frame from the response body, returning the
- * parsed message. Throws if the stream closes without a data frame within
- * `timeoutMs`. Skips comment frames (`:` lines) emitted by the SSE
- * adapter for the "stream open" sentinel.
+ * Read a single `data:` SSE frame from the response body. Throws if the
+ * stream closes without one within `timeoutMs`. Skips the `:` comment
+ * frames the SSE adapter emits as its "stream open" sentinel.
  */
 async function readFirstSceneMessage(
   body: ReadableStream<Uint8Array>,
@@ -172,7 +159,6 @@ describe("e2e: tldx serve", () => {
     try {
       setup = await bootServe("auth.tldx.jsx", bundleDir);
 
-      // The CLI announces the URL on stdout once the server is bound.
       expect(setup.io.stdout).toContain("tldx serving");
       expect(setup.io.stdout).toContain(setup.handle.url);
 
@@ -191,9 +177,8 @@ describe("e2e: tldx serve", () => {
         expect(message.v).toBe(1);
         expect(message.kind).toBe("scene");
         if (message.kind === "scene") {
-          // The auth fixture compiles to a frame + 5 boxes + 4 edges + 1
-          // note. We don't pin the exact count - any non-empty store is
-          // proof the pipeline ran end-to-end.
+          // The exact count is not pinned: a non-empty store is proof
+          // enough that the pipeline ran end to end.
           const records = Object.values(message.payload.store);
           expect(records.length).toBeGreaterThan(1);
         }
@@ -201,7 +186,6 @@ describe("e2e: tldx serve", () => {
         controller.abort();
       }
 
-      // Successful initial compile is reported on the log port.
       expect(
         setup.log.events.some((e) => e.code === "watch/recompile-ok"),
       ).toBe(true);

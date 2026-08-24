@@ -1,14 +1,9 @@
 /**
- * E2E for the overlay round-trip end to end through `tldx serve`
- * (docs/round-trip.md D4): a browser PUTs a canvas edit, the server writes
- * the overlay file and re-pushes the applied scene, and - because the SSE
- * transport replays its last message to new subscribers - a fresh
- * connection (standing in for a page reload) sees the edited scene rather
- * than the pre-edit compile. This is the acceptance criterion for T20: a
- * reload must not lose canvas edits.
- *
- * Modeled on `tests/e2e/serve-fixture.test.ts`: in-process `runServe`, real
- * adapters, stubbed `openBrowser`, hand-rolled SSE parsing.
+ * E2E for the overlay round-trip through `tldx serve`: a browser PUTs a
+ * canvas edit, the server writes the overlay and re-pushes the applied
+ * scene, and a fresh SSE connection (standing in for a page reload) sees
+ * the edited scene rather than the pre-edit compile. That works because the
+ * SSE transport replays its last message to new subscribers.
  */
 
 import { mkdtemp, copyFile, readFile, rm } from "node:fs/promises";

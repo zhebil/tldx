@@ -1,11 +1,8 @@
 /**
- * Acceptance criterion for T21 (docs/plan.md): "fails loudly when fed a
- * deliberately lossy apply - a harness that has never gone red proves
- * nothing." Each case here wraps the real `applyOverlay` with a specific
- * loss (or, for `identity`, ignores the overlay entirely) and asserts
- * `checkFidelity` reports it - and reports it as an `"apply"`-stage
- * failure specifically, proving the real server/reload leg stayed green
- * and the injected loss is what tripped the harness.
+ * Negative control for the fidelity harness. Each case wraps the real
+ * `applyOverlay` with a specific loss and asserts `checkFidelity` reports
+ * it at the `"apply"` stage, proving the server/reload leg stayed green and
+ * the injected loss is what tripped the harness.
  */
 
 import { basename, dirname, join } from "node:path";
@@ -21,8 +18,7 @@ import { checkFidelity, type ApplyFn } from "./fidelity/harness.js";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CORPUS_DIR = join(HERE, "..", "corpus");
 // Large enough (frame nesting, bindings, multiple labellable/colorable
-// shapes) that all seven mutations below bite - verified by running this
-// file.
+// shapes) that every mutation below bites.
 const FIXTURE = join(CORPUS_DIR, "checkout-services.tldx.jsx");
 
 function stripField<K extends keyof OverlayEntry>(overlay: Overlay, field: K): Overlay {

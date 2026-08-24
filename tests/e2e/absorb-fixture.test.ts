@@ -1,14 +1,7 @@
 /**
- * E2E for `tldx absorb` (docs/plan.md T22, docs/round-trip.md D3/D5).
- *
- * The acceptance criterion, verbatim from docs/plan.md: the canvas-first
- * case works end to end - a stub `<Doc/>` plus an overlay of hand-added
- * shapes absorbs into JSX that compiles, on its own and with an empty
- * overlay, to the same scene the canvas showed. Verified by T21's harness
- * (`checkFidelity`), not by inspection.
- *
- * Modeled on `tests/e2e/check-fixture.test.ts` (real adapters, `runXxxCli`
- * called directly) and `tests/e2e/overlay-serve.test.ts` (temp-dir setup).
+ * E2E for `tldx absorb`: a stub `<Doc/>` plus an overlay of hand-added
+ * shapes absorbs into JSX that compiles back to the same scene the canvas
+ * showed. Uses real adapters and verifies with `checkFidelity`.
  */
 
 import assert from "node:assert/strict";
@@ -95,7 +88,7 @@ async function writeOverlay(deps: AbsorbDeps, path: string, overlay: Overlay): P
   await deps.fsWrite.write(overlayPathFor(path), `${JSON.stringify(overlay, null, 2)}\n`);
 }
 
-describe("e2e: tldx absorb - canvas-first case (T22 acceptance criterion)", () => {
+describe("e2e: tldx absorb - canvas-first case", () => {
   it("a stub <Doc/> plus an overlay of added shapes absorbs into JSX that compiles to the same scene, on its own and with an empty overlay", async () => {
     const dir = await makeWorkDir();
     const path = join(dir, "diagram.tldx.jsx");
@@ -183,9 +176,8 @@ describe("e2e: tldx absorb - canvas-first case (T22 acceptance criterion)", () =
     if (base === null) throw new Error("stub failed to compile");
     const pageId = pageIdOf(base);
 
-    // rotation has no JSX prop (docs/dsl.md's <Box> prop list has none) -
-    // absorb can generate a Box for this record, but the rewrite can never
-    // reproduce a non-zero rotation, so verification must fail.
+    // rotation has no JSX prop, so the rewrite can never reproduce a
+    // non-zero rotation and verification must fail.
     const unexpressible: TLRecord = {
       ...boxShape({ id: "shape:spun", x: 0, y: 0, w: 40, h: 40, parentId: pageId, text: "Spun" }),
       rotation: 0.3,
@@ -210,13 +202,12 @@ describe("e2e: tldx absorb - canvas-first case (T22 acceptance criterion)", () =
 });
 
 /**
- * E2E for the move ladder (tldx-d3o, docs/round-trip-scope.md §2, §7 F4.4).
- * Each test builds the *ground truth* by compiling a second, already-edited
- * source (reordered children / a wider gap) and reads the dragged shape's
- * real coordinates back off that compile - so the overlay entry under test
- * is exactly what a real drag would produce, not a hand-guessed number.
+ * Each test builds its ground truth by compiling a second, already-edited
+ * source (reordered children / a wider gap) and reading the dragged shape's
+ * real coordinates off that compile, so the overlay entry under test is
+ * what a real drag would produce rather than a hand-guessed number.
  */
-describe("e2e: tldx absorb - move ladder (tldx-d3o)", () => {
+describe("e2e: tldx absorb - move ladder", () => {
   const ROW_SOURCE = [
     'import { Doc, Box } from "tldx";',
     "",
@@ -247,10 +238,8 @@ describe("e2e: tldx absorb - move ladder (tldx-d3o)", () => {
     "",
   ].join("\n");
 
-  /** Same relaxation `app/absorb.ts`'s own `diffIds` applies: `index` is an
-   *  emit-order artifact a reorder necessarily reassigns, not user data
-   *  (docs/round-trip-scope.md §4) - comparing it here would fail every
-   *  successful reorder for the right reason done. */
+  /** Same relaxation `app/absorb.ts`'s `diffIds` applies: `index` is an
+   *  emit-order artifact a reorder necessarily reassigns, not user data. */
   function stripIndex(scene: SceneJSON): SceneJSON {
     const store = Object.fromEntries(
       Object.entries(scene.store).map(([id, record]) => [
@@ -262,12 +251,10 @@ describe("e2e: tldx absorb - move ladder (tldx-d3o)", () => {
   }
 
   it("absorbs a 3-way rearrangement as a reordered <Box> list, not raw coordinates", async () => {
-    // A real drag only moves the one shape you touch - it never relocates
-    // its siblings (R1's "one drag, one overlay entry" bar). So a clean
-    // "move C in front of A" landing, with A and B undisturbed, needs A and
-    // B to have been dragged into their new slots too: three `moved`
-    // entries, one per shape, all pointing at where a `(c, a, b)` reorder
-    // would put them.
+    // A real drag only moves the shape you touch, never its siblings. So a
+    // clean "move C in front of A" landing needs A and B dragged into their
+    // new slots too: three `moved` entries, one per shape, all pointing at
+    // where a `(c, a, b)` reorder would put them.
     const dir = await makeWorkDir();
     const path = join(dir, "diagram.tldx.jsx");
     const deps = makeDeps();

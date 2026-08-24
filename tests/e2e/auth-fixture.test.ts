@@ -1,11 +1,8 @@
 /**
- * Smoke test for the canonical 5-node auth-flow fixture.
- *
- * The .tldx is the agent-authored DSL source. The target SceneJSON is
- * specified by `expectedScene()` below using `src/contracts/builders.ts`
- * factories - builders are the spec, no checked-in JSON. domain/emit/ is
- * not landed yet; when it is, this test should grow a round-trip
- * assertion that `compile(auth.tldx)` deep-equals `expectedScene()`.
+ * Smoke test for the canonical 5-node auth-flow fixture. The target
+ * SceneJSON is specified by `expectedScene()` below via the
+ * `src/contracts/builders.ts` factories, so the builders are the spec and
+ * no JSON is checked in.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -227,7 +224,7 @@ describe("e2e fixture: auth scene spec", () => {
   });
 });
 
-describe("e2e fixture: styles.tldx.jsx (T9)", () => {
+describe("e2e fixture: styles.tldx.jsx", () => {
   it("compiles with zero diagnostics, exercising every tldraw style enum value", async () => {
     const path = join(FIXTURES, "styles.tldx.jsx");
     const result = await compileFile(path, {

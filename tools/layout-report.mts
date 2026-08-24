@@ -1,12 +1,8 @@
 /**
- * `tools/layout-report.mts <file>` - deterministic, pure-stdout diagnostic
- * dump of a compiled diagram's geometry: a per-shape table, objective
- * layout-quality metrics, and a coarse ASCII render. Phase B uses these
- * metrics as objective gates, so precision here matters more than polish.
- *
- * Builds its own mini pipeline (fs read -> jsx execute -> lower -> layout)
- * instead of `compileFile`, because `compileFile` only returns opaque
- * `SceneJSON` - useless for geometry inspection.
+ * `layout-report.mts <file>` - deterministic stdout dump of a compiled
+ * diagram's geometry: a per-shape table, layout-quality metrics, and a
+ * coarse ASCII render. Builds its own pipeline instead of using
+ * `compileFile`, which only returns opaque `SceneJSON`.
  */
 
 import { basename } from "node:path";
@@ -26,11 +22,6 @@ import { ElkLayoutAdapter } from "../src/infra/layout-elk/elk-layout.js";
 import { formatDiagnostics } from "../src/cli/format-diagnostics.js";
 
 // -- geometry model -----------------------------------------------------------
-//
-// `AbsShape`, `isAncestor`, `overlapArea` live in `src/domain/layout/occlusion.ts`
-// now - `tldx check` needs the same "shape covers shape" computation this
-// report has always done, so it moved into the product and this report
-// imports it back rather than keeping a second copy (docs/diagram-defects.md D15).
 
 export type { ShapeKind, AbsShape };
 
@@ -370,9 +361,9 @@ function sourceOrderViolations(c: ContainerInfo): number {
 // -- ASCII render -----------------------------------------------------------
 
 const GRID_W = 100;
-/** A very tall diagram would otherwise render as hundreds of rows, which is
- *  useless to a judge and blows up the prompt. Compressing the vertical scale
- *  distorts proportion, so the header states the px-per-cell both ways. */
+/** Caps a very tall diagram at a readable number of rows. Compressing the
+ *  vertical scale distorts proportion, so the header states px-per-cell for
+ *  both axes. */
 const GRID_MAX_H = 60;
 
 function renderAscii(shapes: AbsShape[], edges: IREdge[], byId: Map<string, AbsShape>): string {

@@ -1,14 +1,11 @@
 /**
- * `tools/crossing-classify.mts <file.tldx.jsx> [more files...]` - classifies
- * every arrow crossing from `arrow-truth.mts` into one of four buckets, so a
- * routing fix (T3-T5 in `docs/plan.md`) can be scoped to the actual failure
- * mode instead of guessed at.
+ * `crossing-classify.mts <file.tldx.jsx> [more files...]` - classifies every
+ * arrow crossing from `arrow-truth.mts` into one of four buckets, so a
+ * routing fix can be scoped to the actual failure mode.
  *
- * Reuses `arrow-truth.mts`'s exact crossing rule (`crossingPairs`) against
- * real rendered geometry, and `layout-report.mts`'s `walk()` against the same
- * file's positioned IR for container/parent structure and out-degree. The two
- * pipelines describe the same diagram, so ids join directly (tldraw strips
- * the `shape:` prefix; the IR never had one).
+ * Joins `arrow-truth.mts`'s crossing rule against rendered geometry with
+ * `layout-report.mts`'s `walk()` against the positioned IR. Ids join
+ * directly: tldraw strips the `shape:` prefix, the IR never had one.
  */
 
 import { basename, resolve } from "node:path";
@@ -34,7 +31,8 @@ type ClassifyCtx = {
   outDegreeInContainer: Map<string, number>;
 };
 
-/** Pure. Applies the T2 precedence order: same-axis skip, cross-container, fan, other. */
+/** Buckets are tried in precedence order: same-axis skip, cross-container,
+ *  fan, other. */
 export function classifyCrossing(
   pair: { from: string; to: string; crossedId: string },
   ctx: ClassifyCtx,

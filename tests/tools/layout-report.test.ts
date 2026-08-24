@@ -75,7 +75,7 @@ describe("tools/layout-report", () => {
   });
 });
 
-// -- fixture builders (mirrors src/domain/emit/emit.test.ts) ------------------
+// -- fixture builders -------------------------------------------------------
 
 const SPAN = { file: "test.tldx", line: 1, column: 1 };
 

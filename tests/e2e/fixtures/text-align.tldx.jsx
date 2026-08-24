@@ -24,9 +24,8 @@ export default function Diagram() {
         )}
       </Frame>
 
-      {/* <Text> has no verticalAlign/labelColor/h - tldraw's real text shape
-          has neither (see contracts/builders.ts#textShape); only textAlign
-          and w (wrap budget) carry over from the old Note-alignment grid. */}
+      {/* <Text> has no verticalAlign/labelColor/h, because tldraw's text
+          shape has neither. Only textAlign and w (wrap budget) apply. */}
       <Frame id="texts" name="Text alignment" layout="row" gap="24" pad="16">
         {TEXT_ALIGNS.map((textAlign, i) => (
           <Text key={`t-${i}`} id={`t-${i}`} w="180" textAlign={textAlign}>

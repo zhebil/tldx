@@ -1,13 +1,10 @@
 /**
- * `tools/arrow-truth.mts <file.tldx.jsx> [more files...]` - the arrow paths
- * tldraw actually renders, extracted from the live editor. This is the
- * single source for the "arrow paths crossing a non-endpoint shape" metric:
- * `layout-report.mts` used to carry a router guess for it, but that guess
- * matched 0 of 84 corpus arrows against real vertices and has been deleted.
- *
- * Serves the file (via `serve-harness.mts`), opens headless chromium, and
- * pulls arrow vertices and candidate shape bounds straight out of
- * `window.editor`.
+ * `arrow-truth.mts <file.tldx.jsx> [more files...]` - the arrow paths
+ * tldraw actually renders, and the single source for the "arrow paths
+ * crossing a non-endpoint shape" metric. Serves the file, opens headless
+ * chromium, and pulls arrow vertices and shape bounds out of
+ * `window.editor`. A router guess against the IR does not match what
+ * tldraw draws.
  */
 
 import { existsSync } from "node:fs";
@@ -141,9 +138,8 @@ export function segmentHitsRect(
 
 /**
  * One row per (arrow, crossed shape) pair, deduped so one arrow crossing one
- * shape counts once. Shared by `arrow-truth`'s own count and by
- * `crossing-classify.mts`, so the two tools cannot drift on what counts as a
- * crossing.
+ * shape counts once. `crossing-classify.mts` uses this too, so the two tools
+ * cannot drift on what counts as a crossing.
  */
 export function crossingPairs(arrows: ArrowTruth[], shapes: ShapeBounds[]): CrossingPair[] {
   const pairs: CrossingPair[] = [];
@@ -179,7 +175,7 @@ function rectsOverlap(
 /**
  * One row per (labeled arrow, overlapped shape) pair where the arrow's label
  * bounding box (page space) intersects a shape that is neither the arrow's
- * `from` nor `to`. T12's acceptance check.
+ * `from` nor `to`.
  */
 export function labelOverlapPairs(
   arrows: ArrowTruth[],

@@ -5,10 +5,7 @@
  * validation pipeline `loadSnapshot` invokes inside the editor. If our
  * builders or the DEFAULT_SCHEMA in `src/contracts/builders.ts` drift from
  * what `tldraw@^3.15` accepts, this test fails before the viewer would.
- *
- * Uses `@tldraw/tlschema` directly (no DOM, no editor mount) - see
- * docs/scene-json.md for why the tlschema layer is the right contract
- * surface.
+ * Uses `@tldraw/tlschema` directly, so no DOM and no editor mount.
  */
 import { createTLSchema } from "@tldraw/tlschema";
 import { describe, expect, it } from "vitest";

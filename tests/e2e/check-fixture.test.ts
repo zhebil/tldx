@@ -6,17 +6,11 @@
  * case uses `<name>.<other-ext>` as input.
  *
  * The test invokes `runCheck` directly with the real `NodeFs` adapter and
- * `StubLayout` (real ELK is a separate parallel issue, tldx-gxl).
- * Per docs/testing.md, this is the canonical golden-file shape: new cases
- * = new fixture files, no test-code changes.
+ * `StubLayout`. New cases are new fixture files, not test-code changes.
  *
- * The `.diagnostics.txt` may contain `{path}` as a placeholder for the
- * absolute fixture path; the diagnostic prefix uses whatever path was
- * passed to runCheck, so this keeps fixtures portable across machines.
- *
- * Convention: fixtures whose basename starts with `check-` are part of
- * this suite. Other fixtures (e.g. `auth.tldx.jsx`) are owned by other
- * tests.
+ * A `.diagnostics.txt` may contain `{path}` as a placeholder for the
+ * absolute fixture path, which keeps fixtures portable across machines.
+ * Only fixtures whose basename starts with `check-` belong to this suite.
  */
 
 import { readdirSync, readFileSync } from "node:fs";

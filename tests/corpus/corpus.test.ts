@@ -1,10 +1,8 @@
 /**
- * Corpus-driven compile check for the Phase B layout bench (see
- * docs/plan.md). Every `*.tldx.jsx` fixture in this directory
- * must compile clean through the real pipeline (esbuild/worker execute +
- * real ELK layout) - these diagrams are the fixed test bench a long-running
- * layout-tuning loop judges against, so this test only pins "still
- * compiles", not any particular layout output.
+ * Every `*.tldx.jsx` fixture in this directory must compile clean through
+ * the real pipeline. These diagrams are the fixed bench layout tuning is
+ * judged against, so this test pins "still compiles" and nothing about the
+ * layout output.
  */
 
 import { readdirSync } from "node:fs";
@@ -45,9 +43,8 @@ describe("corpus: layout bench fixtures compile clean", () => {
           execute: createJsxExecute(),
         });
 
-        // "Compiles clean" pins compile success, not layout output - occlusion
-        // warnings (T41) are a legitimate finding on a bench fixture, not a
-        // compile failure. See docs/diagram-defects.md D15.
+        // Occlusion warnings are a legitimate finding on a bench fixture,
+        // not a compile failure, so only errors count here.
         expect(hasErrors(result.diagnostics)).toBe(false);
         expect(result.sceneJson).not.toBeNull();
       },

@@ -2,14 +2,10 @@
  * Fixture-driven e2e test for the plugin hooks `plugin/hooks/on-edit.sh` (PostToolUse)
  * and `plugin/hooks/on-prompt.sh` (UserPromptSubmit).
  *
- * Both scripts are pinned by spawning them for real via `spawnSync("sh", ...)`,
- * feeding the hook's stdin JSON contract and reading stdout/exit code back -
- * no reimplementation of their shell logic in TypeScript. `on-edit.sh` runs
- * the real CLI from source (`TLDX_BIN` pointed at `tsx src/cli/main.ts`),
- * reusing the existing `check-jsx-broken`/`check-jsx-good` fixtures from
- * `tests/e2e/fixtures/` (owned by `check-fixture.test.ts`) rather than adding
- * new ones. `on-prompt.sh` only shells out to `jq`/`find` over overlay files,
- * so its cases build their own throwaway fixtures under a temp dir.
+ * Both scripts are spawned for real via `spawnSync("sh", ...)`, fed the
+ * hook's stdin JSON contract, with stdout and exit code read back, so their
+ * shell logic is never reimplemented in TypeScript. `on-edit.sh` runs the
+ * real CLI from source via `TLDX_BIN`.
  */
 
 import { spawnSync } from "node:child_process";

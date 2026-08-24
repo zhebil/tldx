@@ -1,21 +1,13 @@
 /**
- * `tools/font-metrics.mts [out.ts]` - re-measure the per-glyph advance-width
- * tables in `src/domain/layout/glyph-metrics.ts` and print them as pasteable
- * TypeScript.
+ * `font-metrics.mts [out.ts]` - re-measure the per-glyph advance-width tables
+ * in `src/domain/layout/glyph-metrics.ts` and print them as pasteable
+ * TypeScript. Measurement must happen inside `.tl-container`, where tldraw
+ * defines its `--tl-font-*` variables; outside it all four fonts silently
+ * resolve to Times. Space is measured by differencing `"a a a ... a"`
+ * against `"aaaa..."`, because a leading or trailing space collapses.
  *
- * `tools/text-metrics.mts` measures *labels a diagram already contains*;
- * this measures the *font itself*, which is what the layout engine's wrap
- * budget is built on. It starts `tldx serve` (the only place tldraw's
- * `--tl-font-*` CSS variables are defined - they live on `.tl-container`,
- * not on `document.body`, and measuring outside it silently resolves all
- * four fonts to Times), then renders each printable ASCII character 20 times
- * and divides. Space is measured by differencing `"a a a ... a"` against
- * `"aaaa..."`, because a trailing/leading space collapses.
- *
- * Only the `m` size is emitted: advance width scales exactly linearly with
- * font size (max error 0.001px across all 16 combinations), so
- * `glyph-metrics.ts` stores one table per font and scales. `--all` prints
- * the full 16-combination measurement instead, to re-check that claim.
+ * Only the `m` size is emitted, since advance width scales linearly with
+ * font size. `--all` prints all 16 combinations to re-check that.
  */
 
 import { spawn } from "node:child_process";

@@ -1,9 +1,7 @@
 /**
- * `c4-context.tldx.jsx` imports `./lib/c4.jsx` (T16b) - the first
- * multi-file diagram in the corpus. This pins that a fixture composed of
- * more than one file compiles clean through the real pipeline, and that the
- * watch set (`result.inputs`) includes the imported module - the coverage
- * that lets `watchAndServe` re-subscribe to it, so editing it triggers a
+ * `c4-context.tldx.jsx` imports `./lib/c4.jsx`. Pins that a multi-file
+ * fixture compiles clean through the real pipeline and that the watch set
+ * (`result.inputs`) includes the imported module, so editing it triggers a
  * reload.
  */
 

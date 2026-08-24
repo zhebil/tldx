@@ -1,9 +1,8 @@
 /**
- * T14 acceptance test: for every corpus fixture, mechanically rewriting each
+ * For every corpus fixture, mechanically rewriting each
  * `<Frame layout="row"|"col"|"grid">` into the matching `<Row>`/`<Col>`/
- * `<Grid>` shorthand must produce byte-identical scene JSON. Fixtures in
- * `tests/corpus/` are never edited - the rewrite happens in memory and is
- * compiled from a temp file.
+ * `<Grid>` shorthand must produce byte-identical scene JSON. Fixtures are
+ * never edited: the rewrite happens in memory and compiles from a temp file.
  */
 
 import {
@@ -121,9 +120,8 @@ describe("shorthand-equivalence: Row/Col/Grid produce identical scene JSON to Fr
         }
 
         const tmpDir = mkdtempSync(join(tmpdir(), "tldx-shorthand-"));
-        // A fixture may relatively import sibling modules (T16b's
-        // c4-context.tldx.jsx -> ./lib/c4.jsx) - copy them alongside so the
-        // rewritten copy resolves the same imports the original does.
+        // A fixture may relatively import sibling modules, so copy those
+        // alongside for the rewritten copy to resolve.
         const libDir = join(HERE, "lib");
         if (existsSync(libDir)) cpSync(libDir, join(tmpDir, "lib"), { recursive: true });
         const tmpPath = join(tmpDir, fixture.name);
@@ -140,9 +138,9 @@ describe("shorthand-equivalence: Row/Col/Grid produce identical scene JSON to Fr
             compileFile(tmpPath, deps),
           ]);
 
-          // Same reasoning as corpus.test.ts: a fixture may carry a legitimate
-          // occlusion warning (T41); the invariant under test is that the
-          // rewrite is scene-JSON-identical, not that either form is silent.
+          // A fixture may carry a legitimate occlusion warning; the
+          // invariant under test is that the rewrite is scene-JSON-identical,
+          // not that either form is silent.
           expect(hasErrors(originalResult.diagnostics)).toBe(false);
           expect(hasErrors(rewrittenResult.diagnostics)).toBe(false);
           expect(rewrittenResult.sceneJson).not.toBeNull();

@@ -74,7 +74,7 @@ All from `"tldx"`.
 | `<Sticky on>text</Sticky>` | A real tldraw sticky note, fixed 200px wide. `on` attaches it beside another element. |
 | `<Edges>` | One line per arrow, `a -> b: label`. **Default for more than a couple of edges.** See Edges below. |
 | `<Edge from to>` | One arrow, full props. Fallback for what `<Edges>` can't say: an explicit `id`, or a style that differs edge-by-edge within one batch. |
-| `flow("a","b","c")` | Unlabelled chain as a function call, no JSX. Still fine for a short plain sequence; carries no source span (tldx-7kx) - prefer `<Edges>` when that matters. |
+| `flow("a","b","c")` | Unlabelled chain as a function call, no JSX. Still fine for a short plain sequence; carries no source span - prefer `<Edges>` when that matters. |
 
 Reusable components are just functions that return JSX - no registration, no
 mechanism. Give them an `ns` prop and interpolate it into every `id` they
@@ -191,10 +191,7 @@ doc.
 
 - `w` / `h` pin a box's size instead of deriving it from the label. Use for a
   percentage bar or a tall lane box, where the size is the content.
-- `h` works on its own. It used to be silently discarded in `col` and `grid`
-  containers (a sizing pass recomputed height for any box without an explicit
-  `w`), which is why adding a `w` appeared to "fix" it - the `w` was skipping
-  the buggy branch, not making `h` work. Fixed; no workaround needed.
+- `h` works on its own. No paired `w` is needed.
 - **A prop only reaches a `<Box>` if the component passes it on.** Components
   are plain functions, so `<MyThing h="420" />` does nothing unless `MyThing`
   destructures `h` and forwards it. Nothing can warn about this - there is no

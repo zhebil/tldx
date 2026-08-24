@@ -1,11 +1,8 @@
 /**
- * Fidelity harness (docs/plan.md T21) run over the whole corpus: compile a
- * fixture through a real `tldx serve`, PUT a mutated snapshot, reload, and
- * check the served scene and `applyOverlay`'s own output both reproduce the
- * mutation exactly. Supersedes `tests/e2e/overlay-corpus.test.ts` (same
- * mutation generator, plus real disk serialization and a real serve
- * reload); see `tests/e2e/fidelity-harness.test.ts` for the harness's own
- * negative-control coverage.
+ * The fidelity harness run over the whole corpus: compile a fixture through
+ * a real `tldx serve`, PUT a mutated snapshot, reload, and check that the
+ * served scene and `applyOverlay`'s own output both reproduce the mutation
+ * exactly.
  */
 
 import { readdirSync } from "node:fs";

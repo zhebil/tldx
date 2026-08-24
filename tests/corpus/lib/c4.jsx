@@ -1,9 +1,8 @@
 /**
- * A small C4-ish vocabulary, written entirely as components over the tier-1
- * `Box`/`Frame` primitives exported by `"tldx"`. This module is deliberately
- * *outside* the library (T16b): it is the composability test proving a
- * domain vocabulary can be built in userland without any change to
- * `src/runtime/`.
+ * A small C4-ish vocabulary, written entirely as components over the
+ * `Box`/`Frame` primitives exported by `"tldx"`. It lives outside the
+ * library on purpose: it is the composability test proving a domain
+ * vocabulary can be built in userland with no change to `src/runtime/`.
  */
 import { Box, Frame } from "tldx";
 

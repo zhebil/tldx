@@ -1,14 +1,10 @@
 /**
- * Fidelity harness (docs/plan.md T21): compile a fixture through a real
- * `tldx serve`, PUT a mutated snapshot over `/overlay` the way a browser
- * would, reload (a fresh SSE connection), and check that both the served
- * scene and a direct `applyOverlay` call reproduce the mutation exactly.
- *
- * `checkFidelity` never throws for a fidelity divergence - it returns
- * `FidelityFailure[]`, empty on a clean round-trip - because the whole point
- * is that a caller can hand it a deliberately lossy `apply` and observe red
- * (see `tests/e2e/fidelity-harness.test.ts`). Only genuine infrastructure
- * errors (server won't boot, fixture missing) propagate as thrown errors.
+ * Fidelity harness: compile a fixture through a real `tldx serve`, PUT a
+ * mutated snapshot over `/overlay` the way a browser would, reload, and
+ * check that both the served scene and a direct `applyOverlay` reproduce
+ * the mutation exactly. `checkFidelity` returns divergences rather than
+ * throwing, so a caller can pass a deliberately lossy `apply` and observe
+ * the failures. Only infrastructure errors propagate as thrown errors.
  */
 
 import assert from "node:assert/strict";
@@ -49,8 +45,7 @@ function noopIo(): ServeIo {
 }
 
 /** Reads SSE events from a `fetch` body stream and returns the first
- *  `data:` payload, parsed as a `SceneMessage`. Shared by the harness and
- *  `overlay-serve.test.ts`, which drives the same server by hand. */
+ *  `data:` payload, parsed as a `SceneMessage`. */
 export async function readFirstSceneMessage(
   body: ReadableStream<Uint8Array>,
   timeoutMs = 10_000,
@@ -124,9 +119,8 @@ export async function checkFidelity(
   try {
     workDir = await mkdtemp(join(tmpdir(), "tldx-fidelity-"));
     bundleDir = await mkdtemp(join(tmpdir(), "tldx-fidelity-bundle-"));
-    // Recursive, not a single-file copy: some corpus fixtures (e.g.
-    // c4-context.tldx.jsx) import a sibling module (./lib/c4.jsx), which
-    // esbuild resolves against the entry's real directory.
+    // Recursive, not a single-file copy: some corpus fixtures import a
+    // sibling module, which esbuild resolves against the entry's directory.
     await cp(dirname(fixturePath), workDir, { recursive: true });
     const filePath = join(workDir, name);
 

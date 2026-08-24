@@ -1,12 +1,9 @@
 /**
- * E2E for the `/tldx:sync` workflow (docs/plan.md T26): drive the three
- * CLI entry points the slash command calls, in order, against the same
- * canvas-first case `tests/e2e/absorb-fixture.test.ts` proves for `absorb`
- * alone - a stub `<Doc/>` plus an overlay of hand-added shapes.
- *
- * `overlay show` -> `absorb` -> `verify`: show reports the pending shapes,
- * absorb folds them into the source and empties the overlay, verify then
- * confirms the source alone reproduces the canvas.
+ * E2E for the `/tldx:sync` workflow: drive the three CLI entry points the
+ * slash command calls, in order, against a stub `<Doc/>` plus an overlay of
+ * hand-added shapes. `overlay show` reports the pending shapes, `absorb`
+ * folds them into the source and empties the overlay, `verify` confirms the
+ * source alone reproduces the canvas.
  */
 
 import { readFile, rm, mkdtemp } from "node:fs/promises";
@@ -97,7 +94,7 @@ async function writeOverlay(deps: AbsorbDeps, path: string, overlay: Overlay): P
   await deps.fsWrite.write(overlayPathFor(path), `${JSON.stringify(overlay, null, 2)}\n`);
 }
 
-describe("e2e: tldx:sync workflow - overlay show -> absorb -> verify (T26)", () => {
+describe("e2e: tldx:sync workflow - overlay show -> absorb -> verify", () => {
   it("shows the pending shapes, absorbs them, then verifies the source alone reproduces the canvas", async () => {
     const dir = await makeWorkDir();
     const path = join(dir, "diagram.tldx.jsx");
