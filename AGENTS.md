@@ -14,12 +14,13 @@ npm run check                  # tsc + oxfmt --check + oxlint + knip + vitest
 npm run format                 # oxfmt, in place - run this before `check` complains
 npm run build                  # dist/cli (tsc) + dist/viewer (vite)
 npm run dev:cli -- <args>      # run the CLI from source, e.g. `-- serve examples/kernel.tldx.jsx`
-npm run diagrams               # re-render docs/diagrams/*.tldx.jsx to the SVGs docs/ embeds
+npm run diagrams               # re-render docs/diagrams/ and examples/ to their committed SVGs
 ```
 
-The docs diagrams are source plus a committed SVG. `npm run check` only proves
-the source still compiles - if you change one, run `npm run diagrams` and commit
-the SVG alongside it, or the picture in `docs/architecture.md` goes stale.
+The docs diagrams and the examples are source plus a committed SVG. `npm run
+check` only proves the source still compiles - if you change one, run
+`npm run diagrams` and commit the SVG alongside it, or the picture in
+`docs/architecture.md` or the README's examples table goes stale.
 
 `layers.svg` and `round-trip.svg` currently carry arrow bends that were set on
 the canvas and have no JSX spelling ([#30]), so the source alone does not
