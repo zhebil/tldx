@@ -357,6 +357,13 @@ export function estimatedBoxSize(
   const fit = GEO_FIT[model];
   const { wl, hl } = labelExtent(label, maxW, style);
   const a = wl / maxW;
+  // As h grows the label's height fraction tends to 0, so `fit(a, 0)` is the
+  // best any height can do at this width. Past it the outline can never hold
+  // the label - a triangle needs `w > 2 * wl`, an arrow `w > wl / 0.68` - and
+  // the search below would just double h until it overflowed into the
+  // billions. Give the label the plain rectangular height it needs at this
+  // width instead and let `labelOverflow` report the shortfall.
+  if (fit(a, 0) > 1.001) return { w: maxW, h: boxHeightForWidth(label, maxW, style) };
   // `a` (the label's width fraction of the capped box) is fixed once w is
   // pinned to maxW, so this is a single-variable search: grow h until
   // fit(a, hl / h) <= 1. Binary search, not geoScale's fixed-point multiply,

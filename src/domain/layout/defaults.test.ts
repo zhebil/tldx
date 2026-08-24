@@ -4,6 +4,7 @@ import { GEOS } from "../ir/styles.js";
 
 import {
   BOX_ASPECT_TARGET,
+  boxHeightForWidth,
   estimatedBoxSize,
   estimatedNoteSize,
   fitBoxWidth,
@@ -88,6 +89,19 @@ describe("estimatedBoxSize", () => {
     // ratio: a 3-line label in a 200px diamond is genuinely a tall shape.
     expect(cappedDiamond.h).toBeGreaterThan(cappedRect.h);
     expect(cappedDiamond.h).toBeLessThan(600);
+  });
+
+  it("stops growing height when no height can hold the label, and lets labelOverflow say so", () => {
+    // A triangle's label needs `w > 2 * wl` and an arrow's `w > wl / 0.68`,
+    // so at a pinned width neither is ever satisfied by more height. The
+    // search used to double h 24 times and return 3,053,453,312.
+    const label = "Manual approval release manager signs off";
+    for (const geo of ["triangle", "arrow-right"] as const) {
+      const { w, h } = estimatedBoxSize(label, 220, { geo });
+      expect(w).toBe(220);
+      expect(h).toBe(boxHeightForWidth(label, 220));
+      expect(labelOverflow(label, w, h, { geo })).toBeDefined();
+    }
   });
 
   it("keeps the label rectangle inside the outline at the capped width, for diamond and ellipse alike", () => {
