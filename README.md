@@ -7,6 +7,12 @@ You describe _what connects to what_. Layout, sizing, edge routing and label
 placement are the tool's job — there are no coordinates in a `.tldx.jsx` file
 unless you want them.
 
+![The debugging loop](docs/diagrams/debugging.svg)
+
+Source: [`docs/diagrams/debugging.tldx.jsx`](docs/diagrams/debugging.tldx.jsx). No
+coordinates anywhere in it - the blame list is a `.map()` over a four-element
+array, and the loop back onto "add a console.log" is a self-edge, `log -> log`.
+
 ## Install
 
 ```bash
