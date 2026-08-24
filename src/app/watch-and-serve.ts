@@ -8,11 +8,18 @@
  *
  * `deps.fsWrite` being present is what enables the overlay round-trip. An
  * absent or malformed overlay is never surfaced as an error push.
+ *
+ * Every push is namespaced to `deps.pageKey`, because one server serves several
+ * diagrams into one viewer document. The compiled scene stays a standalone
+ * `page:main` scene throughout - namespacing is applied on the way out and
+ * undone on the way back in, so the overlay sidecar is written in the diagram's
+ * own ids and is unaffected by which other diagrams share the server.
  */
 
 import { sceneMessage } from "../contracts/builders.js";
 import { isOverlay, OVERLAY_VERSION } from "../contracts/overlay.js";
 import type { SceneJSON } from "../contracts/scene-json.js";
+import { denamespaceScene, namespaceScene, pageSliceOf } from "../domain/multipage/index.js";
 import {
   applyOverlay,
   diffScenes,
@@ -31,6 +38,8 @@ import type { WatchHandle, WatchPort } from "./ports/watch.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 
 export type WatchAndServeDeps = {
+  /** Page this diagram occupies in the shared viewer document. */
+  pageKey: string;
   watch: WatchPort;
   fs: FsReadPort;
   layout: LayoutPort;
@@ -49,8 +58,14 @@ export interface WatchAndServeHandle {
   /** Stop watching and abandon any in-flight compile (its push is still attempted). */
   close(): Promise<void>;
   /**
-   * Write an overlay derived from the browser's current canvas snapshot, then
-   * push the re-applied scene. No-op if the overlay is disabled (no `fsWrite`)
+   * Name of this diagram's page as of the last successful compile - the
+   * `<Doc title>` or the file name, whichever `emit` used. `undefined` before
+   * the first successful compile.
+   */
+  pageName(): string | undefined;
+  /**
+   * Write an overlay derived from the browser's canvas snapshot for this
+   * diagram's page, then push the re-applied scene. No-op if the overlay is disabled (no `fsWrite`)
    * or no compile has completed yet.
    */
   putOverlay(snapshot: SceneJSON): Promise<void>;
@@ -61,6 +76,7 @@ export function watchAndServe(path: string, deps: WatchAndServeDeps): WatchAndSe
   let closed = false;
   let lastCompiled: SceneJSON | null = null;
   const overlayPath = overlayPathFor(path);
+  const { pageKey } = deps;
 
   const compileAndPush = async (trigger: "initial" | "change"): Promise<void> => {
     const result = await compileFile(path, {
@@ -113,6 +129,13 @@ export function watchAndServe(path: string, deps: WatchAndServeDeps): WatchAndSe
 
   return {
     ready,
+    pageName: () => {
+      if (lastCompiled === null) return undefined;
+      for (const record of Object.values(lastCompiled.store)) {
+        if (record.typeName === "page" && typeof record.name === "string") return record.name;
+      }
+      return undefined;
+    },
     idle: async () => {
       // Loop until the queue settles: a compile may be scheduled inside
       // another's tail.
@@ -136,14 +159,18 @@ export function watchAndServe(path: string, deps: WatchAndServeDeps): WatchAndSe
         .catch(() => undefined)
         .then(async () => {
           if (lastCompiled === null) return;
-          const fresh = diffScenes(lastCompiled, snapshot);
+          // Slice server-side even though the viewer sends one page: this is a
+          // trust boundary, and it is what guarantees another diagram's shapes
+          // can never land in this diagram's sidecar.
+          const edited = denamespaceScene(pageSliceOf(snapshot, pageKey), pageKey, lastCompiled);
+          const fresh = diffScenes(lastCompiled, edited);
           // The fresh diff cannot distinguish an id a source edit invalidated
           // from an id the user undid back to its base value: both are simply
           // absent from it. `snapshotIds` tells them apart - a previous entry
           // survives the merge only when its id is gone from the snapshot
           // entirely.
           const previous = await readOverlay(deps.fs, overlayPath);
-          const snapshotIds = new Set(Object.keys(snapshot.store));
+          const snapshotIds = new Set(Object.keys(edited.store));
           const { entries, preserved } = mergeOverlayEntries(
             previous?.entries ?? {},
             fresh,
@@ -162,7 +189,12 @@ export function watchAndServe(path: string, deps: WatchAndServeDeps): WatchAndSe
           // The transport replays its last message to new subscribers, so
           // without this push a browser reload would be served the pre-edit
           // scene and the user's canvas edits would vanish.
-          deps.transport.push(sceneMessage.scene(applyOverlay(overlay, lastCompiled).scene));
+          deps.transport.push(
+            sceneMessage.scene(
+              pageKey,
+              namespaceScene(applyOverlay(overlay, lastCompiled).scene, pageKey),
+            ),
+          );
         });
       inFlight = task.catch((err: unknown) => {
         deps.log.log({
@@ -184,24 +216,24 @@ async function pushResult(
 ): Promise<void> {
   if (result.sceneJson === null) {
     if (result.diagnostics.length > 0) {
-      deps.transport.push(sceneMessage.error(result.diagnostics));
+      deps.transport.push(sceneMessage.error(deps.pageKey, result.diagnostics));
       deps.log.log({
         level: "warn",
         code: "watch/recompile-error",
         msg: `compile failed (${trigger}): ${result.diagnostics.length} diagnostic(s)`,
-        fields: { trigger, diagnosticCount: result.diagnostics.length },
+        fields: { trigger, diagnosticCount: result.diagnostics.length, pageKey: deps.pageKey },
       });
     }
     return;
   }
 
   const scene = await resolveOverlaidScene(deps, result.sceneJson, overlayPath);
-  deps.transport.push(sceneMessage.scene(scene));
+  deps.transport.push(sceneMessage.scene(deps.pageKey, namespaceScene(scene, deps.pageKey)));
   deps.log.log({
     level: "info",
     code: "watch/recompile-ok",
     msg: `compiled ok (${trigger})`,
-    fields: { trigger },
+    fields: { trigger, pageKey: deps.pageKey },
   });
 }
 
