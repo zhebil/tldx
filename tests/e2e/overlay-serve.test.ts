@@ -17,6 +17,7 @@ import { runServe, type ServeHandle, type ServeIo } from "../../src/cli/serve.js
 import { boxShape } from "../../src/contracts/builders.js";
 import { isOverlay } from "../../src/contracts/overlay.js";
 import type { SceneJSON, TLRecord } from "../../src/contracts/scene-json.js";
+import { denamespaceScene, namespaceScene } from "../../src/domain/multipage/index.js";
 import { overlayPathFor } from "../../src/domain/overlay/index.js";
 import { createSystemClock } from "../../src/infra/clock/system-clock.js";
 import { createJsxExecute } from "../../src/infra/execute-jsx/execute-jsx.js";
@@ -24,6 +25,7 @@ import { createChokidarWatch } from "../../src/infra/fs/chokidar-watch.js";
 import { createNodeFsRead } from "../../src/infra/fs/node-fs-read.js";
 import { createNodeFsWrite } from "../../src/infra/fs/node-fs-write.js";
 import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
+import { pageKeyFor } from "../../src/infra/serve-registry/serve-registry.js";
 
 import { readFirstSceneMessage } from "./fidelity/harness.js";
 
@@ -131,10 +133,11 @@ describe("e2e: overlay round-trip through tldx serve", () => {
 
     const mutated = buildMutatedSnapshot(base);
 
+    const pageKey = pageKeyFor(filePath);
     const putRes = await fetch(`${handle.url}overlay`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(mutated),
+      headers: { "content-type": "application/json", "x-tldx-token": handle.token },
+      body: JSON.stringify({ pageKey, snapshot: mutated }),
     });
     expect(putRes.status).toBe(204);
 
@@ -150,7 +153,11 @@ describe("e2e: overlay round-trip through tldx serve", () => {
       const message = await readFirstSceneMessage(res.body);
       expect(message.kind).toBe("scene");
       if (message.kind !== "scene") throw new Error("expected a scene message");
-      expect(message.payload).toEqual(mutated);
+      // The canvas edit comes back as the server's authoritative page: same
+      // records, re-namespaced onto this diagram's page.
+      expect(message.payload).toEqual(
+        namespaceScene(denamespaceScene(mutated, pageKey, base), pageKey),
+      );
     } finally {
       reloadConn.abort();
     }
