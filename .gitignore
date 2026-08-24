@@ -8,8 +8,12 @@ build/
 .idea/
 .vscode/
 
-.claude
 .playwright-mcp/
+
+# .claude is tracked - skills, commands and shared settings are project source.
+# Only the machine-local and generated parts stay out.
+.claude/worktrees/
+.claude/settings.local.json
 
 # overlay sidecars are generated, never source
 *.overlay.json
