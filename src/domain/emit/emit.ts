@@ -319,6 +319,10 @@ function arrowPlacement(edge: IREdge, ctx: EmitContext): { parentId: string; ind
 
 // `isExact` skips tldraw's arc-vs-outline clipping, which is unstable when the
 // anchor already sits on the outline and can trim a bowed arrow to a 10px stub.
+// Re-measured against the whole corpus for #31: dropping it turns 17 more
+// arrows into that stub, so it is load-bearing, not a stale workaround. Every
+// anchor the router hands us is on a face, which is exactly the input tldraw's
+// clipping is unstable for - the two belong together.
 function emitEdge(
   edge: IREdge,
   out: TLRecord[],
