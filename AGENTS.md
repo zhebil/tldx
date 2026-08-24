@@ -10,10 +10,20 @@ demand rather than up front.
 ## Build & run
 
 ```bash
-npm run check                  # typecheck + lint + dep-lint + vitest
+npm run check                  # tsc + oxfmt --check + oxlint + knip + vitest
+npm run format                 # oxfmt, in place - run this before `check` complains
 npm run build                  # dist/cli (tsc) + dist/viewer (vite)
 npm run dev:cli -- <args>      # run the CLI from source, e.g. `-- serve examples/kernel.tldx.jsx`
 ```
+
+Each tool owns one question and nothing else, so they never disagree: `tsc`
+types, `oxfmt` formatting, `oxlint` per-file rules _and_ the layer boundaries
+(`.oxlintrc.json`), `knip` unused files/exports/dependencies (`knip.json`).
+
+`lint` runs `--type-aware`, which is what makes `no-floating-promises`,
+`await-thenable`, `unbound-method` and the rest of the typed rules do anything
+at all - without it they load and silently pass. It needs `oxlint-tsgolint`
+(a devDependency) and costs ~100ms.
 
 ## Tests
 

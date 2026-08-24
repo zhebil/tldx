@@ -68,8 +68,8 @@ describe("applyOverlay", () => {
     expect(shape?.rotation).toBe(1);
     expect(shape?.parentId).toBe("shape:web");
     expect(shape?.index).toBe("a3");
-    expect((shape?.props as { w: number }).w).toBe(220);
-    expect((shape?.props as { h: number }).h).toBe(96);
+    expect((shape!.props as { w: number }).w).toBe(220);
+    expect((shape!.props as { h: number }).h).toBe(96);
   });
 
   it("moved only writes the keys present in the placement", () => {
@@ -90,8 +90,8 @@ describe("applyOverlay", () => {
     const shape = out.store["shape:pay"];
     expect(diagnostics).toEqual([]);
     expect(shape?.opacity).toBe(0.5);
-    expect((shape?.props as { color: string }).color).toBe("red");
-    expect((shape?.props as { fill: string }).fill).toBe("solid");
+    expect((shape!.props as { color: string }).color).toBe("red");
+    expect((shape!.props as { fill: string }).fill).toBe("solid");
   });
 
   it("applies relabelled to props.richText for a box", () => {
@@ -99,7 +99,7 @@ describe("applyOverlay", () => {
     const overlay = overlayWith({ "shape:checkout": { relabelled: "Ship it" } });
     const { scene: out, diagnostics } = applyOverlay(overlay, scene);
     expect(diagnostics).toEqual([]);
-    expect((out.store["shape:checkout"]?.props as { richText: unknown }).richText).toEqual(
+    expect((out.store["shape:checkout"]!.props as { richText: unknown }).richText).toEqual(
       richText("Ship it"),
     );
   });
@@ -109,7 +109,7 @@ describe("applyOverlay", () => {
     const overlay = overlayWith({ "shape:edge1": { relabelled: "go" } });
     const { scene: out, diagnostics } = applyOverlay(overlay, scene);
     expect(diagnostics).toEqual([]);
-    expect((out.store["shape:edge1"]?.props as { text: string }).text).toBe("go");
+    expect((out.store["shape:edge1"]!.props as { text: string }).text).toBe("go");
   });
 
   it("emits overlay/unlabellable and skips when the record has neither text nor richText", () => {
@@ -183,8 +183,8 @@ describe("applyOverlay", () => {
     expect(diagnostics).toEqual([]);
     const shape = out.store["shape:checkout"];
     expect(shape?.x).toBe(50);
-    expect((shape?.props as { color: string }).color).toBe("green");
-    expect((shape?.props as { richText: unknown }).richText).toEqual(richText("Renamed"));
+    expect((shape!.props as { color: string }).color).toBe("green");
+    expect((shape!.props as { richText: unknown }).richText).toEqual(richText("Renamed"));
   });
 
   it("cascades delete: shape removal drags down its bindings and the bound arrow", () => {

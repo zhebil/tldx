@@ -23,9 +23,8 @@ npm i -g playwright && npx playwright install chromium
 
 Read [`docs/architecture.md`](docs/architecture.md) - the pipeline, the layers,
 and which layer may import which. Those import rules are enforced by
-`.eslintrc.cjs` and `.dependency-cruiser.cjs`, so a violation fails
-`npm run check` rather than review. The one that catches people out:
-`domain/` may not import from `infra/` or `app/`.
+`.oxlintrc.json`, so a violation fails `npm run check` rather than review. The
+one that catches people out: `domain/` may not import from `infra/` or `app/`.
 
 [`docs/reference.md`](docs/reference.md) is the component and prop reference.
 Look things up in it as needed rather than reading it front to back.
@@ -34,12 +33,12 @@ Look things up in it as needed rather than reading it front to back.
 
 Write the smallest test that pins the behaviour, at the layer that owns it:
 
-| what changed | where the test goes |
-| --- | --- |
-| pure logic | co-located unit test in `domain/` |
-| orchestration | integration test in `app/`, against the fakes |
-| real adapter behaviour | the port's `.contract.ts` suite |
-| end to end | a fixture under `tests/e2e/` |
+| what changed           | where the test goes                           |
+| ---------------------- | --------------------------------------------- |
+| pure logic             | co-located unit test in `domain/`             |
+| orchestration          | integration test in `app/`, against the fakes |
+| real adapter behaviour | the port's `.contract.ts` suite               |
+| end to end             | a fixture under `tests/e2e/`                  |
 
 Every port in `app/ports/` has a colocated `.fake.ts`. The contract suite runs
 against the fake and the real adapter both, so a fake that drifts from its

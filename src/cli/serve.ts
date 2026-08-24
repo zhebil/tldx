@@ -19,7 +19,12 @@ import type { LogPort } from "../app/ports/log.js";
 import type { WatchPort } from "../app/ports/watch.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 import { startDevServer } from "../infra/devserver/dev-server.js";
-import { codeFingerprint, hashSource, newestMtimeMs, touchServeCompile } from "../infra/serve-registry/serve-registry.js";
+import {
+  codeFingerprint,
+  hashSource,
+  newestMtimeMs,
+  touchServeCompile,
+} from "../infra/serve-registry/serve-registry.js";
 import { createSseTransport } from "../infra/transport/sse-transport.js";
 
 const DEFAULT_TTL_MINUTES = 60;
@@ -104,8 +109,8 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
 
   const ttlMinutes = deps.ttlMinutes ?? DEFAULT_TTL_MINUTES;
   let resolveIdleExpired: () => void;
-  const idleExpired = new Promise<void>((resolve) => {
-    resolveIdleExpired = resolve;
+  const idleExpired = new Promise<void>((settle) => {
+    resolveIdleExpired = settle;
   });
   const reaper = createIdleReaper({
     clock: deps.clock,
@@ -159,7 +164,10 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
         });
         // The compiler code isn't watched, so this recompile is the cheapest
         // hook for noticing it moved since boot. Warn once; the fix is a restart.
-        if (!warnedCodeStale && codeFingerprint(dirname(fileURLToPath(import.meta.url))) > bootCodeFingerprint) {
+        if (
+          !warnedCodeStale &&
+          codeFingerprint(dirname(fileURLToPath(import.meta.url))) > bootCodeFingerprint
+        ) {
           warnedCodeStale = true;
           deps.log.log({
             level: "warn",
@@ -193,7 +201,11 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     throw err;
   }
 
-  const compile = { hash: await readHashSafe(deps.fs, path), at: deps.clock.now(), codeFingerprint: bootCodeFingerprint };
+  const compile = {
+    hash: await readHashSafe(deps.fs, path),
+    at: deps.clock.now(),
+    codeFingerprint: bootCodeFingerprint,
+  };
 
   io.writeStdout(`tldx serving ${path} on ${server.url}\n`);
 

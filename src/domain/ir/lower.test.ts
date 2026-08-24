@@ -113,10 +113,7 @@ describe("lower: diagnostics", () => {
   it("ir/unknown-reference for both endpoints emits twice", () => {
     const ast = doc({}, [edge({ from: "g1", to: "g2" })]);
     const { codes } = lowerAst(ast);
-    expect(codes).toEqual([
-      "ir/unknown-reference",
-      "ir/unknown-reference",
-    ]);
+    expect(codes).toEqual(["ir/unknown-reference", "ir/unknown-reference"]);
   });
 
   it("ir/anchor-not-supported when endpoint uses dotted form", () => {
@@ -371,11 +368,9 @@ describe("lower: synthetic ids", () => {
     const reordered = doc({}, [note({}, "gamma"), note({}, "alpha"), note({}, "beta")]);
     const a = lowerAst(orig).ir!;
     const b = lowerAst(reordered).ir!;
-    const idOf = (text: string, docIr: IRDoc) => {
-      const n = docIr.children.find(
-        (c) => c.kind === "note" && c.text === text,
-      );
-      if (!n) throw new Error(`no note with text ${text}`);
+    const idOf = (wanted: string, docIr: IRDoc) => {
+      const n = docIr.children.find((c) => c.kind === "note" && c.text === wanted);
+      if (!n) throw new Error(`no note with text ${wanted}`);
       return n.id;
     };
     expect(idOf("alpha", a)).toBe(idOf("alpha", b));
@@ -384,20 +379,11 @@ describe("lower: synthetic ids", () => {
   });
 
   it("synthetic edge id is stable across non-edge sibling reorder", () => {
-    const orig = doc({}, [
-      box({ id: "a" }),
-      box({ id: "b" }),
-      edge({ from: "a", to: "b" }),
-    ]);
-    const reordered = doc({}, [
-      box({ id: "b" }),
-      box({ id: "a" }),
-      edge({ from: "a", to: "b" }),
-    ]);
+    const orig = doc({}, [box({ id: "a" }), box({ id: "b" }), edge({ from: "a", to: "b" })]);
+    const reordered = doc({}, [box({ id: "b" }), box({ id: "a" }), edge({ from: "a", to: "b" })]);
     const a = lowerAst(orig).ir!;
     const b = lowerAst(reordered).ir!;
-    const edgeOf = (docIr: IRDoc) =>
-      docIr.children.find((c) => c.kind === "edge")!;
+    const edgeOf = (docIr: IRDoc) => docIr.children.find((c) => c.kind === "edge")!;
     expect(edgeOf(a).id).toBe(edgeOf(b).id);
   });
 });
@@ -538,35 +524,48 @@ describe("lower: diagnostics name the authored component, not the IR kind", () =
     "Graph",
   ] as const;
 
-  it.each(FRAME_TAGS)("ir/missing-id on a tagless <Frame> or alias %s names itself, not '<frame>'", (tag) => {
-    const expectedTag = tag ?? "Frame";
-    const ast = doc({}, [frame({}, [], false, tag)]);
-    const diagnostics = lowerDiagnostics(ast);
-    expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe("ir/missing-id");
-    expect(diagnostics[0]!.message).toBe(
-      `'<${expectedTag}>' is addressable and requires an explicit 'id'`,
-    );
-  });
+  it.each(FRAME_TAGS)(
+    "ir/missing-id on a tagless <Frame> or alias %s names itself, not '<frame>'",
+    (tag) => {
+      const expectedTag = tag ?? "Frame";
+      const ast = doc({}, [frame({}, [], false, tag)]);
+      const diagnostics = lowerDiagnostics(ast);
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]!.code).toBe("ir/missing-id");
+      expect(diagnostics[0]!.message).toBe(
+        `'<${expectedTag}>' is addressable and requires an explicit 'id'`,
+      );
+    },
+  );
 
-  it.each(FRAME_TAGS)("ir/unknown-prop on <Frame> or alias %s names itself, not '<frame>'", (tag) => {
-    const expectedTag = tag ?? "Frame";
-    const ast = doc({}, [frame({ id: "f", bogus: "x" }, [], false, tag)]);
-    const diagnostics = lowerDiagnostics(ast);
-    expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe("ir/unknown-prop");
-    expect(diagnostics[0]!.message).toMatch(new RegExp(`^'bogus' is not supported on '<${expectedTag}>'`));
-  });
+  it.each(FRAME_TAGS)(
+    "ir/unknown-prop on <Frame> or alias %s names itself, not '<frame>'",
+    (tag) => {
+      const expectedTag = tag ?? "Frame";
+      const ast = doc({}, [frame({ id: "f", bogus: "x" }, [], false, tag)]);
+      const diagnostics = lowerDiagnostics(ast);
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]!.code).toBe("ir/unknown-prop");
+      expect(diagnostics[0]!.message).toMatch(
+        new RegExp(`^'bogus' is not supported on '<${expectedTag}>'`),
+      );
+    },
+  );
 
-  it.each(["Note", "Sticky"] as const)("ir/unknown-prop on <%s> names itself, not '<note>'", (tag) => {
-    const ast = doc({}, [note({ id: "n", bogus: "x" }, "hi", tag === "Sticky", tag === "Note" ? undefined : tag)]);
-    const diagnostics = lowerDiagnostics(ast);
-    expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.code).toBe("ir/unknown-prop");
-    expect(diagnostics[0]!.message).toBe(
-      `'bogus' is not supported on '<${tag}>' (allowed: id, on, x, y, w, h, maxW, color, textAlign, verticalAlign, labelColor, font, size)`,
-    );
-  });
+  it.each(["Note", "Sticky"] as const)(
+    "ir/unknown-prop on <%s> names itself, not '<note>'",
+    (tag) => {
+      const ast = doc({}, [
+        note({ id: "n", bogus: "x" }, "hi", tag === "Sticky", tag === "Note" ? undefined : tag),
+      ]);
+      const diagnostics = lowerDiagnostics(ast);
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]!.code).toBe("ir/unknown-prop");
+      expect(diagnostics[0]!.message).toBe(
+        `'bogus' is not supported on '<${tag}>' (allowed: id, on, x, y, w, h, maxW, color, textAlign, verticalAlign, labelColor, font, size)`,
+      );
+    },
+  );
 });
 
 describe("lower: note sticky marker", () => {
@@ -623,7 +622,19 @@ describe("lower: box text marker", () => {
 
   it("rejects fill/dash/geo/verticalAlign/labelColor/h/label on <Text>", () => {
     const ast = doc({}, [
-      text({ id: "t", fill: "solid", dash: "dashed", geo: "ellipse", verticalAlign: "end", labelColor: "red", h: 40, label: "nope" }, "hi"),
+      text(
+        {
+          id: "t",
+          fill: "solid",
+          dash: "dashed",
+          geo: "ellipse",
+          verticalAlign: "end",
+          labelColor: "red",
+          h: 40,
+          label: "nope",
+        },
+        "hi",
+      ),
     ]);
     const { codes } = lowerAst(ast);
     expect(codes).toEqual(Array(7).fill("ir/unknown-prop"));
@@ -631,7 +642,10 @@ describe("lower: box text marker", () => {
 
   it("accepts w/maxW/color/textAlign/font/size on <Text>", () => {
     const ast = doc({}, [
-      text({ id: "t", w: 200, maxW: 300, color: "blue", textAlign: "end", font: "mono", size: "l" }, "hi"),
+      text(
+        { id: "t", w: 200, maxW: 300, color: "blue", textAlign: "end", font: "mono", size: "l" },
+        "hi",
+      ),
     ]);
     const { ir, codes } = lowerAst(ast);
     expect(codes).toEqual([]);
@@ -678,7 +692,11 @@ describe("lower: note 'on' target", () => {
 
   it("keeps 'on' when it resolves to a frame, note, or edge", () => {
     const ast = doc({}, [
-      frame({ id: "f" }, [box({ id: "a" }), box({ id: "b" }), edge({ id: "e", from: "a", to: "b" })]),
+      frame({ id: "f" }, [
+        box({ id: "a" }),
+        box({ id: "b" }),
+        edge({ id: "e", from: "a", to: "b" }),
+      ]),
       note({ id: "n1", on: "f" }, "on a frame"),
       note({ id: "n2", on: "n1" }, "on another note"),
       note({ id: "n3", on: "e" }, "on an edge"),

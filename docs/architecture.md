@@ -39,7 +39,7 @@ x.tldx.jsx
   └─ transport    infra/transport/     SSE to the viewer (src/viewer/, tldraw)
 ```
 
-ELK is opt-in. `layout="auto"` hands ELK a *flat* graph of one container's
+ELK is opt-in. `layout="auto"` hands ELK a _flat_ graph of one container's
 already-sized direct children and takes back positions only — the routed edge
 geometry is discarded, because `routing.ts` does that better with knowledge of
 labels.
@@ -57,10 +57,14 @@ runtime/    the "tldx" module authors import.
 viewer/     the browser bundle. Imports contracts/ only.
 ```
 
-The dependency rules are enforced mechanically by `.eslintrc.cjs` and
-`.dependency-cruiser.cjs` — `npm run check` fails on a violation, so you don't
-have to remember them. The one that bites most often: `domain/` may not import
-from `infra/` or `app/`.
+The dependency rules are enforced mechanically by `.oxlintrc.json` — one
+`no-restricted-imports` block per layer, plus `import/no-cycle`. `npm run check`
+fails on a violation, so you don't have to remember them. The one that bites
+most often: `domain/` may not import from `infra/` or `app/`.
+
+A glob that stops matching stops enforcing, silently, so
+`tests/tools/lint-boundaries.test.ts` plants one rejected import per layer and
+asserts the lint still catches it. Add a case there whenever you add a rule.
 
 Every port in `app/ports/` has a colocated `.fake.ts` and `.contract.ts`. The
 contract suite runs against both the fake and the real adapter, so the fake
@@ -74,7 +78,7 @@ never in the source, and never written by anything but a human moving shapes.
 
 `tldx absorb` folds back the operations JSX can express exactly, and verifies
 its own rewrite before it empties the overlay. `tldx verify` answers the
-narrower question: does the source *alone* now reproduce what the canvas
+narrower question: does the source _alone_ now reproduce what the canvas
 showed? Anything absorb can't express is left for a human to write.
 
 Overlay sidecars are gitignored. They're a handoff buffer, not source.

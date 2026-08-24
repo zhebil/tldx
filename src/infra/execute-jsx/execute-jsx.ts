@@ -56,9 +56,7 @@ m.paths = Module._nodeModulePaths(path.dirname(workerData.filename));
 m._compile(workerData.code, workerData.filename);
 `;
 
-type WorkerMessage =
-  | { ok: true; ast: unknown }
-  | { ok: false; message: string; stack: string };
+type WorkerMessage = { ok: true; ast: unknown } | { ok: false; message: string; stack: string };
 
 type BuildOk = { code: string; mapText: string; inputs: string[] };
 type BuildOutcome = BuildOk | { diagnostics: Diagnostic[] };
@@ -84,15 +82,15 @@ async function buildBundle(source: string, path: string): Promise<BuildOutcome> 
 
   const entryPlugin: Plugin = {
     name: "tldx-entry",
-    setup(build) {
+    setup(pluginBuild) {
       // The entry's contents come from `source` while its resolved path stays
       // the real one: jsxDEV's `source.fileName` and every span downstream
       // depend on that, and it lets one path map to different sources per call.
-      build.onResolve({ filter: entryFilter }, (args) => ({
+      pluginBuild.onResolve({ filter: entryFilter }, (args) => ({
         path: args.path,
         namespace: "file",
       }));
-      build.onLoad({ filter: entryFilter, namespace: "file" }, () => ({
+      pluginBuild.onLoad({ filter: entryFilter, namespace: "file" }, () => ({
         contents: source,
         loader: "jsx",
       }));
@@ -226,11 +224,11 @@ function runInWorker(
       });
     });
 
-    worker.on("exit", (code) => {
-      if (code !== 0) {
+    worker.on("exit", (exitCode) => {
+      if (exitCode !== 0) {
         finish({
           diagnostics: [
-            error("runtime/threw", `worker exited with code ${String(code)}`, {
+            error("runtime/threw", `worker exited with code ${String(exitCode)}`, {
               file: path,
               line: 1,
               column: 1,
