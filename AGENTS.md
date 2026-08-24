@@ -21,6 +21,16 @@ The docs diagrams are source plus a committed SVG. `npm run check` only proves
 the source still compiles - if you change one, run `npm run diagrams` and commit
 the SVG alongside it, or the picture in `docs/architecture.md` goes stale.
 
+`layers.svg` and `round-trip.svg` currently carry arrow bends that were set on
+the canvas and have no JSX spelling ([#30]), so the source alone does not
+reproduce them. `npm run diagrams` picks them up only because it reuses a
+running `serve`, which applies the overlay ([#38]) - run it with no server up
+and those two SVGs get visibly worse. Check the diff before committing a
+re-render.
+
+[#30]: https://github.com/zhebil/tldx/issues/30
+[#38]: https://github.com/zhebil/tldx/issues/38
+
 Shared entities live in `docs/diagrams/lib/vocabulary.jsx`, not in each diagram.
 Recolouring a layer means editing `LAYER` there once; adding a box that already
 exists elsewhere means importing it, not copying its props.
