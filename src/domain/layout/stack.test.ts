@@ -1160,7 +1160,7 @@ describe("hybridLayout container-aware box sizing", () => {
     expect(capped.w).toBe(100);
   });
 
-  it("does not let a capped diamond's outline-inflated height drag a rect row sibling up to match it (D20 follow-up)", async () => {
+  it("does not let a diamond's outline-inflated height drag a rect row sibling up to match it (D20 follow-up)", async () => {
     const cLabel = "Deploy to staging";
     const dLabel = "Quality gate coverage check";
     const result = await layoutAst(
@@ -1172,11 +1172,12 @@ describe("hybridLayout container-aware box sizing", () => {
     const c = boxById(result.children, "c");
     const d = boxById(result.children, "d");
 
-    // d is capped at maxW and legitimately taller than its own natural
-    // content height, because the diamond's outline has to contain the
-    // label - that stays.
-    const dNatural = boxHeightForWidth(dLabel, fitBoxWidth(dLabel, 200));
-    expect(d.w).toBe(200);
+    // d is legitimately taller than its own natural content height, because
+    // the diamond's outline has to contain the label - that stays. Its maxW
+    // does not: 200 would spike it, so `relaxedMaxW` drops it (#40).
+    // Measured at d's own natural width, since its maxW was relaxed away.
+    const dNatural = boxHeightForWidth(dLabel, fitBoxWidth(dLabel));
+    expect(d.w).toBeGreaterThan(200);
     expect(d.h).toBeGreaterThan(dNatural);
 
     // c still gets a uniform row height (voted from natural content heights,
@@ -1204,7 +1205,7 @@ describe("hybridLayout container-aware box sizing", () => {
     expect(labelOverflow(label, narrow.w, narrow.h)).toBeUndefined();
   });
 
-  it("grows a maxW-capped diamond's height instead of clipping when the shared-width vote's k no longer applies at the capped width", async () => {
+  it("widens a diamond past a maxW that would spike it, instead of paying for the label in height alone (#40)", async () => {
     const label = "Manual approval\nrelease manager signs off";
     const style = { geo: "diamond" as const };
     const result = await layoutAst(
@@ -1212,8 +1213,20 @@ describe("hybridLayout container-aware box sizing", () => {
     );
     const approval = boxById(result.children, "approval");
 
-    expect(approval.w).toBe(220);
+    // maxW=220 used to give 220x680, a 1:3 spike that dragged the whole
+    // diagram taller. The relaxed box is wider than tall and still contains
+    // its label, and never exceeds the width it would take with no maxW.
+    expect(approval.w).toBeGreaterThan(220);
+    expect(approval.h).toBeLessThan(approval.w);
+    expect(approval.w).toBe(estimatedBoxSize(label, undefined, style).w);
     expect(labelOverflow(label, approval.w, approval.h, style)).toBeUndefined();
+  });
+
+  it("still caps a diamond at a maxW it comfortably fits under", async () => {
+    const result = await layoutAst(
+      doc({ layout: "col" }, [box({ id: "gate", label: "Yes?", geo: "diamond", maxW: 100 })]),
+    );
+    expect(boxById(result.children, "gate").w).toBeLessThanOrEqual(100);
   });
 
   it("keeps an author-pinned h even when the label needs more room, so check can still warn", async () => {
