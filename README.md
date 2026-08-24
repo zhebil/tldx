@@ -7,6 +7,12 @@ You describe _what connects to what_. Layout, sizing, edge routing and label
 placement are the tool's job — there are no coordinates in a `.tldx.jsx` file
 unless you want them.
 
+![The debugging loop](docs/diagrams/debugging.svg)
+
+Source: [`docs/diagrams/debugging.tldx.jsx`](docs/diagrams/debugging.tldx.jsx). No
+coordinates anywhere in it - the blame list is a `.map()` over a four-element
+array, and the loop back onto "add a console.log" is a self-edge, `log -> log`.
+
 ## Install
 
 ```bash
@@ -89,8 +95,16 @@ It calls the `tldx` binary on your `PATH`, so install the CLI first.
 
 ## Examples
 
-[`examples/`](examples/) has five: a three-tier web stack, an RFC 793 TCP state
-machine, a Kafka event pipeline, a CI/CD pipeline, and an OS kernel map.
+[`examples/`](examples/) has five, each with its rendered SVG next to it - click
+through to see what the source produces before installing anything.
+
+|                                                   |                                                                           |
+| ------------------------------------------------- | ------------------------------------------------------------------------- |
+| [Web architecture](examples/web-architecture.svg) | a three-tier stack in swimlanes, with an external gateway                 |
+| [TCP (RFC 793)](examples/tcp-rfc793.svg)          | the full state machine, laid out with nested `<Group>` and no coordinates |
+| [Event-driven](examples/event-driven.svg)         | Kafka topics, consumers and a dead-letter redrive loop                    |
+| [CI/CD](examples/cicd-pipeline.svg)               | gates, a manual approval, and every off-ramp                              |
+| [Kernel](examples/kernel.svg)                     | user space to hardware, five rings deep                                   |
 
 ```bash
 tldx serve examples/web-architecture.tldx.jsx

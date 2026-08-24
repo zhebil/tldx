@@ -5,41 +5,33 @@
 A `.tldx.jsx` file is a JavaScript module whose default export returns a
 `<Doc>`. Compiling it means running it and lowering what comes back.
 
-```
-x.tldx.jsx
-  │
-  ├─ execute      infra/execute-jsx/   esbuild bundles the file, a fresh worker
-  │                                    runs it (2s hard timeout). The "tldx"
-  │                                    import is aliased to the bundled runtime.
-  │                                    esbuild's metafile gives us the watch set.
-  │
-  ├─ runtime      runtime/components   Plain functions. No React, no reconciler:
-  │                                    esbuild's JSX transform calls jsx()/jsxDEV()
-  │                                    which call the components directly. jsxDEV's
-  │                                    `source` argument becomes each node's span,
-  │                                    which is why diagnostics have line numbers.
-  │
-  ├─ lower        domain/ir/lower.ts   AST → IR. Assigns ids, validates props and
-  │                                    enums, resolves edge endpoints. Errors are
-  │                                    collected, not thrown — one bad prop doesn't
-  │                                    lose the rest of the diagram.
-  │
-  ├─ layout       domain/layout/       hybridLayout in stack.ts is the engine.
-  │                                    defaults.ts sizes boxes, glyph-metrics.ts
-  │                                    measures text with real tldraw metrics,
-  │                                    routing.ts bends and fans edges,
-  │                                    attach.ts places stickies,
-  │                                    occlusion.ts reports overlaps.
-  │
-  ├─ emit         domain/emit/         positioned IR → a tldraw store snapshot
-  │
-  ├─ overlay      domain/overlay/      applies canvas edits on top. Pure, and it
-  │                                    never re-runs layout.
-  │
-  └─ transport    infra/transport/     SSE to the viewer (src/viewer/, tldraw).
-                                       One message per diagram, last one per page
-                                       replayed to a client on connect.
-```
+![The compile pipeline](diagrams/pipeline.svg)
+
+Every diagram on this page imports `docs/diagrams/lib/vocabulary.jsx` - one
+`LAYER` palette plus a handful of components - so `x.tldx.jsx` is the same blue
+box wherever it appears, and a stage's colour _is_ the layer it lives in. Orange
+touches the outside world, green is pure: the middle of the pipeline being all
+green is a fact about the code, not a styling choice.
+
+The stages, and the part the picture can't hold:
+
+- **execute** (`infra/execute-jsx/`) - esbuild bundles the file and a fresh
+  worker runs it, with a 2s hard timeout. The `"tldx"` import is aliased to the
+  bundled runtime. esbuild's metafile is what gives us the watch set.
+- **runtime** (`runtime/components`) - plain functions. No React, no
+  reconciler: esbuild's JSX transform calls `jsx()`/`jsxDEV()`, which call the
+  components directly. `jsxDEV`'s `source` argument becomes each node's span,
+  which is why diagnostics have line numbers.
+- **lower** (`domain/ir/lower.ts`) - AST → IR. Assigns ids, validates props and
+  enums, resolves edge endpoints. Errors are collected, not thrown — one bad
+  prop doesn't lose the rest of the diagram.
+- **layout** (`domain/layout/`) - `hybridLayout` in `stack.ts` is the engine;
+  the other five files are the stages drawn inside it.
+- **emit** (`domain/emit/`) - positioned IR → a tldraw store snapshot.
+- **overlay** (`domain/overlay/`) - applies canvas edits on top. Pure, and it
+  never re-runs layout.
+- **transport** (`infra/transport/`) - SSE to the viewer. One message per
+  diagram, last one per page replayed to a client on connect.
 
 ELK is opt-in. `layout="auto"` hands ELK a _flat_ graph of one container's
 already-sized direct children and takes back positions only — the routed edge
@@ -63,6 +55,8 @@ The dependency rules are enforced mechanically by `.oxlintrc.json` — one
 `no-restricted-imports` block per layer, plus `import/no-cycle`. `npm run check`
 fails on a violation, so you don't have to remember them. The one that bites
 most often: `domain/` may not import from `infra/` or `app/`.
+
+![Layers and dependency rules](diagrams/layers.svg)
 
 A glob that stops matching stops enforcing, silently, so
 `tests/tools/lint-boundaries.test.ts` plants one rejected import per layer and
@@ -123,6 +117,8 @@ narrower question: does the source _alone_ now reproduce what the canvas
 showed? Anything absorb can't express is left for a human to write.
 
 Overlay sidecars are gitignored. They're a handoff buffer, not source.
+
+![The round trip between source, canvas and overlay](diagrams/round-trip.svg)
 
 ## Why it's a file watcher and not an MCP server
 

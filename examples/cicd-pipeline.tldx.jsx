@@ -20,7 +20,7 @@ export default function CicdPipeline() {
         />
         <Box
           id="quality-gate"
-          maxW="200"
+          maxW="300"
           geo="diamond"
           color="yellow"
           label={"Quality gate\ncoverage >= 80%\nno high CVEs"}
@@ -29,7 +29,7 @@ export default function CicdPipeline() {
 
       <Box
         id="approval"
-        maxW="220"
+        maxW="380"
         geo="diamond"
         color="orange"
         label={"Manual approval\nrelease manager signs off"}
@@ -62,7 +62,7 @@ export default function CicdPipeline() {
         />
         <Box
           id="health-gate"
-          maxW="200"
+          maxW="300"
           geo="diamond"
           color="yellow"
           label={"Health gate\nerror rate < 1% for 10 min"}

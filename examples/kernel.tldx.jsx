@@ -47,7 +47,6 @@ function Rule({ id, label, tone, font = "sans" }) {
       color={tone}
       fill="solid"
       dash="dashed"
-      labelColor="white"
       textAlign="middle"
       font={font}
       size="l"
