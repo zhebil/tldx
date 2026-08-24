@@ -7,10 +7,14 @@ updates:
     open-pull-requests-limit: 5
     groups:
       # One PR per ecosystem-ish cluster instead of one per package.
+      # Majors stay out of the groups: they land as their own PR so a
+      # breaking change is reviewed on its own diff, not buried in a bump list.
       dev-dependencies:
         dependency-type: development
+        update-types: [minor, patch]
       production-dependencies:
         dependency-type: production
+        update-types: [minor, patch]
     ignore:
       # The scene JSON contract is pinned to a tldraw major on purpose; a major
       # bump is a wire-format break, not a dependency update.
