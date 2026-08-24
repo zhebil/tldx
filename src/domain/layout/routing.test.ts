@@ -121,6 +121,34 @@ describe("computeEdgeRoutes", () => {
     expect(route!.endAnchor).toEqual({ x: 0, y: 0.5 });
   });
 
+  it("binds a barely-overlapping peer pair centre to centre rather than corner to face", () => {
+    // 100-wide peers offset by 80: the strip where both spans overlap is 20
+    // wide and b's centre is 30px outside it, so a perpendicular drop would
+    // have to leave a at its bottom-right corner. #31 - a human undoes that.
+    const ir = doc("root", [
+      box({ id: "a", x: 0, y: 0, w: 100, h: 50 }),
+      box({ id: "b", x: 80, y: 150, w: 100, h: 50 }),
+      edge({ id: "ab", from: "a", to: "b" }),
+    ]);
+    const route = computeEdgeRoutes(ir).get("ab");
+    expect(route?.startAnchor).toBeUndefined();
+    expect(route?.endAnchor).toBeUndefined();
+  });
+
+  it("still attaches a wide bar's face when the child it fans to hangs off the end", () => {
+    // Same clamp, but the bar out-spans the box more than 3x, so an attach
+    // near its end is the fan-out this pass exists for - not a fallen-off
+    // corner. Centre binding here would drag the arrow across the whole bar.
+    const ir = doc("root", [
+      box({ id: "bar", x: 0, y: 0, w: 900, h: 50 }),
+      box({ id: "b", x: 860, y: 150, w: 100, h: 50 }),
+      edge({ id: "ab", from: "bar", to: "b" }),
+    ]);
+    const route = computeEdgeRoutes(ir).get("ab");
+    expect(route?.startAnchor).toEqual({ x: 1, y: 1 });
+    expect(route?.endAnchor).toEqual({ x: 0.4, y: 0 });
+  });
+
   it("leaves a cross-container edge straight when nothing sits between its endpoints", () => {
     const ir = doc("root", [
       frame({
