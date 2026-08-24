@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per ecosystem-ish cluster instead of one per package.
+      dev-dependencies:
+        dependency-type: development
+      production-dependencies:
+        dependency-type: production
+    ignore:
+      # The scene JSON contract is pinned to a tldraw major on purpose; a major
+      # bump is a wire-format break, not a dependency update.
+      - dependency-name: tldraw
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly

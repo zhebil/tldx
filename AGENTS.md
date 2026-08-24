@@ -34,3 +34,19 @@ against the fake and the real adapter both, so a fake that drifts fails.
 - Reports, baselines and scratch notes do not belong in `docs/`. Write them to
   a temp dir.
 - Debug PNGs go to a temp dir, never the repo.
+
+## Releasing
+
+`main` is protected; land changes through a PR. To ship a version:
+
+```bash
+npm version patch          # bumps package.json and tags v<x.y.z>
+# bump plugin/.claude-plugin/plugin.json to match, then push both
+git push origin main --follow-tags
+gh release create v<x.y.z> --generate-notes
+```
+
+Publishing to npm is the `Publish Package` workflow, triggered by the GitHub
+release. It authenticates over OIDC (npm trusted publishing), so there is no
+token in the repo and nothing to rotate. The workflow refuses to publish if the
+tag and `package.json` disagree.
