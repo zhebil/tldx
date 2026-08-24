@@ -102,7 +102,7 @@ export function pageRecord(input: {
   return {
     id: input.id,
     typeName: "page",
-    name: input.name ?? "tldsl",
+    name: input.name ?? "tldx",
     index: input.index ?? "a1",
     meta: {},
   };

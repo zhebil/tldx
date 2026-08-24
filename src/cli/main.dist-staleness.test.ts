@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { distStalenessHint } from "./main.js";
 
-describe("distStalenessHint (tldsl-ppj: a stale dist/ should say so, not look like a missing command)", () => {
+describe("distStalenessHint (tldx-ppj: a stale dist/ should say so, not look like a missing command)", () => {
   const dirs: string[] = [];
 
   afterEach(() => {
@@ -14,7 +14,7 @@ describe("distStalenessHint (tldsl-ppj: a stale dist/ should say so, not look li
   });
 
   function makeRepo(): { root: string; distCli: string; srcDir: string } {
-    const root = mkdtempSync(join(tmpdir(), "tldsl-staleness-test-"));
+    const root = mkdtempSync(join(tmpdir(), "tldx-staleness-test-"));
     dirs.push(root);
     const distCli = join(root, "dist", "cli");
     const srcDir = join(root, "src");
@@ -42,7 +42,7 @@ describe("distStalenessHint (tldsl-ppj: a stale dist/ should say so, not look li
   });
 
   it("is silent when src/ doesn't exist next to dist/ (an installed package)", () => {
-    const root = mkdtempSync(join(tmpdir(), "tldsl-staleness-test-"));
+    const root = mkdtempSync(join(tmpdir(), "tldx-staleness-test-"));
     dirs.push(root);
     const distCli = join(root, "dist", "cli");
     mkdirSync(distCli, { recursive: true });
@@ -52,7 +52,7 @@ describe("distStalenessHint (tldsl-ppj: a stale dist/ should say so, not look li
   });
 
   it("is silent when not running from a dist/ directory (dev checkout via tsx)", () => {
-    const root = mkdtempSync(join(tmpdir(), "tldsl-staleness-test-"));
+    const root = mkdtempSync(join(tmpdir(), "tldx-staleness-test-"));
     dirs.push(root);
     const srcCli = join(root, "src", "cli");
     mkdirSync(srcCli, { recursive: true });

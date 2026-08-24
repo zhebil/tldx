@@ -5,7 +5,7 @@
  * by calling `error()` / `warning()` here so severity stays consistent and
  * codes are the single asserted surface in tests.
  *
- * Formatting is intentionally absent: `cli/format-diagnostics.ts` (tldsl-1il)
+ * Formatting is intentionally absent: `cli/format-diagnostics.ts` (tldx-1il)
  * owns the plain-text rendering. Per CONTEXT.md, domain produces the data;
  * cli renders it.
  */

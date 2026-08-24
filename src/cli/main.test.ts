@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { shouldOpenBrowser } from "./main.js";
 
-describe("shouldOpenBrowser (tldsl-69w: a restart must not pile up tabs)", () => {
+describe("shouldOpenBrowser (tldx-69w: a restart must not pile up tabs)", () => {
   it("opens when nothing is live and --no-open wasn't passed", () => {
     expect(shouldOpenBrowser(false, undefined)).toBe(true);
   });

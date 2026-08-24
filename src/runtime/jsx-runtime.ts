@@ -1,5 +1,5 @@
 /**
- * `tldsl/jsx-runtime` - the automatic-runtime module esbuild imports for
+ * `tldx/jsx-runtime` - the automatic-runtime module esbuild imports for
  * plain (non-dev) JSX transforms. No React: `jsx`/`jsxs` call the resolved
  * component function directly (docs/jsx-pivot.md decision 1).
  */

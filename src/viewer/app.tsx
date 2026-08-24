@@ -29,7 +29,7 @@ export function ViewerApp(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    // Keeps `tldsl serve`'s idle-TTL reaper (tldsl-kts) from reaping a
+    // Keeps `tldx serve`'s idle-TTL reaper (tldx-kts) from reaping a
     // server someone is actually looking at - see `heartbeat.ts` for why
     // this has to be visibility-gated rather than just "connected".
     const heartbeat = createHeartbeat();

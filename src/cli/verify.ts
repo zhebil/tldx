@@ -1,5 +1,5 @@
 /**
- * `tldsl verify <file>`: pass/fail check of whether a diagram's JSX source
+ * `tldx verify <file>`: pass/fail check of whether a diagram's JSX source
  * alone reproduces the canvas the overlay describes (`src/app/verify.ts`).
  * This module owns argv shape, result-to-text formatting, and the exit
  * code; `runVerify` itself never prints or exits (CONTEXT.md: app/ never

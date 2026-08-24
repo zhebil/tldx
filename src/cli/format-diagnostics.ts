@@ -1,5 +1,5 @@
 /**
- * Plain-text diagnostic renderer for `tldsl check` output and the PostToolUse
+ * Plain-text diagnostic renderer for `tldx check` output and the PostToolUse
  * hook. Output format (one diagnostic per line):
  *
  *   <file>:<line>:<col>: <severity>[<code>]: <message>

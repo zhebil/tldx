@@ -3,7 +3,7 @@
  * impl, no test variation worth a port abstraction. Tests pass a no-op into
  * `cli/serve`'s `openBrowser` dep instead of going through this module.
  *
- * The tab opens unfocused where the platform allows it, so `tldsl serve` never
+ * The tab opens unfocused where the platform allows it, so `tldx serve` never
  * steals the foreground from the terminal that started it.
  *
  * Failures (binary missing, sandbox refusal, exit non-zero) are swallowed:

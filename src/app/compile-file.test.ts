@@ -38,7 +38,7 @@ const SRC = "export default function Diagram() { return null; }";
 describe("compileFile", () => {
   describe("happy path", () => {
     it("returns a sceneJson and no diagnostics for a valid doc", async () => {
-      const path = "auth.tldsl.jsx";
+      const path = "auth.tldx.jsx";
       const { doc, box, edge } = astBuilders(path);
       const execute = new FakeExecute();
       execute.setResult(SRC, {
@@ -60,7 +60,7 @@ describe("compileFile", () => {
     });
 
     it("invokes the layout port with the lowered IR", async () => {
-      const path = "x.tldsl.jsx";
+      const path = "x.tldx.jsx";
       const { doc, box } = astBuilders(path);
       const execute = new FakeExecute();
       execute.setResult(SRC, {
@@ -82,7 +82,7 @@ describe("compileFile", () => {
 
   describe("filesystem errors", () => {
     it("returns fs/not-found and null sceneJson when the file is missing", async () => {
-      const result = await compileFile("missing.tldsl.jsx", deps({}));
+      const result = await compileFile("missing.tldx.jsx", deps({}));
       expect(result.sceneJson).toBeNull();
       expect(result.diagnostics).toHaveLength(1);
       expect(result.diagnostics[0]!.code).toBe("fs/not-found");
@@ -99,7 +99,7 @@ describe("compileFile", () => {
         layout: new StubLayout(),
         execute: new FakeExecute(),
       };
-      const result = await compileFile("guarded.tldsl.jsx", failing);
+      const result = await compileFile("guarded.tldx.jsx", failing);
       expect(result.sceneJson).toBeNull();
       expect(result.diagnostics).toHaveLength(1);
       expect(result.diagnostics[0]!.code).toBe("fs/read-error");
@@ -108,7 +108,7 @@ describe("compileFile", () => {
 
   describe("compile errors short-circuit before layout", () => {
     it("returns ir diagnostics and skips layout/emit on lowering error", async () => {
-      const path = "dup.tldsl.jsx";
+      const path = "dup.tldx.jsx";
       const { doc, box } = astBuilders(path);
       const execute = new FakeExecute();
       execute.setResult(SRC, {
@@ -126,7 +126,7 @@ describe("compileFile", () => {
     });
 
     it("returns ir/root-not-doc when the top-level element is not <doc>", async () => {
-      const path = "frag.tldsl.jsx";
+      const path = "frag.tldx.jsx";
       const { frame } = astBuilders(path);
       const execute = new FakeExecute();
       execute.setResult(SRC, {
@@ -140,8 +140,8 @@ describe("compileFile", () => {
   });
 
   describe("JSX front end", () => {
-    it("compiles a .tldsl.jsx path from the executor's AST", async () => {
-      const path = "diagram.tldsl.jsx";
+    it("compiles a .tldx.jsx path from the executor's AST", async () => {
+      const path = "diagram.tldx.jsx";
       const source = "export default function Diagram() { return null; }";
       const execute = new FakeExecute();
       execute.setResult(source, {
@@ -158,7 +158,7 @@ describe("compileFile", () => {
     });
 
     it("short-circuits on a diagnostics-only execute result: null sceneJson, surfaced diagnostics, layout never called", async () => {
-      const path = "broken.tldsl.jsx";
+      const path = "broken.tldx.jsx";
       const source = "throw new Error('boom')";
       const execute = new FakeExecute();
       execute.setResult(source, {
@@ -175,7 +175,7 @@ describe("compileFile", () => {
     });
 
     it("calls execute with the file's contents and its path", async () => {
-      const path = "diagram.tldsl.jsx";
+      const path = "diagram.tldx.jsx";
       const source = "export default function Diagram() { return null; }";
       const execute = new FakeExecute();
 
@@ -185,28 +185,28 @@ describe("compileFile", () => {
     });
 
     it("normalises a bare-basename diagnostic span to be relative to the path's directory", async () => {
-      const path = "foo/bar.tldsl.jsx";
+      const path = "foo/bar.tldx.jsx";
       const source = "whatever";
       const execute = new FakeExecute();
       execute.setResult(source, {
         diagnostics: [
-          error("runtime/compile", "bad jsx", { file: "bar.tldsl.jsx", line: 1, column: 1 }),
+          error("runtime/compile", "bad jsx", { file: "bar.tldx.jsx", line: 1, column: 1 }),
         ],
       });
 
       const result = await compileFile(path, deps({ [path]: source }, new StubLayout(), execute));
 
-      expect(result.diagnostics[0]!.span!.file).toBe("foo/bar.tldsl.jsx");
+      expect(result.diagnostics[0]!.span!.file).toBe("foo/bar.tldx.jsx");
     });
 
     it("normalises an absolute diagnostic span to be relative to the path's directory", async () => {
-      const path = "foo/bar.tldsl.jsx";
+      const path = "foo/bar.tldx.jsx";
       const source = "whatever";
       const execute = new FakeExecute();
       execute.setResult(source, {
         diagnostics: [
           error("runtime/compile", "bad jsx", {
-            file: resolve("foo/bar.tldsl.jsx"),
+            file: resolve("foo/bar.tldx.jsx"),
             line: 1,
             column: 1,
           }),
@@ -215,18 +215,18 @@ describe("compileFile", () => {
 
       const result = await compileFile(path, deps({ [path]: source }, new StubLayout(), execute));
 
-      expect(result.diagnostics[0]!.span!.file).toBe("foo/bar.tldsl.jsx");
+      expect(result.diagnostics[0]!.span!.file).toBe("foo/bar.tldx.jsx");
     });
   });
 
   describe("inputs", () => {
     it("is null when the file read fails", async () => {
-      const result = await compileFile("missing.tldsl.jsx", deps({}));
+      const result = await compileFile("missing.tldx.jsx", deps({}));
       expect(result.inputs).toBeNull();
     });
 
     it("is null on a diagnostics-only JSX execute result", async () => {
-      const path = "broken.tldsl.jsx";
+      const path = "broken.tldx.jsx";
       const source = "throw new Error('boom')";
       const execute = new FakeExecute();
       execute.setResult(source, {
@@ -238,23 +238,23 @@ describe("compileFile", () => {
     });
 
     it("is executed.inputs, normalised to the path's directory style, on JSX success", async () => {
-      const path = "foo/bar.tldsl.jsx";
+      const path = "foo/bar.tldx.jsx";
       const source = "export default function Diagram() { return null; }";
       const execute = new FakeExecute();
       execute.setResult(source, {
         ast: docWithLabelledBox(path, "box"),
-        inputs: [resolve(path), resolve("foo/parts.tldsl.jsx")],
+        inputs: [resolve(path), resolve("foo/parts.tldx.jsx")],
       });
 
       const result = await compileFile(path, deps({ [path]: source }, new StubLayout(), execute));
-      expect(result.inputs).toEqual(["foo/bar.tldsl.jsx", "foo/parts.tldsl.jsx"]);
+      expect(result.inputs).toEqual(["foo/bar.tldx.jsx", "foo/parts.tldx.jsx"]);
     });
   });
 });
 
 describe("compileFile: geo (T15)", () => {
   it.each(GEOS)("round-trips geo=%s to scene JSON without a diagnostic", async (geo) => {
-    const path = "geo.tldsl.jsx";
+    const path = "geo.tldx.jsx";
     const { doc, box } = astBuilders(path);
     const execute = new FakeExecute();
     execute.setResult(SRC, {

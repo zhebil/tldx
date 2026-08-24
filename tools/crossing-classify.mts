@@ -1,5 +1,5 @@
 /**
- * `tools/crossing-classify.mts <file.tldsl.jsx> [more files...]` - classifies
+ * `tools/crossing-classify.mts <file.tldx.jsx> [more files...]` - classifies
  * every arrow crossing from `arrow-truth.mts` into one of four buckets, so a
  * routing fix (T3-T5 in `docs/plan.md`) can be scoped to the actual failure
  * mode instead of guessed at.
@@ -254,7 +254,7 @@ function printTotal(perFile: FileResult[]): void {
 async function main(): Promise<void> {
   const files = process.argv.slice(2);
   if (files.length === 0) {
-    throw new Error("usage: tools/crossing-classify.mts <file.tldsl.jsx> [more files...]");
+    throw new Error("usage: tools/crossing-classify.mts <file.tldx.jsx> [more files...]");
   }
 
   const perFile: FileResult[] = [];

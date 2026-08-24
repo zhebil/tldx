@@ -38,7 +38,7 @@ interface Booted {
  * Wrap fetch with `Connection: close` so the underlying socket is not
  * pooled by undici's keep-alive agent. Without this, `server.close()` waits
  * up to ~3s per pooled socket for the keep-alive to expire before resolving,
- * which dominates this test's wall time. Production (`tldsl serve`) is
+ * which dominates this test's wall time. Production (`tldx serve`) is
  * unaffected: the server side keeps default keep-alive behavior.
  */
 async function closeFetch(
@@ -55,7 +55,7 @@ async function bootWithBundle(
   onOverlayPut?: (snapshot: SceneJSON) => Promise<void>,
   onActivity?: () => void,
 ): Promise<Booted> {
-  const bundleDir = await mkdtemp(join(tmpdir(), "tldsl-devserver-"));
+  const bundleDir = await mkdtemp(join(tmpdir(), "tldx-devserver-"));
   for (const [name, body] of Object.entries(files)) {
     await writeFile(join(bundleDir, name), body, "utf8");
   }

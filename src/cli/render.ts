@@ -1,34 +1,34 @@
 /**
- * `tldsl render <file> <out.png>`: export a compiled diagram as an image via
+ * `tldx render <file> <out.png>`: export a compiled diagram as an image via
  * tldraw's `editor.toImage`, cropped to content by construction (no viewport,
  * no zoom-to-fit, no UI-hiding CSS hack). The composition root
  * (`cli/main.ts`) wires real adapters and calls into `runRender`; this
  * module owns argv shape, format inference, serve-reuse, and the exit code.
  *
- * URL resolution: reuse a running `tldsl serve` for the file if one is
+ * URL resolution: reuse a running `tldx serve` for the file if one is
  * recorded, alive, and not stale (`infra/serve-registry`); otherwise boot an
  * in-process, ephemeral `runServe` and close it in a `finally`.
  *
  * `--reuse-only` skips the ephemeral-boot fallback and errors instead, so a
- * hook can render only when a warm `tldsl serve` is already free to use.
+ * hook can render only when a warm `tldx serve` is already free to use.
  *
- * Read-only (tldsl-jwh): `render` never writes `*.tldsl.overlay.json`. Its
+ * Read-only (tldx-jwh): `render` never writes `*.tldx.overlay.json`. Its
  * own ephemeral boot strips `fsWrite` from the deps it hands to `runServe`
  * (`soloDeps` below), which disables the overlay round-trip for that
  * throwaway server entirely - see `cli/serve.ts`'s module docs. A reused
- * server is a separate, already-running `tldsl serve` process render does
+ * server is a separate, already-running `tldx serve` process render does
  * not control; it was wired with `fsWrite` by its own invocation because it
  * legitimately supports human canvas edits.
  *
- * Reuse safety (tldsl-usr, tldsl-46n): a reused server's registry record
+ * Reuse safety (tldx-usr, tldx-46n): a reused server's registry record
  * carries the source hash/timestamp of its last successful compile. Reusing
  * prints that hash so a stale server never looks like a compiler bug; a
  * mismatch against the current on-disk hash is treated as stale and
  * triggers a rebuild (or a refusal under `--reuse-only`, since that flag
  * exists specifically to avoid booting a browser).
  *
- * Code staleness (tldsl-rab): the fixture hash above only covers the
- * `.tldsl.jsx` entry, not the compiler code that ran it. `isCodeStale`
+ * Code staleness (tldx-rab): the fixture hash above only covers the
+ * `.tldx.jsx` entry, not the compiler code that ran it. `isCodeStale`
  * compares the reused server's boot-time `codeFingerprint` (a newest-mtime
  * reading over the compiler source tree, set once in `cli/serve.ts`) against
  * the current tree - a mismatch means `src/domain`, `src/app`, etc. changed
@@ -102,7 +102,7 @@ export function parseArgs(argv: readonly string[]): ParsedRenderArgs {
   const [fileArg, outArg] = positional;
   if (fileArg === undefined || outArg === undefined) {
     throw new Error(
-      "usage: tldsl render <file.tldsl.jsx> <out.png> [--frame <id>] [--shapes <a,b>] [--padding <px>] [--scale <n>] [--format png|svg|jpeg|webp] [--dark] [--no-background] [--reuse-only]",
+      "usage: tldx render <file.tldx.jsx> <out.png> [--frame <id>] [--shapes <a,b>] [--padding <px>] [--scale <n>] [--format png|svg|jpeg|webp] [--dark] [--no-background] [--reuse-only]",
     );
   }
   if (opts.frame !== undefined && opts.shapes !== undefined) {
@@ -164,7 +164,7 @@ export function staleReason(
 
 /**
  * `export-image.ts`'s "unknown --frame/--shapes id" error is easy to
- * mistake for a compiler bug when it's really a stale reused server (tldsl-usr).
+ * mistake for a compiler bug when it's really a stale reused server (tldx-usr).
  * Annotate it with when that server's scene was actually compiled, without
  * touching export-image.ts itself.
  */
@@ -179,7 +179,7 @@ export function withCompiledContext(err: unknown, reused: ServeRecord): Error {
 
 /**
  * Render's own ephemeral server must never wire `fsWrite` - a read-only
- * export must not enable the overlay round-trip (tldsl-jwh). Returns a copy
+ * export must not enable the overlay round-trip (tldx-jwh). Returns a copy
  * of `deps` with `fsWrite` dropped entirely (not set to `undefined` - the
  * key is absent, matching `ServeDeps.fsWrite`'s optionality).
  */
@@ -204,7 +204,7 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
     const stale = reason !== undefined;
 
     if (reused !== undefined && !stale) {
-      io.writeStdout(`tldsl render: reusing serve on ${describeReused(file, reused)}\n`);
+      io.writeStdout(`tldx render: reusing serve on ${describeReused(file, reused)}\n`);
       try {
         await exportImage(reused.url, out, opts);
       } catch (err) {
@@ -214,10 +214,10 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
       if (reuseOnly) {
         throw stale && reused !== undefined
           ? new Error(`reused serve on ${describeReused(file, reused)} is stale (${reason}); refusing under --reuse-only`)
-          : new Error(`no running \`tldsl serve\` for ${file}; start one, or drop --reuse-only to boot a browser`);
+          : new Error(`no running \`tldx serve\` for ${file}; start one, or drop --reuse-only to boot a browser`);
       }
       if (stale && reused !== undefined) {
-        io.writeStdout(`tldsl render: reused serve on ${describeReused(file, reused)} is stale (${reason}), rebuilding\n`);
+        io.writeStdout(`tldx render: reused serve on ${describeReused(file, reused)} is stale (${reason}), rebuilding\n`);
       }
       const handle = await runServe({ path: file, deps: withoutFsWrite(deps), io });
       try {
@@ -227,11 +227,11 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
       }
     }
 
-    io.writeStdout(`tldsl render: wrote ${out}\n`);
+    io.writeStdout(`tldx render: wrote ${out}\n`);
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    io.writeStderr(`tldsl render: ${msg}\n`);
+    io.writeStderr(`tldx render: ${msg}\n`);
     return 1;
   }
 }

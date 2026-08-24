@@ -1,5 +1,5 @@
 /**
- * For every corpus fixture (`tests/corpus/*.tldsl.jsx`), build a synthetic
+ * For every corpus fixture (`tests/corpus/*.tldx.jsx`), build a synthetic
  * canvas edit that exercises all five overlay operation kinds (D1's table:
  * `moved`, `restyled`, `relabelled`, `deleted`, `added`). Moved out of
  * `tests/e2e/overlay-corpus.test.ts` (T21) so `tests/e2e/fidelity/harness.ts`

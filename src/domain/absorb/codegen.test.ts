@@ -94,13 +94,13 @@ describe("domain/absorb/codegen: absorbAdded splice", () => {
     boxShape({ id: `shape:${id}`, x, y: 0, w: 40, h: 40, ...(index === undefined ? {} : { index }) });
 
   it("leaves the source byte-identical for an empty record list", () => {
-    const source = 'import { Doc } from "tldsl";\nexport default () => (\n  <Doc>\n  </Doc>\n);\n';
+    const source = 'import { Doc } from "tldx";\nexport default () => (\n  <Doc>\n  </Doc>\n);\n';
     expect(absorbAdded(source, [])).toEqual({ source });
   });
 
   it("expands a self-closing <Doc/> and inserts children before </Doc>", () => {
     const source = [
-      'import { Doc } from "tldsl";',
+      'import { Doc } from "tldx";',
       "",
       "export default function Diagram() {",
       "  return <Doc/>;",
@@ -117,12 +117,12 @@ describe("domain/absorb/codegen: absorbAdded splice", () => {
         'dash="draw" size="m" font="draw" textAlign="middle" verticalAlign="middle" labelColor="black"/>\n  </Doc>',
     );
     expect(rewritten).not.toContain("/>;");
-    expect(rewritten).toContain('import { Doc, Box } from "tldsl";');
+    expect(rewritten).toContain('import { Doc, Box } from "tldx";');
   });
 
   it("inserts before an existing </Doc> on a multi-child root, preserving what's already there", () => {
     const source = [
-      'import { Doc, Box } from "tldsl";',
+      'import { Doc, Box } from "tldx";',
       "",
       "export default function Diagram() {",
       "  return (",
@@ -148,7 +148,7 @@ describe("domain/absorb/codegen: absorbAdded splice", () => {
   });
 
   it("orders generated elements by record index then id", () => {
-    const source = 'import { Doc } from "tldsl";\nreturn <Doc/>;';
+    const source = 'import { Doc } from "tldx";\nreturn <Doc/>;';
     const records = [box("z", 0, "a2"), box("a", 0, "a1"), box("b", 0, "a1")];
     const result = absorbAdded(source, records);
     const { source: rewritten } = result as { source: string };
@@ -156,27 +156,27 @@ describe("domain/absorb/codegen: absorbAdded splice", () => {
     expect(order).toEqual([...order].sort((x, y) => x - y));
   });
 
-  it("adds Box to an existing tldsl import only when it's missing", () => {
-    const source = 'import { Doc, Box } from "tldsl";\nreturn <Doc/>;';
+  it("adds Box to an existing tldx import only when it's missing", () => {
+    const source = 'import { Doc, Box } from "tldx";\nreturn <Doc/>;';
     const result = absorbAdded(source, [box("a", 0)]);
     const { source: rewritten } = result as { source: string };
-    expect(rewritten).toContain('import { Doc, Box } from "tldsl";');
+    expect(rewritten).toContain('import { Doc, Box } from "tldx";');
     expect(rewritten).not.toContain("Box, Box");
   });
 
-  it("errors instead of guessing when the source has no tldsl import to extend", () => {
+  it("errors instead of guessing when the source has no tldx import to extend", () => {
     const result = absorbAdded("return <Doc/>;", [box("a", 0)]);
-    expect(result).toEqual({ error: expect.stringContaining("tldsl") });
+    expect(result).toEqual({ error: expect.stringContaining("tldx") });
   });
 
   it("errors when no <Doc> is found", () => {
-    const source = 'import { Doc } from "tldsl";\nexport default () => null;';
+    const source = 'import { Doc } from "tldx";\nexport default () => null;';
     const result = absorbAdded(source, [box("a", 0)]);
     expect(result).toEqual({ error: expect.stringContaining("<Doc>") });
   });
 
   it("errors when more than one <Doc> is found", () => {
-    const source = 'import { Doc } from "tldsl";\nconst a = <Doc/>; const b = <Doc/>;';
+    const source = 'import { Doc } from "tldx";\nconst a = <Doc/>; const b = <Doc/>;';
     const result = absorbAdded(source, [box("a", 0)]);
     expect(result).toEqual({ error: expect.stringContaining("<Doc>") });
   });
@@ -227,7 +227,7 @@ describe("domain/absorb/codegen: offsetAt/scanElement (move-ladder text scanning
 
 describe("domain/absorb/codegen: spliceReorder (move-ladder reorder rung)", () => {
   const SOURCE = [
-    'import { Doc, Box } from "tldsl";',
+    'import { Doc, Box } from "tldx";',
     "export default function D() {",
     "  return (",
     '    <Doc layout="row">',

@@ -1,79 +1,115 @@
-# tldsl
+# tldx
 
-A JSX authoring surface for [tldraw](https://tldraw.dev) scenes, designed so AI agents (Claude Code et al.) can drive a live canvas by editing plain files.
+Write architecture and flow diagrams as JSX. `tldx` lays them out and renders
+them on a live [tldraw](https://tldraw.dev) canvas that reloads as you save.
 
-The agent edits a `.tldsl.jsx` file with normal `Edit` / `Write` tools, importing `Doc`, `Frame`, `Box`, `Text`, `Edge`, and `flow` from the `"tldsl"` module. The CLI executes the file in a Node worker, lowers the resulting AST through layout, and pushes tldraw scene JSON to a browser viewer. No MCP, no special API - just files, a watcher, and a CLI.
+You describe *what connects to what*. Layout, sizing, edge routing and label
+placement are the tool's job — there are no coordinates in a `.tldx.jsx` file
+unless you want them.
 
-**Accepted cost**: unlike a plain-text DSL, a `.tldsl.jsx` file needs the CLI to run - it isn't self-contained portable text. See `docs/jsx-pivot.md` for the trade-off this bought (JSX composition, props, `.map()`) and the full reasoning.
-
-## Status
-
-`tldsl check <file>` and `tldsl serve <file>` both work end to end: execute → lower → layout → emit → scene JSON, pushed live to the viewer over SSE. Design for the remaining phase-1/phase-2 surface is settled (see `docs/`); this is not a finished product - see `docs/roadmap.md` for what's still ahead.
-
-## Phase 1 in one paragraph
-
-Write-only. Agent edits the DSL, user watches the canvas. Two CLI modes: `tldsl serve <file>` runs the watcher + viewer for interactive use; `tldsl check <file>` is the one-shot validator wired into a Claude Code `PostToolUse` hook so syntax / layout errors land back in the agent's context inline with the failing edit. No round-trip from canvas back to DSL in phase 1.
-
-## Why this shape
-
-- Maps to how Claude Code already operates - the agent edits files, something else watches them. No new tool surface.
-- The DSL is a real artifact: git-commit, diff, copy across sessions, paste into chat.
-- The renderer is decoupled - restartable, replaceable, openable in any tab.
-- Avoids the failure mode that killed the earlier tldraw MCP attempt (timeouts, brittle).
-
-Sits in the "AI tools should be plug-and-play, not frameworks to learn" lane.
-
-## Run it
+## Install
 
 ```bash
-npm install
-npm run build                                          # dist/cli/ + dist/viewer/
-node dist/cli/main.js serve tests/e2e/fixtures/auth.tldsl.jsx
-# or, after `npm link`:
-tldsl serve tests/e2e/fixtures/auth.tldsl.jsx
+npm i -g tldx
 ```
 
-For an inner dev loop without rebuilding:
+`tldx render` additionally needs Playwright, which is optional because it pulls
+a browser binary:
 
 ```bash
-npm run dev:cli -- serve tests/e2e/fixtures/auth.tldsl.jsx
+npm i -g playwright && npx playwright install chromium
 ```
 
-`tldsl check <file>` is the one-shot validator (exit 0 = clean, 1 = compile errors); `tldsl serve <file>` watches the file (and every file it imports), recompiles on save, and pushes scene JSON to the bundled viewer over SSE.
-
-## What a diagram looks like
+## A diagram
 
 ```jsx
-import { Doc, Frame, Box, Edge, Text } from "tldsl";
+// hello.tldx.jsx
+import { Doc, Frame, Box, Edges } from "tldx";
 
-export default function Diagram() {
+export default function Hello() {
   return (
-    <Doc>
-      <Frame id="auth-flow" name="Auth flow">
-        <Box id="user" label="User" />
-        <Box id="login" label="Login form" />
-        <Box id="auth" label="Auth service" />
+    <Doc layout="col" gap="80">
+      <Box id="browser" label="Browser" color="grey" />
 
-        <Edge id="e-user-login" from="user" to="login" />
-        <Edge id="e-login-auth" from="login" to="auth" />
-
-        <Text id="n-design">Token store is the only writer of session tokens.</Text>
+      <Frame id="system" name="acme.com" layout="row" gap="48">
+        <Box id="api" label="API" />
+        <Box id="cache" label="Redis" geo="ellipse" color="red" />
+        <Box id="db" label="Postgres" geo="ellipse" color="blue" />
       </Frame>
+
+      <Edges>{`
+        browser -> api: HTTPS
+        api -> cache: read-through
+        api -> db
+      `}</Edges>
     </Doc>
   );
 }
 ```
 
-Based on `tests/e2e/fixtures/auth.tldsl.jsx`. Edges reference other elements by `id`; `<Doc>` is always the root.
+```bash
+tldx serve hello.tldx.jsx
+```
 
-## Documents
+That opens a browser tab and repaints on every save. Because it's JSX, a
+diagram is ordinary code: components for repeated shapes, `.map()` over a data
+table, `import` a shared palette from another file.
 
-- [`docs/architecture.md`](docs/architecture.md) - components and data flow
-- [`docs/dsl.md`](docs/dsl.md) - syntax, elements, full example
-- [`docs/jsx-pivot.md`](docs/jsx-pivot.md) - the JSX pivot: why the text DSL was replaced with JSX, decision-by-decision
-- [`docs/roadmap.md`](docs/roadmap.md) - what shipped, what's in flight, what was rejected and why
-- [`docs/decisions.md`](docs/decisions.md) - key design decisions and rationale (ADR-ish)
+## Commands
 
-## Naming
+```
+tldx serve   <file>        watch and push to the live viewer
+tldx check   <file>        parse + validate, exit non-zero on error
+tldx render  <file> <out>  export a PNG/SVG, cropped to content
+tldx measure <file>        print every shape's id, size and position
+tldx absorb  <file>        fold canvas edits back into the source
+tldx verify  <file>        does the source alone reproduce the canvas?
+tldx overlay show <file>   what canvas edits are still unabsorbed
+```
 
-`tldsl` is the working name and the CLI binary. Folder named to match. The project name is not finalised - alternatives considered: `scenefile`, `canvas-dsl`. Revisit before any public release.
+## Claude Code plugin
+
+The `plugin/` directory ships `tldx` as a Claude Code plugin: a `PostToolUse`
+hook that validates and renders a diagram every time the agent edits one, a
+`/tldx:sync` command that folds canvas edits back into source, and a skill
+teaching the component vocabulary.
+
+```
+/plugin marketplace add zhebil/tldx
+/plugin install tldx@tldx
+```
+
+It calls the `tldx` binary on your `PATH`, so install the CLI first.
+
+## Examples
+
+[`examples/`](examples/) has five: a three-tier web stack, an RFC 793 TCP state
+machine, a Kafka event pipeline, a CI/CD pipeline, and an OS kernel map.
+
+```bash
+tldx serve examples/web-architecture.tldx.jsx
+```
+
+## Docs
+
+- [`docs/reference.md`](docs/reference.md) — every component, prop and enum
+- [`docs/architecture.md`](docs/architecture.md) — how the compiler works
+
+## Development
+
+```bash
+npm run check                                  # typecheck + lint + dep-lint + tests
+npm run dev:cli -- serve examples/kernel.tldx.jsx   # run from source, no build
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+That covers tldx's own source. The viewer bundles the
+[tldraw](https://tldraw.dev) SDK, which is separately licensed — free for local
+and development use, commercial license required to deploy it as a service for
+end users. Details in [NOTICE](NOTICE); the full text ships in
+`licenses/tldraw-LICENSE.md`.
+
+Using `tldx` locally to draw diagrams is development use, and needs no license.

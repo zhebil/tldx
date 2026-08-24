@@ -2,11 +2,11 @@
  * Real `LogPort` adapter that writes events to stderr in a flat,
  * human-readable form. Use cases (`watchAndServe`) emit structured events
  * here; this adapter is the production sink so users see watcher status
- * lines while `tldsl serve` runs.
+ * lines while `tldx serve` runs.
  *
  * Format is `[level] code: msg [k=v ...]` - one line per event. The CLI
  * layer treats stdout for primary output (the URL) and stderr for these
- * status lines, mirroring the convention used by `tldsl check` for
+ * status lines, mirroring the convention used by `tldx check` for
  * diagnostics.
  */
 

@@ -19,7 +19,7 @@ function makeDeps(fs: InMemoryFs, execute: FakeExecute): VerifyDeps {
 
 describe("runVerify", () => {
   it("returns compile-error when the file fails to compile", async () => {
-    const path = "broken.tldsl.jsx";
+    const path = "broken.tldx.jsx";
     const { doc, box } = astBuilders(path);
     const execute = new FakeExecute();
     execute.setResult(SRC, {
@@ -37,7 +37,7 @@ describe("runVerify", () => {
   });
 
   it("returns no-overlay when there's no overlay file", async () => {
-    const path = "diagram.tldsl.jsx";
+    const path = "diagram.tldx.jsx";
     const fs = new InMemoryFs({ [path]: SRC });
     const execute = new FakeExecute();
 
@@ -47,7 +47,7 @@ describe("runVerify", () => {
   });
 
   it("returns verified with no entries and stale=false for an up-to-date empty overlay", async () => {
-    const path = "diagram.tldsl.jsx";
+    const path = "diagram.tldx.jsx";
     const { doc, box } = astBuilders(path);
     const execute = new FakeExecute();
     execute.setResult(SRC, { ast: doc({ id: "d" }, [box({ id: "b" })]), inputs: [path] });
@@ -70,7 +70,7 @@ describe("runVerify", () => {
   });
 
   it("reports stale=true when the overlay's basedOn doesn't match the current compile", async () => {
-    const path = "diagram.tldsl.jsx";
+    const path = "diagram.tldx.jsx";
     const { doc, box } = astBuilders(path);
     const execute = new FakeExecute();
     execute.setResult(SRC, { ast: doc({ id: "d" }, [box({ id: "b" })]), inputs: [path] });
@@ -88,7 +88,7 @@ describe("runVerify", () => {
   });
 
   it("marks an entry that already matches the compiled scene as changesScene=false, and a diverging one as true, sorted by id", async () => {
-    const path = "diagram.tldsl.jsx";
+    const path = "diagram.tldx.jsx";
     const { doc, box } = astBuilders(path);
     const execute = new FakeExecute();
     execute.setResult(SRC, {

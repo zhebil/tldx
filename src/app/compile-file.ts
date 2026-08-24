@@ -1,5 +1,5 @@
 /**
- * `compileFile`: read a `.tldsl.jsx` file and run the pure compiler pipeline
+ * `compileFile`: read a `.tldx.jsx` file and run the pure compiler pipeline
  * (JSX executor → ir → layout → emit). The JSX executor (via `ExecutePort` -
  * see `docs/jsx-pivot.md` decision 8) is the only front end; it produces the
  * `AstNode` shape `lower`/`layout`/`emit` expect. Returns the produced

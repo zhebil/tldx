@@ -1,0 +1,34 @@
+tldx
+Copyright (c) 2026 Yevhenii Bilyk
+
+The MIT License in LICENSE applies to tldx's OWN source code. It does not
+apply to the third-party software redistributed in dist/viewer/, listed below.
+
+--------------------------------------------------------------------------
+tldraw  -  https://tldraw.dev
+
+    dist/viewer/ bundles the tldraw SDK. tldraw is NOT MIT-licensed. It is
+    distributed under the tldraw license, a verbatim copy of which is included
+    in this package at:
+
+        licenses/tldraw-LICENSE.md
+
+    In summary (the license text governs, not this summary):
+
+      - Free use is permitted in Development Environments, which the license
+        defines as internal deployments "not accessible to end users,
+        customers, or the public". Running `tldx serve` on your own machine
+        to draw diagrams is such a use.
+      - Use in a Production Environment - a deployment "used to provide
+        functionality to end users, customers, or the public" - requires a
+        commercial license from tldraw. See https://tldraw.dev for terms,
+        including trial, hobby, and startup options.
+
+    If you deploy anything built on tldx's viewer as a service, that
+    obligation is yours to meet.
+
+--------------------------------------------------------------------------
+elkjs  -  https://github.com/kieler/elkjs
+
+    Licensed under the Eclipse Public License 2.0 (EPL-2.0).
+--------------------------------------------------------------------------

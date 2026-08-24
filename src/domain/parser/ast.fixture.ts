@@ -18,7 +18,7 @@ import type {
 
 type Props = Record<string, string | number | boolean | undefined>;
 
-export function astBuilders(file = "test.tldsl") {
+export function astBuilders(file = "test.tldx") {
   const elSpan = { file, line: 1, column: 1 };
 
   function attrs(props: Props): Attrs {

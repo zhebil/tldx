@@ -1,12 +1,12 @@
 /**
- * Fixture-driven e2e test for `tldsl check`.
+ * Fixture-driven e2e test for `tldx check`.
  *
- * Each fixture is a pair `<name>.tldsl.jsx` + `<name>.diagnostics.txt` (the
- * expected stderr; empty = no output expected). The non-`.tldsl.jsx` skip
+ * Each fixture is a pair `<name>.tldx.jsx` + `<name>.diagnostics.txt` (the
+ * expected stderr; empty = no output expected). The non-`.tldx.jsx` skip
  * case uses `<name>.<other-ext>` as input.
  *
  * The test invokes `runCheck` directly with the real `NodeFs` adapter and
- * `StubLayout` (real ELK is a separate parallel issue, tldsl-gxl).
+ * `StubLayout` (real ELK is a separate parallel issue, tldx-gxl).
  * Per docs/testing.md, this is the canonical golden-file shape: new cases
  * = new fixture files, no test-code changes.
  *
@@ -15,7 +15,7 @@
  * passed to runCheck, so this keeps fixtures portable across machines.
  *
  * Convention: fixtures whose basename starts with `check-` are part of
- * this suite. Other fixtures (e.g. `auth.tldsl.jsx`) are owned by other
+ * this suite. Other fixtures (e.g. `auth.tldx.jsx`) are owned by other
  * tests.
  */
 
@@ -35,7 +35,7 @@ const FIXTURES = join(HERE, "fixtures");
 const FIXTURE_PREFIX = "check-";
 
 type Fixture = {
-  /** Full input filename, e.g. "check-jsx-good.tldsl.jsx" or "check-not-tldsl.txt". */
+  /** Full input filename, e.g. "check-jsx-good.tldx.jsx" or "check-not-tldx.txt". */
   input: string;
   /** Path to the matching <basename>.diagnostics.txt. */
   expectedStderr: string;
@@ -81,7 +81,7 @@ function makeCaptureIo(): CheckIo & { stdout: string; stderr: string } {
   };
 }
 
-describe("e2e: tldsl check fixtures", () => {
+describe("e2e: tldx check fixtures", () => {
   const fixtures = discoverFixtures();
 
   it("discovered at least one fixture", () => {

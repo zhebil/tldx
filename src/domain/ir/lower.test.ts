@@ -159,7 +159,7 @@ describe("lower: diagnostics", () => {
     expect(edgeIr.toAnchor).toBeUndefined();
   });
 
-  it("fromSide/toSide (B9) does not collide with a dotted id (tldsl-4s1)", () => {
+  it("fromSide/toSide (B9) does not collide with a dotted id (tldx-4s1)", () => {
     // The whole point of the separate-props design: `from`/`to` stay plain
     // id strings, so an id with a literal '.' (still discouraged, see the
     // dotted-anchor rejection above) is only a `from`/`to` concern, never an
@@ -256,7 +256,7 @@ describe("lower: diagnostics", () => {
   });
 });
 
-describe("lower: <Edges> compact-form seam (tldsl-2rr)", () => {
+describe("lower: <Edges> compact-form seam (tldx-2rr)", () => {
   // <Edges> (src/runtime/components.ts) builds plain AstEdge nodes with a
   // real per-line span, no id, and no unusual attrs - the same shape a
   // hand-written <Edge> produces. These tests hand-build that exact shape
@@ -265,7 +265,7 @@ describe("lower: <Edges> compact-form seam (tldsl-2rr)", () => {
   // compact form gets the identical diagnostic, at the identical span, as
   // one from the verbose tag.
   it("a typo'd id from a compact-form edge still gets ir/unknown-reference, at the compact form's own span", () => {
-    const compactSpan = { file: "diagram.tldsl.jsx", line: 41, column: 8 };
+    const compactSpan = { file: "diagram.tldx.jsx", line: 41, column: 8 };
     const compactEdge: AstEdge = {
       kind: "edge",
       attrs: {
@@ -283,7 +283,7 @@ describe("lower: <Edges> compact-form seam (tldsl-2rr)", () => {
   });
 
   it("a compact-form line with no '->' (missing 'to') gets ir/missing-edge-endpoint, same as a hand-written <Edge> missing 'to'", () => {
-    const compactSpan = { file: "diagram.tldsl.jsx", line: 12, column: 8 };
+    const compactSpan = { file: "diagram.tldx.jsx", line: 12, column: 8 };
     const malformed: AstEdge = {
       kind: "edge",
       attrs: { from: { value: "just-an-id", span: compactSpan, nameSpan: compactSpan } },
@@ -414,7 +414,7 @@ describe("lower: ir/unknown-prop", () => {
     // column 3: fixture's synthetic per-attribute column for `lable`, the
     // second attribute after `id`.
     expect(d!.span).toEqual({
-      file: "test.tldsl",
+      file: "test.tldx",
       line: 1,
       column: 3,
     });
@@ -574,7 +574,7 @@ describe("lower: note sticky marker", () => {
   });
 });
 
-// C1 (tldsl-b8v): <Text> lowers to the same "box" IR kind as <Box> (IRBox.text)
+// C1 (tldx-b8v): <Text> lowers to the same "box" IR kind as <Box> (IRBox.text)
 // - it shares every box layout rule - but takes its content from JSX
 // children (like <Note>/<Sticky>), not a `label` attribute, is not
 // addressable-required (an anonymous heading is fine), and rejects the

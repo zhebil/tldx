@@ -5,7 +5,7 @@
  * The harness owns how `source` maps to a result. The fake's harness
  * generates a unique marker string per call and pre-programs `setResult()`
  * for it before handing it back - `execute()` itself never parses `source`.
- * The real adapter's harness (A3) instead returns actual `.tldsl.jsx` source
+ * The real adapter's harness (A3) instead returns actual `.tldx.jsx` source
  * text that the worker bundles and runs for real.
  */
 

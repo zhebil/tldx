@@ -146,7 +146,7 @@ function resolveMode(mode: LayoutMode | undefined): LayoutMode {
  * `box` re-typed as the style/font-metrics argument every sizing helper in
  * `defaults.ts`/`glyph-metrics.ts` takes: adds `standalone` so a `<Text>`
  * (`IRBox.text`) sizes off `TEXT_FONT_PX` instead of `LABEL_FONT_PX`
- * (D23, tldsl-pnq). Can't rename `IRBox.text` itself to line up for free -
+ * (D23, tldx-pnq). Can't rename `IRBox.text` itself to line up for free -
  * `IRNote.text` is that element's string content, and both kinds get passed
  * here as their own style object.
  */

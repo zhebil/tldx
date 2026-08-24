@@ -982,7 +982,7 @@ function minimizeBends(
     // header), and that approximation gets less trustworthy the further t
     // sits from the midpoint it was validated at. Shrinking the bend on top
     // of an already-slid label risks a false-clear this model can't see
-    // (confirmed against c4-container.tldsl.jsx's `staff -> mainframe`,
+    // (confirmed against c4-container.tldx.jsx's `staff -> mainframe`,
     // labelPosition 0.2 - measured, not guessed), so leave those as the
     // earlier passes committed them.
     if (route.labelPosition !== undefined) continue;

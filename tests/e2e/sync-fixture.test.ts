@@ -1,5 +1,5 @@
 /**
- * E2E for the `/tldsl:sync` workflow (docs/plan.md T26): drive the three
+ * E2E for the `/tldx:sync` workflow (docs/plan.md T26): drive the three
  * CLI entry points the slash command calls, in order, against the same
  * canvas-first case `tests/e2e/absorb-fixture.test.ts` proves for `absorb`
  * alone - a stub `<Doc/>` plus an overlay of hand-added shapes.
@@ -31,7 +31,7 @@ import { createNodeFsWrite } from "../../src/infra/fs/node-fs-write.js";
 import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
 
 const STUB_SOURCE = [
-  'import { Doc } from "tldsl";',
+  'import { Doc } from "tldx";',
   "",
   "export default function Diagram() {",
   "  return <Doc/>;",
@@ -46,7 +46,7 @@ afterEach(async () => {
 });
 
 async function makeWorkDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "tldsl-sync-"));
+  const dir = await mkdtemp(join(tmpdir(), "tldx-sync-"));
   workDirs.push(dir);
   return dir;
 }
@@ -97,10 +97,10 @@ async function writeOverlay(deps: AbsorbDeps, path: string, overlay: Overlay): P
   await deps.fsWrite.write(overlayPathFor(path), `${JSON.stringify(overlay, null, 2)}\n`);
 }
 
-describe("e2e: tldsl:sync workflow - overlay show -> absorb -> verify (T26)", () => {
+describe("e2e: tldx:sync workflow - overlay show -> absorb -> verify (T26)", () => {
   it("shows the pending shapes, absorbs them, then verifies the source alone reproduces the canvas", async () => {
     const dir = await makeWorkDir();
-    const path = join(dir, "diagram.tldsl.jsx");
+    const path = join(dir, "diagram.tldx.jsx");
     const deps = makeDeps();
     await deps.fsWrite.write(path, STUB_SOURCE);
 

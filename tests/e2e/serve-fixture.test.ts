@@ -1,11 +1,11 @@
 /**
- * E2E smoke for `tldsl serve`. Drives `runServe` with the same real
+ * E2E smoke for `tldx serve`. Drives `runServe` with the same real
  * adapters the CLI wires (NodeFs, ChokidarWatch, ElkLayoutAdapter,
- * SystemClock, SseTransport, dev server) against a tldsl fixture, then
+ * SystemClock, SseTransport, dev server) against a tldx fixture, then
  * connects to the dev server's `/events` endpoint and confirms a
  * SceneMessage with `kind: "scene"` arrives.
  *
- * Per the issue and CONTEXT.md "Lifecycle: `tldsl check` is directly
+ * Per the issue and CONTEXT.md "Lifecycle: `tldx check` is directly
  * testable from e2e tests without spawning a child process" - we drive
  * `runServe` in-process. The child-process spawn is unnecessary ceremony:
  * every adapter is real, the HTTP server is real, the file watcher is
@@ -88,7 +88,7 @@ async function bootServe(
   fixtureName: string,
   bundleDir: string,
 ): Promise<Setup> {
-  const workDir = await mkdtemp(join(tmpdir(), "tldsl-serve-"));
+  const workDir = await mkdtemp(join(tmpdir(), "tldx-serve-"));
   const filePath = join(workDir, fixtureName);
   await copyFile(join(FIXTURES, fixtureName), filePath);
 
@@ -154,7 +154,7 @@ async function readFirstSceneMessage(
   throw new Error("timed out waiting for SSE message");
 }
 
-describe("e2e: tldsl serve", () => {
+describe("e2e: tldx serve", () => {
   let setup: Setup | undefined;
 
   beforeEach(() => {
@@ -168,12 +168,12 @@ describe("e2e: tldsl serve", () => {
   it("serves the initial scene over SSE for a valid fixture", async () => {
     // viewerBundleDir is a real-but-empty dir; `/events` works regardless
     // and the static handler 404s gracefully on missing index.html.
-    const bundleDir = await mkdtemp(join(tmpdir(), "tldsl-serve-bundle-"));
+    const bundleDir = await mkdtemp(join(tmpdir(), "tldx-serve-bundle-"));
     try {
-      setup = await bootServe("auth.tldsl.jsx", bundleDir);
+      setup = await bootServe("auth.tldx.jsx", bundleDir);
 
       // The CLI announces the URL on stdout once the server is bound.
-      expect(setup.io.stdout).toContain("tldsl serving");
+      expect(setup.io.stdout).toContain("tldx serving");
       expect(setup.io.stdout).toContain(setup.handle.url);
 
       const controller = new AbortController();

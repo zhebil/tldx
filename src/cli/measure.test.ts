@@ -58,7 +58,7 @@ describe("narrowToFrame", () => {
 describe("runMeasure", () => {
   const { doc, frame, box } = astBuilders();
   const SRC = "diagram source";
-  const PATH = "diagram.tldsl.jsx";
+  const PATH = "diagram.tldx.jsx";
 
   function makeDeps(): { fs: InMemoryFs; execute: FakeExecute; layout: StubLayout } {
     const fs = new InMemoryFs({ [PATH]: SRC });
@@ -143,9 +143,9 @@ describe("runMeasure", () => {
   it("reports a read failure instead of throwing", async () => {
     const io = makeIo();
     const deps = makeDeps();
-    const exitCode = await runMeasure({ argv: ["missing.tldsl.jsx"], deps, io });
+    const exitCode = await runMeasure({ argv: ["missing.tldx.jsx"], deps, io });
 
     expect(exitCode).toBe(1);
-    expect(io.stderr).toContain("tldsl measure:");
+    expect(io.stderr).toContain("tldx measure:");
   });
 });

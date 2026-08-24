@@ -1,5 +1,5 @@
 /**
- * `tools/arrow-truth.mts <file.tldsl.jsx> [more files...]` - the arrow paths
+ * `tools/arrow-truth.mts <file.tldx.jsx> [more files...]` - the arrow paths
  * tldraw actually renders, extracted from the live editor. This is the
  * single source for the "arrow paths crossing a non-endpoint shape" metric:
  * `layout-report.mts` used to carry a router guess for it, but that guess
@@ -49,7 +49,7 @@ export const CROWD_FRACTION = 1 / 3;
 async function main(): Promise<void> {
   const files = process.argv.slice(2);
   if (files.length === 0) {
-    throw new Error("usage: tools/arrow-truth.mts <file.tldsl.jsx> [more files...]");
+    throw new Error("usage: tools/arrow-truth.mts <file.tldx.jsx> [more files...]");
   }
 
   for (const fileArg of files) {

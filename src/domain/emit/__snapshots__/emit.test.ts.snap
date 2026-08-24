@@ -86,7 +86,7 @@ exports[`domain/emit > matches the snapshot for an auth-flow scene 1`] = `
       "id": "page:main",
       "index": "a1",
       "meta": {},
-      "name": "tldsl",
+      "name": "tldx",
       "typeName": "page",
     },
     "shape:auth": {

@@ -1,5 +1,5 @@
 /**
- * `tldsl/jsx-dev-runtime` - imported when esbuild compiles with `jsxDev:
+ * `tldx/jsx-dev-runtime` - imported when esbuild compiles with `jsxDev:
  * true`. `jsxDEV` gets the extra `source` argument (file/line/column of the
  * element), which is where AST spans come from (docs/jsx-pivot.md decision 7).
  */

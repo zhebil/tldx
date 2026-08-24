@@ -113,7 +113,7 @@ export const LABEL_FONT_PX: Record<StyleFontSize, number> = { s: 18, m: 22, l: 2
  * `TextShapeUtil.getTextSize`, which reads `FONT_SIZES[size]`) - the
  * standalone `text` shape `<Text>` emits (`IRBox.text`), distinct from
  * `LABEL_FONT_PX` the same way `ARROW_LABEL_FONT_PX` is: same idea, third
- * table (D23, tldsl-pnq).
+ * table (D23, tldx-pnq).
  */
 export const TEXT_FONT_PX: Record<StyleFontSize, number> = { s: 18, m: 24, l: 36, xl: 44 };
 /** Every glyph table above was measured at this size; other sizes scale linearly off it. */

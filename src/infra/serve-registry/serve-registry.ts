@@ -1,18 +1,18 @@
 /**
- * Discovery record letting `tldsl render` reuse a running `tldsl serve`
+ * Discovery record letting `tldx render` reuse a running `tldx serve`
  * instead of booting its own. Stored in the OS temp dir, never in the user's
  * repo. Best-effort throughout: a failed write or read must never take `serve`
  * down with it.
  *
  * The record also carries a content hash + timestamp of the source file as
  * of the server's last successful compile (`touchServeCompile`, called by
- * `cli/serve.ts` after every recompile). This is what lets a reuser (`tldsl
+ * `cli/serve.ts` after every recompile). This is what lets a reuser (`tldx
  * render`) tell a live, up-to-date server apart from an orphaned one still
- * serving a stale compile (tldsl-usr, tldsl-46n) - printing "reusing serve
+ * serving a stale compile (tldx-usr, tldx-46n) - printing "reusing serve
  * on :port (file @ hash)" and detecting staleness both read this field.
  *
- * `codeFingerprint` (tldsl-rab) covers a different staleness: not the
- * `.tldsl.jsx` fixture, but the compiler code (`src/domain`, `src/app`, ...)
+ * `codeFingerprint` (tldx-rab) covers a different staleness: not the
+ * `.tldx.jsx` fixture, but the compiler code (`src/domain`, `src/app`, ...)
  * that ran when this server booted. It is a newest-mtime reading over the
  * source tree, fixed once at boot - the running process's code cannot change
  * out from under it, so unlike `hash` it is never re-touched on recompile.
@@ -43,7 +43,7 @@ function recordPath(file: string): string {
     key = resolve(file);
   }
   const hash = createHash("sha256").update(key).digest("hex").slice(0, 16);
-  return join(tmpdir(), "tldsl-serve", `${hash}.json`);
+  return join(tmpdir(), "tldx-serve", `${hash}.json`);
 }
 
 function isAlive(pid: number): boolean {

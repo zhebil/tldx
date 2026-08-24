@@ -1,5 +1,5 @@
 /**
- * Real `ExecutePort` adapter: esbuild bundles a `.tldsl.jsx` entry (from the
+ * Real `ExecutePort` adapter: esbuild bundles a `.tldx.jsx` entry (from the
  * `source` string, not from disk - see the plugin below) and a fresh
  * `worker_threads` Worker runs the bundle, hard-terminated at a 2s budget.
  * See `docs/jsx-pivot.md` decisions 5, 7, 8, 12.
@@ -87,7 +87,7 @@ async function buildBundle(source: string, path: string): Promise<BuildOutcome> 
   const entryFilter = new RegExp(`^${escapeRegExp(path)}$`);
 
   const entryPlugin: Plugin = {
-    name: "tldsl-entry",
+    name: "tldx-entry",
     setup(build) {
       // The entry's *contents* come from `source`, but its resolved path
       // stays the real one - jsxDEV's `source.fileName` (and every span
@@ -109,7 +109,7 @@ async function buildBundle(source: string, path: string): Promise<BuildOutcome> 
       stdin: {
         contents: wrapperSource(path),
         resolveDir: dir,
-        sourcefile: "<tldsl-entry>",
+        sourcefile: "<tldx-entry>",
         loader: "js",
       },
       bundle: true,
@@ -119,18 +119,18 @@ async function buildBundle(source: string, path: string): Promise<BuildOutcome> 
       metafile: true,
       sourcemap: "external",
       jsx: "automatic",
-      jsxImportSource: "tldsl",
+      jsxImportSource: "tldx",
       jsxDev: true,
       packages: "external",
       loader: { ".jsx": "jsx" },
       absWorkingDir: dir,
       // Only used to anchor metafile/sourcemap-relative paths - `write:
       // false` means nothing is ever written here.
-      outfile: resolvePath(dir, "__tldsl_bundle__.js"),
+      outfile: resolvePath(dir, "__tldx_bundle__.js"),
       alias: {
-        tldsl: resolvePath(RUNTIME_DIR, "index"),
-        "tldsl/jsx-runtime": resolvePath(RUNTIME_DIR, "jsx-runtime"),
-        "tldsl/jsx-dev-runtime": resolvePath(RUNTIME_DIR, "jsx-dev-runtime"),
+        tldx: resolvePath(RUNTIME_DIR, "index"),
+        "tldx/jsx-runtime": resolvePath(RUNTIME_DIR, "jsx-runtime"),
+        "tldx/jsx-dev-runtime": resolvePath(RUNTIME_DIR, "jsx-dev-runtime"),
       },
       logLevel: "silent",
       plugins: [entryPlugin],
@@ -152,7 +152,7 @@ async function buildBundle(source: string, path: string): Promise<BuildOutcome> 
 
     const inputs = new Set<string>([path]);
     for (const relInput of Object.keys(result.metafile.inputs)) {
-      if (relInput.endsWith("<tldsl-entry>")) continue;
+      if (relInput.endsWith("<tldx-entry>")) continue;
       inputs.add(resolvePath(dir, relInput));
     }
 

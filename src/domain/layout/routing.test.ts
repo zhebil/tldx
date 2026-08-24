@@ -9,7 +9,7 @@ function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
-const SPAN = { file: "test.tldsl", line: 1, column: 1 };
+const SPAN = { file: "test.tldx", line: 1, column: 1 };
 
 function doc(id: string, children: IRElementPositioned[]): IRDocPositioned {
   return { kind: "doc", id, idExplicit: false, span: SPAN, children };
@@ -372,7 +372,7 @@ describe("computeEdgeRoutes", () => {
   });
 
   describe("reciprocal pair label clearance (B1)", () => {
-    // Reproduces the tcp-groups.tldsl.jsx defect: `A -> B` and `B -> A` on a
+    // Reproduces the tcp-groups.tldx.jsx defect: `A -> B` and `B -> A` on a
     // short chord with long labels bow apart (T35's fan) but, at the bare
     // fan step, still stamp their labels on the same spot (D14's other half).
     const LONG_LABEL_A = "active open / SYN";
@@ -567,8 +567,8 @@ describe("computeEdgeRoutes", () => {
       // shared axis, so the route falls through to the bare centre-to-centre
       // ray (`bodyExitPoint`) on both ends - the one path a `geo` shape's
       // real outline (inset from its bounding box on a diagonal) can still
-      // silently diverge from the render `tldsl check` is validating against
-      // (cicd-pipeline.tldsl.jsx's `approval -> notify` "rejected" label).
+      // silently diverge from the render `tldx check` is validating against
+      // (cicd-pipeline.tldx.jsx's `approval -> notify` "rejected" label).
       const ir = doc("root", [
         box({ id: "d", x: 0, y: 0, w: 200, h: 200, geo: "diamond" }),
         box({ id: "n", x: 500, y: 350, w: 100, h: 100 }),
@@ -590,7 +590,7 @@ describe("computeEdgeRoutes", () => {
     });
 
     it("grows the bend to pull a label off a shape no candidate `t` clears (B2/D11)", () => {
-      // Same shape of the tcp-groups.tldsl.jsx repro: `fin1 -> timeWait` is a
+      // Same shape of the tcp-groups.tldx.jsx repro: `fin1 -> timeWait` is a
       // vertical-axis skip whose minimal (unlabelled) bend only has to clear
       // the two flanking shapes' *line*, not a label wide enough to still
       // cover one of them at every candidate `t` - sliding along the arc
@@ -623,7 +623,7 @@ describe("computeEdgeRoutes", () => {
   });
 
   describe("obstacle correction after candidate/lane (B5)", () => {
-    it("moves a candidate edge off its analytically-chosen side when that side actually crosses an off-axis shape invisible to computeCandidate (event-driven.tldsl.jsx repro)", () => {
+    it("moves a candidate edge off its analytically-chosen side when that side actually crosses an off-axis shape invisible to computeCandidate (event-driven.tldx.jsx repro)", () => {
       // t-payments -> dlq is a vertical-axis skip; `notifications` is the one
       // shape computeCandidate's own `crossed` set finds (its y-centre sits
       // strictly between the endpoints), so its x-extent (181..440) sets
@@ -753,7 +753,7 @@ describe("computeEdgeRoutes", () => {
 
   describe("label squish avoidance (B4)", () => {
     it("grows the bend of a short diagonal skip so a long label stops wrapping to more lines than a box label would", () => {
-      // Mirrors tcp-groups.tldsl.jsx's `listen -> syn_rcvd` defect: a short
+      // Mirrors tcp-groups.tldx.jsx's `listen -> syn_rcvd` defect: a short
       // diagonal gap between two nested-container boxes with a label wide
       // enough that tldraw's own arrowLabel.ts squishes it hard.
       const LONG_LABEL = "recv SYN / SYN,ACK";

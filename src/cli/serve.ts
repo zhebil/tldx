@@ -1,5 +1,5 @@
 /**
- * `tldsl serve <file>`: watch a `.tldsl` file, recompile on save, push the
+ * `tldx serve <file>`: watch a `.tldx` file, recompile on save, push the
  * result over SSE, and host the viewer bundle that consumes it. The
  * composition root (`cli/main.ts`) wires real adapters and calls into
  * `runServe`; this module owns the wiring of transport + dev-server +
@@ -21,14 +21,14 @@
  *   resources are torn down before the error propagates so the caller does
  *   not need to clean up.
  *
- * Overlay-write opt-out (tldsl-jwh): `deps.fsWrite` is optional. Omitting it
+ * Overlay-write opt-out (tldx-jwh): `deps.fsWrite` is optional. Omitting it
  * disables the overlay round-trip entirely for this server - `render`'s
  * ephemeral boot does this so a read-only export never writes a
- * `*.tldsl.overlay.json` sidecar. `tldsl serve` always wires a real one.
+ * `*.tldx.overlay.json` sidecar. `tldx serve` always wires a real one.
  *
- * Compile tracking (tldsl-usr, tldsl-46n): every successful compile re-hashes
+ * Compile tracking (tldx-usr, tldx-46n): every successful compile re-hashes
  * the source and records it via `infra/serve-registry`'s `touchServeCompile`,
- * so a later `tldsl render` that reuses this server can tell whether it's
+ * so a later `tldx render` that reuses this server can tell whether it's
  * still serving what's on disk. `ServeHandle.compile` carries the same
  * hash/timestamp from the initial compile so the CLI can seed the registry
  * record atomically at boot (no window where a reuser sees a hash-less
@@ -36,7 +36,7 @@
  * own ephemeral servers never call `recordServe`, so the touch harmlessly
  * finds no record to update.
  *
- * Idle-TTL reaper (tldsl-kts): `deps.ttlMinutes` (default 60; `0` disables)
+ * Idle-TTL reaper (tldx-kts): `deps.ttlMinutes` (default 60; `0` disables)
  * feeds `app/idle-reaper.ts`'s `createIdleReaper`, which owns the "no
  * activity for N minutes" timer via `deps.clock`. This is the one place
  * every activity signal converges - dev-server HTTP requests (any page
@@ -49,19 +49,19 @@
  * `ServeHandle.idleExpired`; `cli/main.ts` races that against SIGINT/SIGTERM
  * and closes the handle the same way either way.
  *
- * Code staleness (tldsl-rab): loading the router/layout modules happens once
- * at process start, and the watcher only watches the `.tldsl.jsx` entry - an
+ * Code staleness (tldx-rab): loading the router/layout modules happens once
+ * at process start, and the watcher only watches the `.tldx.jsx` entry - an
  * edit to `src/domain/**` (or anywhere else in the compiler) is invisible to
  * an already-running process. `ServeHandle.compile.codeFingerprint` is a
  * newest-mtime reading over the compiler source tree taken at boot
  * (`infra/serve-registry`'s `codeFingerprint`); `cli/main.ts` seeds the
- * registry record with it so a later `tldsl render` can tell a server apart
+ * registry record with it so a later `tldx render` can tell a server apart
  * from the code it actually booted with (`cli/render.ts`'s `isCodeStale`).
  * The `watch/recompile-ok` log tap below also re-checks it on every
  * recompile and warns once, loudly, if the tree has moved since boot - this
- * is a notice, not a hot-reload: the fix is to restart `tldsl serve`.
+ * is a notice, not a hot-reload: the fix is to restart `tldx serve`.
  *
- * Viewer staleness (tldsl-rab): `deps.viewerBundleDir` is a prebuilt static
+ * Viewer staleness (tldx-rab): `deps.viewerBundleDir` is a prebuilt static
  * bundle; `src/viewer/**` edits need `npm run build:viewer` before they show
  * up. `viewerStalenessWarning` below is `cli/main.ts`'s `distStalenessHint`
  * pattern applied to `dist/viewer` vs. its `src/viewer` sibling - a one-shot
@@ -113,7 +113,7 @@ export type ServeDeps = {
   /** Bind port. `0` (default) lets the OS pick an ephemeral port. */
   port?: number;
   /**
-   * Idle-TTL in minutes before the server exits itself (tldsl-kts).
+   * Idle-TTL in minutes before the server exits itself (tldx-kts).
    * Defaults to 60. `0` disables the reaper - the server runs until killed.
    */
   ttlMinutes?: number;
@@ -138,7 +138,7 @@ export type ServeHandle = {
    */
   readonly compile: { hash: string | undefined; at: number; codeFingerprint: number };
   /**
-   * Resolves once the idle-TTL reaper fires (tldsl-kts) - never, if
+   * Resolves once the idle-TTL reaper fires (tldx-kts) - never, if
    * `ttlMinutes` is `0`. The reaper has already logged the reason by the
    * time this resolves; the caller (`cli/main.ts`) just needs to close the
    * handle, same as on SIGINT/SIGTERM.
@@ -221,7 +221,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
   }
 
   // Re-hashes and records the source on every successful compile (not just
-  // the initial one) so a `tldsl render` reusing this server later can
+  // the initial one) so a `tldx render` reusing this server later can
   // detect staleness. Harmless no-op when `path` was never registered
   // (`recordServe` not called - e.g. render's own ephemeral boot).
   let warnedCodeStale = false;
@@ -230,7 +230,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
       deps.log.log(event);
       if (event.code === "watch/recompile-ok") {
         // Only a file-change-triggered recompile counts as activity - the
-        // initial boot compile isn't "someone doing something" (tldsl-kts).
+        // initial boot compile isn't "someone doing something" (tldx-kts).
         if (event.fields?.trigger === "change") reaper.bump();
         void readHashSafe(deps.fs, path).then((hash) => {
           if (hash !== undefined) touchServeCompile(path, hash, deps.clock.now());
@@ -243,7 +243,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
           deps.log.log({
             level: "warn",
             code: "serve/code-stale",
-            msg: "the code that compiled this scene (src/domain, src/app, ...) has changed since this server started - restart `tldsl serve` to pick it up",
+            msg: "the code that compiled this scene (src/domain, src/app, ...) has changed since this server started - restart `tldx serve` to pick it up",
             fields: { bootCodeFingerprint },
           });
         }
@@ -274,7 +274,7 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
 
   const compile = { hash: await readHashSafe(deps.fs, path), at: deps.clock.now(), codeFingerprint: bootCodeFingerprint };
 
-  io.writeStdout(`tldsl serving ${path} on ${server.url}\n`);
+  io.writeStdout(`tldx serving ${path} on ${server.url}\n`);
 
   const viewerWarning = viewerStalenessWarning(deps.viewerBundleDir);
   if (viewerWarning !== undefined) {

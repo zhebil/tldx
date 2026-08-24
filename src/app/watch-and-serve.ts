@@ -1,5 +1,5 @@
 /**
- * `watchAndServe`: subscribe to a `.tldsl.jsx` file, recompile on every change,
+ * `watchAndServe`: subscribe to a `.tldx.jsx` file, recompile on every change,
  * and push the result over a `TransportPort` so the viewer renders it.
  *
  * Per ADR-13 (and CONTEXT.md "Scene message contract" → "On compile error"):
@@ -40,12 +40,12 @@
  * - `putOverlay` merges the fresh browser diff onto the on-disk overlay
  *   (`mergeOverlayEntries`) rather than overwriting it - a source edit that
  *   invalidates an entry's id must not delete it just because the fresh
- *   diff has nothing to say about it (tldsl-j3q). But an id the browser's
+ *   diff has nothing to say about it (tldx-j3q). But an id the browser's
  *   snapshot *does* still have, whose canvas value is simply back to
  *   matching base, is not that case - `mergeOverlayEntries` is given the
  *   snapshot's id set precisely so it can tell the two apart and let a
  *   canvas edit that undoes an entry back to its source value actually
- *   remove it (tldsl-z2j half 2), instead of leaving a stale entry the
+ *   remove it (tldx-z2j half 2), instead of leaving a stale entry the
  *   server keeps re-applying.
  */
 
@@ -195,9 +195,9 @@ export function watchAndServe(
           // `deleted`, exactly like an id the user undid back to its base
           // value. `snapshotIds` is what tells those two apart: merging
           // onto the on-disk overlay keeps a previous entry only when its
-          // id is absent from the snapshot entirely (tldsl-j3q); an id
+          // id is absent from the snapshot entirely (tldx-j3q); an id
           // still present in the snapshot but unchanged from base has its
-          // entry dropped (tldsl-z2j half 2), so undoing a canvas edit back
+          // entry dropped (tldx-z2j half 2), so undoing a canvas edit back
           // to the source position actually clears the overlay for it.
           const previous = await readOverlay(deps.fs, overlayPath);
           const snapshotIds = new Set(Object.keys(snapshot.store));

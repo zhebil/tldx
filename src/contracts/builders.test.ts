@@ -72,7 +72,7 @@ describe("record factories", () => {
     expect(pageRecord({ id: "page:home" })).toMatchObject({
       id: "page:home",
       typeName: "page",
-      name: "tldsl",
+      name: "tldx",
       index: "a1",
     });
   });

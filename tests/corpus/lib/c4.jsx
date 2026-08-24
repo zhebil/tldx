@@ -1,11 +1,11 @@
 /**
  * A small C4-ish vocabulary, written entirely as components over the tier-1
- * `Box`/`Frame` primitives exported by `"tldsl"`. This module is deliberately
+ * `Box`/`Frame` primitives exported by `"tldx"`. This module is deliberately
  * *outside* the library (T16b): it is the composability test proving a
  * domain vocabulary can be built in userland without any change to
  * `src/runtime/`.
  */
-import { Box, Frame } from "tldsl";
+import { Box, Frame } from "tldx";
 
 export function Person({ id, name, description }) {
   const label = description ? `${name} - ${description}` : name;

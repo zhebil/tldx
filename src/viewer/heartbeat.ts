@@ -1,5 +1,5 @@
 /**
- * Visible-tab liveness ping for `tldsl serve`'s idle-TTL reaper (tldsl-kts).
+ * Visible-tab liveness ping for `tldx serve`'s idle-TTL reaper (tldx-kts).
  * An open SSE connection is not a liveness signal - an abandoned tab holds
  * it open forever - so the server needs a *periodic* signal instead, sent
  * only while someone is actually looking at the diagram. This is a plain

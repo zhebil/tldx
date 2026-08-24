@@ -10,7 +10,7 @@ describe("createNodeFsWrite", () => {
   let dir: string;
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "tldsl-fs-write-"));
+    dir = await mkdtemp(join(tmpdir(), "tldx-fs-write-"));
   });
 
   afterEach(async () => {

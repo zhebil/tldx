@@ -1,5 +1,5 @@
 /**
- * Wire shape for the overlay file (`x.tldsl.overlay.json`), one per diagram,
+ * Wire shape for the overlay file (`x.tldx.overlay.json`), one per diagram,
  * beside the source (`docs/round-trip.md` D1). It is a final-state map keyed
  * by the tldraw record id as it appears in the compiled scene store, never a
  * delta and never a sequence - re-applying it twice gives the same answer as

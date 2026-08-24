@@ -1,5 +1,5 @@
 /**
- * E2E for the overlay round-trip end to end through `tldsl serve`
+ * E2E for the overlay round-trip end to end through `tldx serve`
  * (docs/round-trip.md D4): a browser PUTs a canvas edit, the server writes
  * the overlay file and re-pushes the applied scene, and - because the SSE
  * transport replays its last message to new subscribers - a fresh
@@ -80,7 +80,7 @@ function buildMutatedSnapshot(base: SceneJSON): SceneJSON {
   return { store, schema: base.schema };
 }
 
-describe("e2e: overlay round-trip through tldsl serve", () => {
+describe("e2e: overlay round-trip through tldx serve", () => {
   let handle: ServeHandle | undefined;
   let workDir: string | undefined;
   let bundleDir: string | undefined;
@@ -100,10 +100,10 @@ describe("e2e: overlay round-trip through tldsl serve", () => {
   it(
     "reloading the served page reproduces the pre-reload scene",
     async () => {
-      workDir = await mkdtemp(join(tmpdir(), "tldsl-overlay-serve-"));
-      bundleDir = await mkdtemp(join(tmpdir(), "tldsl-overlay-serve-bundle-"));
-      const filePath = join(workDir, "auth.tldsl.jsx");
-      await copyFile(join(FIXTURES, "auth.tldsl.jsx"), filePath);
+      workDir = await mkdtemp(join(tmpdir(), "tldx-overlay-serve-"));
+      bundleDir = await mkdtemp(join(tmpdir(), "tldx-overlay-serve-bundle-"));
+      const filePath = join(workDir, "auth.tldx.jsx");
+      await copyFile(join(FIXTURES, "auth.tldx.jsx"), filePath);
 
       handle = await runServe({
         path: filePath,

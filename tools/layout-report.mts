@@ -28,7 +28,7 @@ import { formatDiagnostics } from "../src/cli/format-diagnostics.js";
 // -- geometry model -----------------------------------------------------------
 //
 // `AbsShape`, `isAncestor`, `overlapArea` live in `src/domain/layout/occlusion.ts`
-// now - `tldsl check` needs the same "shape covers shape" computation this
+// now - `tldx check` needs the same "shape covers shape" computation this
 // report has always done, so it moved into the product and this report
 // imports it back rather than keeping a second copy (docs/diagram-defects.md D15).
 

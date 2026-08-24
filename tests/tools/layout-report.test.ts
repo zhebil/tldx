@@ -77,7 +77,7 @@ describe("tools/layout-report", () => {
 
 // -- fixture builders (mirrors src/domain/emit/emit.test.ts) ------------------
 
-const SPAN = { file: "test.tldsl", line: 1, column: 1 };
+const SPAN = { file: "test.tldx", line: 1, column: 1 };
 
 function doc(input: { layout?: LayoutMode; children: IRElementPositioned[] }): IRDocPositioned {
   const { layout, children } = input;

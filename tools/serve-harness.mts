@@ -1,5 +1,5 @@
 /**
- * Shared child-process plumbing for tools that need a live `tldsl serve`
+ * Shared child-process plumbing for tools that need a live `tldx serve`
  * instance: spawns it, waits for it to print its URL, hands the URL to the
  * caller, and always kills the child on the way out - an orphaned `serve`
  * would poison every later run.
@@ -40,7 +40,7 @@ function waitForServeUrl(child: ReturnType<typeof spawn>): Promise<string> {
   return new Promise((resolvePromise, reject) => {
     let stderr = "";
     const timer = setTimeout(() => {
-      reject(new Error(`tldsl serve did not print a URL within ${SERVE_READY_TIMEOUT_MS}ms; stderr: ${stderr}`));
+      reject(new Error(`tldx serve did not print a URL within ${SERVE_READY_TIMEOUT_MS}ms; stderr: ${stderr}`));
     }, SERVE_READY_TIMEOUT_MS);
 
     child.stdout?.on("data", (chunk: Buffer) => {
@@ -55,7 +55,7 @@ function waitForServeUrl(child: ReturnType<typeof spawn>): Promise<string> {
     });
     child.on("exit", (code) => {
       clearTimeout(timer);
-      reject(new Error(`tldsl serve exited early (code ${code}); stderr: ${stderr}`));
+      reject(new Error(`tldx serve exited early (code ${code}); stderr: ${stderr}`));
     });
     child.on("error", (err) => {
       clearTimeout(timer);

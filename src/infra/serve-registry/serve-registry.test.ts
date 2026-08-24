@@ -15,15 +15,15 @@ const DEAD_PID = 999_999_999;
 // hand-written record lands exactly where the module would look for it.
 function pathFor(file: string): string {
   const hash = createHash("sha256").update(realpathSync(file)).digest("hex").slice(0, 16);
-  return join(tmpdir(), "tldsl-serve", `${hash}.json`);
+  return join(tmpdir(), "tldx-serve", `${hash}.json`);
 }
 
 const dirs: string[] = [];
 
 function tempFile(): string {
-  const dir = mkdtempSync(join(tmpdir(), "tldsl-serve-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "tldx-serve-test-"));
   dirs.push(dir);
-  const file = join(dir, "diagram.tldsl.jsx");
+  const file = join(dir, "diagram.tldx.jsx");
   writeFileSync(file, "");
   return file;
 }
@@ -60,7 +60,7 @@ describe("recordServe / findServe", () => {
     forget();
   });
 
-  it("records a codeFingerprint up front when given one (tldsl-rab)", () => {
+  it("records a codeFingerprint up front when given one (tldx-rab)", () => {
     const file = tempFile();
     const forget = recordServe(file, "http://127.0.0.1:4000", { hash: "abcd1234", at: 42, codeFingerprint: 999 });
 
@@ -147,7 +147,7 @@ describe("hashSource", () => {
 
 describe("newestMtimeMs", () => {
   it("returns the newest mtime among files, recursing into subdirectories", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tldsl-mtime-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "tldx-mtime-test-"));
     dirs.push(dir);
     writeFileSync(join(dir, "old.txt"), "old");
     utimesSync(join(dir, "old.txt"), new Date(1000), new Date(1000));
@@ -159,7 +159,7 @@ describe("newestMtimeMs", () => {
   });
 
   it("skips node_modules", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tldsl-mtime-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "tldx-mtime-test-"));
     dirs.push(dir);
     writeFileSync(join(dir, "old.txt"), "old");
     utimesSync(join(dir, "old.txt"), new Date(1000), new Date(1000));
@@ -171,13 +171,13 @@ describe("newestMtimeMs", () => {
   });
 
   it("returns 0 for a directory that doesn't exist", () => {
-    expect(newestMtimeMs(join(tmpdir(), "tldsl-does-not-exist-xyz"))).toBe(0);
+    expect(newestMtimeMs(join(tmpdir(), "tldx-does-not-exist-xyz"))).toBe(0);
   });
 });
 
-describe("codeFingerprint (tldsl-rab)", () => {
+describe("codeFingerprint (tldx-rab)", () => {
   function makeCheckout(): { root: string; distCli: string; srcCli: string } {
-    const root = mkdtempSync(join(tmpdir(), "tldsl-codefp-test-"));
+    const root = mkdtempSync(join(tmpdir(), "tldx-codefp-test-"));
     dirs.push(root);
     const distCli = join(root, "dist", "cli");
     const srcCli = join(root, "src", "cli");
@@ -204,7 +204,7 @@ describe("codeFingerprint (tldsl-rab)", () => {
   });
 
   it("is 0 when running from dist/cli with no sibling src/ (installed package)", () => {
-    const root = mkdtempSync(join(tmpdir(), "tldsl-codefp-test-"));
+    const root = mkdtempSync(join(tmpdir(), "tldx-codefp-test-"));
     dirs.push(root);
     const distCli = join(root, "dist", "cli");
     mkdirSync(distCli, { recursive: true });

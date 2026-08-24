@@ -1,6 +1,6 @@
 /**
- * `tldsl measure <file> [--frame <id>]`: print each shape's id, size, and
- * position without the render-to-SVG-and-grep workaround (tldsl-9mu).
+ * `tldx measure <file> [--frame <id>]`: print each shape's id, size, and
+ * position without the render-to-SVG-and-grep workaround (tldx-9mu).
  *
  * Builds the same mini pipeline `tools/layout-report.mts` does (fs read ->
  * jsx execute -> lower -> layout) instead of `compileFile`, which only
@@ -30,13 +30,13 @@ export type MeasureIo = {
 };
 
 export type RunMeasureArgs = {
-  /** argv after the `measure` command name, e.g. ["a.tldsl.jsx", "--frame", "ctx"] */
+  /** argv after the `measure` command name, e.g. ["a.tldx.jsx", "--frame", "ctx"] */
   argv: readonly string[];
   deps: MeasureDeps;
   io: MeasureIo;
 };
 
-const USAGE = "usage: tldsl measure <file> [--frame <id>]";
+const USAGE = "usage: tldx measure <file> [--frame <id>]";
 
 /** `id  W x H  @ (x,y)`, columns aligned to the widest entry. */
 export function formatMeasure(shapes: readonly AbsShape[]): string {
@@ -60,7 +60,7 @@ export async function runMeasure(args: RunMeasureArgs): Promise<number> {
   const path = args.argv.find((a, i) => !a.startsWith("--") && (frameIdx < 0 || i !== frameIdx + 1));
 
   if (path === undefined) {
-    io.writeStderr(`tldsl measure: missing <file> argument\n${USAGE}\n`);
+    io.writeStderr(`tldx measure: missing <file> argument\n${USAGE}\n`);
     return 1;
   }
 
@@ -69,7 +69,7 @@ export async function runMeasure(args: RunMeasureArgs): Promise<number> {
     source = await deps.fs.read(path);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    io.writeStderr(`tldsl measure: ${msg}\n`);
+    io.writeStderr(`tldx measure: ${msg}\n`);
     return 1;
   }
 
@@ -93,7 +93,7 @@ export async function runMeasure(args: RunMeasureArgs): Promise<number> {
     narrowed = narrowToFrame(shapes, frame);
     if (narrowed.length === 0) {
       const validIds = shapes.map((s) => s.id).sort().join(", ");
-      io.writeStderr(`tldsl measure: unknown --frame id "${frame}". Valid ids: ${validIds}\n`);
+      io.writeStderr(`tldx measure: unknown --frame id "${frame}". Valid ids: ${validIds}\n`);
       return 1;
     }
   }

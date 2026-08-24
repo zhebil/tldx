@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "tldx",
+  "version": "0.1.0",
+  "description": "Write architecture and flow diagrams as JSX and see them rendered on a live tldraw canvas. Requires the `tldx` CLI on PATH.",
+  "author": {
+    "name": "Zhebil"
+  },
+  "homepage": "https://github.com/zhebil/tldx",
+  "repository": "https://github.com/zhebil/tldx",
+  "license": "MIT",
+  "keywords": [
+    "diagrams",
+    "tldraw",
+    "jsx",
+    "architecture",
+    "hooks"
+  ]
+}

@@ -1,11 +1,11 @@
 /**
  * Smoke test for the canonical 5-node auth-flow fixture.
  *
- * The .tldsl is the agent-authored DSL source. The target SceneJSON is
+ * The .tldx is the agent-authored DSL source. The target SceneJSON is
  * specified by `expectedScene()` below using `src/contracts/builders.ts`
  * factories - builders are the spec, no checked-in JSON. domain/emit/ is
  * not landed yet; when it is, this test should grow a round-trip
- * assertion that `compile(auth.tldsl)` deep-equals `expectedScene()`.
+ * assertion that `compile(auth.tldx)` deep-equals `expectedScene()`.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -174,12 +174,12 @@ function expectedScene(): SceneJSON {
   return sceneJson(records);
 }
 
-describe("e2e fixture: auth.tldsl.jsx", () => {
+describe("e2e fixture: auth.tldx.jsx", () => {
   it(
     "executes cleanly and produces the expected element counts",
     async () => {
-      const path = join(FIXTURES, "auth.tldsl.jsx");
-      const source = readFixture("auth.tldsl.jsx");
+      const path = join(FIXTURES, "auth.tldx.jsx");
+      const source = readFixture("auth.tldx.jsx");
       const result = await createJsxExecute().execute(source, path);
 
       expect("diagnostics" in result).toBe(false);
@@ -227,9 +227,9 @@ describe("e2e fixture: auth scene spec", () => {
   });
 });
 
-describe("e2e fixture: styles.tldsl.jsx (T9)", () => {
+describe("e2e fixture: styles.tldx.jsx (T9)", () => {
   it("compiles with zero diagnostics, exercising every tldraw style enum value", async () => {
-    const path = join(FIXTURES, "styles.tldsl.jsx");
+    const path = join(FIXTURES, "styles.tldx.jsx");
     const result = await compileFile(path, {
       fs: createNodeFsRead(),
       layout: new StubLayout(),

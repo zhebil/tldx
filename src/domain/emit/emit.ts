@@ -21,7 +21,7 @@
  * - `<Sticky>` (`note.sticky`) is a real tldraw note shape: drops IR `w`
  *   (tldraw stickies are always 200 wide) and keeps `h` as `growY` above
  *   tldraw's 200 base height; `note.color` passes through. It is the only
- *   `kind: "note"` producer left (C2, tldsl-npd) - the old plain `<Note>`,
+ *   `kind: "note"` producer left (C2, tldx-npd) - the old plain `<Note>`,
  *   which emitted a hand-rolled `geo` rectangle pretending to be an
  *   annotation, is retired in favour of `<Text>` or `<Sticky>`.
  * - `box`/`frame`/`note`/`edge` also pass through the raw tldraw style props
@@ -278,7 +278,7 @@ function emitText(
 
 /**
  * Always a real tldraw sticky note. The fake-geo-rectangle branch for a
- * non-sticky `<Note>` is retired (C2, tldsl-npd): `<Sticky>` is the only
+ * non-sticky `<Note>` is retired (C2, tldx-npd): `<Sticky>` is the only
  * runtime producer of `kind: "note"` left, so `note.sticky` is always true
  * on any IR that reaches here through the public authoring surface.
  */
@@ -360,7 +360,7 @@ function arrowPlacement(edge: IREdge, ctx: EmitContext): { parentId: string; ind
   // to the endpoint's own shape id in the rare case one endpoint is an
   // ancestor of the other (an edge into a frame it also lives inside) -
   // `reparentArrow` special-cases that (no sibling at all) in a way not
-  // worth replicating for a shape that can't occur from tldsl source today.
+  // worth replicating for a shape that can't occur from tldx source today.
   const siblingFrom = pathFrom[i] ?? pathFrom[pathFrom.length - 1]!;
   const siblingTo = pathTo[i] ?? pathTo[pathTo.length - 1]!;
 

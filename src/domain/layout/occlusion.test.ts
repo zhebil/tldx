@@ -11,7 +11,7 @@ import type {
 
 import { computeOcclusionDiagnostics } from "./occlusion.js";
 
-const SPAN = { file: "test.tldsl", line: 1, column: 1 };
+const SPAN = { file: "test.tldx", line: 1, column: 1 };
 
 function doc(children: IRElementPositioned[]): IRDocPositioned {
   return { kind: "doc", id: "root", idExplicit: false, span: SPAN, children };

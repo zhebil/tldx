@@ -1,5 +1,5 @@
 /**
- * Records -> JSX text, plus the splice into a `.tldsl.jsx` source file that
+ * Records -> JSX text, plus the splice into a `.tldx.jsx` source file that
  * adds them as children of the root `<Doc>` (docs/round-trip.md D3, D5).
  * Pure: no I/O, never reformats anything it wasn't asked to touch. `app/
  * absorb.ts` calls this after partitioning the overlay into absorbable vs.
@@ -7,7 +7,7 @@
  *
  * A `geo` record becomes `<Box>`; a `note` record becomes `<Sticky>` - the
  * only vocabulary left that `domain/emit/emit.ts` compiles to a `type:
- * "note"` tldraw record (C2, tldsl-npd: the old plain `<Note>`, which
+ * "note"` tldraw record (C2, tldx-npd: the old plain `<Note>`, which
  * emitted a `geo` box pretending to be an annotation, is retired). Emitting
  * anything else here would recompile to the wrong tldraw type and fail
  * absorb's own verification step every time.
@@ -320,12 +320,12 @@ export function patchGapAttr(
   return { source: source.slice(0, start) + patched + source.slice(innerEnd) };
 }
 
-const TLDSL_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["']tldsl["']/;
+const TLDX_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["']tldx["']/;
 
 /** `<Box>`/`<Sticky>` are only imports the source needs "touched" for when
  *  absorb actually introduces one it wasn't already using (D5: never touch
  *  an import it didn't need to touch). Adds missing names to the existing
- *  `import { ... } from "tldsl"`; errors rather than guessing if there is
+ *  `import { ... } from "tldx"`; errors rather than guessing if there is
  *  no such import to extend. */
 function ensureImports(source: string, records: readonly TLRecord[]): { source: string } | { error: string } {
   const needed: string[] = [];
@@ -333,9 +333,9 @@ function ensureImports(source: string, records: readonly TLRecord[]): { source: 
   if (records.some((r) => r.type === "note")) needed.push("Sticky");
   if (needed.length === 0) return { source };
 
-  const match = TLDSL_IMPORT.exec(source);
+  const match = TLDX_IMPORT.exec(source);
   if (match === null) {
-    return { error: 'could not find `import { ... } from "tldsl"` to add the new component(s) to' };
+    return { error: 'could not find `import { ... } from "tldx"` to add the new component(s) to' };
   }
   const existing = match[1]!
     .split(",")
@@ -344,7 +344,7 @@ function ensureImports(source: string, records: readonly TLRecord[]): { source: 
   const missing = needed.filter((n) => !existing.includes(n));
   if (missing.length === 0) return { source };
 
-  const newImport = `import { ${[...existing, ...missing].join(", ")} } from "tldsl"`;
+  const newImport = `import { ${[...existing, ...missing].join(", ")} } from "tldx"`;
   return {
     source: source.slice(0, match.index) + newImport + source.slice(match.index + match[0].length),
   };
@@ -353,7 +353,7 @@ function ensureImports(source: string, records: readonly TLRecord[]): { source: 
 /**
  * Splices `records` in as children of the root `<Doc>`, immediately before
  * its `</Doc>` (expanding a self-closing `<Doc .../>` first if that's the
- * root form), adding any of `Box`/`Sticky` the existing `"tldsl"` import is
+ * root form), adding any of `Box`/`Sticky` the existing `"tldx"` import is
  * missing. Returns an error - never throws, never writes partial output -
  * when the root can't be found unambiguously or a record has no JSX form.
  */

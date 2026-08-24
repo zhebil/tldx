@@ -18,15 +18,15 @@ runFsReadContract("InMemoryFs", async (): Promise<FsReadHarness> => {
 
 describe("InMemoryFs (fake-specific affordances)", () => {
   it("seeds files via the constructor record", async () => {
-    const fs = new InMemoryFs({ "a.tldsl": "alpha", "b.tldsl": "beta" });
-    expect(await fs.read("a.tldsl")).toBe("alpha");
-    expect(await fs.read("b.tldsl")).toBe("beta");
+    const fs = new InMemoryFs({ "a.tldx": "alpha", "b.tldx": "beta" });
+    expect(await fs.read("a.tldx")).toBe("alpha");
+    expect(await fs.read("b.tldx")).toBe("beta");
   });
 
   it("deleteFile makes subsequent reads throw ENOENT", async () => {
-    const fs = new InMemoryFs({ "doc.tldsl": "x" });
-    fs.deleteFile("doc.tldsl");
-    expect(fs.has("doc.tldsl")).toBe(false);
-    await expect(fs.read("doc.tldsl")).rejects.toMatchObject({ code: "ENOENT" });
+    const fs = new InMemoryFs({ "doc.tldx": "x" });
+    fs.deleteFile("doc.tldx");
+    expect(fs.has("doc.tldx")).toBe(false);
+    await expect(fs.read("doc.tldx")).rejects.toMatchObject({ code: "ENOENT" });
   });
 });

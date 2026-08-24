@@ -1,5 +1,5 @@
 /**
- * Idle-TTL reaper for `tldsl serve` (tldsl-kts). Activity is an event, not
+ * Idle-TTL reaper for `tldx serve` (tldx-kts). Activity is an event, not
  * an open connection - an abandoned browser tab holds its SSE connection
  * open forever, so "a client is connected" is not a liveness signal. The
  * reaper instead tracks discrete activity events (`bump()`) and fires

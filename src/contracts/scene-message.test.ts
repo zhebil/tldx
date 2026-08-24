@@ -29,7 +29,7 @@ describe("SceneMessage envelope", () => {
         severity: "error",
         code: "parser/unexpected-token",
         message: "expected closing '>'",
-        span: { file: "auth.tldsl", line: 3, column: 12, length: 1 },
+        span: { file: "auth.tldx", line: 3, column: 12, length: 1 },
       },
     ]);
     expect(msg.kind).toBe("error");
