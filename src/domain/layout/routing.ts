@@ -141,8 +141,9 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
   const { shapes, edges } = collect(ir);
   const byId = new Map(shapes.map((s) => [s.id, s]));
 
-  // Edges the router must leave alone: self-loops, whose arc is the loop
-  // itself, and anything carrying an authored `bend`.
+  // Self-loops are the one shape the router has nothing to say about: the arc
+  // is the loop. An authored `bend` is handled further down - it overrides the
+  // arc, not the attachment, so those edges still go through every pass here.
   const routes = new Map<string, EdgeRoute>();
   const pinned = new Set<string>();
   for (const edge of edges) {
@@ -155,19 +156,6 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
       bend: edge.bend ?? loop,
       startAnchor: edge.fromAnchor ?? { x: 0.75, y: 0 },
       endAnchor: edge.toAnchor ?? { x: 0.25, y: 0 },
-    });
-  }
-
-  // An authored `bend` wins outright, so the edge joins the self-edges in
-  // sitting out every pass below - each of those grows or shrinks a bend, and
-  // any one of them running would silently overwrite the author's number.
-  for (const edge of edges) {
-    if (edge.bend === undefined || pinned.has(edge.id)) continue;
-    pinned.add(edge.id);
-    routes.set(edge.id, {
-      bend: edge.bend,
-      ...(edge.fromAnchor === undefined ? {} : { startAnchor: edge.fromAnchor }),
-      ...(edge.toAnchor === undefined ? {} : { endAnchor: edge.toAnchor }),
     });
   }
 
@@ -206,9 +194,25 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
 
   growBendForLabelSquish(otherEdges, byId, shapes, routes);
 
+  // An authored `bend` overrides the arc, not the attachment. The edge has
+  // been through every anchor pass above, so it leaves and arrives where the
+  // router would have put it - only the depth of the bow is the author's. That
+  // matters for the workflow the prop exists for: the number `overlay show`
+  // reports was measured against those anchors, so dropping them would give
+  // the pasted value a different arc from the one on the canvas.
+  //
+  // Applied here, after everything that grows or shrinks a bend and before
+  // `placeLabels`, so the label is positioned on the arc actually drawn.
+  const keepBend = new Set(fanned);
+  for (const edge of otherEdges) {
+    if (edge.bend === undefined) continue;
+    keepBend.add(edge.id);
+    routes.set(edge.id, { ...routes.get(edge.id), bend: edge.bend });
+  }
+
   placeLabels(edges, byId, shapes, routes);
 
-  minimizeBends(otherEdges, byId, shapes, routes, fanned);
+  minimizeBends(otherEdges, byId, shapes, routes, keepBend);
 
   return routes;
 }
@@ -920,7 +924,7 @@ function minimizeBends(
   byId: Map<string, AbsShape>,
   shapes: AbsShape[],
   routes: Map<string, EdgeRoute>,
-  fanned: ReadonlySet<string>,
+  keepBend: ReadonlySet<string>,
 ): void {
   const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
   const snapshot = new Map<string, { bend: number; labelBox?: LabelBox }>();
@@ -932,14 +936,15 @@ function minimizeBends(
   for (const edge of edges) {
     const route = routes.get(edge.id);
     if (!route || route.bend === 0) continue;
-    // A fan bend is already the minimum separation `fanSharedPairs` chose, so
-    // there is nothing here to give back. It also cannot be judged by
+    // Two kinds of bend are not this pass's to give back. An authored one is
+    // the author's number, full stop. A fan bend is already the minimum
+    // separation `fanSharedPairs` chose, and it cannot be judged by
     // `arcsTooClose` alone: the pair shares both terminals, so two arcs that
     // meet at the ends stay under the fraction even when the whole middle is
     // one line, and `snapshot` would score each half against the other's
     // pre-shrink bend anyway - both halves shrink to zero and the pair lands
     // back on the same line.
-    if (fanned.has(edge.id)) continue;
+    if (keepBend.has(edge.id)) continue;
     // `approxLabelBox`'s parabola stands in for the real circular arc, and it
     // gets less trustworthy the further `t` sits from the midpoint it was
     // validated at. Shrinking a bend under an already-slid label risks a

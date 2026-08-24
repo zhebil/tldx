@@ -833,6 +833,23 @@ describe("computeEdgeRoutes", () => {
       box({ id: "d", x: 450, y: 0, w: 100, h: 50 }),
     ];
 
+    it("overrides the arc but not the attachment - the router's anchors survive", () => {
+      // The number an author pastes in was measured on a canvas where the
+      // router had already picked the faces. Dropping those anchors along with
+      // the bend would give the same number a different arc.
+      const withoutBend = computeEdgeRoutes(
+        doc("root", [...row, edge({ id: "ad", from: "a", to: "d" })]),
+      ).get("ad");
+      const withBend = computeEdgeRoutes(
+        doc("root", [...row, edge({ id: "ad", from: "a", to: "d", bend: -43 })]),
+      ).get("ad");
+
+      expect(withoutBend?.startAnchor).toBeDefined();
+      expect(withBend?.bend).toBe(-43);
+      expect(withBend?.startAnchor).toEqual(withoutBend?.startAnchor);
+      expect(withBend?.endAnchor).toEqual(withoutBend?.endAnchor);
+    });
+
     it("replaces the bend the router would have computed for itself", () => {
       // a -> d skips b and c, so left alone the router bows it clear.
       const routed = computeEdgeRoutes(
