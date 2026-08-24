@@ -145,10 +145,10 @@ export function planMoveCandidates(
     return unabsorbable('rotation has no JSX equivalent');
   }
   if (placement.parentId !== undefined) {
-    return unabsorbable("shape was reparented into a different container - F4 doesn't absorb cross-container moves");
+    return unabsorbable("shape was reparented into a different container - absorb only handles moves within a container");
   }
   if (placement.w !== undefined || placement.h !== undefined) {
-    return unabsorbable("resize has no absorbable form yet (F4 is moves only)");
+    return unabsorbable("resize has no absorbable form yet - absorb only handles moves");
   }
   if (placement.x === undefined && placement.y === undefined) {
     return unabsorbable("moved entry carries no position change");
