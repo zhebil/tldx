@@ -221,6 +221,19 @@ describe("applyOverlay", () => {
     expect(overlay).toEqual(overlaySnapshot);
   });
 
+  it("ignores an added session record, warning instead of putting it in the scene", () => {
+    // Sidecars written by an older viewer carry these; the scene they poison
+    // is one no tldraw document store will load.
+    const overlay = overlayWith({
+      "user:jGkov": { added: { id: "user:jGkov", typeName: "user" } },
+    });
+
+    const { scene, diagnostics } = applyOverlay(overlay, baseScene());
+
+    expect(scene.store["user:jGkov"]).toBeUndefined();
+    expect(diagnostics.map((d) => d.code)).toEqual(["overlay/not-a-document-record"]);
+  });
+
   it("is idempotent: applying the same overlay to its own result is a no-op", () => {
     const scene = baseScene();
     const overlay = overlayWith({

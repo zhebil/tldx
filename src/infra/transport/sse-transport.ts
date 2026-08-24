@@ -2,7 +2,9 @@
  * Real `TransportPort` adapter on Server-Sent Events. It hosts no HTTP server
  * of its own; it exposes `handler(req, res)` for the dev server to mount on
  * `/events`. Each push is one JSON `data:` event; on connect the stream emits
- * a `: ok` comment, then replays the last pushed message.
+ * a `: ok` comment, then replays the per-page cache (see `transport-replay`),
+ * so a reloaded viewer gets every served diagram back, not just the one that
+ * compiled most recently.
  *
  * The recurring `: ping` comment is a transport-level keepalive against idle
  * proxies and sleeping laptops, distinct from the `kind="ping"` SceneMessage,
@@ -13,6 +15,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { ClockPort, TimerHandle } from "../../app/ports/clock.js";
+import { createReplayCache } from "../../app/ports/transport-replay.js";
 import { TransportClosedError, type TransportPort } from "../../app/ports/transport.js";
 import type { SceneMessage } from "../../contracts/scene-message.js";
 
@@ -55,7 +58,7 @@ export function createSseTransport(options: CreateSseTransportOptions): SseTrans
   }
 
   const clients = new Set<Client>();
-  let last: SceneMessage | undefined;
+  const replay = createReplayCache();
   let closed = false;
 
   function dropClient(client: Client): void {
@@ -84,7 +87,7 @@ export function createSseTransport(options: CreateSseTransportOptions): SseTrans
   return {
     push(message: SceneMessage): void {
       if (closed) throw new TransportClosedError();
-      last = message;
+      replay.record(message);
       const wire = format(message);
       for (const client of clients) {
         if (client.closed) continue;
@@ -95,6 +98,10 @@ export function createSseTransport(options: CreateSseTransportOptions): SseTrans
           dropClient(client);
         }
       }
+    },
+
+    subscriberCount(): number {
+      return clients.size;
     },
 
     async close(): Promise<void> {
@@ -130,9 +137,9 @@ export function createSseTransport(options: CreateSseTransportOptions): SseTrans
       const client: Client = { res, closed: false, heartbeat: undefined };
       clients.add(client);
 
-      if (last !== undefined) {
+      for (const message of replay.replay()) {
         try {
-          res.write(format(last));
+          res.write(format(message));
         } catch {
           dropClient(client);
           return;

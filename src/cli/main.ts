@@ -17,14 +17,21 @@ import { gitStatus } from "../infra/git/git-status.js";
 import { ElkLayoutAdapter } from "../infra/layout-elk/elk-layout.js";
 import { createStderrLog } from "../infra/log/stderr-log.js";
 import { openBrowser } from "../infra/open-browser/open-browser.js";
-import { findServe, newestMtimeMs, recordServe } from "../infra/serve-registry/serve-registry.js";
+import {
+  claimServer,
+  findServer,
+  newestMtimeMs,
+  projectRootFor,
+  type ServeRecord,
+} from "../infra/serve-registry/serve-registry.js";
 
 import { runAbsorbCli } from "./absorb.js";
 import { runCheck, type CheckIo } from "./check.js";
 import { runMeasure } from "./measure.js";
 import { runOverlayCli } from "./overlay.js";
 import { runRender } from "./render.js";
-import { runServe } from "./serve.js";
+import { handOff } from "./serve-handoff.js";
+import { pageUrl, runServe } from "./serve.js";
 import { runVerifyCli } from "./verify.js";
 
 type CliIo = CheckIo;
@@ -50,14 +57,41 @@ function defaultViewerBundleDir(): string {
 }
 
 /**
- * A restart shouldn't pile up browser tabs: if a live `tldx serve` is already
- * recorded for this file, a tab already points at it.
+ * A tab is opened when nobody is looking at this server yet. A live record only
+ * proves a server is up, not that a viewer is connected to it - the server
+ * reports the latter, since only it can see its SSE clients.
  */
-export function shouldOpenBrowser(
-  noOpen: boolean,
-  live: { readonly pid: number } | undefined,
-): boolean {
-  return !noOpen && live === undefined;
+export function shouldOpenBrowser(noOpen: boolean, hasViewer: boolean): boolean {
+  return !noOpen && !hasViewer;
+}
+
+/**
+ * Give `path` to an already-running server and return this process's exit
+ * code. The server owns the watcher from here on, so there is nothing left for
+ * this process to do.
+ */
+async function handOffTo(
+  live: ServeRecord,
+  path: string,
+  opts: { noOpen: boolean; ttlMinutes: number | undefined },
+  io: { writeStdout: (chunk: string) => void },
+): Promise<number> {
+  const added = await handOff(live, path);
+  const page = added.name !== undefined ? ` as page "${added.name}"` : "";
+  io.writeStdout(
+    added.alreadyServed
+      ? `tldx serve: already serving ${path}${page} at ${live.url}\n`
+      : `tldx serve: added ${path}${page} to the server at ${live.url}\n`,
+  );
+  if (opts.ttlMinutes !== undefined && opts.ttlMinutes !== live.ttlMinutes) {
+    io.writeStdout(
+      `tldx serve: --ttl ignored; server already running with ttl ${String(live.ttlMinutes)}m\n`,
+    );
+  }
+  if (shouldOpenBrowser(opts.noOpen, added.hasViewer)) {
+    openBrowser(pageUrl(live.url, added.pageKey));
+  }
+  return 0;
 }
 
 /**
@@ -203,37 +237,58 @@ const commands: readonly Command[] = [
         return 1;
       }
       try {
-        const live = findServe(path);
-        const openThisTime = shouldOpenBrowser(noOpen, live);
-        if (!openThisTime && !noOpen && live !== undefined) {
-          io.writeStdout(
-            `tldx serve: a server for ${path} is already live at ${live.url}; not opening another tab\n`,
-          );
+        // A server already up for this project takes the diagram; this process
+        // prints where it landed and exits, leaving that server's terminal the
+        // only one holding watchers.
+        const live = findServer(path);
+        if (live !== undefined) {
+          return await handOffTo(live, path, { noOpen, ttlMinutes }, io);
         }
-        const handle = await runServe({
-          path,
-          deps: {
-            fs: createNodeFsRead(),
-            fsWrite: createNodeFsWrite(),
-            watch: createChokidarWatch(),
-            layout: new ElkLayoutAdapter(),
-            execute: createJsxExecute(),
-            log: createStderrLog(),
-            clock: createSystemClock(),
-            viewerBundleDir: defaultViewerBundleDir(),
-            ...(openThisTime ? { openBrowser } : {}),
-            ...(ttlMinutes !== undefined ? { ttlMinutes } : {}),
-          },
-          io,
-        });
-        const forgetServe = recordServe(path, handle.url, handle.compile);
-        return await awaitShutdown({
-          close: async () => {
-            await handle.close();
-            forgetServe();
-          },
-          idleExpired: handle.idleExpired,
-        });
+
+        // Claim the slot BEFORE binding a port, so two invocations racing from
+        // cold cannot both end up listening. The loser hands off instead.
+        const claim = claimServer(projectRootFor(path));
+        if (claim === undefined) {
+          const winner = findServer(path);
+          if (winner === undefined) {
+            io.writeStderr("tldx serve: another server is starting for this project; retry\n");
+            return 1;
+          }
+          return await handOffTo(winner, path, { noOpen, ttlMinutes }, io);
+        }
+
+        try {
+          const handle = await runServe({
+            path,
+            deps: {
+              fs: createNodeFsRead(),
+              fsWrite: createNodeFsWrite(),
+              watch: createChokidarWatch(),
+              layout: new ElkLayoutAdapter(),
+              execute: createJsxExecute(),
+              log: createStderrLog(),
+              clock: createSystemClock(),
+              viewerBundleDir: defaultViewerBundleDir(),
+              claim,
+              // A server this process just started has no viewer connected, so
+              // the tab opens unless the user said not to.
+              ...(shouldOpenBrowser(noOpen, false) ? { openBrowser } : {}),
+              ...(ttlMinutes !== undefined ? { ttlMinutes } : {}),
+            },
+            io,
+          });
+          claim.publish(handle.url, handle.compile.codeFingerprint, handle.ttlMinutes);
+          return await awaitShutdown({
+            close: async () => {
+              await handle.close();
+              claim.release();
+            },
+            idleExpired: handle.idleExpired,
+          });
+        } catch (err) {
+          claim.release();
+          throw err;
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         io.writeStderr(`tldx serve: ${msg}\n`);

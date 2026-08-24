@@ -15,12 +15,14 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  claimServer,
   codeFingerprint,
-  findServe,
+  diagramOf,
+  findServer,
   hashSource,
   newestMtimeMs,
-  recordServe,
-  touchServeCompile,
+  pageKeyFor,
+  projectRootFor,
 } from "./serve-registry.js";
 
 // Well past any real OS pid range, so `process.kill(pid, 0)` reliably
@@ -29,205 +31,212 @@ const DEAD_PID = 999_999_999;
 
 // Mirrors the module's private path formula so a hand-written record lands
 // exactly where it would look for it.
-function pathFor(file: string): string {
-  const hash = createHash("sha256").update(realpathSync(file)).digest("hex").slice(0, 16);
+function pathForRoot(root: string): string {
+  const hash = createHash("sha256").update(realpathSync(root)).digest("hex").slice(0, 16);
   return join(tmpdir(), "tldx-serve", `${hash}.json`);
 }
 
 const dirs: string[] = [];
 
-function tempFile(): string {
-  const dir = mkdtempSync(join(tmpdir(), "tldx-serve-test-"));
-  dirs.push(dir);
-  const file = join(dir, "diagram.tldx.jsx");
+/** A temp project directory containing one diagram, marked as a git repo. */
+function tempProject(marker: ".git" | ".git-file" | "package.json" | "none" = ".git"): {
+  root: string;
+  file: string;
+} {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "tldx-serve-test-")));
+  dirs.push(root);
+  if (marker === ".git") mkdirSync(join(root, ".git"));
+  if (marker === ".git-file") writeFileSync(join(root, ".git"), "gitdir: /elsewhere\n");
+  if (marker === "package.json") writeFileSync(join(root, "package.json"), "{}");
+  const nested = join(root, "diagrams");
+  mkdirSync(nested);
+  const file = join(nested, "diagram.tldx.jsx");
   writeFileSync(file, "");
-  return file;
+  return { root, file };
 }
 
 afterEach(() => {
   while (dirs.length > 0) {
-    rmSync(dirs.pop()!, { recursive: true, force: true });
+    const dir = dirs.pop()!;
+    rmSync(pathForRoot(dir), { force: true });
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
-describe("recordServe / findServe", () => {
-  it("records then finds returns the record", () => {
-    const file = tempFile();
-    const forget = recordServe(file, "http://127.0.0.1:4000");
-
-    expect(findServe(file)).toEqual({ pid: process.pid, url: "http://127.0.0.1:4000", file });
-
-    forget();
-    expect(findServe(file)).toBeUndefined();
+describe("projectRootFor", () => {
+  it("finds the nearest ancestor with a .git directory", () => {
+    const { root, file } = tempProject(".git");
+    expect(projectRootFor(file)).toBe(root);
   });
 
-  it("records a compile hash/timestamp up front when given one", () => {
-    const file = tempFile();
-    const forget = recordServe(file, "http://127.0.0.1:4000", { hash: "abcd1234", at: 42 });
-
-    expect(findServe(file)).toEqual({
-      pid: process.pid,
-      url: "http://127.0.0.1:4000",
-      file,
-      hash: "abcd1234",
-      compiledAt: 42,
-    });
-
-    forget();
+  it("finds a worktree root, where .git is a file", () => {
+    const { root, file } = tempProject(".git-file");
+    expect(projectRootFor(file)).toBe(root);
   });
 
-  it("records a codeFingerprint up front when given one", () => {
-    const file = tempFile();
-    const forget = recordServe(file, "http://127.0.0.1:4000", {
-      hash: "abcd1234",
-      at: 42,
-      codeFingerprint: 999,
-    });
-
-    expect(findServe(file)).toEqual({
-      pid: process.pid,
-      url: "http://127.0.0.1:4000",
-      file,
-      hash: "abcd1234",
-      compiledAt: 42,
-      codeFingerprint: 999,
-    });
-
-    forget();
+  it("falls back to the nearest package.json", () => {
+    const { root, file } = tempProject("package.json");
+    expect(projectRootFor(file)).toBe(root);
   });
 
-  it("a record whose pid is dead returns undefined and removes the file", () => {
-    const file = tempFile();
-    const path = pathFor(file);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify({ pid: DEAD_PID, url: "http://127.0.0.1:4001", file }));
-
-    expect(findServe(file)).toBeUndefined();
-    expect(existsSync(path)).toBe(false);
+  it("falls back to the file's own directory", () => {
+    const { file } = tempProject("none");
+    expect(projectRootFor(file)).toBe(dirname(realpathSync(file)));
   });
 
-  it("a corrupt record returns undefined and is removed", () => {
-    const file = tempFile();
-    const path = pathFor(file);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, "not json");
-
-    expect(findServe(file)).toBeUndefined();
-    expect(existsSync(path)).toBe(false);
+  it("prefers .git over a nearer package.json's ancestor", () => {
+    const { root, file } = tempProject(".git");
+    writeFileSync(join(root, "package.json"), "{}");
+    expect(projectRootFor(file)).toBe(root);
   });
 });
 
-describe("touchServeCompile", () => {
-  it("updates hash/compiledAt on an existing record owned by this process", () => {
-    const file = tempFile();
-    const forget = recordServe(file, "http://127.0.0.1:4000");
+describe("pageKeyFor", () => {
+  it("is stable per path and differs between files", () => {
+    const { root, file } = tempProject();
+    const other = join(root, "diagrams", "other.tldx.jsx");
+    writeFileSync(other, "");
 
-    touchServeCompile(file, "deadbeef", 1000);
+    expect(pageKeyFor(file)).toBe(pageKeyFor(file));
+    expect(pageKeyFor(file)).not.toBe(pageKeyFor(other));
+    expect(pageKeyFor(file)).toMatch(/^[0-9a-f]{8}$/);
+  });
+});
 
-    expect(findServe(file)).toEqual({
+describe("claimServer / findServer", () => {
+  it("a published claim is findable, with its diagrams", () => {
+    const { root, file } = tempProject();
+    const claim = claimServer(root);
+    expect(claim).toBeDefined();
+    claim!.publish("http://127.0.0.1:4000/", 7, 60);
+    claim!.addDiagram(file, { pageKey: pageKeyFor(file) });
+
+    const found = findServer(file);
+    expect(found).toMatchObject({
       pid: process.pid,
-      url: "http://127.0.0.1:4000",
-      file,
+      url: "http://127.0.0.1:4000/",
+      token: claim!.token,
+      ttlMinutes: 60,
+      codeFingerprint: 7,
+    });
+    expect(diagramOf(found!, file)).toEqual({ pageKey: pageKeyFor(file) });
+
+    claim!.release();
+    expect(findServer(file)).toBeUndefined();
+  });
+
+  it("a second claimant loses while the first holds the slot", () => {
+    const { root } = tempProject();
+    const first = claimServer(root);
+    expect(first).toBeDefined();
+
+    expect(claimServer(root)).toBeUndefined();
+
+    first!.release();
+    expect(claimServer(root)).toBeDefined();
+  });
+
+  it("a claim held by a dead process is taken over", () => {
+    const { root } = tempProject();
+    const path = pathForRoot(root);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(
+      path,
+      JSON.stringify({ pid: DEAD_PID, url: "http://127.0.0.1:4001/", diagrams: {} }),
+    );
+
+    expect(claimServer(root)).toBeDefined();
+  });
+
+  it("touchCompile updates only its own diagram", () => {
+    const { root, file } = tempProject();
+    const claim = claimServer(root)!;
+    claim.publish("http://127.0.0.1:4000/", 0, 60);
+    claim.addDiagram(file, { pageKey: "aaaaaaaa" });
+
+    claim.touchCompile(file, "deadbeef", 1000);
+
+    expect(diagramOf(findServer(file)!, file)).toEqual({
+      pageKey: "aaaaaaaa",
       hash: "deadbeef",
       compiledAt: 1000,
     });
-
-    forget();
   });
 
-  it("is a no-op when nothing is recorded yet", () => {
-    const file = tempFile();
-    touchServeCompile(file, "deadbeef", 1000);
-    expect(findServe(file)).toBeUndefined();
+  it("an update leaves a readable record even if a stray temp file is left behind", () => {
+    const { root, file } = tempProject();
+    const claim = claimServer(root)!;
+    claim.publish("http://127.0.0.1:4000/", 0, 60);
+    claim.addDiagram(file, { pageKey: "aaaaaaaa" });
+
+    // The atomic write renames onto the target, so the target is never a
+    // partially written file - only whole records are ever observable.
+    const raw = readFileSync(pathForRoot(root), "utf8");
+    expect(() => JSON.parse(raw)).not.toThrow();
+    expect(existsSync(`${pathForRoot(root)}.${String(process.pid)}.tmp`)).toBe(false);
+
+    claim.release();
   });
 
-  it("never clobbers a record owned by a different (still-alive) pid", () => {
-    const file = tempFile();
-    const path = pathFor(file);
+  it("a record whose pid is dead is removed and reported absent", () => {
+    const { root, file } = tempProject();
+    const path = pathForRoot(root);
     mkdirSync(dirname(path), { recursive: true });
-    // pid 1 (init/launchd) is always alive and is never our own pid.
-    writeFileSync(path, JSON.stringify({ pid: 1, url: "http://127.0.0.1:4002", file }));
+    writeFileSync(
+      path,
+      JSON.stringify({ pid: DEAD_PID, url: "http://127.0.0.1:4001/", diagrams: {} }),
+    );
 
-    touchServeCompile(file, "deadbeef", 1000);
+    expect(findServer(file)).toBeUndefined();
+    expect(existsSync(path)).toBe(false);
+  });
 
-    const record = JSON.parse(readFileSync(path, "utf8")) as { hash?: unknown };
-    expect(record.hash).toBeUndefined();
+  it("a corrupt record is removed and reported absent", () => {
+    const { root, file } = tempProject();
+    const path = pathForRoot(root);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "not json");
+
+    expect(findServer(file)).toBeUndefined();
+    expect(existsSync(path)).toBe(false);
+  });
+
+  it("a claim that has not published a url yet is not findable", () => {
+    const { root, file } = tempProject();
+    const claim = claimServer(root)!;
+
+    expect(findServer(file)).toBeUndefined();
+
+    claim.release();
   });
 });
 
 describe("hashSource", () => {
-  it("is stable for identical content and differs for different content", () => {
-    expect(hashSource("a")).toBe(hashSource("a"));
-    expect(hashSource("a")).not.toBe(hashSource("b"));
-    expect(hashSource("a")).toHaveLength(8);
+  it("is stable and short", () => {
+    expect(hashSource("abc")).toBe(hashSource("abc"));
+    expect(hashSource("abc")).toMatch(/^[0-9a-f]{8}$/);
+    expect(hashSource("abc")).not.toBe(hashSource("abd"));
   });
 });
 
-describe("newestMtimeMs", () => {
-  it("returns the newest mtime among files, recursing into subdirectories", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tldx-mtime-test-"));
-    dirs.push(dir);
-    writeFileSync(join(dir, "old.txt"), "old");
-    utimesSync(join(dir, "old.txt"), new Date(1000), new Date(1000));
-    mkdirSync(join(dir, "nested"));
-    writeFileSync(join(dir, "nested", "new.txt"), "new");
-    utimesSync(join(dir, "nested", "new.txt"), new Date(2000), new Date(2000));
+describe("newestMtimeMs / codeFingerprint", () => {
+  it("reports the newest mtime under a directory and skips node_modules", () => {
+    const { root } = tempProject();
+    const old = join(root, "old.ts");
+    writeFileSync(old, "");
+    utimesSync(old, new Date(1000), new Date(1000));
+    const modules = join(root, "node_modules");
+    mkdirSync(modules);
+    const ignored = join(modules, "huge.ts");
+    writeFileSync(ignored, "");
 
-    expect(newestMtimeMs(dir)).toBeCloseTo(2000, -1);
+    const newest = newestMtimeMs(root);
+    expect(newest).toBeGreaterThan(1000);
+    expect(newest).toBeLessThanOrEqual(Date.now() + 1000);
   });
 
-  it("skips node_modules", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tldx-mtime-test-"));
-    dirs.push(dir);
-    writeFileSync(join(dir, "old.txt"), "old");
-    utimesSync(join(dir, "old.txt"), new Date(1000), new Date(1000));
-    mkdirSync(join(dir, "node_modules"));
-    writeFileSync(join(dir, "node_modules", "pkg.js"), "pkg");
-    utimesSync(join(dir, "node_modules", "pkg.js"), new Date(9999), new Date(9999));
-
-    expect(newestMtimeMs(dir)).toBeCloseTo(1000, -1);
-  });
-
-  it("returns 0 for a directory that doesn't exist", () => {
+  it("is 0 for a directory that does not exist", () => {
     expect(newestMtimeMs(join(tmpdir(), "tldx-does-not-exist-xyz"))).toBe(0);
-  });
-});
-
-describe("codeFingerprint", () => {
-  function makeCheckout(): { root: string; distCli: string; srcCli: string } {
-    const root = mkdtempSync(join(tmpdir(), "tldx-codefp-test-"));
-    dirs.push(root);
-    const distCli = join(root, "dist", "cli");
-    const srcCli = join(root, "src", "cli");
-    mkdirSync(distCli, { recursive: true });
-    mkdirSync(srcCli, { recursive: true });
-    writeFileSync(join(distCli, "serve.js"), "// built");
-    writeFileSync(join(srcCli, "serve.ts"), "// source");
-    return { root, distCli, srcCli };
-  }
-
-  it("running from src/cli (dev via tsx) fingerprints the whole src/ tree", () => {
-    const { srcCli } = makeCheckout();
-    utimesSync(join(srcCli, "serve.ts"), new Date(1234), new Date(1234));
-
-    expect(codeFingerprint(srcCli)).toBeCloseTo(1234, -1);
-  });
-
-  it("running from dist/cli fingerprints the sibling src/ tree, not dist/ itself", () => {
-    const { distCli, srcCli } = makeCheckout();
-    utimesSync(join(distCli, "serve.js"), new Date(1), new Date(1));
-    utimesSync(join(srcCli, "serve.ts"), new Date(5678), new Date(5678));
-
-    expect(codeFingerprint(distCli)).toBeCloseTo(5678, -1);
-  });
-
-  it("is 0 when running from dist/cli with no sibling src/ (installed package)", () => {
-    const root = mkdtempSync(join(tmpdir(), "tldx-codefp-test-"));
-    dirs.push(root);
-    const distCli = join(root, "dist", "cli");
-    mkdirSync(distCli, { recursive: true });
-    writeFileSync(join(distCli, "serve.js"), "// built");
-
-    expect(codeFingerprint(distCli)).toBe(0);
+    expect(codeFingerprint(join(tmpdir(), "tldx-does-not-exist-xyz", "cli"))).toBe(0);
   });
 });

@@ -19,9 +19,9 @@ import {
 } from "../infra/render/export-image.js";
 import {
   codeFingerprint,
-  findServe,
+  diagramOf,
+  findServer,
   hashSource,
-  type ServeRecord,
 } from "../infra/serve-registry/serve-registry.js";
 
 import { runServe, type ServeDeps, type ServeIo } from "./serve.js";
@@ -102,6 +102,37 @@ function inferFormat(outPath: string): RenderFormat {
   return EXPORT_TYPES.includes(ext as RenderFormat) ? (ext as RenderFormat) : "png";
 }
 
+/**
+ * A running server plus the entry for the diagram being rendered - everything
+ * the reuse decision needs, flattened. Built only when that server actually
+ * serves this file.
+ */
+export type ReusedServe = {
+  url: string;
+  pageKey: string;
+  name?: string;
+  hash?: string;
+  compiledAt?: number;
+  codeFingerprint?: number;
+};
+
+/**
+ * The live server for `file`, but only when it actually serves `file`: a shared
+ * server holding other diagrams is no use for rendering this one, and reusing
+ * it would export whichever page happened to be showing.
+ */
+export function reusableServe(file: string): ReusedServe | undefined {
+  const record = findServer(file);
+  if (record === undefined) return undefined;
+  const diagram = diagramOf(record, file);
+  if (diagram === undefined) return undefined;
+  return {
+    url: record.url,
+    ...diagram,
+    ...(record.codeFingerprint !== undefined ? { codeFingerprint: record.codeFingerprint } : {}),
+  };
+}
+
 export type RunRenderArgs = {
   argv: readonly string[];
   deps: ServeDeps;
@@ -109,7 +140,7 @@ export type RunRenderArgs = {
 };
 
 /** `:port (file @ hash)`, or without the hash when the record has none. */
-export function describeReused(file: string, reused: ServeRecord): string {
+export function describeReused(file: string, reused: ReusedServe): string {
   let host = reused.url;
   try {
     host = `:${new URL(reused.url).port}`;
@@ -121,12 +152,12 @@ export function describeReused(file: string, reused: ServeRecord): string {
 }
 
 /** Current on-disk hash disagrees with the reused server's last recorded compile. An unknown hash counts as fresh. */
-export function isStale(currentHash: string, reused: ServeRecord): boolean {
+export function isStale(currentHash: string, reused: ReusedServe): boolean {
   return reused.hash !== undefined && reused.hash !== currentHash;
 }
 
 /** The compiler source tree has a file newer than the reused server's boot fingerprint. An unknown fingerprint counts as fresh. */
-export function isCodeStale(currentCodeFingerprint: number, reused: ServeRecord): boolean {
+export function isCodeStale(currentCodeFingerprint: number, reused: ReusedServe): boolean {
   return reused.codeFingerprint !== undefined && currentCodeFingerprint > reused.codeFingerprint;
 }
 
@@ -134,7 +165,7 @@ export function isCodeStale(currentCodeFingerprint: number, reused: ServeRecord)
 export function staleReason(
   currentHash: string,
   currentCodeFingerprint: number,
-  reused: ServeRecord,
+  reused: ReusedServe,
 ): string | undefined {
   const sourceStale = isStale(currentHash, reused);
   const codeStale = isCodeStale(currentCodeFingerprint, reused);
@@ -151,7 +182,7 @@ export function staleReason(
  * bug when it is really a stale reused server, so annotate it with when that
  * server's scene was compiled.
  */
-export function withCompiledContext(err: unknown, reused: ServeRecord): Error {
+export function withCompiledContext(err: unknown, reused: ReusedServe): Error {
   const message = err instanceof Error ? err.message : String(err);
   if (reused.compiledAt === undefined || !/^unknown --(frame|shapes)/.test(message)) {
     return err instanceof Error ? err : new Error(message);
@@ -178,7 +209,7 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
       throw new Error(`no such file: ${file}`);
     }
 
-    const reused = findServe(file);
+    const reused = reusableServe(file);
     const currentCodeFingerprint = codeFingerprint(dirname(fileURLToPath(import.meta.url)));
     const reason =
       reused !== undefined
@@ -189,7 +220,7 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
     if (reused !== undefined && !stale) {
       io.writeStdout(`tldx render: reusing serve on ${describeReused(file, reused)}\n`);
       try {
-        await exportImage(reused.url, out, opts);
+        await exportImage(reused.url, out, { ...opts, pageKey: reused.pageKey });
       } catch (err) {
         throw withCompiledContext(err, reused);
       }

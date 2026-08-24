@@ -10,13 +10,16 @@ import { SCENE_MESSAGE_VERSION } from "./scene-message.js";
 
 describe("SceneMessage envelope", () => {
   it("scene messages stamp v=1", () => {
-    const msg = sceneMessage.scene(sceneJson([documentRecord(), pageRecord({ id: "page:main" })]));
+    const msg = sceneMessage.scene(
+      "pageA",
+      sceneJson([documentRecord(), pageRecord({ id: "page:main" })]),
+    );
     expect(msg.v).toBe(SCENE_MESSAGE_VERSION);
     expect(msg.kind).toBe("scene");
   });
 
   it("error messages preserve diagnostic codes", () => {
-    const msg = sceneMessage.error([
+    const msg = sceneMessage.error("pageA", [
       {
         severity: "error",
         code: "parser/unexpected-token",

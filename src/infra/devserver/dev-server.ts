@@ -1,6 +1,14 @@
 /**
  * Dev HTTP server for `tldx serve`, on Hono + `@hono/node-server`: the static
- * viewer bundle plus the SSE endpoint at `/events`.
+ * viewer bundle, the SSE endpoint at `/events`, and two write endpoints -
+ * `POST /diagrams` (serve another diagram into this server) and
+ * `PUT /overlay` (persist canvas edits).
+ *
+ * Both writes are gated. Binding `127.0.0.1` keeps the LAN out but not the
+ * browser: any page you visit can `fetch()` a loopback URL, and it does not
+ * need to read the response for the side effect to land - and the side effect
+ * of `POST /diagrams` is "compile and execute this file". So both require the
+ * per-server token, reject a cross-site `Origin`, and require a JSON body.
  *
  * `/events` bypasses Hono entirely. It is intercepted on the underlying
  * `node:http` server before Hono's request listener runs, and the raw
@@ -21,9 +29,20 @@ import { resolve } from "node:path";
 
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 
 import type { SceneJSON } from "../../contracts/scene-json.js";
+
+/** What `POST /diagrams` answers with: where the diagram landed, and whether anyone is watching. */
+export interface AddDiagramResult {
+  pageKey: string;
+  /** Page name shown in the viewer's page menu. */
+  name?: string;
+  /** True when this file was already being served. */
+  alreadyServed: boolean;
+  /** Whether a viewer is currently connected to this server. */
+  hasViewer: boolean;
+}
 
 /** Subset of the SSE transport this server depends on. */
 export interface DevServerTransportHandler {
@@ -46,10 +65,21 @@ export interface StartDevServerOptions {
    */
   host?: string;
   /**
-   * Handler for `PUT /overlay`, the viewer's canvas-edit round-trip. Omit to
-   * 404 the route entirely.
+   * Handler for `PUT /overlay`, the viewer's canvas-edit round-trip. The page
+   * key names the diagram the edit belongs to. Omit to 404 the route entirely.
    */
-  onOverlayPut?: (snapshot: SceneJSON) => Promise<void>;
+  onOverlayPut?: (pageKey: string, snapshot: SceneJSON) => Promise<void>;
+  /**
+   * Handler for `POST /diagrams`, which hands a file to this server. Resolves
+   * with the page key the diagram was given. Omit to 404 the route entirely.
+   */
+  onAddDiagram?: (file: string) => Promise<AddDiagramResult>;
+  /**
+   * Shared secret required on both write endpoints, as `X-Tldx-Token`. Omit
+   * only in tests that exercise unauthenticated behaviour deliberately; a real
+   * server always has one.
+   */
+  token?: string;
   /**
    * Called once per incoming request, before routing - static assets,
    * `PUT /overlay`, `/events` connects and `/heartbeat` pings all go through
@@ -100,10 +130,28 @@ function isSceneJsonLike(value: unknown): value is SceneJSON {
   );
 }
 
+/**
+ * Reject anything that is not a same-origin JSON request carrying the token.
+ * Returns the response to send, or `undefined` when the request may proceed.
+ *
+ * The `Origin` check is what stops a browser page driving these endpoints even
+ * if the token ever leaks; the token is what stops everything else. Both are
+ * cheap, and neither reveals whether the file named in the body exists.
+ */
+function rejectUnauthorized(c: Context, token: string | undefined): Response | undefined {
+  if (token === undefined || c.req.header("x-tldx-token") !== token) return c.body(null, 403);
+  const origin = c.req.header("origin");
+  if (origin !== undefined && origin !== new URL(c.req.url).origin) return c.body(null, 403);
+  const contentType = c.req.header("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) return c.body(null, 415);
+  return undefined;
+}
+
 function buildApp(
   bundleRoot: string,
-  onOverlayPut: ((snapshot: SceneJSON) => Promise<void>) | undefined,
+  options: Pick<StartDevServerOptions, "onOverlayPut" | "onAddDiagram" | "token">,
 ): Hono {
+  const { onOverlayPut, onAddDiagram, token } = options;
   const app = new Hono();
 
   // Must stay ahead of the blanket 405 guard below: Hono matches in
@@ -111,17 +159,46 @@ function buildApp(
   // Exists only so the viewer's ping gets a cheap 204 instead of index.html.
   app.get("/heartbeat", (c) => c.body(null, 204));
 
-  app.put("/overlay", async (c) => {
-    if (onOverlayPut === undefined) return c.body(null, 404);
+  // The viewer needs the token to write its canvas edits back. Safe to serve
+  // here: no CORS headers means a cross-site page cannot read the response,
+  // and a local process could already read the token out of the registry file.
+  app.get("/token", (c) => c.json({ token: token ?? "" }));
+
+  app.post("/diagrams", async (c) => {
+    if (onAddDiagram === undefined) return c.body(null, 404);
+    const rejected = rejectUnauthorized(c, token);
+    if (rejected !== undefined) return rejected;
     let body: unknown;
     try {
       body = await c.req.json();
     } catch {
       return c.body(null, 400);
     }
-    if (!isSceneJsonLike(body)) return c.body(null, 400);
+    const file = (body as { file?: unknown } | null)?.file;
+    if (typeof file !== "string" || file === "") return c.body(null, 400);
     try {
-      await onOverlayPut(body);
+      return c.json(await onAddDiagram(file), 200);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
+  app.put("/overlay", async (c) => {
+    if (onOverlayPut === undefined) return c.body(null, 404);
+    const rejected = rejectUnauthorized(c, token);
+    if (rejected !== undefined) return rejected;
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.body(null, 400);
+    }
+    const envelope = body as { pageKey?: unknown; snapshot?: unknown } | null;
+    const pageKey = envelope?.pageKey;
+    if (typeof pageKey !== "string" || pageKey === "") return c.body(null, 400);
+    if (!isSceneJsonLike(envelope?.snapshot)) return c.body(null, 400);
+    try {
+      await onOverlayPut(pageKey, envelope.snapshot);
     } catch {
       return c.body(null, 500);
     }
@@ -186,7 +263,7 @@ export async function startDevServer(options: StartDevServerOptions): Promise<De
   const host = options.host ?? "127.0.0.1";
   const bundleRoot = resolve(options.viewerBundleDir);
 
-  const app = buildApp(bundleRoot, options.onOverlayPut);
+  const app = buildApp(bundleRoot, options);
 
   // `Options.createServer` is the documented hook for supplying our own
   // factory, which is how the `/events` interceptor gets to wrap the listener.

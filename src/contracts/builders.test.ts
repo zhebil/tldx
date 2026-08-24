@@ -14,12 +14,12 @@ import {
 
 describe("sceneMessage", () => {
   it("scene wraps a payload at v=1", () => {
-    const msg = sceneMessage.scene(sceneJson([documentRecord()]));
+    const msg = sceneMessage.scene("pageA", sceneJson([documentRecord()]));
     expect(msg).toMatchObject({ v: 1, kind: "scene" });
   });
 
   it("error wraps diagnostics at v=1", () => {
-    const msg = sceneMessage.error([{ severity: "error", code: "x/y", message: "boom" }]);
+    const msg = sceneMessage.error("pageA", [{ severity: "error", code: "x/y", message: "boom" }]);
     expect(msg).toMatchObject({
       v: 1,
       kind: "error",
@@ -257,6 +257,6 @@ describe("integration: builders compose into a realistic scene", () => {
       "shape:home",
       "shape:login",
     ]);
-    expect(sceneMessage.scene(scene).kind).toBe("scene");
+    expect(sceneMessage.scene("pageA", scene).kind).toBe("scene");
   });
 });
