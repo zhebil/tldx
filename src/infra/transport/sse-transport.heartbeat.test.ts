@@ -13,7 +13,7 @@ import { FakeClock } from "../../app/ports/clock.fake.js";
 
 import { createSseTransport } from "./sse-transport.js";
 
-interface FakeReq extends EventEmitter {}
+type FakeReq = EventEmitter;
 
 interface FakeRes extends EventEmitter {
   writeHead(status: number, headers?: Record<string, string>): FakeRes;

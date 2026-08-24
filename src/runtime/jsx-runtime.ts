@@ -25,6 +25,8 @@ export namespace JSX {
   export interface ElementChildrenAttribute {
     children: unknown;
   }
-  // No intrinsic (lowercase-tag) elements - only imported components.
+  // No intrinsic (lowercase-tag) elements - only imported components. TS
+  // requires this to be an interface, so it cannot be `type ... = {}`.
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- an empty IntrinsicElements is the point: it rejects every lowercase tag.
   export interface IntrinsicElements {}
 }

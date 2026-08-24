@@ -39,6 +39,7 @@ async function loadChromium(): Promise<(typeof import("playwright"))["chromium"]
       throw new Error(
         "tldx render needs playwright: npm i -g playwright && npx playwright install chromium\n" +
           "(drop the -g if you installed tldx as a local dependency)",
+        { cause: err },
       );
     }
     throw err;
@@ -54,7 +55,7 @@ export async function exportImage(url: string, outPath: string, opts: RenderOpti
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("Executable doesn't exist") || msg.includes("browserType.launch")) {
-      throw new Error(`${msg}\nRun: npx playwright install chromium`);
+      throw new Error(`${msg}\nRun: npx playwright install chromium`, { cause: err });
     }
     throw err;
   }
