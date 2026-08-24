@@ -1,0 +1,9 @@
+# Gitignored files copied into each new Claude Code worktree.
+# Gitignore-style patterns, matched against ignored files only.
+
+# Machine-local Claude settings (output style, permissions)
+.claude/settings.local.json
+
+# Local env, if you ever have one
+.env
+.env.local
