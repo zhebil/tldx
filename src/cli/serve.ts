@@ -2,10 +2,17 @@
  * `tldx serve <file>`: watch a `.tldx` file, recompile on save, push the
  * result over SSE, and host the viewer bundle that consumes it.
  *
- * Only the `.tldx.jsx` entry is watched - edits to the compiler source
+ * One server holds many diagrams. The first `serve` in a project starts it and
+ * stays in the foreground owning every watcher; later `serve` invocations hand
+ * their file to it over `POST /diagrams` and exit. Each diagram is a page in
+ * the shared viewer, with its own watcher, compile and overlay sidecar - see
+ * `app/watch-and-serve.ts`.
+ *
+ * Only the `.tldx.jsx` entries are watched - edits to the compiler source
  * itself need a restart, which the staleness checks below only warn about.
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,7 +30,8 @@ import {
   codeFingerprint,
   hashSource,
   newestMtimeMs,
-  touchServeCompile,
+  pageKeyFor,
+  type ServeClaim,
 } from "../infra/serve-registry/serve-registry.js";
 import { createSseTransport } from "../infra/transport/sse-transport.js";
 
@@ -53,6 +61,11 @@ export type ServeDeps = {
   port?: number;
   /** Minutes of inactivity before the server exits itself. Defaults to 60; `0` disables. */
   ttlMinutes?: number;
+  /**
+   * Registry slot this server owns. Present for a real `tldx serve`; absent for
+   * the private server `tldx render` boots, which nobody should discover.
+   */
+  claim?: ServeClaim;
 };
 
 export type RunServeArgs = {
@@ -61,23 +74,44 @@ export type RunServeArgs = {
   io: ServeIo;
 };
 
+/** Compile state of one diagram as of its last successful compile. */
+export type DiagramCompile = { hash: string | undefined; at: number; codeFingerprint: number };
+
+export type AddedDiagram = {
+  pageKey: string;
+  /** Page name as compiled - the `<Doc title>` or the file name. */
+  name?: string;
+  /** True when this file was already being served, so nothing was added. */
+  alreadyServed: boolean;
+  /** Whether a viewer was connected when this diagram was added. */
+  hasViewer: boolean;
+};
+
 export type ServeHandle = {
   /** URL of the viewer's index. */
   readonly url: string;
   /** Resolved TCP port the dev server bound. */
   readonly port: number;
+  /** Secret required on this server's write endpoints. */
+  readonly token: string;
+  /** Idle timeout this server was started with, in minutes. */
+  readonly ttlMinutes: number;
   /**
    * Source hash/timestamp as of the initial compile (`undefined` hash if that
    * read/compile failed) plus the compiler code's fingerprint at boot, so the
-   * caller can seed the serve-registry record atomically.
+   * caller can seed the registry record atomically.
    */
-  readonly compile: { hash: string | undefined; at: number; codeFingerprint: number };
+  readonly compile: DiagramCompile;
   /**
    * Resolves once the idle-TTL reaper fires; never if `ttlMinutes` is `0`.
    * The reaper has already logged the reason by then.
    */
   readonly idleExpired: Promise<void>;
-  /** Tear down watcher, transport, and dev server. Idempotent. */
+  /** Start serving another diagram as its own page. Idempotent per file. */
+  addDiagram(file: string): Promise<AddedDiagram>;
+  /** Whether any viewer is currently connected. */
+  hasViewer(): boolean;
+  /** Tear down every watcher, the transport, and the dev server. Idempotent. */
   close(): Promise<void>;
 };
 
@@ -101,11 +135,21 @@ export function viewerStalenessWarning(viewerBundleDir: string): string | undefi
   return undefined;
 }
 
+/** The viewer URL that opens straight onto one diagram's page. */
+export function pageUrl(serverUrl: string, pageKey: string): string {
+  return `${serverUrl}#page=${pageKey}`;
+}
+
 export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
   const { path, deps, io } = args;
   const bootCodeFingerprint = codeFingerprint(dirname(fileURLToPath(import.meta.url)));
 
   const transport = createSseTransport({ clock: deps.clock });
+  // The claim owns the token when there is one - it must, since it publishes
+  // the token before this server exists. Without a claim (render's private
+  // server, tests) the server still mints one: the write endpoints are gated
+  // unconditionally, so "no token" must never mean "no gate".
+  const token = deps.claim?.token ?? randomUUID();
 
   const ttlMinutes = deps.ttlMinutes ?? DEFAULT_TTL_MINUTES;
   let resolveIdleExpired: () => void;
@@ -126,9 +170,8 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     },
   });
 
-  // The dev server must boot first so `runServe` can report its bound port,
-  // but its `onOverlayPut` callback needs the watch handle. Box it.
-  const watchBox: { current?: WatchAndServeHandle } = {};
+  /** Every diagram this server holds, keyed by page key. */
+  const diagrams = new Map<string, { file: string; watch: WatchAndServeHandle }>();
 
   let server;
   try {
@@ -137,9 +180,11 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
       ...(deps.host !== undefined ? { host: deps.host } : {}),
       viewerBundleDir: deps.viewerBundleDir,
       transport,
-      onOverlayPut: async (snapshot) => {
-        await watchBox.current?.putOverlay(snapshot);
+      token,
+      onOverlayPut: async (pageKey, snapshot) => {
+        await diagrams.get(pageKey)?.watch.putOverlay(snapshot);
       },
+      onAddDiagram: (file) => addDiagram(file),
       onActivity: () => reaper.bump(),
     });
   } catch (err) {
@@ -148,64 +193,98 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
     throw err;
   }
 
-  // Re-hash and record the source on every successful compile so a later
-  // `tldx render` reusing this server can detect staleness. No-op when
-  // `path` was never registered.
+  /**
+   * Per-diagram log wrapper. It re-hashes the source on every successful
+   * compile so a later `tldx render` reusing this server can detect staleness,
+   * tags every line with the page it came from - output for a diagram you did
+   * not start is otherwise unattributable - and warns once if the compiler's
+   * own code moved under the running server.
+   */
   let warnedCodeStale = false;
-  const log: LogPort = {
+  const logFor = (file: string, pageKey: string): LogPort => ({
     log: (event) => {
-      deps.log.log(event);
-      if (event.code === "watch/recompile-ok") {
-        // Only a file-change-triggered recompile counts as activity; the
-        // initial boot compile does not.
-        if (event.fields?.trigger === "change") reaper.bump();
-        void readHashSafe(deps.fs, path).then((hash) => {
-          if (hash !== undefined) touchServeCompile(path, hash, deps.clock.now());
+      deps.log.log({ ...event, fields: { ...event.fields, pageKey, file } });
+      if (event.code !== "watch/recompile-ok") return;
+      // Only a file-change-triggered recompile counts as activity; the
+      // initial boot compile does not.
+      if (event.fields?.trigger === "change") reaper.bump();
+      void readHashSafe(deps.fs, file).then((hash) => {
+        if (hash !== undefined) deps.claim?.touchCompile(file, hash, deps.clock.now());
+      });
+      // The compiler code isn't watched, so this recompile is the cheapest
+      // hook for noticing it moved since boot. Warn once; the fix is a restart.
+      if (
+        !warnedCodeStale &&
+        codeFingerprint(dirname(fileURLToPath(import.meta.url))) > bootCodeFingerprint
+      ) {
+        warnedCodeStale = true;
+        deps.log.log({
+          level: "warn",
+          code: "serve/code-stale",
+          msg: "the code that compiled this scene (src/domain, src/app, ...) has changed since this server started - restart `tldx serve` to pick it up",
+          fields: { bootCodeFingerprint },
         });
-        // The compiler code isn't watched, so this recompile is the cheapest
-        // hook for noticing it moved since boot. Warn once; the fix is a restart.
-        if (
-          !warnedCodeStale &&
-          codeFingerprint(dirname(fileURLToPath(import.meta.url))) > bootCodeFingerprint
-        ) {
-          warnedCodeStale = true;
-          deps.log.log({
-            level: "warn",
-            code: "serve/code-stale",
-            msg: "the code that compiled this scene (src/domain, src/app, ...) has changed since this server started - restart `tldx serve` to pick it up",
-            fields: { bootCodeFingerprint },
-          });
-        }
       }
     },
-  };
-
-  const watch = watchAndServe(path, {
-    fs: deps.fs,
-    ...(deps.fsWrite !== undefined ? { fsWrite: deps.fsWrite } : {}),
-    watch: deps.watch,
-    layout: deps.layout,
-    execute: deps.execute,
-    transport,
-    log,
   });
-  watchBox.current = watch;
 
+  async function addDiagram(file: string): Promise<AddedDiagram> {
+    const pageKey = pageKeyFor(file);
+    const hasViewer = transport.subscriberCount() > 0;
+    const existing = diagrams.get(pageKey);
+    if (existing !== undefined) {
+      return {
+        pageKey,
+        ...(existing.watch.pageName() !== undefined ? { name: existing.watch.pageName()! } : {}),
+        alreadyServed: true,
+        hasViewer,
+      };
+    }
+
+    const watch = watchAndServe(file, {
+      pageKey,
+      fs: deps.fs,
+      ...(deps.fsWrite !== undefined ? { fsWrite: deps.fsWrite } : {}),
+      watch: deps.watch,
+      layout: deps.layout,
+      execute: deps.execute,
+      transport,
+      log: logFor(file, pageKey),
+    });
+    diagrams.set(pageKey, { file, watch });
+
+    try {
+      await watch.ready;
+    } catch (err) {
+      diagrams.delete(pageKey);
+      await watch.close();
+      throw err;
+    }
+
+    const hash = await readHashSafe(deps.fs, file);
+    const name = watch.pageName();
+    deps.claim?.addDiagram(file, {
+      pageKey,
+      ...(name !== undefined ? { name } : {}),
+      ...(hash !== undefined ? { hash, compiledAt: deps.clock.now() } : {}),
+    });
+    return { pageKey, ...(name !== undefined ? { name } : {}), alreadyServed: false, hasViewer };
+  }
+
+  let firstCompile: DiagramCompile;
   try {
-    await watch.ready;
+    await addDiagram(path);
+    firstCompile = {
+      hash: await readHashSafe(deps.fs, path),
+      at: deps.clock.now(),
+      codeFingerprint: bootCodeFingerprint,
+    };
   } catch (err) {
     reaper.stop();
-    await watch.close();
     await transport.close();
     await server.close();
     throw err;
   }
-
-  const compile = {
-    hash: await readHashSafe(deps.fs, path),
-    at: deps.clock.now(),
-    codeFingerprint: bootCodeFingerprint,
-  };
 
   io.writeStdout(`tldx serving ${path} on ${server.url}\n`);
 
@@ -215,19 +294,24 @@ export async function runServe(args: RunServeArgs): Promise<ServeHandle> {
   }
 
   if (deps.openBrowser !== undefined) {
-    deps.openBrowser(server.url);
+    deps.openBrowser(pageUrl(server.url, pageKeyFor(path)));
   }
 
   let closing: Promise<void> | undefined;
   return {
     url: server.url,
     port: server.port,
-    compile,
+    token,
+    ttlMinutes,
+    compile: firstCompile,
     idleExpired,
+    addDiagram,
+    hasViewer: () => transport.subscriberCount() > 0,
     close(): Promise<void> {
       return (closing ??= (async () => {
         reaper.stop();
-        await watch.close();
+        for (const { watch } of diagrams.values()) await watch.close();
+        diagrams.clear();
         await transport.close();
         await server.close();
       })());
