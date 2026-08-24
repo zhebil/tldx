@@ -25,8 +25,8 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.2.0",
-    "@types/react": "^18.3.28",
-    "@types/react-dom": "^18.3.7",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.1.0",
     "dependency-cruiser": "^18.2.0",
     "eslint": "^10.9.0",
@@ -46,11 +46,11 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "chokidar": "^5.0.0",
-    "elkjs": "^0.11.1",
+    "elkjs": "^0.12.0",
     "esbuild": "^0.28.2",
     "hono": "^4.13.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "tldraw": "^3.15.6"
   },
   "license": "MIT",
