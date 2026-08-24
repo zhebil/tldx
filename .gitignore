@@ -21,3 +21,6 @@ build/
 
 # Debug renders belong in a temp dir, never the repo.
 *.png
+
+# Local-only bug repros - a scratch ledger, not shipped source
+examples/repro/
