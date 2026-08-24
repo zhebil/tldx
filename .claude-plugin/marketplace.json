@@ -1,0 +1,11 @@
+{
+  "name": "tldsl",
+  "owner": { "name": "Yevhenii Bilyk", "email": "jbilyk1996@gmail.com" },
+  "plugins": [
+    {
+      "name": "tldsl",
+      "source": "./",
+      "description": "Write architecture diagrams as JSX and see them rendered."
+    }
+  ]
+}
