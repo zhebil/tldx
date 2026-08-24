@@ -29,6 +29,9 @@ against the fake and the real adapter both, so a fake that drifts fails.
 
 ## Conventions
 
+`CONTRIBUTING.md` has the human-facing version of the commit and PR rules; it
+and this file must not disagree.
+
 - Never `git add .` / `git add -A`; stage hunks, one concern per commit.
 - Don't commit before the user has reviewed the diff, unless asked.
 - Reports, baselines and scratch notes do not belong in `docs/`. Write them to

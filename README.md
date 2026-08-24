@@ -108,6 +108,9 @@ npm run check                                  # typecheck + lint + dep-lint + t
 npm run dev:cli -- serve examples/kernel.tldx.jsx   # run from source, no build
 ```
 
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers the layer rules, where a test
+belongs, and how to open a PR.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
