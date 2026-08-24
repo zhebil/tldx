@@ -1,9 +1,9 @@
 {
   "name": "tldx",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.0.1",
+  "private": false,
   "type": "module",
-  "description": "CLI + local viewer turning a plain-text DSL into a live tldraw canvas.",
+  "description": "Write architecture and flow diagrams as JSX and render them on a live tldraw canvas.",
   "bin": {
     "tldx": "dist/cli/main.js"
   },
@@ -16,7 +16,8 @@
     "build:viewer": "vite build",
     "build": "npm run build:cli && npm run build:viewer",
     "dev:cli": "tsx src/cli/main.ts",
-    "check": "npm run typecheck && npm run lint && npm run lint:deps && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run lint:deps && npm run test",
+    "prepublishOnly": "npm run check && npm run build"
   },
   "devDependencies": {
     "@types/node": "^25.6.2",
@@ -47,5 +48,26 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tldraw": "^3.15.6"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhebil/tldx.git"
+  },
+  "homepage": "https://github.com/zhebil/tldx",
+  "keywords": [
+    "diagrams",
+    "tldraw",
+    "jsx",
+    "architecture",
+    "claude-code"
+  ],
+  "files": [
+    "dist/",
+    "!dist/**/*.map",
+    "licenses/",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ]
 }
