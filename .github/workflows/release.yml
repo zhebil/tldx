@@ -1,0 +1,39 @@
+name: Publish Package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      # A release tag that disagrees with package.json publishes a version
+      # nobody can find from the tag. Fail before anything reaches the registry.
+      - name: Tag must match package.json version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          if [ "$tag" != "$pkg" ]; then
+            echo "tag $GITHUB_REF_NAME implies $tag but package.json says $pkg" >&2
+            exit 1
+          fi
+
+      - run: npm ci
+
+      # `prepublishOnly` re-runs check and build; this step is here so a
+      # failure reads as "check failed", not as "publish failed".
+      - run: npm run check
+
+      - run: npm publish
