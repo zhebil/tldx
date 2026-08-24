@@ -23,8 +23,9 @@ check` only proves the source still compiles - if you change one, run
 `docs/architecture.md` or the README's examples table goes stale.
 
 `layers.svg` and `round-trip.svg` currently carry arrow bends that were set on
-the canvas and have no JSX spelling ([#30]), so the source alone does not
-reproduce them. `npm run diagrams` picks them up only because it reuses a
+the canvas and never ported into their sources ([#30]), so the source alone
+does not reproduce them. `<Edge bend>` exists now, so porting them is just
+work someone has to do. `npm run diagrams` picks them up only because it reuses a
 running `serve`, which applies the overlay ([#38]) - run it with no server up
 and those two SVGs get visibly worse. Check the diff before committing a
 re-render.

@@ -34,14 +34,14 @@ An unnamed container that isn't a `<Group>` also draws no chrome.
 
 ## Props
 
-| element               | props                                                                                          |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| `<Doc>`               | `id title direction layout gap rowGap colGap pad cols align equalize`                          |
-| `<Frame>` and aliases | all of `<Doc>`'s, plus `name x y w h color`                                                    |
-| `<Box>`               | `id label x y w h maxW color fill dash geo textAlign verticalAlign labelColor font size`       |
-| `<Text>`              | `id x y w maxW color textAlign font size`                                                      |
-| `<Sticky>`            | `id on x y w h maxW color textAlign verticalAlign labelColor font size`                        |
-| `<Edge>` `<Edges>`    | `id from to fromSide toSide color dash arrowheadStart arrowheadEnd label labelColor font size` |
+| element               | props                                                                                               |
+| --------------------- | --------------------------------------------------------------------------------------------------- |
+| `<Doc>`               | `id title direction layout gap rowGap colGap pad cols align equalize`                               |
+| `<Frame>` and aliases | all of `<Doc>`'s, plus `name x y w h color`                                                         |
+| `<Box>`               | `id label x y w h maxW color fill dash geo textAlign verticalAlign labelColor font size`            |
+| `<Text>`              | `id x y w maxW color textAlign font size`                                                           |
+| `<Sticky>`            | `id on x y w h maxW color textAlign verticalAlign labelColor font size`                             |
+| `<Edge>` `<Edges>`    | `id from to fromSide toSide bend color dash arrowheadStart arrowheadEnd label labelColor font size` |
 
 `<Text>` has no `h` — tldraw's text shape doesn't have one. `fill`, `dash` and
 `geo` are `<Box>`-only.
@@ -87,6 +87,7 @@ a `title` - use `<Frame name>` or `<Text>` for a visible heading.
 | `arrowheadStart`, `arrowheadEnd` | `arrow` `triangle` `square` `dot` `pipe` `diamond` `inverted` `bar` `none`                                                                                                                                     |
 | `geo`                            | `rectangle` (default) `ellipse` `oval` `diamond` `rhombus` `hexagon` `octagon` `pentagon` `triangle` `trapezoid` `star` `cloud` `heart` `check-box` `x-box` `arrow-up` `arrow-down` `arrow-left` `arrow-right` |
 | `fromSide`, `toSide`             | `n` `ne` `e` `se` `s` `sw` `w` `nw` `center`, or `"x,y"` with each in 0..1                                                                                                                                     |
+| `bend`                           | a signed number of page px - how far the arc's midpoint sits off the straight chord                                                                                                                            |
 
 ## Edges
 
@@ -106,6 +107,14 @@ Props on the `<Edges>` block apply to every edge in it. Drop to a hand-written
 
 By default the router picks the attachment faces. `fromSide` / `toSide` pin
 them.
+
+`bend` pins the curve. It is the same signed pixel offset tldraw itself
+stores, so a bend dragged into shape on the canvas can be read off
+`tldx overlay show` and written straight into the source. It overrides the
+arc only - the router still picks the attachment faces, so the pasted number
+draws the arc it drew on the canvas. Nothing later shrinks it: no chord cap,
+no bend minimizing. `bend="0"` forces a straight line the router would
+otherwise bow.
 
 ## Sizing
 

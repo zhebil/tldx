@@ -230,7 +230,8 @@ ignored.
 On `<Edge>`: `color`, `dash`, `label`, `labelColor`, `font`, `size`,
 `arrowheadStart` / `arrowheadEnd` (`arrow triangle square dot pipe diamond
 inverted bar none`), `fromSide` / `toSide` (which face the arrow leaves/
-arrives at - see Edges below).
+arrives at - see Edges below) and `bend` (how far the arc bows - see Edges
+below).
 
 `<Frame>` only supports `color` - tldraw's frame shape has nothing else.
 
@@ -327,6 +328,22 @@ than overriding it. Separate props, not `id.anchor` dotted syntax - `from`/
 rule above. `<Edges>` doesn't have a per-line spelling for this yet - drop
 to a hand-written `<Edge>` when a side needs pinning, the same escape hatch
 as an explicit `id` or a one-off style.
+
+**Pinning the curve (`bend`).** `bend` is a signed number of page pixels - how
+far the arc's midpoint sits off the straight chord, tldraw's own units and
+sign, so it is exactly the number `tldx overlay show` reports for an arrow bent
+on the canvas:
+
+```jsx
+<Edge from="domain" to="infra" bend="-105" />
+```
+
+It overrides the arc and nothing else - the router still chooses which faces
+the arrow leaves and arrives at, so the number reproduces the arc you bent on
+the canvas. No chord cap and no bend-minimizing pass will shrink it after the
+fact. `bend="0"` forces a straight line the router would otherwise bow. Prefer
+fixing the layout first; reach for `bend` when the router's answer is wrong
+rather than merely unlucky.
 
 ## Title
 

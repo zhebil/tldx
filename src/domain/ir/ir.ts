@@ -163,6 +163,14 @@ export type IREdge = IRBase & {
    */
   fromAnchor?: IRAnchor;
   toAnchor?: IRAnchor;
+  /**
+   * Authored arc depth (`bend`), in page px, tldraw's own units and sign: the
+   * perpendicular offset of the arc's midpoint from the straight chord.
+   * Wins outright over `domain/layout/routing.ts` - unlike `fromAnchor`, which
+   * the router routes *around*, a set bend takes the edge out of every pass
+   * that would grow or shrink it, cap included.
+   */
+  bend?: number;
   /** Pass-through tldraw arrow style; does not affect layout. */
   color?: StyleColor;
   dash?: StyleDash;

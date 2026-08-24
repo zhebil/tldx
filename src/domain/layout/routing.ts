@@ -141,22 +141,25 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
   const { shapes, edges } = collect(ir);
   const byId = new Map(shapes.map((s) => [s.id, s]));
 
+  // Self-loops are the one shape the router has nothing to say about: the arc
+  // is the loop. An authored `bend` is handled further down - it overrides the
+  // arc, not the attachment, so those edges still go through every pass here.
   const routes = new Map<string, EdgeRoute>();
-  const selfEdges = new Set<string>();
+  const pinned = new Set<string>();
   for (const edge of edges) {
     if (edge.from !== edge.to) continue;
-    selfEdges.add(edge.id);
+    pinned.add(edge.id);
     const shape = byId.get(edge.from);
     if (!shape) continue;
     const loop = Math.max(LOOP_MIN, Math.min(LOOP_SHAPE_FACTOR * shape.w, LOOP_MAX));
     routes.set(edge.id, {
-      bend: loop,
+      bend: edge.bend ?? loop,
       startAnchor: edge.fromAnchor ?? { x: 0.75, y: 0 },
       endAnchor: edge.toAnchor ?? { x: 0.25, y: 0 },
     });
   }
 
-  const otherEdges = edges.filter((edge) => !selfEdges.has(edge.id));
+  const otherEdges = edges.filter((edge) => !pinned.has(edge.id));
 
   // An authored `fromSide`/`toSide` wins over anything the router computes.
   // Seeded before every other pass so each treats the author's choice as a
@@ -191,9 +194,25 @@ export function computeEdgeRoutes(ir: IRDocPositioned): Map<string, EdgeRoute> {
 
   growBendForLabelSquish(otherEdges, byId, shapes, routes);
 
+  // An authored `bend` overrides the arc, not the attachment. The edge has
+  // been through every anchor pass above, so it leaves and arrives where the
+  // router would have put it - only the depth of the bow is the author's. That
+  // matters for the workflow the prop exists for: the number `overlay show`
+  // reports was measured against those anchors, so dropping them would give
+  // the pasted value a different arc from the one on the canvas.
+  //
+  // Applied here, after everything that grows or shrinks a bend and before
+  // `placeLabels`, so the label is positioned on the arc actually drawn.
+  const keepBend = new Set(fanned);
+  for (const edge of otherEdges) {
+    if (edge.bend === undefined) continue;
+    keepBend.add(edge.id);
+    routes.set(edge.id, { ...routes.get(edge.id), bend: edge.bend });
+  }
+
   placeLabels(edges, byId, shapes, routes);
 
-  minimizeBends(otherEdges, byId, shapes, routes, fanned);
+  minimizeBends(otherEdges, byId, shapes, routes, keepBend);
 
   return routes;
 }
@@ -301,7 +320,9 @@ function placeLabels(
     // only `bend`'s existing side, and tests only the arc's midpoint - a
     // widened bend combined with an offset `t` measurably reintroduces
     // label/label collisions this approximation misses.
-    if (best.shapeScore > 0) {
+    // An authored `bend` is exempt: the label slides along the arc the author
+    // asked for, it never moves the arc.
+    if (best.shapeScore > 0 && slot.edge.bend === undefined) {
       const otherLabelBoxes = others
         .map((o) => {
           const r = routes.get(o.edge.id);
@@ -903,7 +924,7 @@ function minimizeBends(
   byId: Map<string, AbsShape>,
   shapes: AbsShape[],
   routes: Map<string, EdgeRoute>,
-  fanned: ReadonlySet<string>,
+  keepBend: ReadonlySet<string>,
 ): void {
   const blockerPool = shapes.filter((s) => s.kind === "box" || s.kind === "note");
   const snapshot = new Map<string, { bend: number; labelBox?: LabelBox }>();
@@ -915,14 +936,15 @@ function minimizeBends(
   for (const edge of edges) {
     const route = routes.get(edge.id);
     if (!route || route.bend === 0) continue;
-    // A fan bend is already the minimum separation `fanSharedPairs` chose, so
-    // there is nothing here to give back. It also cannot be judged by
+    // Two kinds of bend are not this pass's to give back. An authored one is
+    // the author's number, full stop. A fan bend is already the minimum
+    // separation `fanSharedPairs` chose, and it cannot be judged by
     // `arcsTooClose` alone: the pair shares both terminals, so two arcs that
     // meet at the ends stay under the fraction even when the whole middle is
     // one line, and `snapshot` would score each half against the other's
     // pre-shrink bend anyway - both halves shrink to zero and the pair lands
     // back on the same line.
-    if (fanned.has(edge.id)) continue;
+    if (keepBend.has(edge.id)) continue;
     // `approxLabelBox`'s parabola stands in for the real circular arc, and it
     // gets less trustworthy the further `t` sits from the midpoint it was
     // validated at. Shrinking a bend under an already-slid label risks a
