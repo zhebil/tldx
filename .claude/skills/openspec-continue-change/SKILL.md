@@ -36,9 +36,11 @@ Continue working on a change by creating the next artifact.
    Always announce: "Using change: <name>" and how to override (e.g., `/opsx:continue <other>`).
 
 2. **Check current status**
+
    ```bash
    openspec status --change "<name>" --json
    ```
+
    Parse the JSON to understand current state. The response includes:
    - `schemaName`: The workflow schema being used (e.g., "spec-driven")
    - `artifacts`: Array of artifacts with their status ("done", "skipped", "ready", "blocked")
@@ -47,7 +49,7 @@ Continue working on a change by creating the next artifact.
 
 3. **Act based on status**:
 
-   ---
+   ***
 
    **If all planning artifacts are complete (`isPlanningComplete: true`, or legacy `isComplete: true`)**:
    - Congratulate the user
@@ -55,7 +57,7 @@ Continue working on a change by creating the next artifact.
    - Suggest: "Planning is complete! You can now implement this change. Once implementation and any tracked work are complete, archive it."
    - STOP
 
-   ---
+   ***
 
    **If artifacts are ready to create** (status shows artifacts with `status: "ready"`):
    - Pick the FIRST artifact with `status: "ready"` from the status output
@@ -80,7 +82,7 @@ Continue working on a change by creating the next artifact.
    - Show what was created and what's now unlocked
    - STOP after creating ONE artifact
 
-   ---
+   ***
 
    **If no artifacts are ready (all blocked)**:
    - This shouldn't happen with a valid schema
@@ -94,6 +96,7 @@ Continue working on a change by creating the next artifact.
 **Output**
 
 After each invocation, show:
+
 - Which artifact was created
 - Schema workflow being used
 - Current progress (N/M complete)
@@ -107,6 +110,7 @@ The artifact types and their purpose depend on the schema. The `instruction` fie
 If the `instruction` field directs you to use a specific skill or command to create the artifact, invoke it instead of writing the artifact directly.
 
 **Guardrails**
+
 - Create ONE artifact per invocation
 - Always read dependency artifacts before creating a new one - re-read from disk, not from conversation memory (files may have changed since you last saw them)
 - Never skip artifacts or create out of order
