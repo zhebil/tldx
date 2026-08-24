@@ -2,7 +2,6 @@
  * Real `ExecutePort` adapter: esbuild bundles a `.tldx.jsx` entry (from the
  * `source` string, not from disk - see the plugin below) and a fresh
  * `worker_threads` Worker runs the bundle, hard-terminated at a 2s budget.
- * See `docs/jsx-pivot.md` decisions 5, 7, 8, 12.
  */
 
 import { dirname, resolve as resolvePath } from "node:path";
@@ -41,13 +40,11 @@ try {
 `;
 }
 
-// The bundle is handed to Module#_compile directly, under the entry file's
-// own path as its filename - that's what makes every frame in a thrown
-// stack trace read "<path>:<generatedLine>:<generatedColumn>", which is all
-// threwDiagnostic() needs to find the frame to map through the sourcemap.
-// setSourceMapsEnabled() is not required for that (we map manually with
-// node:module's SourceMap), but costs nothing and improves any diagnostics
-// Node itself prints if something goes wrong before postMessage.
+// The bundle goes through Module#_compile under the entry file's own path as
+// its filename, so every frame of a thrown stack reads
+// "<path>:<generatedLine>:<generatedColumn>" - all `threwDiagnostic` needs to
+// pick the frame to map. Mapping is manual, so `setSourceMapsEnabled` is not
+// required; it only improves what Node prints if boot fails before postMessage.
 const WORKER_BOOTSTRAP = `
 process.setSourceMapsEnabled(true);
 const { workerData } = require("node:worker_threads");
@@ -69,10 +66,9 @@ type BuildOutcome = BuildOk | { diagnostics: Diagnostic[] };
 export function createJsxExecute(): ExecutePort {
   return {
     async execute(source: string, path: string): Promise<ExecuteResult> {
-      // esbuild requires an absolute `absWorkingDir` and resolves entry
-      // points to absolute paths, so a relative `path` (what the CLI and the
-      // PostToolUse hook pass) has to be resolved before anything reads it.
-      // Every span this adapter returns is therefore absolute; `compileFile`
+      // esbuild requires an absolute `absWorkingDir` and resolves entry points
+      // to absolute paths, so a relative `path` has to be resolved first. Every
+      // span this adapter returns is therefore absolute; `compileFile`
       // normalises them back to the caller's style.
       const entry = resolvePath(path);
       const built = await buildBundle(source, entry);
@@ -89,10 +85,9 @@ async function buildBundle(source: string, path: string): Promise<BuildOutcome> 
   const entryPlugin: Plugin = {
     name: "tldx-entry",
     setup(build) {
-      // The entry's *contents* come from `source`, but its resolved path
-      // stays the real one - jsxDEV's `source.fileName` (and every span
-      // downstream) depends on that, and it's what lets the same path
-      // resolve to different sources on different calls (no on-disk read).
+      // The entry's contents come from `source` while its resolved path stays
+      // the real one: jsxDEV's `source.fileName` and every span downstream
+      // depend on that, and it lets one path map to different sources per call.
       build.onResolve({ filter: entryFilter }, (args) => ({
         path: args.path,
         namespace: "file",
@@ -124,8 +119,8 @@ async function buildBundle(source: string, path: string): Promise<BuildOutcome> 
       packages: "external",
       loader: { ".jsx": "jsx" },
       absWorkingDir: dir,
-      // Only used to anchor metafile/sourcemap-relative paths - `write:
-      // false` means nothing is ever written here.
+      // Only anchors metafile/sourcemap-relative paths; `write: false` means
+      // nothing is written.
       outfile: resolvePath(dir, "__tldx_bundle__.js"),
       alias: {
         tldx: resolvePath(RUNTIME_DIR, "index"),
@@ -253,12 +248,11 @@ function threwDiagnostic(stack: string, path: string, mapText: string): Diagnost
   return error("runtime/threw", message, span);
 }
 
-/** Finds the topmost frame inside the compiled bundle (frames carry `path`
- * as their filename - see WORKER_BOOTSTRAP) and maps it through the
- * sourcemap to the original file/line/column. `entry.originalSource` (when
- * present) is esbuild's source path relative to the entry's own directory -
- * see the `outfile`/`absWorkingDir` comments in `buildBundle` - so it's
- * resolved against `dirname(path)` to recover the imported file's path. */
+/**
+ * Maps the topmost bundle frame in `stack` back to the original
+ * file/line/column. `entry.originalSource` is relative to the entry's own
+ * directory, so it resolves against `dirname(path)`.
+ */
 function mappedSpan(stack: string, path: string, mapText: string): SourceSpan | undefined {
   let map: SourceMap;
   try {

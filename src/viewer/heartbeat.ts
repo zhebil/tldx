@@ -1,16 +1,10 @@
 /**
- * Visible-tab liveness ping for `tldx serve`'s idle-TTL reaper (tldx-kts).
- * An open SSE connection is not a liveness signal - an abandoned tab holds
- * it open forever - so the server needs a *periodic* signal instead, sent
- * only while someone is actually looking at the diagram. This is a plain
- * `GET /heartbeat` (any HTTP request already bumps the reaper - see
- * `infra/devserver`'s `onActivity`); it is the caller's job to only send it
- * while visible.
+ * Visible-tab liveness ping for `tldx serve`'s idle-TTL reaper. An open SSE
+ * connection proves nothing - an abandoned tab holds one open forever - so the
+ * reaper needs a periodic `GET /heartbeat` sent only while the tab is visible.
  *
- * This is DISTINCT from `infra/transport/sse-transport.ts`'s `: ping`
- * comment heartbeat, which is a server->client SSE keepalive against idle
- * proxies. This module is client->server, app-level, and tab-visibility
- * gated.
+ * Distinct from the transport's `: ping` SSE comment, which is a
+ * server-to-client keepalive against idle proxies.
  */
 
 export interface HeartbeatOptions {

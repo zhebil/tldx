@@ -20,8 +20,7 @@ export default function Diagram() {
 `;
 }
 
-// Line 3 is asserted directly by the "thrown error line" test below - keep
-// the throw on that exact line if this template changes.
+// Keep the throw on line 3; a test asserts that exact line number.
 const THROWING_SOURCE = `import { Doc, Box } from "tldx";
 export default function Diagram() {
   throw new Error("boom");
@@ -175,17 +174,15 @@ export default function Diagram() {
   it(
     "runtime/threw diagnostic from an imported file names that file, and inputs covers the module graph",
     async () => {
-      // esbuild resolves relative imports through their real (symlink-free)
-      // path when building the sourcemap's `sources`; on macOS `tmpdir()`
-      // sits under a `/var` -> `/private/var` symlink, so the temp dir is
-      // realpath'd up front to keep every path comparison below exact.
+      // esbuild puts real (symlink-free) paths in the sourcemap's `sources`,
+      // and on macOS `tmpdir()` sits under a `/var` -> `/private/var` symlink,
+      // so realpath the temp dir to keep the path comparisons below exact.
       const dir = await realpath(await mkdtemp(join(tmpdir(), "tldx-execute-jsx-imported-throw-")));
       try {
         const libDir = join(dir, "lib");
         await mkdir(libDir);
         const brokenPath = join(libDir, "broken.jsx");
-        // Line 8 is asserted directly below - keep the throw on that exact
-        // line if this template changes.
+        // Keep the throw on line 8; the assertion below pins that number.
         await writeFile(
           brokenPath,
           `import { Box } from "tldx";

@@ -1,13 +1,11 @@
 /**
  * `editor.toImage` export adapter behind `tldx render`. Drives headless
- * chromium against a served diagram URL and writes the resulting image to
- * disk. Per CONTEXT.md "boundaries that don't vary" there is no port here -
- * one implementation, wired directly from `cli/render.ts`.
+ * chromium against a served diagram URL and writes the image to disk.
  *
  * playwright is a devDependency (it pulls browser binaries) but this file
  * ships in `dist/cli`, so the import is dynamic and optional: a missing
  * install fails with an actionable message instead of crashing every `tldx`
- * invocation that never calls `render`.
+ * invocation that never renders.
  */
 
 import { writeFile } from "node:fs/promises";
@@ -26,9 +24,8 @@ export type RenderOptions = {
   background: boolean;
 };
 
-// tldraw defaults bitmap exports to pixelRatio 2; pinned explicitly so PNG
-// output dimensions don't silently change if that default ever moves, since
-// this repo diffs PNGs across revisions.
+// tldraw's own default, pinned so PNG dimensions cannot shift under us if
+// that default ever moves; this repo diffs PNGs across revisions.
 const PIXEL_RATIO = 2;
 
 async function loadChromium(): Promise<(typeof import("playwright"))["chromium"]> {
@@ -73,19 +70,17 @@ export async function exportImage(url: string, outPath: string, opts: RenderOpti
         const editor = (window as unknown as { editor: Editor }).editor;
 
         // Arrow labels export as absolutely-positioned <tspan>s whose x values
-        // come from measuring the text in the DOM at export time. Measure
-        // before the webfont lands and every x is a fallback-font advance while
-        // the SVG renders the real font, so words overprint each other (D6).
+        // come from measuring text in the DOM at export time. Measure before
+        // the webfont lands and every x is a fallback-font advance while the
+        // SVG renders the real font, so words overprint each other.
         await editor.fonts.loadRequiredFontsForCurrentPage();
         await document.fonts.ready;
 
         const allIds = [...editor.getCurrentPageShapeIds()];
         const validIds = allIds.map((tlId) => tlId.replace(/^shape:/, "")).sort();
 
-        // toImage/getSvgJsx already expands each given id to itself plus its
-        // descendants internally, so a frame id alone is enough to pull in
-        // its children - confirmed by reading getSvgJsx.mjs, which calls
-        // editor.getShapeAndDescendantIds(ids) before rendering.
+        // toImage expands each given id to itself plus its descendants, so a
+        // frame id alone is enough to pull in its children.
         let targetIds: TLShapeId[];
         if (frame !== undefined) {
           const frameId = `shape:${frame}` as TLShapeId;
@@ -105,16 +100,11 @@ export async function exportImage(url: string, outPath: string, opts: RenderOpti
           targetIds = allIds;
         }
 
-        // tldraw's own content-bounds pass (getSvgJsx, unexported) unions
-        // getShapeMaskedPageBounds over every shape. That bounds getter
-        // (Geometry2d.vertices, see primitives/geometry/Geometry2d.mjs) is
-        // built with Geometry2dFilters.EXCLUDE_LABELS baked in - it's meant
-        // for selection/hit-testing, where a label overhanging its arrow
-        // shouldn't grow the selection box. The same filtered bounds feed
-        // the export crop, though, so a label whose text runs past its
-        // arrow's line gets clipped. The label child itself still reports
-        // its own correct (unfiltered) bounds - walk each shape's geometry
-        // tree directly and union every label child back in, in page space.
+        // tldraw's own content-bounds pass unions getShapeMaskedPageBounds,
+        // which excludes labels: right for selection boxes, wrong for the
+        // export crop, where a label overhanging its arrow gets clipped. The
+        // label child still reports correct bounds, so walk each shape's
+        // geometry tree and union every label child back in, in page space.
         let bounds: Box | undefined;
         for (const id of editor.getShapeAndDescendantIds(targetIds)) {
           const shapeBounds = editor.getShapeMaskedPageBounds(id);

@@ -1,38 +1,11 @@
 /**
- * Dev HTTP server for `tldx serve`. Owns the HTTP listener that hosts both
- * the static viewer bundle and the SSE endpoint at `/events` fed by the
- * passed `TransportPort`. Per CONTEXT.md there is intentionally no
- * `DevServerPort` - one impl, no test variation. The CLI composes this
- * directly with `createSseTransport()`; HTTP/SSE wiring stays here, never
- * leaks into `cli/`.
+ * Dev HTTP server for `tldx serve`, on Hono + `@hono/node-server`: the static
+ * viewer bundle plus the SSE endpoint at `/events`.
  *
- * Implementation: Hono + `@hono/node-server`. Hono handles the static-bundle
- * routing (file lookup, MIME, SPA fallback to index.html, traversal rejection,
- * 405 on non-GET/HEAD). The SSE endpoint at `/events` bypasses Hono entirely:
- * it is intercepted on the underlying `node:http` server before Hono's request
- * listener runs, and the raw `(req, res)` are handed to `transport.handler` so
- * the SSE adapter keeps full control of headers, keepalive, and teardown.
- *
- * The transport is expected to expose `handler(req, res)` (the shape
- * implemented by `infra/transport/sse-transport.ts`); we accept any object
- * with that shape rather than importing the concrete adapter, so this module
- * stays in `infra/` without reaching back into another adapter.
- *
- * Static serving rules:
- * - GET `/` resolves to `<viewerBundleDir>/index.html`.
- * - Files under `viewerBundleDir` are served with the standard MIME table.
- * - Unknown paths fall back to `index.html` (SPA route fallback) so client-
- *   side routing does not 404 on hard reload.
- * - Path traversal (`..`) is rejected with `403` before any disk access.
- *
- * Method handling:
- * - Only `GET` and `HEAD` are supported. Everything else gets `405`.
- *
- * Lifecycle:
- * - `startDevServer` resolves once the listener is bound. The returned
- *   `port` is the actual TCP port (resolved from `0` when the caller asks
- *   for an ephemeral port).
- * - `close()` closes the underlying server and is idempotent.
+ * `/events` bypasses Hono entirely. It is intercepted on the underlying
+ * `node:http` server before Hono's request listener runs, and the raw
+ * `(req, res)` go to `transport.handler`, so the SSE adapter keeps full
+ * control of headers, keepalive and teardown.
  */
 
 import {
@@ -73,19 +46,15 @@ export interface StartDevServerOptions {
    */
   host?: string;
   /**
-   * Handler for `PUT /overlay` - the viewer's canvas-edit round-trip
-   * (docs/round-trip.md D4: "the viewer writes the overlay over a plain
-   * `PUT /overlay`, not a websocket"). Omit to 404 the route entirely
-   * (e.g. `tldx check` never boots a dev server that needs this).
+   * Handler for `PUT /overlay`, the viewer's canvas-edit round-trip. Omit to
+   * 404 the route entirely.
    */
   onOverlayPut?: (snapshot: SceneJSON) => Promise<void>;
   /**
-   * Called once per incoming request, before routing - page loads, static
-   * assets, `PUT /overlay`, `/events` SSE connects, and `/heartbeat` pings
-   * all go through here. Feeds `tldx-kts`'s idle-TTL reaper (`cli/serve.ts`):
-   * "any HTTP request" is one of the activity kinds that defers server
-   * exit. Omit to skip activity tracking entirely (e.g. `tldx render`'s
-   * ephemeral server, which has no reaper).
+   * Called once per incoming request, before routing - static assets,
+   * `PUT /overlay`, `/events` connects and `/heartbeat` pings all go through
+   * here. Feeds the idle-TTL reaper in `cli/serve.ts`. Omit to skip activity
+   * tracking entirely.
    */
   onActivity?: () => void;
 }
@@ -102,10 +71,9 @@ export interface DevServerHandle {
 }
 
 /**
- * Detect path-traversal attempts (`..` segments or repeated slashes) in a
- * URL path. Hono's `serveStatic` already rejects these by falling through
- * to `next()`, but we want a hard `403` rather than the SPA fallback for
- * traversal, which is unambiguously hostile.
+ * Detect path traversal (`..` segments or repeated slashes). `serveStatic`
+ * merely falls through to `next()` on these, which would hand them the SPA
+ * fallback; we want a hard `403` instead.
  */
 function looksLikeTraversal(rawPath: string): boolean {
   let decoded: string;
@@ -138,12 +106,9 @@ function buildApp(
 ): Hono {
   const app = new Hono();
 
-  // Registered before the blanket 405 guard below - Hono matches routes in
-  // registration order, and that guard returns without calling `next()`.
-  // The heartbeat itself is just an HTTP request, so `onActivity` (wired in
-  // `makeRootListener`, below) already covers it - this route only needs to
-  // exist so the viewer's periodic ping gets a cheap 204 instead of the SPA
-  // fallback's full `index.html`.
+  // Must stay ahead of the blanket 405 guard below: Hono matches in
+  // registration order and that guard returns without calling `next()`.
+  // Exists only so the viewer's ping gets a cheap 204 instead of index.html.
   app.get("/heartbeat", (c) => c.body(null, 204));
 
   app.put("/overlay", async (c) => {
@@ -163,8 +128,7 @@ function buildApp(
     return c.body(null, 204);
   });
 
-  // 405 for anything other than GET/HEAD on any path. Registering this
-  // before the static handlers means non-GET requests never reach disk.
+  // Ahead of the static handlers, so non-GET requests never reach disk.
   app.all("*", async (c, next) => {
     const method = c.req.method;
     if (method !== "GET" && method !== "HEAD") {
@@ -173,8 +137,7 @@ function buildApp(
     await next();
   });
 
-  // Reject path traversal up front with 403. `serveStatic` would otherwise
-  // silently fall through to the SPA fallback for these paths.
+  // Reject traversal up front, before any disk access.
   app.use("*", async (c, next) => {
     if (looksLikeTraversal(c.req.path)) {
       return c.body(null, 403);
@@ -182,21 +145,17 @@ function buildApp(
     await next();
   });
 
-  // Static bundle. `root` is absolute - the warning in serveStatic's docs
-  // about "absolute paths not supported" is stale; the implementation uses
-  // path.join, which handles absolute roots fine.
+  // `root` is absolute: serveStatic's docs warn against that, but the warning
+  // is stale - the implementation uses path.join, which handles it fine.
   app.use(
     "*",
     serveStatic({
       root: bundleRoot,
-      // `serveStatic` joins root + request path. With root="/abs/dir" and
-      // path="/index.html", join yields "/abs/dir/index.html" - correct.
       rewriteRequestPath: (p) => (p === "/" ? "/index.html" : p),
     }),
   );
 
-  // SPA fallback: anything the static handler did not serve falls through
-  // here and gets index.html, so client-side routing survives a hard reload.
+  // SPA fallback, so client-side routing survives a hard reload.
   app.get("*", async (c, next) =>
     serveStatic({ root: bundleRoot, path: "index.html" })(c, next),
   );
@@ -205,9 +164,8 @@ function buildApp(
 }
 
 /**
- * Wrap Hono's request listener with a pre-check that diverts `/events`
- * straight to the transport. Hono never sees those requests; the transport
- * owns the response stream.
+ * Wrap Hono's request listener with a pre-check that diverts `/events` to the
+ * transport. Hono never sees those requests; the transport owns the stream.
  */
 function makeRootListener(
   honoListener: RequestListener,
@@ -217,7 +175,6 @@ function makeRootListener(
   return (req, res) => {
     onActivity?.();
     const url = req.url ?? "/";
-    // Strip query/hash before comparing.
     const pathOnly = url.split(/[?#]/, 1)[0] ?? "/";
     if (pathOnly === "/events") {
       transport.handler(req, res);
@@ -235,10 +192,8 @@ export async function startDevServer(
 
   const app = buildApp(bundleRoot, options.onOverlayPut);
 
-  // Use `@hono/node-server`'s `createServer` hook so we can wrap its request
-  // listener with our `/events` interceptor. This is the documented escape
-  // hatch (`Options.createServer`) - we pass our own factory that calls
-  // node's `createHttpServer` with the wrapped listener.
+  // `Options.createServer` is the documented hook for supplying our own
+  // factory, which is how the `/events` interceptor gets to wrap the listener.
   const server: Server = await new Promise<Server>((resolveListen, rejectListen) => {
     let bound = false;
     const onError = (err: Error): void => {
@@ -267,8 +222,7 @@ export async function startDevServer(
 
   const addr = server.address();
   if (addr === null || typeof addr === "string") {
-    // Should be unreachable for a TCP listener; defensive so callers get a
-    // typed handle and not `any`.
+    // Unreachable for a TCP listener; keeps the returned handle typed.
     await new Promise<void>((r) => server.close(() => r()));
     throw new Error("dev server failed to bind a TCP socket");
   }

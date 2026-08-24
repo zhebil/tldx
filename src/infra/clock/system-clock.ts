@@ -1,7 +1,6 @@
 /**
- * Real `ClockPort` adapter on top of `Date.now` and the global
- * `setTimeout`/`clearTimeout`. The CLI wires this into `watchAndServe`
- * so debounce reflects real time; tests use the colocated `FakeClock`.
+ * Real `ClockPort` adapter on `Date.now` and the global `setTimeout`. Tests
+ * use the port's `FakeClock` instead.
  */
 
 import type { ClockPort, TimerHandle } from "../../app/ports/clock.js";

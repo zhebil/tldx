@@ -1,9 +1,7 @@
 /**
- * Unit-style tests for the SSE heartbeat schedule. These stub the HTTP
- * request/response objects so the FakeClock drives the only timer source -
- * advancing the clock is the sole way a write can happen between pushes.
- * The full HTTP path is exercised by `sse-transport.test.ts` (the contract
- * battery) which never advances its clock and so never sees a heartbeat.
+ * The SSE heartbeat schedule. The HTTP request/response are stubbed so the
+ * FakeClock is the only timer source: advancing it is the sole way a write
+ * can happen between pushes.
  */
 
 import { EventEmitter } from "node:events";
@@ -106,7 +104,6 @@ describe("createSseTransport heartbeat", () => {
     const afterFirst = res.writes.length;
     expect(res.writes[afterFirst - 1]).toBe(": ping\n\n");
 
-    // Simulate the client closing the connection.
     req.emit("close");
 
     clock.advance(60_000);

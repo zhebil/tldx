@@ -1,25 +1,13 @@
 /**
- * Real `TransportPort` adapter on top of Server-Sent Events. The transport
- * does NOT host its own HTTP server - it exposes a `handler(req, res)` that
- * the dev server (`infra/devserver/`) mounts on `/events`. This keeps the
- * HTTP wiring in one place and lets the transport be reused if the dev
- * server is replaced.
+ * Real `TransportPort` adapter on Server-Sent Events. It hosts no HTTP server
+ * of its own; it exposes `handler(req, res)` for the dev server to mount on
+ * `/events`. Each push is one JSON `data:` event; on connect the stream emits
+ * a `: ok` comment, then replays the last pushed message.
  *
- * Wire format: each pushed message is JSON-serialized and emitted as a
- * single SSE `data:` event (one line, no `event:` field - the envelope's
- * `kind` already discriminates). On connect the server emits a `: ok`
- * comment so subscribers can detect that the stream is live, then replays
- * the most recently pushed message (last-wins replay; see TransportPort
- * docs).
- *
- * Heartbeat: each connected client gets a recurring `: ping` SSE comment
- * write at `heartbeatMs` intervals (default 15s). This is a transport-level
- * keepalive that prevents idle proxies / sleeping laptops from killing the
- * connection. Comments are ignored by EventSource consumers, so the viewer
- * never sees them. This is DISTINCT from the `kind="ping"` SceneMessage
- * envelope, which is an app-level signal pushed via `push()`. The schedule
- * is driven by `ClockPort.setTimer` in a self-rescheduling loop (no native
- * `setInterval`) so tests with `FakeClock` can drive heartbeats deterministically.
+ * The recurring `: ping` comment is a transport-level keepalive against idle
+ * proxies and sleeping laptops, distinct from the `kind="ping"` SceneMessage,
+ * which is an app-level signal pushed via `push()`. It reschedules through
+ * `ClockPort.setTimer` rather than `setInterval` so `FakeClock` can drive it.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -90,8 +78,7 @@ export function createSseTransport(
       try {
         client.res.write(HEARTBEAT_FRAME);
       } catch {
-        // Broken pipe: drop client; keepalive failures are not the use
-        // case's concern. Same policy as `push`.
+        // Broken pipe: drop the client, same policy as `push`.
         dropClient(client);
         return;
       }
@@ -110,7 +97,6 @@ export function createSseTransport(
           client.res.write(wire);
         } catch {
           // Broken pipe / slow consumer: drop this client and keep going.
-          // Per-client failures are not the use case's concern.
           dropClient(client);
         }
       }
@@ -142,9 +128,8 @@ export function createSseTransport(
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
       });
-      // Sentinel comment so subscribers can wait for "stream ready" before
-      // any push happens. Comments are valid SSE per the spec and are
-      // ignored by EventSource consumers.
+      // Sentinel so subscribers can wait for "stream ready" before any push.
+      // EventSource ignores comments, so the viewer never sees it.
       res.write(": ok\n\n");
 
       const client: Client = { res, closed: false, heartbeat: undefined };

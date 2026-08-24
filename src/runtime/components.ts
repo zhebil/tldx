@@ -1,8 +1,8 @@
 /**
  * The `"tldx"` component library. Each component is a plain function that
  * builds the exact AST node shape `domain/parser/ast.ts` already defines -
- * no React, no reconciler (see docs/jsx-pivot.md decision 1). `jsx`/`jsxs`/
- * `jsxDEV` call these functions directly and return whatever they return.
+ * no React, no reconciler. `jsx`/`jsxs`/`jsxDEV` call these functions directly
+ * and return whatever they return.
  */
 import type { SourceSpan } from "../contracts/diagnostic.js";
 import type {
@@ -151,8 +151,8 @@ export function Grid(props: Props, source?: JsxSource): AstFrame {
   return { ...Frame({ ...props, layout: "grid" }, source), tag: "Grid" };
 }
 
-/** A `<Frame>` that draws no frame chrome and reserves no title space; still
- * a layout container (see `domain/emit/emit.ts`'s `group` handling). */
+/** A `<Frame>` that draws no chrome and reserves no title space, but is still
+ * a layout container. */
 export function Group(props: Props, source?: JsxSource): AstFrame {
   return { ...Frame(props, source), group: true, tag: "Group" };
 }
@@ -229,12 +229,9 @@ export function Box(props: Props, source?: JsxSource): AstBox {
   return { kind: "box", attrs: propsToAttrs(props, span), span };
 }
 
-/** A real tldraw sticky note - fixed 200px wide, self-growing height. The
- * only surviving "note" alias (C2, tldx-npd): the old plain `<Note>`, which
- * emitted a hand-rolled geo-rectangle imitation, is retired in favour of
- * this (attached or free-floating annotation) or `<Text>` (borderless,
- * unstyled caption). Same AST node kind as the old `<Note>` (`"note"`),
- * marked `sticky: true`. */
+/** A real tldraw sticky note - fixed 200px wide, self-growing height. Use it
+ * for an attached or free-floating annotation; use `<Text>` for a borderless,
+ * unstyled caption. Content is JSX text children, not a `label` prop. */
 export function Sticky(props: Props, source?: JsxSource): AstNote {
   const span = toSpan(source);
   return {
@@ -271,25 +268,16 @@ export function Edge(props: Props, source?: JsxSource): AstEdge {
 
 /**
  * `<Edges>{`a -> b\nb -> c: label`}</Edges>` - a compact multi-line
- * alternative to a block of hand-written `<Edge>` tags (tldx-2rr). Each
- * non-blank line is `id ("->" id)+ (":" label)?`; a chain of N ids expands
- * to N-1 edges, mirroring `flow()`'s pairwise semantics with an optional
- * shared label. Props other than `children` (the same style set `<Edge>`
- * accepts - never `id`, `from`, `to`, or `label`, which are per-line only)
- * are copied onto every edge the block produces, so a same-styled batch
- * needs the style written once, not once per edge.
+ * alternative to a block of hand-written `<Edge>` tags. Each non-blank line is
+ * `id ("->" id)+ (":" label)?`; a chain of N ids expands to N-1 edges with an
+ * optional shared label. Props other than `children` (the style set `<Edge>`
+ * accepts - never `id`, `from`, `to` or `label`, which are per-line) are
+ * copied onto every edge the block produces. Each edge gets its own per-line
+ * span.
  *
- * Unlike `flow()`, this is a JSX element, so jsxDEV hands it a real
- * `source` - each edge's span is computed by counting the newlines inside
- * the (source-preserved) string, offset from the `<Edges>` tag's own line.
- * That is a real per-line span, finer than `<Edge>`'s existing
- * shared-per-element span - not the zero span `flow()`'s edges carry
- * (tldx-7kx; left open here, see design note on tldx-2rr for why).
- *
- * Children must be a single string expression (`{`...`}`), not bare JSX
- * text: esbuild's automatic JSX transform collapses newlines in JSX text
- * children and rejects a literal `>`, which would silently destroy this
- * grammar.
+ * Children must be a single string expression (`{`...`}`), not bare JSX text:
+ * esbuild's automatic JSX transform collapses newlines in JSX text children
+ * and rejects a literal `>`, which would silently destroy this grammar.
  */
 export function Edges(props: Props, source?: JsxSource): AstEdge[] {
   const span = toSpan(source);
@@ -322,12 +310,11 @@ function edgesSpecText(children: unknown): string {
 }
 
 /**
- * One line of `<Edges>` grammar: `id ("->" id)+ (":" label)?`. A chain of
- * N ids becomes N-1 edges sharing the line's label and block-level attrs.
- * A line that doesn't parse into at least two ids becomes a single edge
- * missing `to` - lower.ts's existing `ir/missing-edge-endpoint` check
- * reports it, the same diagnostic a hand-written `<Edge>` missing `to`
- * gets - deliberately not a new "malformed compact syntax" code.
+ * One line of `<Edges>` grammar: `id ("->" id)+ (":" label)?`. A chain of N
+ * ids becomes N-1 edges sharing the line's label and block-level attrs. A line
+ * that yields fewer than two ids becomes a single edge missing `to`, so
+ * `ir/missing-edge-endpoint` reports it just as it would a hand-written
+ * `<Edge>`.
  */
 function parseFlowLine(line: string, span: SourceSpan, sharedAttrs: Attrs): AstEdge[] {
   const colon = line.indexOf(":");

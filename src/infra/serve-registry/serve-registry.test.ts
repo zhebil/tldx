@@ -7,12 +7,12 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { codeFingerprint, findServe, hashSource, newestMtimeMs, recordServe, touchServeCompile } from "./serve-registry.js";
 
-// A pid this large is guaranteed unassigned (well past any real OS pid
-// range), so `process.kill(pid, 0)` reliably reports "no such process".
+// Well past any real OS pid range, so `process.kill(pid, 0)` reliably
+// reports "no such process".
 const DEAD_PID = 999_999_999;
 
-// Mirrors the path formula documented for `recordServe`/`findServe`, so a
-// hand-written record lands exactly where the module would look for it.
+// Mirrors the module's private path formula so a hand-written record lands
+// exactly where it would look for it.
 function pathFor(file: string): string {
   const hash = createHash("sha256").update(realpathSync(file)).digest("hex").slice(0, 16);
   return join(tmpdir(), "tldx-serve", `${hash}.json`);
@@ -60,7 +60,7 @@ describe("recordServe / findServe", () => {
     forget();
   });
 
-  it("records a codeFingerprint up front when given one (tldx-rab)", () => {
+  it("records a codeFingerprint up front when given one", () => {
     const file = tempFile();
     const forget = recordServe(file, "http://127.0.0.1:4000", { hash: "abcd1234", at: 42, codeFingerprint: 999 });
 
@@ -125,9 +125,7 @@ describe("touchServeCompile", () => {
     const file = tempFile();
     const path = pathFor(file);
     mkdirSync(dirname(path), { recursive: true });
-    // process.pid (the test's own, alive) but not process.pid+1 - use a
-    // real, currently-alive, non-us pid: pid 1 (init/launchd) is always
-    // alive and never process.pid on any platform this runs on.
+    // pid 1 (init/launchd) is always alive and is never our own pid.
     writeFileSync(path, JSON.stringify({ pid: 1, url: "http://127.0.0.1:4002", file }));
 
     touchServeCompile(file, "deadbeef", 1000);
@@ -175,7 +173,7 @@ describe("newestMtimeMs", () => {
   });
 });
 
-describe("codeFingerprint (tldx-rab)", () => {
+describe("codeFingerprint", () => {
   function makeCheckout(): { root: string; distCli: string; srcCli: string } {
     const root = mkdtempSync(join(tmpdir(), "tldx-codefp-test-"));
     dirs.push(root);

@@ -1,9 +1,3 @@
-/**
- * Unit test for the stderr `LogPort` adapter. Drives `createStderrLog` with
- * an injected writer so the assertions stay fully in-memory and do not
- * depend on `process.stderr`.
- */
-
 import { describe, expect, it } from "vitest";
 
 import { createStderrLog } from "./stderr-log.js";

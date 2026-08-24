@@ -1,13 +1,8 @@
 /**
- * Real `gitStatus` for `absorb`'s D5 guardrail (docs/round-trip.md D5): never
- * write to a file with uncommitted changes without saying so. No port
- * interface - the function type is declared inline in `src/app/absorb.ts`;
- * this is a one-line-ish adapter like `infra/fs/node-fs-write.ts`.
- *
- * `git status --porcelain -- <file>` prints one line per dirty path and
- * nothing when clean; a non-zero exit (not a repo, git missing, path
- * outside any repo) collapses to `"no-repo"` - absorb treats that the same
- * as "no gitStatus at all" and writes a `.bak` before rewriting.
+ * Real `gitStatus` behind `absorb`'s guardrail: never write to a file with
+ * uncommitted changes without saying so. A non-zero exit (not a repo, git
+ * missing, path outside any repo) collapses to `"no-repo"`, which absorb
+ * treats as "no gitStatus at all" and writes a `.bak` before rewriting.
  */
 
 import { execFile } from "node:child_process";

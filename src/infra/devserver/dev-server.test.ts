@@ -1,18 +1,7 @@
 /**
- * Contract test for the dev HTTP server. Boots an in-process server on an
- * ephemeral port (port 0) against a temp viewer bundle, then exercises the
- * three things the dev server has to get right:
- *
- * 1. Static bundle: GET `/index.html` and `/` both return the bundle's
- *    index document with the right content-type.
- * 2. SPA fallback: an unknown nested path falls through to index.html
- *    rather than 404, so client-side routing survives a hard reload.
- * 3. SSE wiring: opening a stream against `/events` and pushing a
- *    SceneMessage on the transport delivers the message to the connected
- *    client. We parse the SSE wire format by hand (no EventSource in node).
- *
- * No `node:http` here directly - we drive the server through `fetch`, so
- * test code stays at the same level a real client would see.
+ * Boots an in-process dev server on an ephemeral port against a temp viewer
+ * bundle. Everything is driven through `fetch`, at the level a real client
+ * sees; the SSE wire format is parsed by hand, since node has no EventSource.
  */
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";

@@ -1,21 +1,8 @@
 /**
- * Discovery record letting `tldx render` reuse a running `tldx serve`
- * instead of booting its own. Stored in the OS temp dir, never in the user's
- * repo. Best-effort throughout: a failed write or read must never take `serve`
- * down with it.
- *
- * The record also carries a content hash + timestamp of the source file as
- * of the server's last successful compile (`touchServeCompile`, called by
- * `cli/serve.ts` after every recompile). This is what lets a reuser (`tldx
- * render`) tell a live, up-to-date server apart from an orphaned one still
- * serving a stale compile (tldx-usr, tldx-46n) - printing "reusing serve
- * on :port (file @ hash)" and detecting staleness both read this field.
- *
- * `codeFingerprint` (tldx-rab) covers a different staleness: not the
- * `.tldx.jsx` fixture, but the compiler code (`src/domain`, `src/app`, ...)
- * that ran when this server booted. It is a newest-mtime reading over the
- * source tree, fixed once at boot - the running process's code cannot change
- * out from under it, so unlike `hash` it is never re-touched on recompile.
+ * Discovery record letting `tldx render` reuse a running `tldx serve` instead
+ * of booting its own. Stored in the OS temp dir, never in the user's repo.
+ * Best-effort throughout: a failed write or read must never take `serve` down
+ * with it.
  */
 
 import { createHash } from "node:crypto";
@@ -31,7 +18,11 @@ export type ServeRecord = {
   hash?: string;
   /** `ClockPort.now()` reading at that same compile. */
   compiledAt?: number;
-  /** Newest mtime (ms) across the compiler source tree as of this server's boot. */
+  /**
+   * Newest mtime (ms) across the compiler source tree as of this server's
+   * boot. Fixed at boot and never re-touched: a running process's own code
+   * cannot change under it.
+   */
   codeFingerprint?: number;
 };
 
@@ -82,15 +73,11 @@ export function newestMtimeMs(dir: string): number {
 }
 
 /**
- * Newest mtime (ms) across the compiler's own source tree, given the
- * directory of a currently-running module one level under `cli/` (e.g.
- * `dirname(fileURLToPath(import.meta.url))` from `cli/serve.ts` or
- * `cli/render.ts`). Mirrors `cli/main.ts`'s `distStalenessHint` dist/src
- * sibling convention: running from `dist/cli` resolves to the sibling
- * `src/` (dev checkout); running from `src/cli` (via `tsx`) resolves to
- * `src/` directly. `0` when there is no `src/` to check (installed package),
- * which makes a later comparison against this fingerprint never register as
- * stale.
+ * Newest mtime (ms) across the compiler's own source tree, given the directory
+ * of a running module one level under `cli/`. Running from `dist/cli` resolves
+ * to the sibling `src/`; running from `src/cli` resolves to `src/` directly.
+ * `0` when there is no `src/` (installed package), which makes any later
+ * comparison against this fingerprint never register as stale.
  */
 export function codeFingerprint(here: string): number {
   const parent = resolve(here, "..");
@@ -132,11 +119,10 @@ export function recordServe(
 }
 
 /**
- * Update the hash/compiledAt of an already-recorded serve after a later
- * recompile. No-op if nothing is recorded yet for `file`, or if the record
- * belongs to a different process - a still-alive but orphaned server (the
- * exact scenario this registry exists to detect) must never clobber a
- * newer process's record for the same file.
+ * Update the hash/compiledAt of an already-recorded serve after a recompile.
+ * No-op if nothing is recorded for `file`, or if the record belongs to another
+ * process: an orphaned but still-alive server must never clobber a newer
+ * process's record for the same file.
  */
 export function touchServeCompile(file: string, hash: string, compiledAt: number): void {
   const path = recordPath(file);

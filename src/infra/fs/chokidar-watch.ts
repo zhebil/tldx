@@ -1,18 +1,9 @@
 /**
- * Real `WatchPort` adapter on top of chokidar. Each handle owns one
- * `FSWatcher` covering the initial path set; `change` events are forwarded
- * to the listener. `add` and `unlink` are folded into change too - the use
- * case re-reads via `FsReadPort` and surfaces any ENOENT as a diagnostic,
- * so the port surface stays narrow (one event).
- *
- * `update()` diffs the requested set against what the watcher currently
- * covers and only unwatches/adds the difference. Chokidar 5 honours
- * `ignoreInitial` for post-ready `add()` too, so a redundant re-add is
- * silent today - the diff is what keeps that from being load-bearing.
- *
- * `awaitWriteFinish` is left off for MVP: editor saves on dev workflows are
- * atomic enough that the extra latency is not worth it. Debounce belongs in
- * the use case layer when `tldx-2lu` lands a clock port.
+ * Real `WatchPort` adapter on chokidar. Each handle owns one `FSWatcher`.
+ * `add` and `unlink` are folded into `change` so the port stays one event
+ * wide - the use case re-reads and surfaces any ENOENT as a diagnostic.
+ * `update()` diffs against the currently-watched set and only touches the
+ * difference. Debouncing is the use case's job, not this adapter's.
  */
 
 import { watch as chokidarWatch, type FSWatcher } from "chokidar";
@@ -48,11 +39,9 @@ export function createChokidarWatch(): WatchPort {
         });
       }
 
-      // Single-flight close: cache the underlying close promise so
-      // concurrent or repeated callers all observe the same outcome,
-      // including a rejection. (A naive `if (closed) return` flag would
-      // mark the handle closed *before* awaiting watcher.close(); a failure
-      // there would be silently swallowed by every subsequent call.)
+      // Single-flight close: cache the promise so repeated callers observe
+      // the same outcome, including a rejection. A `closed` flag would mark
+      // the handle closed before the await and swallow a failure there.
       let closing: Promise<void> | undefined;
       return {
         update: (next: readonly string[]) => {

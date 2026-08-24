@@ -1,21 +1,12 @@
 /**
- * Debounces canvas edits into `PUT /overlay` calls (docs/round-trip.md D4:
- * "the viewer writes the overlay over a plain `PUT /overlay`, not a
- * websocket"). Kept out of `app.tsx` so the debounce/guard logic is
- * unit-testable without mounting tldraw.
+ * Debounces canvas edits into `PUT /overlay` calls. Kept out of `app.tsx` so
+ * the debounce and echo guard are testable without mounting tldraw.
  *
- * Why `noteServerScene` exists: `editor.loadSnapshot` flushes store
- * listeners through `throttleToNextFrame` (verified in
- * `node_modules/@tldraw/store/dist-esm/lib/Store.mjs` - the history
- * reactor's `scheduleEffect`), so the store-change listener fires
- * *asynchronously* after a server push, not synchronously inside the
- * `loadSnapshot` call. A synchronous "I am currently loading a server
- * push, ignore the next listener call" flag therefore cannot suppress it -
- * the flag would already be back to "not loading" by the time the listener
- * runs. Comparing the incoming snapshot against the last scene the server
- * pushed (a `JSON.stringify` compare is fine at this size) is a guard that
- * does not depend on timing: a snapshot that matches what the server just
- * sent is an echo, not a user edit, regardless of when it arrives.
+ * `noteServerScene` is the echo guard. `editor.loadSnapshot` flushes store
+ * listeners through `throttleToNextFrame`, so the change listener fires
+ * asynchronously after a server push; an "am I loading right now" flag would
+ * already be back to false by then. Comparing against the last scene the
+ * server sent works regardless of when the listener runs.
  */
 
 import type { SceneJSON } from "../contracts/scene-json.js";

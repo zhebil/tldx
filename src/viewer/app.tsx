@@ -29,9 +29,8 @@ export function ViewerApp(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    // Keeps `tldx serve`'s idle-TTL reaper (tldx-kts) from reaping a
-    // server someone is actually looking at - see `heartbeat.ts` for why
-    // this has to be visibility-gated rather than just "connected".
+    // Keeps `tldx serve`'s idle-TTL reaper from reaping a server someone is
+    // actually looking at. `heartbeat.ts` explains the visibility gating.
     const heartbeat = createHeartbeat();
     return () => {
       heartbeat.close();
@@ -94,10 +93,9 @@ function currentDocumentSnapshot(editor: Editor): SceneJSON {
 }
 
 /**
- * The server re-pushes the applied scene after every overlay write
- * (`watchAndServe.putOverlay`); reloading an identical snapshot into
- * tldraw would clear selection and flash the canvas mid-edit, so a scene
- * that already matches the editor's current document is skipped.
+ * The server re-pushes the applied scene after every overlay write. Reloading
+ * an identical snapshot would clear selection and flash the canvas mid-edit,
+ * so a scene matching the editor's current document is skipped.
  */
 function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);

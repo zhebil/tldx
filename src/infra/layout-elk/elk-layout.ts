@@ -1,24 +1,12 @@
 /**
- * Real `LayoutPort` adapter on top of `elkjs`. The pure compiler core
- * (`domain/`) depends on the port; this adapter is the only place in the
- * codebase that may import `elkjs` (lint-enforced by both eslint
- * `no-restricted-imports` and dependency-cruiser).
+ * Real `LayoutPort` adapter on `elkjs`, and the only place in the codebase
+ * allowed to import it (lint-enforced).
  *
- * `layout(ir)` just runs `hybridLayout` (`domain/layout/stack.ts`), which
- * does all the tree walking, sizing, and deterministic row/col/grid/free
- * placement itself; this adapter supplies only the `AutoPlacer` that
- * `hybridLayout` calls for a container whose `layout="auto"`.
- *
- * `placeAuto` builds ONE flat ELK graph per call: a synthetic root with one
- * fixed-size leaf node per requested node (sizes come pre-computed from the
- * domain - ELK is not asked to size or route anything hierarchical) and one
- * `ElkExtendedEdge` per requested edge, purely as topology hints for node
- * placement. The routed edge geometry ELK computes is discarded; the MVP
- * emit pipeline only consumes node positions.
- *
- * Determinism: the contract requires `layout(ir)` to be deterministic on the
- * same input. ELK's layered algorithm is deterministic given the same input
- * graph and options; we never rely on insertion order for randomness.
+ * `hybridLayout` does the tree walking, sizing and row/col/grid/free
+ * placement; this adapter supplies only the `AutoPlacer` it calls for a
+ * container with `layout="auto"`. `placeAuto` builds one flat ELK graph of
+ * pre-sized leaf nodes per call, using edges purely as placement hints - the
+ * routed edge geometry ELK returns is discarded.
  */
 
 import ElkConstructor, {

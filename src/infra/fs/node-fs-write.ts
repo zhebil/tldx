@@ -1,8 +1,4 @@
-/**
- * Real `FsWritePort` adapter on top of node:fs/promises. Only the overlay
- * write path uses this - a one-line passthrough, so no contract suite (see
- * `node-fs-write.test.ts`).
- */
+/** Real `FsWritePort` adapter on node:fs/promises. */
 
 import { writeFile } from "node:fs/promises";
 

@@ -1,15 +1,14 @@
 /**
- * `tldx/jsx-dev-runtime` - imported when esbuild compiles with `jsxDev:
- * true`. `jsxDEV` gets the extra `source` argument (file/line/column of the
- * element), which is where AST spans come from (docs/jsx-pivot.md decision 7).
+ * `tldx/jsx-dev-runtime` - imported when esbuild compiles with `jsxDev: true`.
+ * `jsxDEV` gets the extra `source` argument (file/line/column of the element),
+ * which is where AST spans come from.
  */
 import { invokeComponent, type JsxSource, type Props } from "./components.js";
 
 export { Fragment } from "./jsx-runtime.js";
 
-// `key` and `isStatic` (args 3-4) and `self` (arg 6, dropped here - JS
-// ignores extra call arguments) are part of esbuild's jsxDEV call shape but
-// unused by this runtime.
+// `key`, `isStatic` and `self` are part of esbuild's jsxDEV call shape but
+// unused here; `self` is simply not declared, since JS ignores extra args.
 export function jsxDEV(
   type: unknown,
   props: Props,

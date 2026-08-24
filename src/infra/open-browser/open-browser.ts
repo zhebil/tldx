@@ -1,18 +1,9 @@
 /**
- * Best-effort OS default-handler launch for the dev-server URL. No port - one
- * impl, no test variation worth a port abstraction. Tests pass a no-op into
- * `cli/serve`'s `openBrowser` dep instead of going through this module.
- *
- * The tab opens unfocused where the platform allows it, so `tldx serve` never
- * steals the foreground from the terminal that started it.
- *
- * Failures (binary missing, sandbox refusal, exit non-zero) are swallowed:
- * the CLI has already printed the URL on stdout, so the user can paste it
- * manually. We `unref()` the child so it never holds the parent process open
- * past its own teardown.
- *
- * The `spawn` injectable is exposed for unit tests so they don't actually
- * pop a browser tab. Production callers omit it.
+ * Best-effort OS default-handler launch for the dev-server URL. The tab opens
+ * unfocused where the platform allows it, so `tldx serve` never steals the
+ * foreground from the terminal that started it. Failures are swallowed: the
+ * CLI already printed the URL. The child is `unref()`d so it never holds the
+ * parent open past its own teardown.
  */
 
 import { spawn as nodeSpawn } from "node:child_process";

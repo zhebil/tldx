@@ -1,9 +1,3 @@
-/**
- * Unit test for the best-effort browser launcher. Injects a fake `spawn`
- * so the test never actually pops a browser tab and so we can assert the
- * platform-specific command shape.
- */
-
 import { EventEmitter } from "node:events";
 import type { ChildProcess, spawn as nodeSpawn } from "node:child_process";
 
