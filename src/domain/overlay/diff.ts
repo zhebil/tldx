@@ -56,11 +56,15 @@ export function diffScenes(base: SceneJSON, current: SceneJSON): Record<TLRecord
  * binding and creates a new one with a fresh random id, so keying on it turns
  * one gesture into an unrelated delete and add.
  */
+function terminalKey(arrowId: string, terminal: string): string {
+  return `${arrowId}|${terminal}`;
+}
+
 function terminalKeyOf(record: TLRecord): string | undefined {
   if (record.typeName !== "binding" || record.type !== "arrow") return undefined;
   const terminal = (record.props as Record<string, unknown> | undefined)?.terminal;
   if (typeof record.fromId !== "string" || typeof terminal !== "string") return undefined;
-  return `${record.fromId}|${terminal}`;
+  return terminalKey(record.fromId, terminal);
 }
 
 /**
@@ -92,6 +96,16 @@ function matchRebinds(
     replacements.add(id as TLRecordId);
   }
   return { pairs, replacements };
+}
+
+/**
+ * The compiled binding ids a rebind accounts for. `mergeOverlayEntries` reads
+ * "absent from both the fresh diff and the canvas snapshot" as "stale", and a
+ * rebound binding is absent from both - it sits in the canvas under an id of
+ * tldraw's own naming - so without this a rebind entry could never be undone.
+ */
+export function reboundBaseIds(base: SceneJSON, current: SceneJSON): TLRecordId[] {
+  return [...matchRebinds(base, current).pairs.keys()];
 }
 
 function boundTerminals(scene: SceneJSON): ReadonlySet<string> {
@@ -147,7 +161,7 @@ function diffRecord(
     // back leaves the point wherever the pointer was, and recording it would
     // be an entry no source could ever express, so `verify` would stay red
     // forever.
-    if ((key === "start" || key === "end") && bound.has(`${current.id}|${key}`)) continue;
+    if ((key === "start" || key === "end") && bound.has(terminalKey(current.id, key))) continue;
     if (!deepEqual(baseProps[key], value)) restyled[key] = value;
   }
 
