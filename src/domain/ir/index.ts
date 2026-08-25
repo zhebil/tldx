@@ -1,4 +1,5 @@
 export type {
+  IRAnchor,
   IRBox,
   IRBoxPositioned,
   IRContainer,

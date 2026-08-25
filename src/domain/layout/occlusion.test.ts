@@ -9,7 +9,7 @@ import type {
   IRNotePositioned,
 } from "../ir/index.js";
 
-import { computeOcclusionDiagnostics } from "./occlusion.js";
+import { computeOcclusionDiagnostics, walkEdges } from "./occlusion.js";
 
 const SPAN = { file: "test.tldx", line: 1, column: 1 };
 
@@ -50,7 +50,14 @@ function frame(input: {
   return { kind: "frame", idExplicit: true, span: SPAN, ...input };
 }
 
-function edge(input: { id: string; from: string; to: string; label?: string }): IREdge {
+function edge(input: {
+  id: string;
+  from: string;
+  to: string;
+  label?: string;
+  fromAnchor?: { x: number; y: number };
+  toAnchor?: { x: number; y: number };
+}): IREdge {
   return { kind: "edge", idExplicit: true, span: SPAN, ...input };
 }
 
@@ -160,5 +167,78 @@ describe("computeOcclusionDiagnostics", () => {
     expect(
       computeOcclusionDiagnostics(ir).filter((d) => d.code === "layout/label-overflow"),
     ).toEqual([]);
+  });
+});
+
+describe("walkEdges", () => {
+  it("resolves an authored side to its name and its page-space point", () => {
+    const ir = doc([
+      box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" }),
+      box({ id: "b", x: 400, y: 200, w: 120, h: 62, label: "B" }),
+      edge({
+        id: "ab",
+        from: "a",
+        to: "b",
+        fromAnchor: { x: 1, y: 0.5 },
+        toAnchor: { x: 0, y: 0 },
+      }),
+    ]);
+    expect(walkEdges(ir)).toEqual([
+      {
+        id: "ab",
+        from: "a",
+        to: "b",
+        bend: 0,
+        start: { side: "right", x: 120, y: 31 },
+        end: { side: "top-left", x: 400, y: 200 },
+      },
+    ]);
+  });
+
+  it("leaves both terminals absent when the router bound neither", () => {
+    const ir = doc([
+      box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" }),
+      box({ id: "b", x: 400, y: 300, w: 120, h: 62, label: "B" }),
+      edge({ id: "ab", from: "a", to: "b" }),
+    ]);
+    const [routed] = walkEdges(ir);
+    expect(routed?.start).toBeUndefined();
+    expect(routed?.end).toBeUndefined();
+  });
+
+  it("carries the label and the box the router placed it in", () => {
+    const ir = doc([
+      box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" }),
+      box({ id: "b", x: 400, y: 0, w: 120, h: 62, label: "B" }),
+      edge({ id: "ab", from: "a", to: "b", label: "calls" }),
+    ]);
+    const [routed] = walkEdges(ir);
+    expect(routed?.label).toBe("calls");
+    expect(routed?.labelBox).toMatchObject({
+      x: expect.any(Number),
+      y: expect.any(Number),
+      w: expect.any(Number),
+      h: expect.any(Number),
+    });
+  });
+
+  it("finds edges nested inside a frame, in document order", () => {
+    const ir = doc([
+      box({ id: "a", x: 0, y: 0, w: 120, h: 62, label: "A" }),
+      frame({
+        id: "f",
+        x: 0,
+        y: 200,
+        w: 600,
+        h: 200,
+        children: [
+          box({ id: "b", x: 20, y: 220, w: 120, h: 62, label: "B" }),
+          box({ id: "c", x: 400, y: 220, w: 120, h: 62, label: "C" }),
+          edge({ id: "bc", from: "b", to: "c" }),
+        ],
+      }),
+      edge({ id: "ab", from: "a", to: "b" }),
+    ]);
+    expect(walkEdges(ir).map((e) => e.id)).toEqual(["bc", "ab"]);
   });
 });

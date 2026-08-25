@@ -1,6 +1,6 @@
 /**
- * `tldx measure <file> [--frame <id>]`: print each shape's id, size, and
- * position.
+ * `tldx measure <file> [--frame <id>]`: print each shape's id, size and
+ * position, then each edge's terminals, bend and label box.
  *
  * Runs the pipeline by hand (read -> execute -> lower -> layout) rather than
  * via `compileFile`, whose opaque `SceneJSON` carries no geometry.
@@ -10,7 +10,13 @@ import type { ExecutePort } from "../app/ports/execute.js";
 import type { FsReadPort } from "../app/ports/fs.js";
 import { hasErrors } from "../domain/diagnostics/index.js";
 import { lower } from "../domain/ir/index.js";
-import { walkShapes, type AbsShape } from "../domain/layout/occlusion.js";
+import {
+  walkEdges,
+  walkShapes,
+  type AbsEdge,
+  type AbsShape,
+  type AbsTerminal,
+} from "../domain/layout/occlusion.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 
 import { formatDiagnostics } from "./format-diagnostics.js";
@@ -44,6 +50,39 @@ export function formatMeasure(shapes: readonly AbsShape[]): string {
     .map(
       (s) =>
         `${s.id.padEnd(idWidth)}  ${sizeOf(s).padEnd(sizeWidth)}  @ (${Math.round(s.x)},${Math.round(s.y)})`,
+    )
+    .join("\n");
+}
+
+/** `auto` where the router bound nothing and tldraw clips at the shape's outline. */
+const terminalAt = (p: AbsTerminal | undefined): string =>
+  p === undefined ? "auto" : `${p.side} (${Math.round(p.x)},${Math.round(p.y)})`;
+
+/**
+ * `from -> to  <start> -> <end>  bend N  "label" W x H @ (x,y)`, columns
+ * aligned like `formatMeasure`. An unlabelled edge stops after the bend.
+ *
+ * The label's box is the point of it: a label wrapped one character per line
+ * is a tall one-glyph-wide rect, and a label buried under a shape has
+ * coordinates inside that shape's rect a line above.
+ */
+export function formatEdges(edges: readonly AbsEdge[]): string {
+  const pairOf = (e: AbsEdge): string => `${e.from} -> ${e.to}`;
+  const termsOf = (e: AbsEdge): string => `${terminalAt(e.start)} -> ${terminalAt(e.end)}`;
+  const bendOf = (e: AbsEdge): string => `bend ${Math.round(e.bend)}`;
+  const labelOf = (e: AbsEdge): string => {
+    if (e.label === undefined) return "";
+    const b = e.labelBox;
+    return b === undefined
+      ? `"${e.label}"`
+      : `"${e.label}"  ${Math.round(b.w)} x ${Math.round(b.h)}  @ (${Math.round(b.x)},${Math.round(b.y)})`;
+  };
+  const widest = (f: (e: AbsEdge) => string): number =>
+    Math.max(0, ...edges.map((e) => f(e).length));
+  const [pairW, termsW, bendW] = [widest(pairOf), widest(termsOf), widest(bendOf)];
+  return edges
+    .map((e) =>
+      `${pairOf(e).padEnd(pairW)}  ${termsOf(e).padEnd(termsW)}  ${bendOf(e).padEnd(bendW)}  ${labelOf(e)}`.trimEnd(),
     )
     .join("\n");
 }
@@ -103,6 +142,14 @@ export async function runMeasure(args: RunMeasureArgs): Promise<number> {
     }
   }
 
-  io.writeStdout(narrowed.length > 0 ? `${formatMeasure(narrowed)}\n` : "");
+  // An edge is in scope only when both its endpoints are: `--frame` aside,
+  // every endpoint is a shape, so this filter is a no-op for the whole doc.
+  const ids = new Set(narrowed.map((s) => s.id));
+  const edges = walkEdges(positioned).filter((e) => ids.has(e.from) && ids.has(e.to));
+
+  const sections: string[] = [];
+  if (narrowed.length > 0) sections.push(`shapes:\n${formatMeasure(narrowed)}`);
+  if (edges.length > 0) sections.push(`edges:\n${formatEdges(edges)}`);
+  io.writeStdout(sections.length > 0 ? `${sections.join("\n\n")}\n` : "");
   return 0;
 }

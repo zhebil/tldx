@@ -396,12 +396,27 @@ done. `--no-open` suppresses the tab; use it only when the user already has one.
 ```bash
 tldx check   diagram.tldx.jsx          # parse + validate. Fast, no browser.
 tldx render  diagram.tldx.jsx out.png  # export, cropped to content
-tldx measure diagram.tldx.jsx          # every shape's id, size and position
+tldx measure diagram.tldx.jsx          # every shape's and edge's placed geometry
 ```
 
 `measure` is the cheap way to answer "is this box big enough / are these two
 overlapping" without exporting a PNG and eyeballing it. Reach for it before
-`render`.
+`render`. It prints two sections:
+
+```
+shapes:
+routing  138 x 152  @ (587,766)
+
+edges:
+lower -> layout  bottom (819,600) -> top (819,734)  bend 0
+layout -> elk    auto -> auto                       bend 65  "one flat container"  183 x 33  @ (1132,891)
+```
+
+The edges section is where most layout trouble actually is. A terminal reads
+`auto` when tldraw aims at the shape's centre and clips at its outline, and a
+side name plus a point when the router pinned it - so two arrows drawn as one
+stroke show up as the same points, and a label wrapped one character per line
+shows up as a tall one-glyph-wide box.
 
 - **`check`, then render and look.** `check` catches parse and validation
   errors - every diagnostic carries a code and a source location - but it

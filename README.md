@@ -73,7 +73,7 @@ table, `import` a shared palette from another file.
 tldx serve   <file>        watch and push to the live viewer
 tldx check   <file>        parse + validate, exit non-zero on error
 tldx render  <file> <out>  export a PNG/SVG, cropped to content
-tldx measure <file>        print every shape's id, size and position
+tldx measure <file>        print every shape's and edge's placed geometry
 tldx absorb  <file>        fold canvas edits back into the source
 tldx verify  <file>        does the source alone reproduce the canvas?
 tldx overlay show <file>   what canvas edits are still unabsorbed
