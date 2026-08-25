@@ -22,15 +22,13 @@ check` only proves the source still compiles - if you change one, run
 `npm run diagrams` and commit the SVG alongside it, or the picture in
 `docs/architecture.md` or the README's examples table goes stale.
 
-`layers.svg` and `round-trip.svg` currently carry arrow bends that were set on
-the canvas and never ported into their sources ([#30]), so the source alone
-does not reproduce them. `<Edge bend>` exists now, so porting them is just
-work someone has to do. `npm run diagrams` picks them up only because it reuses a
-running `serve`, which applies the overlay ([#38]) - run it with no server up
-and those two SVGs get visibly worse. Check the diff before committing a
-re-render.
+Every committed SVG now renders from its source alone. Keep it that way: a
+bend you drag on the canvas belongs in the source as `<Edge bend>` before you
+re-render, or the next person's clean render silently reverts it. `npm run
+diagrams` reuses a running `serve` and so applies whatever the overlay holds
+([#38]), which is exactly how a canvas-only edit gets baked into an SVG that
+the source cannot reproduce. Check the diff before committing a re-render.
 
-[#30]: https://github.com/zhebil/tldx/issues/30
 [#38]: https://github.com/zhebil/tldx/issues/38
 
 Shared entities live in `docs/diagrams/lib/vocabulary.jsx`, not in each diagram.

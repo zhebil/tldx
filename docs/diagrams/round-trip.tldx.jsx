@@ -76,12 +76,15 @@ export default function RoundTrip() {
 
       <Edge from="canvas" to="overlay" fromSide="bottom" toSide="right" label="drag" />
       <Edge from="gate" to="verify" dash="dotted" color="grey" fromSide="right" toSide="left" />
+      {/* The one arrow that has to clear the whole column. Bend ported from the
+          canvas (#30): the router's own arc hugs the boxes it passes. */}
       <Edge
         from="committed"
         to="source"
         fromSide="left"
         toSide="left"
         color="green"
+        bend="-288.6"
         label="the loop closes here"
       />
     </Doc>

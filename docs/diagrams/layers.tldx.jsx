@@ -90,12 +90,18 @@ export default function Layers() {
         cli -> app-usecases
         cli -> infra-list
         app-usecases -> app-ports
-        app-usecases -> domain
         infra-list -> app-ports: implements
-        infra-list -> domain
         domain -> contracts
         viewer -> contracts
       `}</Edges>
+
+      {/* These three share the corridor between the two frames and domain/, so
+          all three carry bends ported from the canvas (#30). Each is about half
+          the depth the router picks on its own: most of that extra sag was it
+          pulling two arrowheads apart, which the slots on domain/'s top face
+          now do without moving the arcs. */}
+      <Edge from="app-usecases" to="domain" bend="-42.8" />
+      <Edge from="infra-list" to="domain" bend="47.2" />
 
       <Edge
         from="domain"
@@ -105,6 +111,7 @@ export default function Layers() {
         color="red"
         dash="dotted"
         size="s"
+        bend="-105.4"
         label="never"
       />
       <Edge
