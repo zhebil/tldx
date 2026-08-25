@@ -1,5 +1,5 @@
 /**
- * Factories for the typical wire shapes. Defaults track the tldraw ^3.15 pin.
+ * Factories for the typical wire shapes. Defaults track the tldraw ^5.3 pin.
  *
  * Keep these PURE: no I/O, no randomness, no Date.now. Callers pass ids;
  * id-generation policy is owned by domain/ir.
@@ -10,40 +10,41 @@ import type { SceneJSON, TLRecord, TLStoreSchema } from "./scene-json.js";
 import type { SceneMessage } from "./scene-message.js";
 
 /**
- * Tracks `createTLSchema().serialize()` from tldraw ^3.15. If tldraw ticks one
+ * Tracks `createTLSchema().serialize()` from tldraw ^5.3. If tldraw ticks one
  * of these on a point release, bump in lockstep. An e2e test pins this against
  * the live schema so drift fails CI rather than the viewer.
  */
 const DEFAULT_SCHEMA: TLStoreSchema = {
   schemaVersion: 2,
   sequences: {
-    "com.tldraw.store": 4,
+    "com.tldraw.store": 5,
     "com.tldraw.asset": 1,
     "com.tldraw.camera": 1,
     "com.tldraw.document": 2,
-    "com.tldraw.instance": 25,
+    "com.tldraw.instance": 26,
     "com.tldraw.instance_page_state": 5,
     "com.tldraw.page": 1,
     "com.tldraw.instance_presence": 6,
     "com.tldraw.pointer": 1,
     "com.tldraw.shape": 4,
     "com.tldraw.asset.bookmark": 2,
-    "com.tldraw.asset.image": 5,
+    "com.tldraw.asset.image": 6,
     "com.tldraw.asset.video": 5,
-    "com.tldraw.shape.arrow": 6,
+    "com.tldraw.shape.arrow": 8,
     "com.tldraw.shape.bookmark": 2,
-    "com.tldraw.shape.draw": 2,
+    "com.tldraw.shape.draw": 5,
     "com.tldraw.shape.embed": 4,
     "com.tldraw.shape.frame": 1,
-    "com.tldraw.shape.geo": 10,
+    "com.tldraw.shape.geo": 12,
     "com.tldraw.shape.group": 0,
-    "com.tldraw.shape.highlight": 1,
+    "com.tldraw.shape.highlight": 4,
     "com.tldraw.shape.image": 5,
     "com.tldraw.shape.line": 5,
-    "com.tldraw.shape.note": 9,
-    "com.tldraw.shape.text": 3,
+    "com.tldraw.shape.note": 13,
+    "com.tldraw.shape.text": 4,
     "com.tldraw.shape.video": 4,
     "com.tldraw.binding.arrow": 1,
+    "com.tldraw.user": 1,
   },
 };
 
@@ -170,6 +171,8 @@ export function boxShape(
       url: "",
       growY: 0,
       scale: 1,
+      flipX: false,
+      flipY: false,
       richText: richText(input.text ?? ""),
     },
   } satisfies TLRecord;
@@ -195,12 +198,15 @@ export function noteShape(
       labelColor: input.labelColor ?? "black",
       size: input.size ?? "m",
       font: input.font ?? "draw",
-      fontSizeAdjustment: 0,
+      // A multiplier on the label font size, not an absolute px value: 0
+      // renders the text at zero height, i.e. invisible.
+      fontSizeAdjustment: 1,
       align: input.textAlign ?? "middle",
       verticalAlign: input.verticalAlign ?? "middle",
       growY: input.growY ?? 0,
       url: "",
       scale: 1,
+      textLastEditedBy: null,
       richText: richText(input.text ?? ""),
     },
   } satisfies TLRecord;
@@ -288,7 +294,7 @@ export function arrowShape(
       font: input.font ?? "draw",
       arrowheadStart: input.arrowheadStart ?? "none",
       arrowheadEnd: input.arrowheadEnd ?? "arrow",
-      text: input.text ?? "",
+      richText: richText(input.text ?? ""),
       labelPosition: input.labelPosition ?? 0.5,
       scale: 1,
       elbowMidPoint: 0.5,

@@ -44,7 +44,7 @@ describe("sceneJson", () => {
   it("uses default schema when none is passed", () => {
     const scene = sceneJson([documentRecord()]);
     expect(scene.schema.schemaVersion).toBe(2);
-    expect(scene.schema.sequences["com.tldraw.store"]).toBe(4);
+    expect(scene.schema.sequences["com.tldraw.store"]).toBe(5);
   });
 
   it("accepts an explicit schema override", () => {

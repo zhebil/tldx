@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState, type JSX } from "react";
 import { Tldraw, type Editor, type TLPageId, type TLRecord, type TLShapeId } from "tldraw";
 import "tldraw/tldraw.css";
 

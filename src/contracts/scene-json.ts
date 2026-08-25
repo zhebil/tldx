@@ -4,7 +4,7 @@
  * `editor.store.getStoreSnapshot('document')` and accepted by
  * `loadSnapshot(store, { document: <SceneJSON> })`.
  *
- * Pinned to tldraw ^3.15 because the store snapshot shape is version-specific.
+ * Pinned to tldraw ^5.3 because the store snapshot shape is version-specific.
  * Bumping the tldraw major is a wire-format break: ship a v: 2 SceneMessage
  * envelope and migrate viewers in lockstep.
  *
