@@ -11,34 +11,125 @@
  * Props present in `base` but absent in `current` are ignored - tldraw never
  * removes a prop key from a record, only changes its value, so there is no
  * "unset" op to build.
+ *
+ * The one place record ids are *not* the unit of comparison is arrow
+ * terminals: see `matchRebinds`.
  */
 
 import { richText } from "../../contracts/builders.js";
 import { RESTYLE_RECORD_FIELDS } from "../../contracts/overlay.js";
-import type { OverlayEntry, OverlayPlacement } from "../../contracts/overlay.js";
+import type { OverlayEntry, OverlayPlacement, OverlayRebind } from "../../contracts/overlay.js";
 import type { SceneJSON, TLRecord, TLRecordId } from "../../contracts/scene-json.js";
 
 export function diffScenes(base: SceneJSON, current: SceneJSON): Record<TLRecordId, OverlayEntry> {
   const entries: Record<TLRecordId, OverlayEntry> = {};
+  const rebinds = matchRebinds(base, current);
+  const bound = boundTerminals(current);
 
   for (const [id, record] of Object.entries(current.store)) {
+    if (rebinds.replacements.has(id)) continue;
     const baseRecord = base.store[id];
     if (baseRecord === undefined) {
       entries[id] = { added: { ...record } };
       continue;
     }
-    const entry = diffRecord(baseRecord, record);
+    const entry = diffRecord(baseRecord, record, bound);
     if (entry !== undefined) entries[id] = entry;
   }
 
+  for (const [id, replacement] of rebinds.pairs) {
+    const rebound = diffRebind(base.store[id]!, replacement);
+    if (rebound !== undefined) entries[id] = { rebound };
+  }
+
   for (const id of Object.keys(base.store)) {
-    if (!(id in current.store)) entries[id] = { deleted: true };
+    if (id in current.store || rebinds.pairs.has(id)) continue;
+    entries[id] = { deleted: true };
   }
 
   return entries;
 }
 
-function diffRecord(base: TLRecord, current: TLRecord): OverlayEntry | undefined {
+/**
+ * `shape:e|end` - what a human means by "that arrow's end". A binding id is
+ * tldraw's, not ours: dropping a terminal back onto a shape deletes the
+ * binding and creates a new one with a fresh random id, so keying on it turns
+ * one gesture into an unrelated delete and add.
+ */
+function terminalKey(arrowId: string, terminal: string): string {
+  return `${arrowId}|${terminal}`;
+}
+
+function terminalKeyOf(record: TLRecord): string | undefined {
+  if (record.typeName !== "binding" || record.type !== "arrow") return undefined;
+  const terminal = (record.props as Record<string, unknown> | undefined)?.terminal;
+  if (typeof record.fromId !== "string" || typeof terminal !== "string") return undefined;
+  return terminalKey(record.fromId, terminal);
+}
+
+/**
+ * Pairs a binding that vanished with the one that took over the same arrow
+ * terminal. Both halves have to be unmatched by id for a pair to form, so a
+ * binding tldraw kept, or an arrow deleted outright, still diffs per-record.
+ */
+function matchRebinds(
+  base: SceneJSON,
+  current: SceneJSON,
+): { pairs: Map<TLRecordId, TLRecord>; replacements: ReadonlySet<TLRecordId> } {
+  const orphaned = new Map<string, TLRecord>();
+  for (const [id, record] of Object.entries(base.store)) {
+    if (id in current.store) continue;
+    const key = terminalKeyOf(record);
+    if (key !== undefined) orphaned.set(key, record);
+  }
+
+  const pairs = new Map<TLRecordId, TLRecord>();
+  const replacements = new Set<TLRecordId>();
+  for (const [id, record] of Object.entries(current.store)) {
+    if (id in base.store) continue;
+    const key = terminalKeyOf(record);
+    if (key === undefined) continue;
+    const was = orphaned.get(key);
+    if (was === undefined) continue;
+    orphaned.delete(key);
+    pairs.set(was.id as TLRecordId, record);
+    replacements.add(id as TLRecordId);
+  }
+  return { pairs, replacements };
+}
+
+/**
+ * The compiled binding ids a rebind accounts for. `mergeOverlayEntries` reads
+ * "absent from both the fresh diff and the canvas snapshot" as "stale", and a
+ * rebound binding is absent from both - it sits in the canvas under an id of
+ * tldraw's own naming - so without this a rebind entry could never be undone.
+ */
+export function reboundBaseIds(base: SceneJSON, current: SceneJSON): TLRecordId[] {
+  return [...matchRebinds(base, current).pairs.keys()];
+}
+
+function boundTerminals(scene: SceneJSON): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const record of Object.values(scene.store)) {
+    const key = terminalKeyOf(record);
+    if (key !== undefined) keys.add(key);
+  }
+  return keys;
+}
+
+function diffRebind(base: TLRecord, current: TLRecord): OverlayRebind | undefined {
+  if (deepEqual(base.toId, current.toId) && deepEqual(base.props, current.props)) return undefined;
+  return {
+    toId: current.toId as TLRecordId,
+    props: { ...(current.props as Record<string, unknown>) },
+  };
+}
+
+function diffRecord(
+  base: TLRecord,
+  current: TLRecord,
+  bound: ReadonlySet<string>,
+): OverlayEntry | undefined {
   const entry: OverlayEntry = {};
 
   const moved = diffPlacement(base, current);
@@ -65,6 +156,12 @@ function diffRecord(base: TLRecord, current: TLRecord): OverlayEntry | undefined
 
   for (const [key, value] of Object.entries(currentProps)) {
     if (key === "w" || key === "h" || key === "text" || key === "richText") continue;
+    // An arrow's `start`/`end` free point is dead while that terminal is
+    // bound - tldraw reads the binding instead. Dragging a terminal off and
+    // back leaves the point wherever the pointer was, and recording it would
+    // be an entry no source could ever express, so `verify` would stay red
+    // forever.
+    if ((key === "start" || key === "end") && bound.has(terminalKey(current.id, key))) continue;
     if (!deepEqual(baseProps[key], value)) restyled[key] = value;
   }
 

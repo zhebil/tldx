@@ -172,6 +172,117 @@ describe("diffScenes", () => {
     assertRoundTrip(base, current);
   });
 
+  describe("rebinding an arrowhead", () => {
+    /** `shape:e` runs a -> b, both terminals bound the way emit writes them. */
+    function boundScene(): SceneJSON {
+      return sceneJson([
+        documentRecord(),
+        pageRecord({ id: "page:main" }),
+        boxShape({ id: "shape:a", x: 0, y: 0, w: 100, h: 50 }),
+        boxShape({ id: "shape:b", x: 200, y: 0, w: 100, h: 50 }),
+        boxShape({ id: "shape:c", x: 400, y: 0, w: 100, h: 50 }),
+        arrowShape({ id: "shape:e", x: 0, y: 0 }),
+        arrowBinding({
+          id: "binding:e-start",
+          arrowId: "shape:e",
+          shapeId: "shape:a",
+          terminal: "start",
+          normalizedAnchor: { x: 1, y: 0.5 },
+          isPrecise: true,
+        }),
+        arrowBinding({
+          id: "binding:e-end",
+          arrowId: "shape:e",
+          shapeId: "shape:b",
+          terminal: "end",
+          normalizedAnchor: { x: 0, y: 0.5 },
+          isPrecise: true,
+        }),
+      ]);
+    }
+
+    /**
+     * What tldraw leaves behind after the drag: the old binding gone, a new one
+     * under an id of its own, and the arrow's now-dead `end` point parked
+     * wherever the pointer was let go.
+     */
+    function afterDropping(
+      onto: string,
+      anchor: { x: number; y: number },
+      freePoint = { x: 309.76, y: 973.64 },
+    ): SceneJSON {
+      const scene = boundScene();
+      delete scene.store["binding:e-end"];
+      scene.store["binding:UT-iFTTgCkD2lT0T7m51Y"] = arrowBinding({
+        id: "binding:UT-iFTTgCkD2lT0T7m51Y",
+        arrowId: "shape:e",
+        shapeId: onto,
+        terminal: "end",
+        normalizedAnchor: anchor,
+        isPrecise: true,
+      });
+      (scene.store["shape:e"]!.props as { end: unknown }).end = freePoint;
+      return scene;
+    }
+
+    it("is one entry on the compiled binding, not a delete plus an add", () => {
+      const base = boundScene();
+      const current = afterDropping("shape:c", { x: 0, y: 0.5 });
+      const entries = diffScenes(base, current);
+
+      expect(entries).toEqual({
+        "binding:e-end": {
+          rebound: {
+            toId: "shape:c",
+            props: {
+              terminal: "end",
+              normalizedAnchor: { x: 0, y: 0.5 },
+              isPrecise: true,
+              isExact: false,
+              snap: "none",
+            },
+          },
+        },
+      });
+    });
+
+    it("reproduces the canvas, under the binding id the source named", () => {
+      const base = boundScene();
+      const current = afterDropping("shape:c", { x: 0, y: 0.5 });
+      const overlay = { v: 1, basedOn: sceneHash(base), entries: diffScenes(base, current) };
+      const { scene, diagnostics } = applyOverlay(overlay, base);
+
+      expect(diagnostics).toEqual([]);
+      // Not `toEqual(current)`: the replayed scene keeps `binding:e-end` rather
+      // than tldraw's random id, and leaves the dead free point alone. Both
+      // differences are deliberate - the binding stays matchable to the edge,
+      // and a bound terminal ignores the point.
+      expect(scene.store["binding:UT-iFTTgCkD2lT0T7m51Y"]).toBeUndefined();
+      expect(scene.store["binding:e-end"]).toEqual({
+        ...current.store["binding:UT-iFTTgCkD2lT0T7m51Y"],
+        id: "binding:e-end",
+      });
+    });
+
+    it("says nothing at all when the terminal lands back where it started", () => {
+      const base = boundScene();
+      const current = afterDropping("shape:b", { x: 0, y: 0.5 });
+      expect(diffScenes(base, current)).toEqual({});
+    });
+
+    it("still reports a delete, and a live free point, when the terminal is dropped on empty canvas", () => {
+      const base = boundScene();
+      const current = boundScene();
+      delete current.store["binding:e-end"];
+      (current.store["shape:e"]!.props as { end: unknown }).end = { x: 309.76, y: 973.64 };
+      const entries = diffScenes(base, current);
+
+      expect(entries["binding:e-end"]).toEqual({ deleted: true });
+      expect(entries["shape:e"]).toEqual({ restyled: { end: { x: 309.76, y: 973.64 } } });
+      assertRoundTrip(base, current);
+    });
+  });
+
   it("round-trips a record with several ops at once", () => {
     const base = sceneJson([
       documentRecord(),

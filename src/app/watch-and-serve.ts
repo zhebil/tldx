@@ -25,6 +25,7 @@ import {
   diffScenes,
   mergeOverlayEntries,
   overlayPathFor,
+  reboundBaseIds,
   sceneHash,
 } from "../domain/overlay/index.js";
 
@@ -170,7 +171,12 @@ export function watchAndServe(path: string, deps: WatchAndServeDeps): WatchAndSe
           // survives the merge only when its id is gone from the snapshot
           // entirely.
           const previous = await readOverlay(deps.fs, overlayPath);
-          const snapshotIds = new Set(Object.keys(edited.store));
+          // A rebound binding sits in the canvas under an id tldraw minted, so
+          // its compiled id is missing from the snapshot without being stale.
+          const snapshotIds = new Set([
+            ...Object.keys(edited.store),
+            ...reboundBaseIds(lastCompiled, edited),
+          ]);
           const { entries, preserved } = mergeOverlayEntries(
             previous?.entries ?? {},
             fresh,

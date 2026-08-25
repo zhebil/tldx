@@ -51,6 +51,9 @@ again to see them, and express each one in the source yourself:
   genuinely a hand placement, because a pinned shape leaves flow layout.
 - **`restyled`** - the matching style prop on the element.
 - **`relabelled`** - the element's label text.
+- **`rebound`** - an arrowhead was dragged onto another shape or another face
+  of the same one. Point the `<Edge>`'s `from`/`to` at the shape it names, and
+  set `fromSide`/`toSide` to the face the anchor describes.
 - **`deleted`** - delete the element, and any `<Edge>` that referenced it.
 - **added arrows** - an `<Edge from=... to=.../>` between the two shapes.
 

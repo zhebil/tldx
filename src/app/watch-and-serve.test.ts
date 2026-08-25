@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { SceneJSON } from "../contracts/scene-json.js";
 import type { SceneMessage } from "../contracts/scene-message.js";
 import { error } from "../domain/diagnostics/index.js";
 import { astBuilders } from "../domain/parser/ast.fixture.js";
@@ -356,6 +357,78 @@ describe("watchAndServe", () => {
       };
       expect(afterUndo.entries["shape:dash"]).toBeUndefined();
       // Not the "invalidated id" path - nothing should be preserved.
+      expect(log.byCode("overlay/preserved")).toHaveLength(0);
+
+      await handle.close();
+    });
+
+    it("drops a rebound entry too, even though the canvas never holds the compiled binding id", async () => {
+      const execute = new FakeExecute();
+      execute.setResult(VALID_SRC, { ast: VALID_AST, inputs: [AUTH_PATH] });
+      const fs = new InMemoryFs({ [AUTH_PATH]: VALID_SRC });
+      const log = new CaptureLog();
+      const transport = new InMemoryTransport();
+      const deps: WatchAndServeDeps = {
+        pageKey: PAGE_KEY,
+        fs,
+        fsWrite: fs,
+        watch: new FakeWatch(),
+        transport,
+        log,
+        layout: new StubLayout(),
+        execute,
+      };
+      const overlayPath = "auth.tldx.overlay.json";
+
+      const handle = watchAndServe(AUTH_PATH, deps);
+      await handle.ready;
+
+      const initial = transport.pushed[0]!;
+      if (!isScene(initial)) throw new Error("expected initial push to be a scene");
+      const compiled = Object.values(initial.payload.store).find(
+        (r) => r.typeName === "binding" && (r.props as { terminal?: string }).terminal === "end",
+      )!;
+      const localId = (compiled.id as string).replace(`${PAGE_KEY}_`, "");
+
+      /** tldraw's replacement for `compiled`: a fresh id, the given props. */
+      const dropped = (id: string, props: Record<string, unknown>): SceneJSON => {
+        const store = { ...initial.payload.store };
+        delete store[compiled.id];
+        store[`binding:${PAGE_KEY}_${id}`] = {
+          ...compiled,
+          id: `binding:${PAGE_KEY}_${id}`,
+          props,
+        };
+        return { schema: initial.payload.schema, store };
+      };
+
+      const compiledProps = compiled.props as Record<string, unknown>;
+      await handle.putOverlay(
+        dropped("R1", {
+          ...compiledProps,
+          normalizedAnchor: { x: 0.25, y: 0.75 },
+          isPrecise: true,
+        }),
+      );
+      const afterRebind = JSON.parse(await fs.read(overlayPath)) as {
+        entries: Record<string, unknown>;
+      };
+      expect(afterRebind.entries[localId]).toEqual({
+        rebound: {
+          toId: "shape:dash",
+          props: { ...compiledProps, normalizedAnchor: { x: 0.25, y: 0.75 }, isPrecise: true },
+        },
+      });
+
+      // Dragged back onto the face it compiled to. tldraw mints yet another id,
+      // so the compiled binding is still absent from the snapshot - the entry
+      // has to go anyway.
+      await handle.putOverlay(dropped("R2", compiledProps));
+
+      const afterUndo = JSON.parse(await fs.read(overlayPath)) as {
+        entries: Record<string, unknown>;
+      };
+      expect(afterUndo.entries).toEqual({});
       expect(log.byCode("overlay/preserved")).toHaveLength(0);
 
       await handle.close();

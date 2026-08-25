@@ -13,6 +13,7 @@ import {
   type Overlay,
   type OverlayEntry,
   type OverlayPlacement,
+  type OverlayRebind,
 } from "../contracts/overlay.js";
 import type { Diagnostic } from "../domain/diagnostics/index.js";
 import { applyOverlay, deepEqual, overlayPathFor, sceneHash } from "../domain/overlay/index.js";
@@ -86,6 +87,7 @@ const OP_ORDER = [
   "moved",
   "restyled",
   "relabelled",
+  "rebound",
   "deleted",
   "added",
 ] as const satisfies readonly (keyof OverlayEntry)[];
@@ -100,6 +102,7 @@ function detailOf(entry: OverlayEntry): string {
   if (entry.restyled !== undefined) parts.push(restyledDetail(entry.restyled));
   if (entry.relabelled !== undefined)
     parts.push(`relabelled to ${JSON.stringify(entry.relabelled)}`);
+  if (entry.rebound !== undefined) parts.push(reboundDetail(entry.rebound));
   if (entry.deleted === true) parts.push("deleted");
   if (entry.added !== undefined)
     parts.push(`added ${String(entry.added.type ?? entry.added.typeName)} shape`);
@@ -115,6 +118,21 @@ function movedDetail(p: OverlayPlacement): string {
   if (p.w !== undefined || p.h !== undefined)
     clauses.push(`resized to ${p.w ?? "?"}x${p.h ?? "?"}`);
   return `moved ${clauses.join(", ")}`;
+}
+
+/** The anchor is worth printing: rebinding onto another face of the *same*
+ *  shape is a real edit, and `rebound to shape:gate` alone would read as a
+ *  no-op. */
+function reboundDetail(rebound: OverlayRebind): string {
+  const anchor = rebound.props.normalizedAnchor;
+  if (typeof anchor !== "object" || anchor === null) return `rebound to ${rebound.toId}`;
+  const { x, y } = anchor as { x?: unknown; y?: unknown };
+  if (typeof x !== "number" || typeof y !== "number") return `rebound to ${rebound.toId}`;
+  return `rebound to ${rebound.toId} at (${round2(x)}, ${round2(y)})`;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
 function restyledDetail(patch: Record<string, unknown>): string {
