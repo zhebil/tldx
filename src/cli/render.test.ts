@@ -9,6 +9,8 @@ import { FakeExecute } from "../app/ports/execute.fake.js";
 import { InMemoryFs } from "../app/ports/fs.fake.js";
 import { CaptureLog } from "../app/ports/log.fake.js";
 import { FakeWatch } from "../app/ports/watch.fake.js";
+import { OVERLAY_VERSION } from "../contracts/overlay.js";
+import { overlayPathFor } from "../domain/overlay/index.js";
 import { StubLayout } from "../domain/ports/layout.fake.js";
 import {
   claimServer,
@@ -22,6 +24,7 @@ import {
   describeReused,
   isCodeStale,
   isStale,
+  overlayReason,
   parseArgs,
   runRender,
   staleReason,
@@ -248,6 +251,18 @@ describe("staleReason", () => {
   });
 });
 
+describe("overlayReason", () => {
+  it("is undefined when the overlay holds nothing", () => {
+    expect(overlayReason(0)).toBeUndefined();
+  });
+
+  it("names the count and points at absorb", () => {
+    expect(overlayReason(1)).toMatch(/1 pending overlay entry/);
+    expect(overlayReason(3)).toMatch(/3 pending overlay entries/);
+    expect(overlayReason(1)).toMatch(/tldx absorb/);
+  });
+});
+
 describe("withCompiledContext", () => {
   it("annotates an unknown --frame error with when the reused scene was compiled", () => {
     const reused: ReusedServe = {
@@ -362,7 +377,8 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
 
       expect(code).toBe(1);
       const stderr = io.stderr.join("");
-      expect(stderr).toMatch(/is stale/);
+      expect(stderr).toMatch(/not reusing the serve/);
+      expect(stderr).toMatch(/source has changed/);
       expect(stderr).toMatch(/--reuse-only/);
       expect(stderr).not.toMatch(/no running `tldx serve`/);
     } finally {
@@ -386,7 +402,7 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
 
       expect(code).toBe(1);
       const stderr = io.stderr.join("");
-      expect(stderr).toMatch(/is stale/);
+      expect(stderr).toMatch(/not reusing the serve/);
       expect(stderr).toMatch(/code that compiled it/);
       expect(stderr).toMatch(/--reuse-only/);
     } finally {
@@ -411,9 +427,40 @@ describe("runRender - reuse-only refusal (no chromium needed: both paths throw b
       // because a refusal fired.
       expect(code).toBe(1);
       const stderr = io.stderr.join("");
-      expect(stderr).not.toMatch(/is stale/);
+      expect(stderr).not.toMatch(/not reusing the serve/);
       expect(stderr).not.toMatch(/no running `tldx serve`/);
       expect(io.stdout.join("")).toMatch(/reusing serve on :9999 \(diagram\.tldx\.jsx @ /);
+    } finally {
+      forget();
+    }
+  });
+
+  it("refuses a fresh server whose canvas holds a pending overlay, because only it would apply one", async () => {
+    const content = "export default function Diagram() { return null; }";
+    const file = tempFile(content);
+    const forget = registerServe(file, "http://127.0.0.1:9999/", { hash: hashSource(content) });
+    const fs = new InMemoryFs({
+      [file]: content,
+      [overlayPathFor(file)]: JSON.stringify({
+        v: OVERLAY_VERSION,
+        basedOn: "whatever",
+        entries: { "shape:box": { moved: { x: 10, y: 20 } } },
+      }),
+    });
+    const io = makeIo();
+
+    try {
+      const code = await runRender({
+        argv: [file, `${file}.png`, "--reuse-only"],
+        deps: { ...makeDeps(file, content), fs, fsWrite: fs },
+        io,
+      });
+
+      expect(code).toBe(1);
+      const stderr = io.stderr.join("");
+      expect(stderr).toMatch(/not reusing the serve/);
+      expect(stderr).toMatch(/1 pending overlay entry/);
+      expect(io.stdout.join("")).not.toMatch(/reusing serve on/);
     } finally {
       forget();
     }

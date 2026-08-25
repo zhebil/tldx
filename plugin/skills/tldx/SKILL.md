@@ -438,9 +438,10 @@ shows up as a tall one-glyph-wide box.
 - **Do not offer the user a screenshot.** They have the live diagram. Describe
   what changed and let them look.
 
-`render` never writes a `*.tldx.overlay.json` sidecar - it is read-only. A
-running `serve` does write one, so if a diagram has unabsorbed canvas edits they
-will show up in a render that reuses that server.
+`render` never writes a `*.tldx.overlay.json` sidecar - it is read-only. It
+exports the source and nothing else: a diagram with unabsorbed canvas edits
+declines the reuse and renders from source, saying so on stdout. Run
+`tldx absorb` first if you want those edits in the image.
 
 If `tldx` is not on `PATH`, none of the above works - tell the user to
 install the CLI (see the tldx README) rather than trying another route.

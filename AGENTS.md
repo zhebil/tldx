@@ -22,14 +22,11 @@ check` only proves the source still compiles - if you change one, run
 `npm run diagrams` and commit the SVG alongside it, or the picture in
 `docs/architecture.md` or the README's examples table goes stale.
 
-Every committed SVG now renders from its source alone. Keep it that way: a
-bend you drag on the canvas belongs in the source as `<Edge bend>` before you
-re-render, or the next person's clean render silently reverts it. `npm run
-diagrams` reuses a running `serve` and so applies whatever the overlay holds
-([#38]), which is exactly how a canvas-only edit gets baked into an SVG that
-the source cannot reproduce. Check the diff before committing a re-render.
-
-[#38]: https://github.com/zhebil/tldx/issues/38
+Every committed SVG renders from its source alone, and `render` enforces it: a
+diagram with a pending overlay declines to reuse a running `serve` and renders
+from source instead, so `npm run diagrams` gives the same SVGs whether or not
+you have servers up. A bend you drag on the canvas therefore belongs in the
+source as `<Edge bend>` before you re-render, or the clean render reverts it.
 
 Shared entities live in `docs/diagrams/lib/vocabulary.jsx`, not in each diagram.
 Recolouring a layer means editing `LAYER` there once; adding a box that already
