@@ -127,4 +127,57 @@ describe("runVerify", () => {
     const cEntry = result.entries.find((e) => e.id === "shape:c")!;
     expect(cEntry.changesScene).toBe(true);
   });
+
+  it("reports a rebound terminal by the shape and face it landed on", async () => {
+    const path = "diagram.tldx.jsx";
+    const { doc, box, edge } = astBuilders(path);
+    const execute = new FakeExecute();
+    execute.setResult(SRC, {
+      ast: doc({ id: "d" }, [
+        box({ id: "a" }),
+        box({ id: "b" }),
+        box({ id: "c" }),
+        edge({ id: "e", from: "a", to: "b" }),
+      ]),
+      inputs: [path],
+    });
+    const fs = new InMemoryFs({ [path]: SRC });
+    const deps = makeDeps(fs, execute);
+
+    const base = (await compileFile(path, deps)).sceneJson;
+    if (base === null) throw new Error("stub failed to compile");
+
+    const overlay: Overlay = {
+      v: OVERLAY_VERSION,
+      basedOn: sceneHash(base),
+      entries: {
+        "binding:e-end": {
+          rebound: {
+            toId: "shape:c",
+            props: {
+              terminal: "end",
+              normalizedAnchor: { x: 0, y: 0.5 },
+              isPrecise: true,
+              isExact: true,
+              snap: "none",
+            },
+          },
+        },
+      },
+    };
+    fs.setFile(overlayPathFor(path), JSON.stringify(overlay));
+
+    const result = await runVerify({ path }, deps);
+
+    expect(result.status).toBe("verified");
+    if (result.status !== "verified") throw new Error("expected verified");
+    expect(result.entries).toEqual([
+      {
+        id: "binding:e-end",
+        ops: ["rebound"],
+        detail: "rebound to shape:c at (0, 0.5)",
+        changesScene: true,
+      },
+    ]);
+  });
 });

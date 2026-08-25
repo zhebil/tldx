@@ -13,7 +13,12 @@
 import { richText } from "../../contracts/builders.js";
 import { RESTYLE_RECORD_FIELDS } from "../../contracts/overlay.js";
 import { isDocumentRecord } from "../../contracts/page-scope.js";
-import type { Overlay, OverlayEntry, OverlayPlacement } from "../../contracts/overlay.js";
+import type {
+  Overlay,
+  OverlayEntry,
+  OverlayPlacement,
+  OverlayRebind,
+} from "../../contracts/overlay.js";
 import type { SceneJSON, TLRecord, TLRecordId } from "../../contracts/scene-json.js";
 import { warning } from "../diagnostics/index.js";
 import type { Diagnostic } from "../diagnostics/index.js";
@@ -71,6 +76,7 @@ export function applyOverlay(
     }
     if (entry.moved !== undefined) applyMoved(record, entry.moved);
     if (entry.restyled !== undefined) applyRestyled(record, entry.restyled);
+    if (entry.rebound !== undefined) applyRebound(record, entry.rebound);
     if (entry.relabelled !== undefined) {
       const labelled = applyRelabelled(record, entry.relabelled);
       if (!labelled) {
@@ -99,6 +105,7 @@ function fieldOps(entry: OverlayEntry): string[] {
   if (entry.moved !== undefined) ops.push("moved");
   if (entry.restyled !== undefined) ops.push("restyled");
   if (entry.relabelled !== undefined) ops.push("relabelled");
+  if (entry.rebound !== undefined) ops.push("rebound");
   return ops;
 }
 
@@ -127,6 +134,15 @@ function applyRestyled(record: TLRecord, patch: Record<string, unknown>): void {
     }
   }
   if (props !== undefined) record.props = props;
+}
+
+/** The record keeps its compiled id: the point of a rebind entry is that the
+ *  binding stays the one emit named after the edge, whatever tldraw called the
+ *  binding it created on the canvas. Deletion runs after this, so a rebind onto
+ *  a shape that also went away still cascades. */
+function applyRebound(record: TLRecord, rebound: OverlayRebind): void {
+  record.toId = rebound.toId;
+  record.props = { ...rebound.props };
 }
 
 function applyRelabelled(record: TLRecord, label: string): boolean {

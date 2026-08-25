@@ -27,6 +27,21 @@ export type OverlayPlacement = {
   h?: number;
 };
 
+/**
+ * An arrow terminal dragged onto a different shape - or onto a different face
+ * of the same one. tldraw implements the drop as a delete plus an add, giving
+ * the replacement binding an id of its own, so this entry is keyed on the
+ * *compiled* binding's id instead: that id names an edge in the source,
+ * tldraw's names nothing.
+ */
+export type OverlayRebind = {
+  toId: TLRecordId;
+  /** The new binding's props wholesale, not a patch - `normalizedAnchor`,
+   *  `isPrecise`, `isExact` and `snap` are a closed set tldraw rewrites
+   *  together. */
+  props: Record<string, unknown>;
+};
+
 export type OverlayEntry = {
   moved?: OverlayPlacement;
   /** Flat style patch. Keys in `RESTYLE_RECORD_FIELDS` are written on the
@@ -35,6 +50,8 @@ export type OverlayEntry = {
   /** Plain-text label. Written to `props.richText`, which is where every
    *  labelled shape keeps its text. */
   relabelled?: string;
+  /** Arrow bindings only: this terminal now attaches somewhere else. */
+  rebound?: OverlayRebind;
   deleted?: true;
   added?: TLRecord;
 };

@@ -112,7 +112,7 @@ export async function runAbsorb(args: AbsorbArgs, deps: AbsorbDeps): Promise<Abs
     return {
       status: "nothing",
       message:
-        "nothing absorb can express yet: every overlay entry is a restyled/relabelled/deleted op, or an added shape absorb doesn't handle (only added geo/note shapes are absorbable)",
+        "nothing absorb can express yet: every overlay entry is a restyled/relabelled/rebound/deleted op, or an added shape absorb doesn't handle (only added geo/note shapes are absorbable)",
     };
   }
 
