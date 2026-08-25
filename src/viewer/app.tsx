@@ -185,7 +185,13 @@ export function mergePages(
   // user edits, and writes them into their sidecars.
   for (const key of touched) writer?.noteServerScene(key, pageSnapshot(editor, key));
 
-  const target = arrived.at(-1) ?? deepLinkedKey(merged) ?? keyOfPage(editor.getCurrentPageId());
+  // `#page=` first: nothing ever writes the hash, so it is there only because
+  // someone asked for that page by name - a render, or a shared link - and it
+  // must not lose to a diagram that merely arrived in the same merge. Ordered
+  // the other way, which page got exported depended on how the server batched
+  // its pages, and a tldraw bump was enough to flip it.  With no hash the
+  // interactive case is unchanged: a newly arrived page still pops into view.
+  const target = deepLinkedKey(merged) ?? arrived.at(-1) ?? keyOfPage(editor.getCurrentPageId());
   if (target !== null && merged.has(target)) {
     editor.setCurrentPage(pageIdFor(target) as TLPageId);
   }
