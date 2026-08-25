@@ -32,8 +32,8 @@ export type OverlayEntry = {
   /** Flat style patch. Keys in `RESTYLE_RECORD_FIELDS` are written on the
    *  record; every other key is written into `props`. */
   restyled?: Record<string, unknown>;
-  /** Plain-text label. Written to `props.richText` for geo/note shapes and
-   *  to `props.text` for arrows. */
+  /** Plain-text label. Written to `props.richText`, which is where every
+   *  labelled shape keeps its text. */
   relabelled?: string;
   deleted?: true;
   added?: TLRecord;

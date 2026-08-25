@@ -316,7 +316,16 @@ export async function extractTruth(url: string): Promise<PageTruth> {
           return { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 };
         });
 
-        const text = arrow.props.text.trim();
+        // Runs inside page.evaluate, so domain/overlay's richTextToPlain is
+        // out of reach - flatten the tiptap doc inline instead.
+        const richText = arrow.props.richText as
+          | { content?: { content?: { text?: string }[] }[] }
+          | undefined;
+        const text = (richText?.content ?? [])
+          .flatMap((paragraph) => paragraph.content ?? [])
+          .map((node) => node.text ?? "")
+          .join("")
+          .trim();
         let labelBox: { x: number; y: number; w: number; h: number } | undefined;
         if (text !== "") {
           const label = children[1];

@@ -6,6 +6,17 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # react, react-dom and their types are one peer set: react-dom@18 pins
+      # react@18, so a PR that moves one of them alone cannot resolve and the
+      # `check` job dies on npm ci. This group takes majors on purpose - the
+      # major is still one reviewable change, just spread over four packages.
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+        update-types: [major, minor, patch]
       # One PR per ecosystem-ish cluster instead of one per package.
       # Majors stay out of the groups: they land as their own PR so a
       # breaking change is reviewed on its own diff, not buried in a bump list.
@@ -17,8 +28,12 @@ updates:
         update-types: [minor, patch]
     ignore:
       # The scene JSON contract is pinned to a tldraw major on purpose; a major
-      # bump is a wire-format break, not a dependency update.
+      # bump is a wire-format break, not a dependency update. @tldraw/* ships
+      # in lockstep with tldraw, so ignoring one without the other just gets us
+      # a tlschema that no longer matches the tldraw we build against.
       - dependency-name: tldraw
+        update-types: [version-update:semver-major]
+      - dependency-name: "@tldraw/*"
         update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
