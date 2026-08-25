@@ -44,7 +44,9 @@ unprompted.
 ## 3. Rewrite the source for whatever is left
 
 Absorb leaves every entry it cannot generate JSX for. Run `tldx overlay show $1`
-again to see them, and express each one in the source yourself:
+again to see them, and express each one in the source yourself. Each entry is
+named the way the source names it - a shape by its `id`, an arrow by
+`from -> to`, and an arrowhead by that arrow plus `(start)` or `(end)`:
 
 - **`moved`** - prefer a layout change: reorder the children, switch the
   container's `layout`, adjust `gap`. Pin `x`/`y` only when the move is

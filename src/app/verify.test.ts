@@ -121,7 +121,7 @@ describe("runVerify", () => {
     expect(result.entries.map((e) => e.id)).toEqual(["shape:b", "shape:c"]);
 
     const bEntry = result.entries.find((e) => e.id === "shape:b")!;
-    expect(bEntry.ops).toEqual(["moved"]);
+    expect(bEntry.detail).toMatch(/^moved to/);
     expect(bEntry.changesScene).toBe(false);
 
     const cEntry = result.entries.find((e) => e.id === "shape:c")!;
@@ -174,8 +174,8 @@ describe("runVerify", () => {
     expect(result.entries).toEqual([
       {
         id: "binding:e-end",
-        ops: ["rebound"],
-        detail: "rebound to shape:c at (0, 0.5)",
+        name: "a -> b (end)",
+        detail: "rebound to c at (0, 0.5)",
         changesScene: true,
       },
     ]);

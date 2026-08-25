@@ -55,7 +55,7 @@ export async function runVerifyCli(args: RunVerifyCliArgs): Promise<number> {
 
   if (staleLine !== "") io.writeStderr(staleLine);
   for (const entry of outstanding) {
-    io.writeStderr(`  ${entry.id}: ${entry.detail}\n`);
+    io.writeStderr(`  ${entry.name}: ${entry.detail}\n`);
   }
   io.writeStderr(
     `${path} does not yet reproduce the canvas (${outstanding.length} outstanding overlay entr${outstanding.length === 1 ? "y" : "ies"})\n`,
