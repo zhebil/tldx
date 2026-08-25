@@ -227,8 +227,11 @@ describe("runMeasure", () => {
         .slice(1)
         .map((l) => l.split(/\s+/)[0]),
     ).toEqual(["ctx", "c1-sys", "c1-smart"]);
-    // The edge leaving the frame goes with it; the one inside stays.
-    expect(edges?.split("\n").slice(1)).toHaveLength(1);
+    // c1-sys -> c1-smart stays; standalone -> c1-sys is dropped, because
+    // naming an endpoint that isn't in the shapes section above is no use.
+    expect(edges?.split("\n").slice(1)).toEqual([
+      "c1-sys -> c1-smart  right (190,22) -> left (230,22)  bend 0",
+    ]);
     expect(io.stdout).not.toContain("standalone");
   });
 

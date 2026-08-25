@@ -54,7 +54,8 @@ export function formatMeasure(shapes: readonly AbsShape[]): string {
     .join("\n");
 }
 
-const at = (p: AbsTerminal | undefined): string =>
+/** `auto` where the router bound nothing and tldraw clips at the shape's outline. */
+const terminalAt = (p: AbsTerminal | undefined): string =>
   p === undefined ? "auto" : `${p.side} (${Math.round(p.x)},${Math.round(p.y)})`;
 
 /**
@@ -67,7 +68,7 @@ const at = (p: AbsTerminal | undefined): string =>
  */
 export function formatEdges(edges: readonly AbsEdge[]): string {
   const pairOf = (e: AbsEdge): string => `${e.from} -> ${e.to}`;
-  const termsOf = (e: AbsEdge): string => `${at(e.start)} -> ${at(e.end)}`;
+  const termsOf = (e: AbsEdge): string => `${terminalAt(e.start)} -> ${terminalAt(e.end)}`;
   const bendOf = (e: AbsEdge): string => `bend ${Math.round(e.bend)}`;
   const labelOf = (e: AbsEdge): string => {
     if (e.label === undefined) return "";
