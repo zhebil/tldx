@@ -1,17 +1,25 @@
 /**
  * `tldx render <file> <out.png>`: export a compiled diagram as an image,
  * cropped to content. Reuses a running `tldx serve` for the file when one is
- * recorded, alive, and not stale; otherwise boots an ephemeral `runServe`.
- * `--reuse-only` refuses instead of booting one.
+ * recorded, alive, not stale, and has no pending overlay; otherwise boots an
+ * ephemeral `runServe`. `--reuse-only` refuses instead of booting one.
  *
  * `render` is read-only: it never writes an overlay sidecar, so its own
  * ephemeral server is wired without `fsWrite`.
+ *
+ * The export is a function of the source alone. A reused server applies the
+ * overlay and render's own server does not, so a diagram with pending canvas
+ * edits declines the reuse rather than silently exporting two different
+ * pictures from one unchanged file - see `overlayReason`.
  */
 
 import { existsSync } from "node:fs";
 import { extname, resolve, basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { readOverlay } from "../app/absorb.js";
+import type { FsReadPort } from "../app/ports/fs.js";
+import { overlayPathFor } from "../domain/overlay/index.js";
 import {
   exportImage,
   type RenderFormat,
@@ -178,6 +186,25 @@ export function staleReason(
 }
 
 /**
+ * Reason to decline a reused server because its canvas holds edits the source
+ * does not express. Counting entries is deliberately cheap and slightly
+ * conservative: an entry that merely restates what the source already says
+ * still costs a rebuild, and telling the two apart means compiling, which is
+ * the work reuse exists to skip.
+ */
+export function overlayReason(entryCount: number): string | undefined {
+  if (entryCount === 0) return undefined;
+  const noun = entryCount === 1 ? "entry" : "entries";
+  return `its canvas has ${entryCount} pending overlay ${noun} that the source alone does not reproduce - \`tldx absorb\` folds them in`;
+}
+
+/** Entries pending in `file`'s overlay sidecar. Absent or malformed counts as none, exactly as the server treats it. */
+export async function pendingOverlayCount(fs: FsReadPort, file: string): Promise<number> {
+  const overlay = await readOverlay(fs, overlayPathFor(file));
+  return overlay === null ? 0 : Object.keys(overlay.entries).length;
+}
+
+/**
  * An "unknown --frame/--shapes id" error is easy to mistake for a compiler
  * bug when it is really a stale reused server, so annotate it with when that
  * server's scene was compiled.
@@ -213,11 +240,12 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
     const currentCodeFingerprint = codeFingerprint(dirname(fileURLToPath(import.meta.url)));
     const reason =
       reused !== undefined
-        ? staleReason(hashSource(await deps.fs.read(file)), currentCodeFingerprint, reused)
+        ? (overlayReason(await pendingOverlayCount(deps.fs, file)) ??
+          staleReason(hashSource(await deps.fs.read(file)), currentCodeFingerprint, reused))
         : undefined;
-    const stale = reason !== undefined;
+    const declined = reason !== undefined;
 
-    if (reused !== undefined && !stale) {
+    if (reused !== undefined && !declined) {
       io.writeStdout(`tldx render: reusing serve on ${describeReused(file, reused)}\n`);
       try {
         await exportImage(reused.url, out, { ...opts, pageKey: reused.pageKey });
@@ -226,17 +254,17 @@ export async function runRender(args: RunRenderArgs): Promise<number> {
       }
     } else {
       if (reuseOnly) {
-        throw stale && reused !== undefined
+        throw declined && reused !== undefined
           ? new Error(
-              `reused serve on ${describeReused(file, reused)} is stale (${reason}); refusing under --reuse-only`,
+              `not reusing the serve on ${describeReused(file, reused)}: ${reason}; refusing under --reuse-only`,
             )
           : new Error(
               `no running \`tldx serve\` for ${file}; start one, or drop --reuse-only to boot a browser`,
             );
       }
-      if (stale && reused !== undefined) {
+      if (declined && reused !== undefined) {
         io.writeStdout(
-          `tldx render: reused serve on ${describeReused(file, reused)} is stale (${reason}), rebuilding\n`,
+          `tldx render: not reusing the serve on ${describeReused(file, reused)}: ${reason}; rendering from source\n`,
         );
       }
       const handle = await runServe({ path: file, deps: withoutFsWrite(deps), io });
