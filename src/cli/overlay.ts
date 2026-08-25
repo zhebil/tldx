@@ -56,9 +56,12 @@ export async function runOverlayCli(args: RunOverlayCliArgs): Promise<number> {
   const lines = [
     `${entries.length} overlay entr${entries.length === 1 ? "y" : "ies"} at ${overlayPath}:`,
   ];
+  // Named, not keyed: `app-usecases -> domain` is the arrow the reader
+  // dragged, `shape:1f4f1641-0` is the hash of it.
+  const width = Math.max(...entries.map((entry) => entry.name.length));
   for (const entry of entries) {
     const marker = entry.changesScene ? "" : " (already in the source)";
-    lines.push(`  ${entry.id}  ${entry.ops.join("+")}  ${entry.detail}${marker}`);
+    lines.push(`  ${entry.name.padEnd(width)}  ${entry.detail}${marker}`);
   }
   if (stale) {
     lines.push("note: the overlay was recorded against a different compile of this file");

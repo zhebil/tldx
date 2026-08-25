@@ -16,7 +16,14 @@ import {
   type OverlayRebind,
 } from "../contracts/overlay.js";
 import type { Diagnostic } from "../domain/diagnostics/index.js";
-import { applyOverlay, deepEqual, overlayPathFor, sceneHash } from "../domain/overlay/index.js";
+import {
+  applyOverlay,
+  deepEqual,
+  describeRecordId,
+  localName,
+  overlayPathFor,
+  sceneHash,
+} from "../domain/overlay/index.js";
 import type { LayoutPort } from "../domain/ports/layout.js";
 
 import { readOverlay } from "./absorb.js";
@@ -28,8 +35,8 @@ export type VerifyDeps = { fs: FsReadPort; layout: LayoutPort; execute: ExecuteP
 
 export type OverlayEntryReport = {
   id: string;
-  /** Which op keys the entry carries, e.g. ["moved", "restyled"]. */
-  ops: string[];
+  /** The record id in the language of the source, e.g. `api -> db (end)`. */
+  name: string;
   /** One-line human summary, e.g. `moved to (900, 120)`. */
   detail: string;
   /** False means applying this entry alone changes nothing: the source
@@ -68,12 +75,14 @@ export async function runVerify(args: { path: string }, deps: VerifyDeps): Promi
       const applied = applyOverlay(single, base).scene;
       return {
         id,
-        ops: opsOf(entry),
+        name: describeRecordId(base, id),
         detail: detailOf(entry),
         changesScene: !deepEqual(base, applied),
       };
     })
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    // By name, so an arrow and its two terminals - three entries for one
+    // gesture - land next to each other rather than under `b` and `s`.
+    .sort((a, b) => compare(a.name, b.name) || compare(a.id, b.id));
 
   return {
     status: "verified",
@@ -83,17 +92,8 @@ export async function runVerify(args: { path: string }, deps: VerifyDeps): Promi
   };
 }
 
-const OP_ORDER = [
-  "moved",
-  "restyled",
-  "relabelled",
-  "rebound",
-  "deleted",
-  "added",
-] as const satisfies readonly (keyof OverlayEntry)[];
-
-function opsOf(entry: OverlayEntry): string[] {
-  return OP_ORDER.filter((op) => entry[op] !== undefined);
+function compare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 function detailOf(entry: OverlayEntry): string {
@@ -121,20 +121,30 @@ function movedDetail(p: OverlayPlacement): string {
 }
 
 /** The anchor is worth printing: rebinding onto another face of the *same*
- *  shape is a real edit, and `rebound to shape:gate` alone would read as a
- *  no-op. */
+ *  shape is a real edit, and `rebound to gate` alone would read as a no-op. */
 function reboundDetail(rebound: OverlayRebind): string {
   const anchor = rebound.props.normalizedAnchor;
-  if (typeof anchor !== "object" || anchor === null) return `rebound to ${rebound.toId}`;
+  if (typeof anchor !== "object" || anchor === null) return `rebound to ${localName(rebound.toId)}`;
   const { x, y } = anchor as { x?: unknown; y?: unknown };
-  if (typeof x !== "number" || typeof y !== "number") return `rebound to ${rebound.toId}`;
-  return `rebound to ${rebound.toId} at (${round2(x)}, ${round2(y)})`;
+  if (typeof x !== "number" || typeof y !== "number")
+    return `rebound to ${localName(rebound.toId)}`;
+  return `rebound to ${localName(rebound.toId)} at (${round2(x)}, ${round2(y)})`;
 }
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * `restyled (bend 43, color blue)`. The value prints only when it is a scalar:
+ * `richText` and `normalizedAnchor` are objects no single line can hold, and
+ * the key alone already says which knob moved.
+ */
 function restyledDetail(patch: Record<string, unknown>): string {
-  return `restyled (${Object.keys(patch).join(", ")})`;
+  const parts = Object.entries(patch).map(([key, value]) => {
+    if (typeof value === "number") return `${key} ${round2(value)}`;
+    if (typeof value === "string" || typeof value === "boolean") return `${key} ${String(value)}`;
+    return key;
+  });
+  return `restyled (${parts.join(", ")})`;
 }
