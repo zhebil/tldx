@@ -157,9 +157,10 @@ tldx serve   <file> [--no-open] [--ttl m]  watch the module graph, recompile, pu
                                            another page, and exits. Idle-exits after
                                            --ttl minutes (default 60, 0 disables);
                                            the first --ttl wins.
-tldx render  <file> <out>                  export cropped to content. Reuses a running
-             [--frame id | --shapes a,b]   serve that serves this file, targeting its
-             [--padding px] [--scale n]    page. Read-only: never writes an overlay.
+tldx render  <file> <out>                  export cropped to content, from the source
+             [--frame id | --shapes a,b]   alone. Reuses a running serve that serves
+             [--padding px] [--scale n]    this file, unless it is stale or has a
+                                           pending overlay. Never writes an overlay.
              [--format png|svg|jpeg|webp]
              [--dark] [--no-background] [--reuse-only]
 tldx measure <file> [--frame id]           every shape's id, size and position,
