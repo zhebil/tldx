@@ -21,8 +21,9 @@ one needs the picture, not just the error.
 ## `tldx measure` output
 
 <!-- Optional but usually decisive: it gives every shape's id, size and
-     position, which settles "is this box too small" or "are these two
-     overlapping" without anyone guessing from pixels. -->
+     position plus every edge's terminals, bend and label box, which settles
+     "is this box too small", "are these two overlapping" or "where did that
+     arrow attach" without anyone guessing from pixels. -->
 
 ```
 

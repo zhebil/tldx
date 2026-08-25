@@ -8,7 +8,13 @@
 
 import { warning } from "../diagnostics/index.js";
 import type { Diagnostic, SourceSpan } from "../diagnostics/index.js";
-import type { IRBoxPositioned, IRDocPositioned, IREdge, IRElementPositioned } from "../ir/index.js";
+import type {
+  IRAnchor,
+  IRBoxPositioned,
+  IRDocPositioned,
+  IREdge,
+  IRElementPositioned,
+} from "../ir/index.js";
 
 import { labelOverflow } from "./defaults.js";
 import { computeEdgeRoutes } from "./routing.js";
@@ -90,6 +96,71 @@ export function walkShapes(doc: IRDocPositioned): AbsShape[] {
 
   visit(doc.id, doc.children, 0, 0, []);
   return shapes;
+}
+
+/**
+ * One end of an edge, resolved to page coordinates. `side` names the face of
+ * the shape the arrow leaves or arrives at, which is the part a human reasons
+ * about - a raw `normalizedAnchor` fraction is not.
+ */
+export type AbsTerminal = { side: string; x: number; y: number };
+
+export type AbsEdge = {
+  id: string;
+  from: string;
+  to: string;
+  /**
+   * Absent where the router left the terminal unbound: tldraw then aims at the
+   * shape's centre and clips the arrow at its outline, so there is no anchor
+   * to report.
+   */
+  start?: AbsTerminal;
+  end?: AbsTerminal;
+  bend: number;
+  label?: string;
+  labelBox?: LabelBox;
+};
+
+/** `{x:0.5,y:0}` -> `top`, `{x:1,y:1}` -> `bottom-right` - `lower.ts`'s `ANCHOR_SIDES` read backwards. */
+function sideOf(a: IRAnchor): string {
+  const vertical = a.y <= 0 ? "top" : a.y >= 1 ? "bottom" : "";
+  const horizontal = a.x <= 0 ? "left" : a.x >= 1 ? "right" : "";
+  const named = [vertical, horizontal].filter((s) => s !== "").join("-");
+  if (named !== "") return named;
+  return a.x === 0.5 && a.y === 0.5 ? "center" : "inside";
+}
+
+function resolveTerminal(
+  shape: AbsShape | undefined,
+  a: IRAnchor | undefined,
+): AbsTerminal | undefined {
+  if (shape === undefined || a === undefined) return undefined;
+  return { side: sideOf(a), x: shape.x + a.x * shape.w, y: shape.y + a.y * shape.h };
+}
+
+/**
+ * Walks positioned IR into what the router decided about each edge, in page
+ * coordinates - the arrow-shaped counterpart to `walkShapes`. `measure` prints
+ * it; the numbers are the same ones emit hands tldraw.
+ */
+export function walkEdges(doc: IRDocPositioned): AbsEdge[] {
+  const byId = new Map(walkShapes(doc).map((s) => [s.id, s]));
+  const routes = computeEdgeRoutes(doc);
+  return collectEdges(doc).map((edge) => {
+    const route = routes.get(edge.id);
+    const start = resolveTerminal(byId.get(edge.from), route?.startAnchor);
+    const end = resolveTerminal(byId.get(edge.to), route?.endAnchor);
+    return {
+      id: edge.id,
+      from: edge.from,
+      to: edge.to,
+      bend: route?.bend ?? 0,
+      ...(start === undefined ? {} : { start }),
+      ...(end === undefined ? {} : { end }),
+      ...(edge.label === undefined ? {} : { label: edge.label }),
+      ...(route?.labelBox === undefined ? {} : { labelBox: route.labelBox }),
+    };
+  });
 }
 
 /** True if either shape is a frame ancestor of the other - containment, not occlusion. */

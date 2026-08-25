@@ -162,7 +162,9 @@ tldx render  <file> <out>                  export cropped to content. Reuses a r
              [--padding px] [--scale n]    page. Read-only: never writes an overlay.
              [--format png|svg|jpeg|webp]
              [--dark] [--no-background] [--reuse-only]
-tldx measure <file> [--frame id]           every shape's id, size and position
+tldx measure <file> [--frame id]           every shape's id, size and position,
+                                           then every edge's terminals, bend and
+                                           label box
 tldx verify  <file>                        does the source alone reproduce what the
                                            overlay says the canvas showed?
 tldx overlay show <file>                   what's pending in the overlay
