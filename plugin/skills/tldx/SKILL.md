@@ -385,13 +385,23 @@ never have to wait on you for a picture.
 
 ```bash
 tldx serve diagram.tldx.jsx    # opens a browser tab, reloads on every save
+tldx serve docs/diagrams/      # every .tldx.jsx in that folder, one page each
 ```
 
 Run it in the background before you write the first `<Box>`, on a new file or an
 existing one. It creates the file's viewer tab and then rebuilds on save, so
 every edit you make is on screen within a second. Do not stop it between edits
-and do not restart it per change - one server per file, running until the work is
-done. `--no-open` suppresses the tab; use it only when the user already has one.
+and do not restart it per change - one server per project, running until the
+work is done. `--no-open` suppresses the tab; use it only when the user already
+has one.
+
+Give it a directory when the work spans several diagrams: it serves every
+`.tldx.jsx` file directly inside, sorted by name, each as its own page in the
+one tab, which is the same as running `serve` once per file. It does not
+descend into subdirectories, ignores everything that is not a `.tldx.jsx`
+file, and fails if the directory holds no diagram. Serving a diagram the server
+already has is a no-op, so re-running it after adding a file is safe and is how
+a new file joins the tab.
 
 ```bash
 tldx check   diagram.tldx.jsx          # parse + validate. Fast, no browser.

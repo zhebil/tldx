@@ -63,6 +63,16 @@ That opens a browser tab and repaints on every save. The `"tldx"` import needs
 nothing installed next to your diagram - the compiler resolves it to its own
 bundled runtime.
 
+Point `serve` at a directory instead and every `.tldx.jsx` file directly inside
+it becomes its own page in that one tab:
+
+```bash
+tldx serve docs/diagrams/
+```
+
+It does not descend into subdirectories, and skips everything that is not a
+`.tldx.jsx` file.
+
 Because it's JSX, a
 diagram is ordinary code: components for repeated shapes, `.map()` over a data
 table, `import` a shared palette from another file.
@@ -70,7 +80,8 @@ table, `import` a shared palette from another file.
 ## Commands
 
 ```
-tldx serve   <file>        watch and push to the live viewer
+tldx serve   <file|dir>    watch and push to the live viewer (a dir serves every
+                           .tldx.jsx directly inside it, one page each)
 tldx check   <file>        parse + validate, exit non-zero on error
 tldx render  <file> <out>  export a PNG/SVG, cropped to content
 tldx measure <file>        print every shape's and edge's placed geometry
@@ -108,6 +119,7 @@ through to see what the source produces before installing anything.
 
 ```bash
 tldx serve examples/web-architecture.tldx.jsx
+tldx serve examples/            # all five, one tab, one page each
 ```
 
 ## Docs
