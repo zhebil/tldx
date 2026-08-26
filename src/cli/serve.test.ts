@@ -27,6 +27,7 @@ import {
   type ServeClaim,
 } from "../infra/serve-registry/serve-registry.js";
 
+import { addEach } from "./main.js";
 import {
   pageUrl,
   runServe,
@@ -240,6 +241,43 @@ describe("runServe", () => {
 
       expect(opened).toEqual([pageUrl(started.url, pageKeyFor(paths[0]!))]);
       expect(pageUrl("http://x/", "abc")).toBe("http://x/#page=abc");
+    });
+
+    // The cold-start half of `tldx serve <dir>`: the first file boots the
+    // server and opens the tab, the rest join it through `addDiagram`.
+    it("serving a directory cold gives every file its own page, in order, behind one tab", async () => {
+      const { root, paths } = makeProject(["a.tldx.jsx", "b.tldx.jsx", "c.tldx.jsx"]);
+      const [a, b, c] = paths as [string, string, string];
+      const opened: string[] = [];
+      const out: string[] = [];
+      const deps = makeDeps({ [a]: SRC, [b]: SRC, [c]: SRC });
+      deps.claim = makeClaim(root);
+      deps.openBrowser = (url) => opened.push(url);
+      started = await runServe({ path: a, deps, io: makeIo() });
+      deps.claim.publish(started.url, started.compile.codeFingerprint, started.ttlMinutes);
+
+      const { first, failed } = await addEach(
+        [b, c],
+        (file) => started!.addDiagram(file),
+        started.url,
+        { writeStdout: (chunk) => out.push(chunk), writeStderr: () => {} },
+      );
+
+      expect(failed).toBe(false);
+      expect(first?.pageKey).toBe(pageKeyFor(b));
+      expect(out).toEqual([
+        `tldx serve: added ${b} as page "b" to the server at ${started.url}\n`,
+        `tldx serve: added ${c} as page "c" to the server at ${started.url}\n`,
+      ]);
+
+      const record = findServer(a)!;
+      expect(Object.keys(record.diagrams)).toHaveLength(3);
+      for (const file of [a, b, c]) {
+        expect(diagramOf(record, file)?.pageKey).toBe(pageKeyFor(file));
+      }
+
+      // One invocation, one tab, on the first file of the directory.
+      expect(opened).toEqual([pageUrl(started.url, pageKeyFor(a))]);
     });
   });
 

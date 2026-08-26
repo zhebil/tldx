@@ -150,8 +150,11 @@ These produce no error, or a confusing one:
 ```
 tldx check   <file>                        parse + validate; exit non-zero on error.
                                            Files not ending .tldx.jsx exit 0 silently.
-tldx serve   <file> [--no-open] [--ttl m]  watch the module graph, recompile, push over
-                                           SSE, and open the tab. One server per
+tldx serve   <file|dir>                    watch the module graph, recompile, push over
+             [--no-open] [--ttl m]         SSE, and open the tab. A directory serves
+                                           every .tldx.jsx directly inside it, sorted
+                                           by name, one page each - no recursion, and
+                                           no diagram in it is an error. One server per
                                            project: a second `serve` hands its file
                                            to the running one, which serves it as
                                            another page, and exits. Idle-exits after

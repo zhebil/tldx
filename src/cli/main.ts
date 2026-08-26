@@ -30,7 +30,8 @@ import { runCheck, type CheckIo } from "./check.js";
 import { runMeasure } from "./measure.js";
 import { runOverlayCli } from "./overlay.js";
 import { runRender } from "./render.js";
-import { handOff } from "./serve-handoff.js";
+import { handOff, type HandoffResult } from "./serve-handoff.js";
+import { resolveServeTargets } from "./serve-target.js";
 import { pageUrl, runServe } from "./serve.js";
 import { runVerifyCli } from "./verify.js";
 
@@ -66,32 +67,63 @@ export function shouldOpenBrowser(noOpen: boolean, hasViewer: boolean): boolean 
 }
 
 /**
- * Give `path` to an already-running server and return this process's exit
- * code. The server owns the watcher from here on, so there is nothing left for
- * this process to do.
+ * Add every file to one server through `add`, in order, reporting where each
+ * landed. A file that fails is reported and skipped rather than abandoning the
+ * ones behind it: `serve` on a directory of ten diagrams must not lose nine
+ * because the tenth could not be added.
+ *
+ * Returns the first successful result - which is what the browser-open
+ * decision keys off, so one invocation opens at most one tab - and whether
+ * anything failed.
+ */
+export async function addEach(
+  files: readonly string[],
+  add: (file: string) => Promise<HandoffResult>,
+  url: string,
+  io: CliIo,
+): Promise<{ first: HandoffResult | undefined; failed: boolean }> {
+  let first: HandoffResult | undefined;
+  let failed = false;
+  for (const file of files) {
+    try {
+      const added = await add(file);
+      first ??= added;
+      const page = added.name !== undefined ? ` as page "${added.name}"` : "";
+      io.writeStdout(
+        added.alreadyServed
+          ? `tldx serve: already serving ${file}${page} at ${url}\n`
+          : `tldx serve: added ${file}${page} to the server at ${url}\n`,
+      );
+    } catch (err) {
+      failed = true;
+      const msg = err instanceof Error ? err.message : String(err);
+      io.writeStderr(`tldx serve: ${file}: ${msg}\n`);
+    }
+  }
+  return { first, failed };
+}
+
+/**
+ * Give `files` to an already-running server and return this process's exit
+ * code. The server owns the watchers from here on, so there is nothing left
+ * for this process to do.
  */
 async function handOffTo(
   live: ServeRecord,
-  path: string,
+  files: readonly string[],
   opts: { noOpen: boolean; ttlMinutes: number | undefined },
-  io: { writeStdout: (chunk: string) => void },
+  io: CliIo,
 ): Promise<number> {
-  const added = await handOff(live, path);
-  const page = added.name !== undefined ? ` as page "${added.name}"` : "";
-  io.writeStdout(
-    added.alreadyServed
-      ? `tldx serve: already serving ${path}${page} at ${live.url}\n`
-      : `tldx serve: added ${path}${page} to the server at ${live.url}\n`,
-  );
+  const { first, failed } = await addEach(files, (file) => handOff(live, file), live.url, io);
   if (opts.ttlMinutes !== undefined && opts.ttlMinutes !== live.ttlMinutes) {
     io.writeStdout(
       `tldx serve: --ttl ignored; server already running with ttl ${String(live.ttlMinutes)}m\n`,
     );
   }
-  if (shouldOpenBrowser(opts.noOpen, added.hasViewer)) {
-    openBrowser(pageUrl(live.url, added.pageKey));
+  if (first !== undefined && shouldOpenBrowser(opts.noOpen, first.hasViewer)) {
+    openBrowser(pageUrl(live.url, first.pageKey));
   }
-  return 0;
+  return failed ? 1 : 0;
 }
 
 /**
@@ -223,9 +255,9 @@ const commands: readonly Command[] = [
   },
   {
     name: "serve",
-    args: "<file> [--no-open] [--ttl <minutes>]",
+    args: "<file|dir> [--no-open] [--ttl <minutes>]",
     description:
-      "watch a .tldx or .tldx.jsx file and serve the live viewer locally (default --ttl 60; 0 disables)",
+      "watch a .tldx.jsx file - or every one directly inside a directory - and serve the live viewer locally (default --ttl 60; 0 disables)",
     run: async (rest, io) => {
       const { path, noOpen, ttlMinutes, error } = parseServeArgs(rest);
       if (error !== undefined) {
@@ -233,33 +265,39 @@ const commands: readonly Command[] = [
         return 1;
       }
       if (path === undefined) {
-        io.writeStderr("tldx serve: missing <file> argument\n");
+        io.writeStderr("tldx serve: missing <file|dir> argument\n");
         return 1;
       }
       try {
-        // A server already up for this project takes the diagram; this process
-        // prints where it landed and exits, leaving that server's terminal the
-        // only one holding watchers.
-        const live = findServer(path);
+        // Expand before anything else: a directory holding no diagram must
+        // fail without binding a port or touching a live server, and both
+        // `findServer` and `projectRootFor` below answer for a file, not a
+        // directory.
+        const [head, ...tail] = resolveServeTargets(path);
+
+        // A server already up for this project takes the diagrams; this
+        // process prints where they landed and exits, leaving that server's
+        // terminal the only one holding watchers.
+        const live = findServer(head);
         if (live !== undefined) {
-          return await handOffTo(live, path, { noOpen, ttlMinutes }, io);
+          return await handOffTo(live, [head, ...tail], { noOpen, ttlMinutes }, io);
         }
 
         // Claim the slot BEFORE binding a port, so two invocations racing from
         // cold cannot both end up listening. The loser hands off instead.
-        const claim = claimServer(projectRootFor(path));
+        const claim = claimServer(projectRootFor(head));
         if (claim === undefined) {
-          const winner = findServer(path);
+          const winner = findServer(head);
           if (winner === undefined) {
             io.writeStderr("tldx serve: another server is starting for this project; retry\n");
             return 1;
           }
-          return await handOffTo(winner, path, { noOpen, ttlMinutes }, io);
+          return await handOffTo(winner, [head, ...tail], { noOpen, ttlMinutes }, io);
         }
 
         try {
           const handle = await runServe({
-            path,
+            path: head,
             deps: {
               fs: createNodeFsRead(),
               fsWrite: createNodeFsWrite(),
@@ -278,13 +316,17 @@ const commands: readonly Command[] = [
             io,
           });
           claim.publish(handle.url, handle.compile.codeFingerprint, handle.ttlMinutes);
-          return await awaitShutdown({
+          // `head` is already served and its tab already open; the rest of the
+          // directory joins the server this process now owns.
+          const { failed } = await addEach(tail, (file) => handle.addDiagram(file), handle.url, io);
+          const code = await awaitShutdown({
             close: async () => {
               await handle.close();
               claim.release();
             },
             idleExpired: handle.idleExpired,
           });
+          return failed ? 1 : code;
         } catch (err) {
           claim.release();
           throw err;

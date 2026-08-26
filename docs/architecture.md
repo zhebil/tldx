@@ -74,6 +74,12 @@ else the file's own directory. A second `tldx serve` in that project finds the
 running one in the registry, `POST`s its file to `/diagrams`, prints where it
 landed, and exits; the first process keeps every watcher and owns the terminal.
 
+`serve` also takes a directory, which `src/cli/serve-target.ts` expands to the
+`.tldx.jsx` files directly inside it before anything else runs - `pageKeyFor`
+and `projectRootFor` answer for a file, so nothing below the CLI ever sees a
+directory. From there each file takes the path it would have taken on its own:
+the first boots or finds the server, the rest are added one at a time.
+
 The registry is one JSON record per server under the temp dir, keyed by a hash
 of the project root, holding `{pid, url, token, codeFingerprint, diagrams}`.
 Writes go through a temp file and `rename`, so a torn write can't lose every
