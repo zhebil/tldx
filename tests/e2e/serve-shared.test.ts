@@ -9,7 +9,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdtemp, copyFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, copyFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,7 @@ import { createNodeFsWrite } from "../../src/infra/fs/node-fs-write.js";
 import { ElkLayoutAdapter } from "../../src/infra/layout-elk/elk-layout.js";
 import {
   claimServer,
+  findServer,
   projectRootFor,
   type ServeClaim,
 } from "../../src/infra/serve-registry/serve-registry.js";
@@ -122,13 +123,26 @@ interface Shared {
   handoffCode: number;
 }
 
-/** One server holding two diagrams, the second added through the real CLI. */
-async function bootShared(viewerBundleDir: string): Promise<Shared> {
+/**
+ * One server holding two diagrams, the second added through the real CLI -
+ * either by naming the file, or (`target: "dir"`) by naming the directory both
+ * live in, which is the same handoff with the expansion in front of it.
+ *
+ * The work dir also holds a non-diagram file and a nested diagram, so a
+ * directory serve has something to correctly ignore.
+ */
+async function bootShared(
+  viewerBundleDir: string,
+  target: "file" | "dir" = "file",
+): Promise<Shared> {
   const workDir = await mkdtemp(join(tmpdir(), "tldx-shared-"));
   const first = join(workDir, "auth.tldx.jsx");
   const second = join(workDir, "edge-labels.tldx.jsx");
   await copyFile(join(FIXTURES, "auth.tldx.jsx"), first);
   await copyFile(join(FIXTURES, "edge-labels.tldx.jsx"), second);
+  await writeFile(join(workDir, "notes.md"), "not a diagram\n");
+  await mkdir(join(workDir, "nested"));
+  await copyFile(join(FIXTURES, "styles.tldx.jsx"), join(workDir, "nested", "styles.tldx.jsx"));
 
   // The temp dir holds both files and no `.git`/`package.json`, so it is the
   // project root, and this test's registry record is its own.
@@ -152,7 +166,7 @@ async function bootShared(viewerBundleDir: string): Promise<Shared> {
   // this server stale mid-test. Code staleness has its own tests in
   // `render.test.ts`; here it is noise.
   claim.publish(handle.url, Number.MAX_SAFE_INTEGER, handle.ttlMinutes);
-  const handoffCode = await main(["serve", second, "--no-open"], io);
+  const handoffCode = await main(["serve", target === "dir" ? workDir : second, "--no-open"], io);
   return { handle, claim, workDir, first, second, deps, io, handoffCode };
 }
 
@@ -197,6 +211,31 @@ describe("e2e: one server, many diagrams", () => {
       expect(ids).toContain(`page:${message.pageKey}`);
       expect(ids.every((id) => id.includes(message.pageKey))).toBe(true);
     }
+  }, 60_000);
+
+  it("serves a whole directory into the running server, ignoring what is not a diagram", async () => {
+    bundleDir = await mkdtemp(join(tmpdir(), "tldx-shared-bundle-"));
+    shared = await bootShared(bundleDir, "dir");
+    const { handle, workDir, first, second, io } = shared;
+
+    expect(shared.handoffCode, io.buf.stderr).toBe(0);
+    // `first` was already the server's; `second` is the one the directory added.
+    expect(io.buf.stdout).toContain(`already serving ${first}`);
+    expect(io.buf.stdout).toContain(`added ${second}`);
+    // One level only, diagrams only: `notes.md` and `nested/styles.tldx.jsx`
+    // are not served.
+    expect(io.buf.stdout).not.toContain("notes.md");
+    expect(io.buf.stdout).not.toContain("styles.tldx.jsx");
+
+    const record = findServer(first)!;
+    expect(Object.keys(record.diagrams)).toHaveLength(2);
+    expect(reusableServe(first)?.url).toBe(handle.url);
+    expect(reusableServe(second)?.url).toBe(handle.url);
+    expect(reusableServe(join(workDir, "nested", "styles.tldx.jsx"))).toBeUndefined();
+
+    // Two pages on the wire, one per diagram in the directory.
+    const scenes = (await readReplay(handle.url, 2)).filter((m) => m.kind === "scene");
+    expect(new Set(scenes.map((m) => m.pageKey)).size).toBe(2);
   }, 60_000);
 
   it.skipIf(!canRender)(
