@@ -9,7 +9,10 @@ cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
 
 body=""
 
-for o in $(find "$cwd" -name '*.tldx.overlay.json' -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' 2>/dev/null); do
+# -prune, not -not -path: a path filter still descends into node_modules and
+# stats every entry, which costs ~30s in a big monorepo and blows the hook's
+# timeout. Pruning skips those trees outright.
+for o in $(find "$cwd" \( -name node_modules -o -name .git -o -name dist \) -prune -o -name '*.tldx.overlay.json' -print 2>/dev/null); do
   n=$(jq '.entries | length' "$o" 2>/dev/null) || n=0
   case "$n" in
     ''|*[!0-9]*) continue ;;
