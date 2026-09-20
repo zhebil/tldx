@@ -9,7 +9,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -104,6 +104,26 @@ describe("e2e: plugin/hooks/on-prompt.sh", () => {
     const result = runHook(HOOK, { cwd: dir });
     expect(result.status).toBe(0);
     expect(result.stdout).toBe("");
+  }, 30_000);
+
+  it("ignores overlays inside node_modules, .git and dist", () => {
+    for (const skipped of ["node_modules", ".git", "dist"]) {
+      mkdirSync(join(dir, skipped, "nested"), { recursive: true });
+      writeFileSync(
+        join(dir, skipped, "nested", "buried.tldx.overlay.json"),
+        JSON.stringify({ v: 1, basedOn: "x", entries: { a: {} } }),
+      );
+    }
+    writeFileSync(
+      join(dir, "visible.tldx.overlay.json"),
+      JSON.stringify({ v: 1, basedOn: "x", entries: { a: {} } }),
+    );
+
+    const result = runHook(HOOK, { cwd: dir });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(join(dir, "visible.tldx.jsx"));
+    expect(result.stdout).not.toContain("buried");
   }, 30_000);
 
   it("stays silent when there is no overlay file", () => {
